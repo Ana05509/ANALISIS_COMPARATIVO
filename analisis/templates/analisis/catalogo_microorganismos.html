@@ -1,0 +1,205 @@
+{% extends "analisis/base.html" %}
+
+{% block title %}Catálogo de Microorganismos{% endblock %}
+{% block nav_catalogo %}active{% endblock %}
+{% block topbar_title %}Catálogo de microorganismos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Catálogo microbiano</h1>
+    <p>Base de datos referencial 16S (Bacterias) e ITS (Hongos)</p>
+</div>
+
+<!-- Estadísticas globales -->
+{% if estadisticas %}
+<div class="metrics-grid" style="margin-bottom:1.5rem;">
+    <div class="metric-card">
+        <div class="metric-label">Total registros</div>
+        <div class="metric-value">{{ estadisticas.total }}</div>
+    </div>
+    <div class="metric-card verde">
+        <div class="metric-label">Benéficos ✅</div>
+        <div class="metric-value">{{ estadisticas.total_beneficos }}</div>
+    </div>
+    <div class="metric-card amber">
+        <div class="metric-label">Fitopatógenos ⚠️</div>
+        <div class="metric-value">{{ estadisticas.total_fitopatogenos }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Sin clasificación ⚪</div>
+        <div class="metric-value">{{ estadisticas.total_sin_clas }}</div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Filtros -->
+<div class="card card-sm" style="margin-bottom:1.25rem;">
+    <form method="get" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+        <div>
+            <label class="form-label">Buscar</label>
+            <input type="text" name="q" value="{{ busqueda }}" placeholder="Nombre del taxón..." class="form-control" style="width:220px;">
+        </div>
+        <div>
+            <label class="form-label">Marcador</label>
+            <select name="marcador" class="form-control" style="width:100px;">
+                <option value="">Todos</option>
+                {% for m in marcadores_disponibles %}
+                <option value="{{ m }}" {% if filtro_marcador == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Clasificación</label>
+            <select name="clasificacion" class="form-control" style="width:190px;">
+                <option value="">Todas</option>
+                {% for val, label in clasificaciones_disponibles %}
+                <option value="{{ val }}" {% if filtro_clasificacion == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Nivel</label>
+            <select name="nivel" class="form-control" style="width:120px;">
+                <option value="">Todos</option>
+                {% for n in niveles_taxonomicos %}
+                <option value="{{ n|lower }}" {% if filtro_nivel == n|lower %}selected{% endif %}>{{ n }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">
+            <i class="ti ti-search" aria-hidden="true"></i> Filtrar
+        </button>
+        <a href="{% url 'analisis:catalogo' %}" class="btn btn-outline btn-sm">
+            <i class="ti ti-x" aria-hidden="true"></i> Limpiar
+        </a>
+    </form>
+</div>
+
+<!-- Tabla del catálogo -->
+<div class="card">
+    {% if microorganismos %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Taxonomía</th>
+                    <th>Nivel</th>
+                    <th>Producto</th>
+                    <th>Marcador</th>
+                    <th>% Abundancia</th>
+                    <th>Clasificación</th>
+                    {% if request.user.is_staff %}
+                    <th>Acciones</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in microorganismos %}
+                <tr>
+                    <td><strong>{{ m.taxonomia }}</strong></td>
+                    <td style="font-size:12px; color:var(--text-hint); text-transform:capitalize;">{{ m.nivel }}</td>
+                    <td style="font-size:13px;">{{ m.producto.nombre }}</td>
+                    <td>
+                        <span class="{% if m.producto.tipo == '16S' %}pill-16s{% else %}pill-its{% endif %}">
+                            {{ m.producto.tipo }}
+                        </span>
+                    </td>
+                    <td class="td-mono">{{ m.porcentaje_hits|floatformat:4 }}%</td>
+                    <td>
+                        {% if m.clasificacion == 'benefico' %}
+                            <span class="badge badge-benefico"><i class="ti ti-circle-check" aria-hidden="true"></i> Benéfico</span>
+                        {% elif m.clasificacion == 'fitopatogeno' %}
+                            <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Fitopatógeno</span>
+                        {% else %}
+                            <span class="badge badge-sin-clas">Sin clasificación</span>
+                        {% endif %}
+                    </td>
+                    {% if request.user.is_staff %}
+                    <td>
+                        <button class="btn btn-outline btn-sm"
+                            onclick="abrirReclasificar({{ m.id }}, '{{ m.taxonomia }}', '{{ m.clasificacion }}')">
+                            <i class="ti ti-edit" aria-hidden="true"></i>
+                        </button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="ti ti-microphone-2" aria-hidden="true"></i>
+        <strong>Sin resultados</strong>
+        <p>Ajuste los filtros o cargue muestras para poblar el catálogo.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal de reclasificación (Analista / Admin) -->
+{% if request.user.is_staff %}
+<div id="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
+    <div style="background:var(--surface); border-radius:var(--radius-lg); padding:2rem; width:420px; border:1px solid var(--gris-border);">
+        <h3 style="font-family:'Fraunces',serif; font-size:18px; font-weight:500; margin-bottom:0.5rem;">
+            Reclasificar microorganismo
+        </h3>
+        <p id="modal-nombre" style="font-size:14px; color:var(--text-muted); margin-bottom:1.25rem;"></p>
+
+        <div class="form-group">
+            <label class="form-label">Nueva clasificación</label>
+            <select id="nueva-clas" class="form-control">
+                <option value="benefico">✅ Benéfico</option>
+                <option value="fitopatogeno">⚠️ Fitopatógeno</option>
+                <option value="sin_clasificacion">⚪ Sin clasificación</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Justificación científica</label>
+            <textarea id="justificacion" class="form-control" rows="3" placeholder="Referencia bibliográfica o criterio aplicado..."></textarea>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:0.5rem;">
+            <button class="btn btn-outline" onclick="cerrarModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="guardarClasificacion()">
+                <i class="ti ti-check" aria-hidden="true"></i> Guardar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let modalPk = null;
+
+function abrirReclasificar(pk, nombre, clasificacionActual) {
+    modalPk = pk;
+    document.getElementById('modal-nombre').textContent = nombre;
+    document.getElementById('nueva-clas').value = clasificacionActual || 'sin_clasificacion';
+    document.getElementById('justificacion').value = '';
+    document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function cerrarModal() {
+    document.getElementById('modal-overlay').style.display = 'none';
+}
+
+async function guardarClasificacion() {
+    const clas  = document.getElementById('nueva-clas').value;
+    const just  = document.getElementById('justificacion').value;
+    const url   = `/analisis/catalogo/${modalPk}/reclasificar/`;
+    const form  = new FormData();
+    form.append('clasificacion', clas);
+    form.append('justificacion', just);
+    form.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    const resp = await fetch(url, { method: 'POST', body: form });
+    const data = await resp.json();
+
+    if (data.ok) {
+        cerrarModal();
+        location.reload();
+    } else {
+        alert('Error: ' + data.error);
+    }
+}
+</script>
+{% endif %}
+{% endblock %}

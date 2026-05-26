@@ -1,0 +1,198 @@
+{% extends "analisis/base.html" %}
+
+{% block title %}Análisis Avanzado{% endblock %}
+{% block nav_analisis %}active{% endblock %}
+{% block topbar_title %}Análisis avanzado{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Análisis avanzado de perfiles</h1>
+    <p>Diversidad alfa · Rankings de abundancia · Análisis diferencial</p>
+</div>
+
+<!-- Filtros -->
+<div class="card card-sm" style="margin-bottom:1.5rem;">
+    <form method="get" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+        <div>
+            <label class="form-label">Marcador</label>
+            <select name="tipo" class="form-control" style="width:100px;">
+                {% for m in marcadores_disponibles %}
+                <option value="{{ m }}" {% if tipo == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Nivel taxonómico</label>
+            <select name="nivel" class="form-control" style="width:130px;">
+                {% for n in niveles_taxonomicos %}
+                <option value="{{ n|lower }}" {% if nivel == n|lower %}selected{% endif %}>{{ n }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Top N</label>
+            <select name="top_n" class="form-control" style="width:90px;">
+                {% for opt in opciones_top_n %}
+                <option value="{{ opt }}" {% if top_n == opt %}selected{% endif %}>Top {{ opt }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Producto (opcional)</label>
+            <input type="text" name="producto_id" value="{{ producto_id|default:'' }}" placeholder="ID producto" class="form-control" style="width:140px;">
+        </div>
+        <button type="submit" class="btn btn-primary">
+            <i class="ti ti-refresh" aria-hidden="true"></i> Actualizar
+        </button>
+    </form>
+</div>
+
+{% if diversidad %}
+<!-- Índices de diversidad alfa -->
+<div class="metrics-grid" style="margin-bottom:1.5rem;">
+    <div class="metric-card verde">
+        <div class="metric-label">Riqueza (S)</div>
+        <div class="metric-value">{{ diversidad.riqueza }}</div>
+        <div class="metric-sub">Taxa únicos</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Shannon H'</div>
+        <div class="metric-value td-mono">{{ diversidad.shannon }}</div>
+        <div class="metric-sub">Diversidad</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Simpson D</div>
+        <div class="metric-value td-mono">{{ diversidad.simpson }}</div>
+        <div class="metric-sub">1 - Dominancia</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Equitatividad J'</div>
+        <div class="metric-value td-mono">{{ diversidad.equitatividad }}</div>
+        <div class="metric-sub">Pielou</div>
+    </div>
+</div>
+{% endif %}
+
+{% if top_microorganismos %}
+<div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:1.25rem; align-items:start;">
+
+    <!-- Tabla Top N -->
+    <div class="card">
+        <div class="card-title">Top {{ top_n }} — {{ nivel|capfirst }}
+            <span class="{% if tipo == '16S' %}pill-16s{% else %}pill-its{% endif %}" style="margin-left:8px;">{{ tipo }}</span>
+        </div>
+        <div class="table-wrap" style="margin-top:0.75rem;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Taxonomía</th>
+                        <th>% Abundancia</th>
+                        <th>Clasificación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in top_microorganismos %}
+                    <tr>
+                        <td class="td-mono" style="color:var(--text-hint);">{{ forloop.counter }}</td>
+                        <td><strong>{{ item.taxonomia }}</strong></td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="flex:1; height:5px; background:var(--gris-light); border-radius:3px;">
+                                    <div style="height:5px; background:var(--verde); border-radius:3px; width:{{ item.porcentaje_hits|floatformat:0 }}%;"></div>
+                                </div>
+                                <span class="td-mono" style="min-width:52px;">{{ item.porcentaje_hits|floatformat:4 }}%</span>
+                            </div>
+                        </td>
+                        <td>
+                            {% if item.clasificacion == 'benefico' %}
+                                <span class="badge badge-benefico">Benéfico</span>
+                            {% elif item.clasificacion == 'fitopatogeno' %}
+                                <span class="badge badge-fitopatogeno">Fitopatógeno</span>
+                            {% else %}
+                                <span class="badge badge-sin-clas">Sin clas.</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Gráfico donut -->
+    <div class="card">
+        <div class="card-title">Composición taxonómica</div>
+        <canvas id="chart-donut" style="margin-top:1rem;"></canvas>
+    </div>
+</div>
+
+<script>
+const topData = {{ top_microorganismos|safe }};
+const labels  = topData.map(r => r.taxonomia);
+const values  = topData.map(r => parseFloat(r.porcentaje_hits || 0));
+const colores = ['#1D9E75','#0F6E56','#085041','#BA7517','#9E6515','#185FA5','#0C447C','#A32D2D','#5F5E5A','#888780'];
+
+new Chart(document.getElementById('chart-donut'), {
+    type: 'doughnut',
+    data: {
+        labels,
+        datasets: [{ data: values, backgroundColor: colores, borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'right', labels: { font: { size: 11 }, boxWidth: 12 } },
+            tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed.toFixed(4)}%` } }
+        }
+    }
+});
+</script>
+
+{% else %}
+<div class="empty-state">
+    <i class="ti ti-chart-dots" aria-hidden="true"></i>
+    <strong>Sin datos disponibles</strong>
+    <p>Ajuste los filtros o cargue muestras para este marcador.</p>
+</div>
+{% endif %}
+
+{% if analisis_diferencial %}
+<div class="card" style="margin-top:1.25rem;">
+    <div class="card-title">Análisis diferencial</div>
+    {% if analisis_diferencial.beta %}
+    <div style="display:flex; gap:2rem; margin-top:0.75rem; flex-wrap:wrap;">
+        <div>
+            <div class="metric-label">Índice Jaccard</div>
+            <div style="font-size:22px; font-weight:600; font-family:'DM Mono',monospace; color:var(--verde-dark);">
+                {{ analisis_diferencial.beta.jaccard }}
+            </div>
+            <div style="font-size:12px; color:var(--text-hint);">Similitud entre comunidades</div>
+        </div>
+        <div>
+            <div class="metric-label">Taxa compartidos</div>
+            <div style="font-size:22px; font-weight:600; font-family:'DM Mono',monospace;">
+                {{ analisis_diferencial.beta.compartidos|length }}
+            </div>
+        </div>
+        <div>
+            <div class="metric-label">Exclusivos A</div>
+            <div style="font-size:22px; font-weight:600; font-family:'DM Mono',monospace;">
+                {{ analisis_diferencial.beta.exclusivos.exclusivos_a|length }}
+            </div>
+        </div>
+        <div>
+            <div class="metric-label">Exclusivos B</div>
+            <div style="font-size:22px; font-weight:600; font-family:'DM Mono',monospace;">
+                {{ analisis_diferencial.beta.exclusivos.exclusivos_b|length }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

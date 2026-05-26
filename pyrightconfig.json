@@ -1,0 +1,15 @@
+{
+  "pythonVersion": "3.13",
+  "venvPath": ".",
+  "venv": "venv",
+  "pythonPlatform": "Windows",
+  "extraPaths": [
+    "."
+  ],
+  "plugins": [
+    "pylance"
+  ],
+  "typeCheckingMode": "basic",
+  "reportMissingModuleSource": "none",
+  "reportAttributeAccessIssue": "none"
+}

@@ -1,0 +1,183 @@
+{% extends "analisis/base.html" %}
+
+{% block title %}Reportes{% endblock %}
+{% block nav_reportes %}active{% endblock %}
+{% block topbar_title %}Reportes interpretativos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Reportes de análisis</h1>
+    <p>Generación y descarga de reportes para agricultura de precisión</p>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1.6fr; gap: 1.5rem; align-items: start;">
+
+    <!-- Panel de generación -->
+    <div class="card">
+        <div class="card-title">Generar nuevo reporte</div>
+
+        <div class="form-group" style="margin-top:0.75rem;">
+            <label class="form-label">Marcador molecular</label>
+            <select id="rep-tipo" class="form-control">
+                {% for m in marcadores_disponibles %}
+                <option value="{{ m }}" {% if tipo_actual == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Producto (opcional)</label>
+            <select id="rep-producto" class="form-control">
+                <option value="">Todos los productos</option>
+                {% for p in productos %}
+                <option value="{{ p.id }}">{{ p.nombre }} — {{ p.variedad|default:p.tipo }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+            <div class="form-group">
+                <label class="form-label">Nivel taxonómico</label>
+                <select id="rep-nivel" class="form-control">
+                    <option value="genus">Genus</option>
+                    <option value="species">Species</option>
+                    <option value="phylum">Phylum</option>
+                    <option value="family">Family</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Top N</label>
+                <select id="rep-top" class="form-control">
+                    <option value="5">Top 5</option>
+                    <option value="10" selected>Top 10</option>
+                    <option value="25">Top 25</option>
+                    <option value="50">Top 50</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Formato de salida</label>
+            <div style="display:flex; gap:10px; margin-top:6px;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:14px; cursor:pointer;">
+                    <input type="radio" name="rep-formato" value="pdf" checked> PDF
+                </label>
+                <label style="display:flex; align-items:center; gap:6px; font-size:14px; cursor:pointer;">
+                    <input type="radio" name="rep-formato" value="excel"> Excel
+                </label>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" style="width:100%;" onclick="generarReporte()">
+            <i class="ti ti-report" aria-hidden="true"></i> Generar reporte
+        </button>
+
+        <div id="rep-msg" style="display:none; margin-top:1rem;"></div>
+    </div>
+
+    <!-- Historial de reportes -->
+    <div class="card">
+        <div class="card-title">
+            Reportes generados
+            <span class="td-mono" style="font-size:12px; color:var(--text-hint); margin-left:6px;">{{ total_reportes }}</span>
+        </div>
+
+        {% if historial_reportes %}
+        <div class="table-wrap" style="margin-top:0.75rem;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Marcador</th>
+                        <th>Nivel</th>
+                        <th>Top</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in historial_reportes %}
+                    <tr>
+                        <td style="font-size:13px; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            <i class="ti ti-file" style="font-size:14px; color:var(--text-hint);" aria-hidden="true"></i>
+                            {{ r.nombre }}
+                        </td>
+                        <td>
+                            <span class="{% if r.tipo == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ r.tipo }}</span>
+                        </td>
+                        <td style="font-size:12px; color:var(--text-hint); text-transform:capitalize;">{{ r.nivel }}</td>
+                        <td class="td-mono">{{ r.top_n }}</td>
+                        <td style="font-size:12px; color:var(--text-hint);">{{ r.fecha }}</td>
+                        <td>
+                            <a href="{{ r.url }}" class="btn btn-outline btn-sm" target="_blank">
+                                <i class="ti ti-download" aria-hidden="true"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:2rem;">
+            <i class="ti ti-report" aria-hidden="true"></i>
+            <strong>Sin reportes generados</strong>
+            <p>Configure los parámetros y genere su primer reporte.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Nota científica -->
+<div class="card card-sm" style="margin-top:1.25rem; border-left:3px solid var(--verde);">
+    <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--verde-dark);">
+        <i class="ti ti-flask-2" aria-hidden="true"></i>
+        <strong>Nota científica</strong>
+    </div>
+    <p style="font-size:13px; color:var(--text-muted); margin-top:6px; line-height:1.6;">
+        Los reportes incluyen clasificación funcional basada en bases de datos referenciales integradas
+        para marcadores <span class="pill-16s">16S</span> (Bacterias) e <span class="pill-its">ITS</span> (Hongos).
+        El Analista Especialista puede editar la clasificación desde el catálogo de microorganismos.
+    </p>
+</div>
+
+<script>
+async function generarReporte() {
+    const tipo      = document.getElementById('rep-tipo').value;
+    const producto  = document.getElementById('rep-producto').value;
+    const nivel     = document.getElementById('rep-nivel').value;
+    const top_n     = document.getElementById('rep-top').value;
+    const formato   = document.querySelector('input[name="rep-formato"]:checked').value;
+    const msgEl     = document.getElementById('rep-msg');
+
+    const form = new FormData();
+    form.append('tipo', tipo);
+    form.append('producto_id', producto);
+    form.append('nivel', nivel);
+    form.append('top_n', top_n);
+    form.append('formato', formato);
+    form.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    msgEl.style.display = 'block';
+    msgEl.innerHTML = '<div class="alert alert-success"><i class="ti ti-loader" aria-hidden="true"></i> Generando reporte...</div>';
+
+    try {
+        const resp = await fetch("{% url 'analisis:generar_reporte' %}", { method: 'POST', body: form });
+        const data = await resp.json();
+
+        if (data.ok) {
+            msgEl.innerHTML = `<div class="alert alert-success">
+                <i class="ti ti-circle-check" aria-hidden="true"></i>
+                Reporte generado.
+                <a href="${data.url_reporte}" target="_blank" style="color:var(--verde-dark); font-weight:500;">Descargar</a>
+            </div>`;
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            msgEl.innerHTML = `<div class="alert alert-error"><i class="ti ti-alert-circle" aria-hidden="true"></i> ${data.error}</div>`;
+        }
+    } catch(e) {
+        msgEl.innerHTML = `<div class="alert alert-error"><i class="ti ti-alert-circle" aria-hidden="true"></i> Error de conexión.</div>`;
+    }
+}
+</script>
+{% endblock %}

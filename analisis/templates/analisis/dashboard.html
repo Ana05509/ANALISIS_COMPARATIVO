@@ -1,0 +1,158 @@
+{% extends "analisis/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+{% block topbar_title %}Dashboard{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'analisis:subir_datos' %}" class="btn btn-primary btn-sm">
+    <i class="ti ti-upload" aria-hidden="true"></i> Nueva muestra
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Resumen general</h1>
+    <p>
+        Perfiles microbianos cargados —
+        <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual }}</span>
+    </p>
+</div>
+
+<!-- Métricas -->
+<div class="metrics-grid">
+    <div class="metric-card verde">
+        <div class="metric-label">Muestras registradas</div>
+        <div class="metric-value">{{ total_productos }}</div>
+        <div class="metric-sub">Cultivos y variedades</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Resultados procesados</div>
+        <div class="metric-value">{{ total_analisis }}</div>
+        <div class="metric-sub">Pipeline ejecutado</div>
+    </div>
+    <div class="metric-card verde">
+        <div class="metric-label">Benéficos ✅</div>
+        <div class="metric-value">{{ total_beneficos }}</div>
+        <div class="metric-sub">Clasificados</div>
+    </div>
+    <div class="metric-card amber">
+        <div class="metric-label">Fitopatógenos ⚠️</div>
+        <div class="metric-value">{{ total_fitopatogenos }}</div>
+        <div class="metric-sub">Clasificados</div>
+    </div>
+</div>
+
+<!-- PHASE 2: GRÁFICOS INTERACTIVOS CON PLOTLY -->
+{% if graficos_json %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<style>
+    .plotly-container {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .plotly-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.25rem;
+        margin-bottom: 1.25rem;
+    }
+    @media (max-width: 1024px) {
+        .plotly-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="plotly-grid">
+    {% if graficos_json.grafico_barras != "null" %}
+    <div class="plotly-container">
+        <div id="grafico-barras" style="height: 400px;"></div>
+    </div>
+    {% endif %}
+    
+    {% if graficos_json.grafico_pie != "null" %}
+    <div class="plotly-container">
+        <div id="grafico-pie" style="height: 400px;"></div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    var graficosData = {{ graficos_json|safe }};
+    
+    // Renderizar gráfico de barras
+    if (graficosData.grafico_barras && Object.keys(graficosData.grafico_barras).length > 0) {
+        Plotly.newPlot('grafico-barras', graficosData.grafico_barras.data, graficosData.grafico_barras.layout, {responsive: true});
+    }
+    
+    // Renderizar gráfico de pastel
+    if (graficosData.grafico_pie && Object.keys(graficosData.grafico_pie).length > 0) {
+        Plotly.newPlot('grafico-pie', graficosData.grafico_pie.data, graficosData.grafico_pie.layout, {responsive: true});
+    }
+</script>
+{% endif %}
+
+<!-- Tabla de análisis recientes -->
+<div class="card">
+    <div class="card-title">Resultados recientes</div>
+
+    {% if analisis_recientes %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Género</th>
+                    <th>Especie</th>
+                    <th>Muestra</th>
+                    <th>% Abundancia</th>
+                    <th>Num. Hits</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in analisis_recientes %}
+                <tr>
+                    <td><strong>{{ a.genus|default:"—" }}</strong></td>
+                    <td style="font-size:13px; color:var(--text-muted);">{{ a.species|default:"—" }}</td>
+                    <td>
+                        <a href="{% url 'analisis:ver_producto' a.archivo.muestra.id %}" style="color: var(--verde); text-decoration: none;">
+                            {{ a.archivo.muestra.codigo }}
+                        </a>
+                    </td>
+                    <td class="td-mono">{{ a.porcentaje_hits|floatformat:4 }}%</td>
+                    <td class="td-mono">{{ a.num_hits }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="ti ti-flask-2" aria-hidden="true"></i>
+        <strong>Sin análisis aún</strong>
+        <p>Cargue un archivo 16S o ITS para comenzar.</p>
+        <a href="{% url 'analisis:subir_datos' %}" class="btn btn-primary" style="margin-top:1rem;">
+            <i class="ti ti-upload" aria-hidden="true"></i> Cargar muestra
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Distribución por variedad/clon -->
+{% if productos_por_variedad %}
+<div class="card" style="margin-top: 1.25rem;">
+    <div class="card-title">Distribución por variedad / clon</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 0.5rem;">
+        {% for v in productos_por_variedad %}
+        <div style="background: var(--gris-light); border-radius: 8px; padding: 0.5rem 1rem; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:13px; font-weight:500;">{{ v.variedad_clon__nombre|default:"Sin variedad" }}</span>
+            <span style="font-family:'DM Mono',monospace; font-size:12px; color:var(--text-hint);">{{ v.total }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

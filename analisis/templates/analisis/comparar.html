@@ -1,0 +1,190 @@
+{% extends "analisis/base.html" %}
+
+{% block title %}Comparar perfiles{% endblock %}
+{% block nav_comparar %}active{% endblock %}
+{% block topbar_title %}Comparar perfiles microbianos{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Análisis comparativo</h1>
+    <p>Dominantes · Compartidos (Core) · Exclusivos por variedad o clon</p>
+</div>
+
+<!-- Formulario de comparación -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-title">Parámetros de comparación</div>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="tipo" value="{{ tipo_actual }}">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end;">
+            <div>
+                <label class="form-label">Productos / variedades</label>
+                {{ form.productos }}
+            </div>
+            <div>
+                <label class="form-label">Nivel taxonómico</label>
+                {{ form.nivel }}
+            </div>
+            <div>
+                <label class="form-label">Top N</label>
+                {{ form.top_n }}
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="ti ti-arrows-diff" aria-hidden="true"></i> Comparar
+            </button>
+        </div>
+    </form>
+</div>
+
+{% if tabla %}
+<!-- Métricas BI -->
+<div class="metrics-grid">
+    <div class="metric-card">
+        <div class="metric-label">Taxa comparados</div>
+        <div class="metric-value">{{ total_taxonomias }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Promedio %_hits</div>
+        <div class="metric-value td-mono">{{ promedio_hits }}</div>
+    </div>
+    <div class="metric-card verde">
+        <div class="metric-label">Benéficos ✅</div>
+        <div class="metric-value">{{ total_beneficos }}</div>
+    </div>
+    <div class="metric-card amber">
+        <div class="metric-label">Fitopatógenos ⚠️</div>
+        <div class="metric-value">{{ total_fitopatogenos }}</div>
+    </div>
+</div>
+
+<!-- Análisis diferencial -->
+{% if dominantes or compartidos or exclusivos %}
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+
+    <div class="card card-sm">
+        <div class="card-title" style="color:var(--verde-dark);">
+            <i class="ti ti-trending-up" aria-hidden="true"></i> Dominantes
+        </div>
+        <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 6px;">
+            {% for d in dominantes %}
+                <span style="font-size:12px; background:var(--verde-light); color:var(--verde-dark); padding:2px 8px; border-radius:20px;">{{ d }}</span>
+            {% empty %}
+                <span style="font-size:13px; color:var(--text-hint);">Sin dominantes identificados</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card card-sm">
+        <div class="card-title" style="color: #185FA5;">
+            <i class="ti ti-circles-relation" aria-hidden="true"></i> Compartidos (Core)
+        </div>
+        <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 6px;">
+            {% for c in compartidos %}
+                <span style="font-size:12px; background:#E6F1FB; color:#0C447C; padding:2px 8px; border-radius:20px;">{{ c }}</span>
+            {% empty %}
+                <span style="font-size:13px; color:var(--text-hint);">Sin taxa compartidos</span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card card-sm">
+        <div class="card-title" style="color: var(--amber);">
+            <i class="ti ti-sparkles" aria-hidden="true"></i> Exclusivos
+        </div>
+        <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 6px;">
+            {% for e in exclusivos %}
+                <span style="font-size:12px; background:var(--amber-light); color:#5a3a00; padding:2px 8px; border-radius:20px;">{{ e }}</span>
+            {% empty %}
+                <span style="font-size:13px; color:var(--text-hint);">Sin taxa exclusivos</span>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Tabla comparativa -->
+<div class="card">
+    <div class="card-title">Tabla comparativa — Top {{ top_actual }} por {{ nivel_actual }}</div>
+    <div style="margin-bottom: 0.75rem; font-size:13px; color:var(--text-hint);">
+        Taxón más abundante: <strong style="color:var(--text-primary);">{{ top_taxonomia }}</strong>
+    </div>
+    <div class="table-wrap">
+        <table id="tabla-comparativa">
+            <thead>
+                <tr>
+                    <th>Taxonomía</th>
+                    {% for key in tabla.0.keys %}
+                        {% if key != 'taxonomia' and key != 'clasificacion' %}
+                        <th>{{ key }}</th>
+                        {% endif %}
+                    {% endfor %}
+                    <th>Clasificación</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in tabla %}
+                <tr>
+                    <td><strong>{{ fila.taxonomia }}</strong></td>
+                    {% for key, val in fila.items %}
+                        {% if key != 'taxonomia' and key != 'clasificacion' %}
+                        <td class="td-mono">{{ val|floatformat:4 }}</td>
+                        {% endif %}
+                    {% endfor %}
+                    <td>
+                        {% if fila.clasificacion == 'benefico' %}
+                            <span class="badge badge-benefico">Benéfico</span>
+                        {% elif fila.clasificacion == 'fitopatogeno' %}
+                            <span class="badge badge-fitopatogeno">Fitopatógeno</span>
+                        {% else %}
+                            <span class="badge badge-sin-clas">Sin clasificación</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Gráfico de barras comparativo -->
+<div class="card" style="margin-top: 1.25rem;">
+    <div class="card-title">Abundancia relativa comparada</div>
+    <canvas id="chart-comparativo" height="100"></canvas>
+</div>
+
+<script>
+const tablaData = {{ tabla_json|safe }};
+const labels = tablaData.map(r => r.taxonomia);
+const productos = Object.keys(tablaData[0] || {}).filter(k => k !== 'taxonomia' && k !== 'clasificacion');
+const colores = ['#1D9E75','#BA7517','#185FA5','#A32D2D','#0F6E56'];
+const datasets = productos.map((p, i) => ({
+    label: p,
+    data: tablaData.map(r => parseFloat(r[p] || 0).toFixed(4)),
+    backgroundColor: colores[i % colores.length] + '99',
+    borderColor: colores[i % colores.length],
+    borderWidth: 1,
+}));
+
+new Chart(document.getElementById('chart-comparativo'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'top' } },
+        scales: { y: { beginAtZero: true, title: { display: true, text: '% Abundancia' } } }
+    }
+});
+</script>
+
+{% else %}
+<div class="empty-state">
+    <i class="ti ti-arrows-diff" aria-hidden="true"></i>
+    <strong>Seleccione productos para comparar</strong>
+    <p>Elija dos o más productos y configure los parámetros del análisis.</p>
+</div>
+{% endif %}
+{% endblock %}

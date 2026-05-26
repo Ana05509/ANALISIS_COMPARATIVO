@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso — BioSoil Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <style>
+        :root {
+            --verde:       #1D9E75;
+            --verde-light: #E1F5EE;
+            --verde-dark:  #085041;
+            --gris-border: #D3D1C7;
+            --bg:          #F7F6F2;
+            --surface:     #FFFFFF;
+            --text:        #1a1a18;
+            --text-muted:  #5F5E5A;
+            --radius:      10px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        /* Panel izquierdo — identidad */
+        .left-panel {
+            background: var(--verde-dark);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .left-panel::before {
+            content: '';
+            position: absolute;
+            width: 500px; height: 500px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.06);
+            top: -100px; right: -150px;
+        }
+
+        .left-panel::after {
+            content: '';
+            position: absolute;
+            width: 300px; height: 300px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.06);
+            bottom: 60px; left: -80px;
+        }
+
+        .brand-mark {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 3rem;
+        }
+
+        .brand-icon {
+            width: 44px; height: 44px;
+            background: rgba(255,255,255,0.12);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .brand-icon i { color: #fff; font-size: 22px; }
+
+        .brand-text { color: #fff; font-family: 'Fraunces', serif; font-size: 18px; font-weight: 500; }
+
+        .left-headline {
+            font-family: 'Fraunces', serif;
+            font-size: 38px;
+            font-weight: 300;
+            color: #fff;
+            line-height: 1.2;
+            letter-spacing: -1px;
+            margin-bottom: 1.5rem;
+        }
+
+        .left-headline em {
+            font-style: italic;
+            color: #9FE1CB;
+        }
+
+        .left-desc {
+            color: rgba(255,255,255,0.6);
+            font-size: 15px;
+            line-height: 1.7;
+            max-width: 380px;
+        }
+
+        .features {
+            margin-top: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: rgba(255,255,255,0.75);
+            font-size: 14px;
+        }
+
+        .feature-item i {
+            color: #9FE1CB;
+            font-size: 16px;
+        }
+
+        /* Panel derecho — formulario */
+        .right-panel {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+        }
+
+        .login-box {
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .login-title {
+            font-family: 'Fraunces', serif;
+            font-size: 26px;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 0.35rem;
+        }
+
+        .login-sub {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .form-group { margin-bottom: 1.1rem; }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.65rem 0.9rem;
+            border: 1px solid var(--gris-border);
+            border-radius: var(--radius);
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            color: var(--text);
+            background: var(--surface);
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--verde);
+            box-shadow: 0 0 0 3px rgba(29,158,117,0.12);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 0.7rem;
+            background: var(--verde);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            transition: background 0.15s;
+        }
+
+        .btn-login:hover { background: var(--verde-dark); }
+
+        .error-msg {
+            background: #FCEBEB;
+            color: #A32D2D;
+            border-radius: var(--radius);
+            padding: 0.7rem 1rem;
+            font-size: 13px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .login-footer {
+            margin-top: 2rem;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            body { grid-template-columns: 1fr; }
+            .left-panel { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="left-panel">
+    <div class="brand-mark">
+        <div class="brand-icon"><i class="ti ti-dna-2" aria-hidden="true"></i></div>
+        <span class="brand-text">BioSoil Analytics</span>
+    </div>
+
+    <h1 class="left-headline">Análisis microbiano<br>para <em>suelos agrícolas</em></h1>
+
+    <p class="left-desc">
+        Plataforma de análisis comparativo de perfiles microbianos 16S e ITS orientada a investigadores y agrónomos.
+    </p>
+
+    <div class="features">
+        <div class="feature-item">
+            <i class="ti ti-circle-check" aria-hidden="true"></i>
+            Pipeline bioinformático automatizado
+        </div>
+        <div class="feature-item">
+            <i class="ti ti-circle-check" aria-hidden="true"></i>
+            Clasificación funcional de microorganismos
+        </div>
+        <div class="feature-item">
+            <i class="ti ti-circle-check" aria-hidden="true"></i>
+            Análisis diferencial 16S e ITS
+        </div>
+        <div class="feature-item">
+            <i class="ti ti-circle-check" aria-hidden="true"></i>
+            Reportes para agricultura de precisión
+        </div>
+    </div>
+</div>
+
+<div class="right-panel">
+    <div class="login-box">
+        <h2 class="login-title">Bienvenido</h2>
+        <p class="login-sub">Ingrese sus credenciales para continuar</p>
+
+        {% if form.errors %}
+        <div class="error-msg">
+            <i class="ti ti-alert-circle" aria-hidden="true"></i>
+            Usuario o contraseña incorrectos. Intente nuevamente.
+        </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label class="form-label" for="id_username">Usuario</label>
+                <input type="text" name="username" id="id_username" class="form-control" placeholder="Ingrese su usuario" autocomplete="username" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="id_password">Contraseña</label>
+                <input type="password" name="password" id="id_password" class="form-control" placeholder="••••••••" autocomplete="current-password" required>
+            </div>
+            <button type="submit" class="btn-login">Iniciar sesión</button>
+        </form>
+
+        <div class="login-footer">
+            BioSoil Analytics &mdash; Análisis de Biodiversidad Microbiana
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

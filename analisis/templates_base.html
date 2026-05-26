@@ -1,0 +1,211 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Análisis Comparativo de Perfiles Microbianos{% endblock %}</title>
+    <style>
+        :root {
+            --color-primary: #2c3e50;
+            --color-secondary: #27ae60;
+            --color-danger: #e74c3c;
+            --color-warning: #f39c12;
+            --color-info: #3498db;
+            --color-light: #ecf0f1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: var(--color-primary);
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: var(--color-primary);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        nav {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            transition: background-color 0.3s;
+        }
+
+        nav a:hover {
+            background-color: var(--color-secondary);
+            border-radius: 4px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 15px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--color-secondary);
+        }
+
+        .btn-secondary {
+            background-color: var(--color-info);
+            color: white;
+        }
+
+        .btn-danger {
+            background-color: var(--color-danger);
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        input[type="file"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+
+        .alert {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        table th {
+            background-color: var(--color-primary);
+            color: white;
+            padding: 0.75rem;
+            text-align: left;
+        }
+
+        table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .main-content {
+            min-height: calc(100vh - 200px);
+            padding: 2rem 0;
+        }
+
+        footer {
+            background-color: var(--color-primary);
+            color: white;
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <h1>🧬 Análisis Microbianos</h1>
+                {% if user.is_authenticated %}
+                <a href="{% url 'analisis:dashboard' %}">Dashboard</a>
+                <a href="{% url 'analisis:subir_datos' %}">Subir Datos</a>
+                <a href="{% url 'analisis:comparar' %}">Comparar</a>
+                <a href="{% url 'analisis:catalogo' %}">Catálogo</a>
+                <a href="{% url 'analisis:reportes' %}">Reportes</a>
+                <a href="{% url 'admin:index' %}">Admin</a>
+                <a href="{% url 'logout' %}">Cerrar Sesión</a>
+                {% else %}
+                <a href="{% url 'login' %}">Iniciar Sesión</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% block content %}
+            <p>Contenido no especificado</p>
+            {% endblock %}
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 Análisis Comparativo de Perfiles Microbianos. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+</body>
+</html>
