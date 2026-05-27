@@ -71,35 +71,17 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # ---------------------------
 # DATABASE
 # ---------------------------
-# Por defecto usa SQLite (desarrollo). Para PostgreSQL, configura variables de entorno:
-# DATABASE_ENGINE=postgresql
-# DATABASE_NAME=MICROBIANA
-# DATABASE_USER=postgres
-# DATABASE_PASSWORD=tu_password
-# DATABASE_HOST=localhost
-# DATABASE_PORT=5432
 
-DB_ENGINE = os.environ.get('DATABASE_ENGINE', 'sqlite3')
-
-if DB_ENGINE == 'postgresql':
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.environ.get('DATABASE_NAME', 'MICROBIANA'),
-            'USER': os.environ.get('DATABASE_USER', 'postgres'),
-            'PASSWORD': os.environ.get('DATABASE_PASSWORD', ''),
-            'HOST': os.environ.get('DATABASE_HOST', 'localhost'),
-            'PORT': os.environ.get('DATABASE_PORT', '5432'),
-        }
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'MICROBIANA',
+        'USER': 'postgres',
+        'PASSWORD': 'ABCDE',  
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
-else:
-    # SQLite por defecto (seguro y fácil para desarrollo)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+}
 
 # ---------------------------
 # PASSWORDS

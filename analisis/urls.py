@@ -31,4 +31,4 @@ urlpatterns = [
     path("reportes/", views.reportes, name="reportes"),
     path("reportes/generar/", views.generar_reporte, name="generar_reporte"),
     path("reportes/<int:reporte_id>/", views.detalle_reporte, name="detalle_reporte"),
-]
+] 

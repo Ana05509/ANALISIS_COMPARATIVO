@@ -1,10 +1,13 @@
+import os
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import JsonResponse
 
+# IMPORTACIONES CORREGIDAS SEGÚN TU ESTRUCTURA DE CARPETAS
 from analisis.services.business.upload_service import procesar_upload
 from analisis.forms import SubirDatosForm
-from analisis.models import MuestraSuelo
+from analisis.models import MuestraSuelo, VariedadClon
 
 MARCADORES_VALIDOS = ("16S", "ITS")
 

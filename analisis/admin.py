@@ -1,4 +1,8 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+
+# IMPORTACIÓN MÍNIMA Y SEGURA DE UNFOLD
+from unfold.admin import ModelAdmin
 
 from .models import (
     Cultivo,
@@ -10,17 +14,22 @@ from .models import (
     Usuario,
 )
 
+# Títulos personalizados para el panel administrativo
+admin.site.site_header = "TerraBioLab UTC"
+admin.site.site_title = "Administración TerraBioLab"
+admin.site.index_title = "Panel de Control Microbiológico"
+
 
 # =========================================================
 # CULTIVOS
 # =========================================================
 
 @admin.register(Cultivo)
-class CultivoAdmin(admin.ModelAdmin):
+class CultivoAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 
     list_display = ("id", "nombre", "descripcion")
 
-    search_fields = ("nombre",)
+    search_fields = ("nombreord", "nombre", "descripcion")
 
     ordering = ("nombre",)
 
@@ -32,13 +41,13 @@ class CultivoAdmin(admin.ModelAdmin):
 # =========================================================
 
 @admin.register(VariedadClon)
-class VariedadClonAdmin(admin.ModelAdmin):
+class VariedadClonAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 
     list_display = ("id", "nombre", "cultivo")
 
-    list_filter = ("cultivo",)
+    list_filter = ("cultivo",) # Filtro nativo de Django compatible con Unfold
 
-    search_fields = ("nombre",)
+    search_fields = ("nombre", "cultivo__nombre")
 
     ordering = ("nombre",)
 
@@ -50,7 +59,7 @@ class VariedadClonAdmin(admin.ModelAdmin):
 # =========================================================
 
 @admin.register(MuestraSuelo)
-class MuestraSueloAdmin(admin.ModelAdmin):
+class MuestraSueloAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 
     list_display = (
         "id",
@@ -63,11 +72,12 @@ class MuestraSueloAdmin(admin.ModelAdmin):
 
     list_filter = (
         "cultivo",
+        "variedad_clon",
         "tipo_muestra",
         "fecha_registro",
     )
 
-    search_fields = ("codigo",)
+    search_fields = ("codigo", "cultivo__nombre", "variedad_clon__nombre")
 
     ordering = ("-fecha_registro",)
 
@@ -81,7 +91,7 @@ class MuestraSueloAdmin(admin.ModelAdmin):
 # =========================================================
 
 @admin.register(ArchivoMolecular)
-class ArchivoMolecularAdmin(admin.ModelAdmin):
+class ArchivoMolecularAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 
     list_display = (
         "id",
@@ -109,7 +119,7 @@ class ArchivoMolecularAdmin(admin.ModelAdmin):
 # =========================================================
 
 @admin.register(ResultadoTaxonomico)
-class ResultadoTaxonomicoAdmin(admin.ModelAdmin):
+class ResultadoTaxonomicoAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 
     list_display = (
         "id",
@@ -128,6 +138,7 @@ class ResultadoTaxonomicoAdmin(admin.ModelAdmin):
         "genus",
         "species",
         "phylum",
+        "archivo__muestra__codigo",
     )
 
     ordering = ("-num_hits",)
@@ -140,7 +151,7 @@ class ResultadoTaxonomicoAdmin(admin.ModelAdmin):
 # =========================================================
 
 @admin.register(CatalogoMicroorganismo)
-class CatalogoMicroorganismoAdmin(admin.ModelAdmin):
+class CatalogoMicroorganismoAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 
     list_display = (
         "id",
@@ -166,7 +177,7 @@ class CatalogoMicroorganismoAdmin(admin.ModelAdmin):
 # =========================================================
 
 @admin.register(Usuario)
-class UsuarioAdmin(admin.ModelAdmin):
+class UsuarioAdmin(BaseUserAdmin, ModelAdmin): # <-- BaseUserAdmin + Unfold sin errores
 
     list_display = (
         "id",
@@ -189,3 +200,15 @@ class UsuarioAdmin(admin.ModelAdmin):
     ordering = ("username",)
 
     list_per_page = 20
+    
+    # Inyección dinámica del campo 'rol' para edición en tiempo de ejecución
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        fieldsets_list = list(fieldsets or [])
+        fieldsets_list.append((
+            "Información de Roles TerraBioLab",
+            {
+                "fields": ("rol",)
+            }
+        ))
+        return fieldsets_list

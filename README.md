@@ -1,3 +1,4 @@
+TEMA: ANALISIS ...........
 # Sistema Web de Análisis Comparativo de Perfiles Microbianos (16S & ITS)
 
 Este sistema está diseñado para el análisis bioinformático y la visualización de datos metagenómicos procedentes de suelos agrícolas. Permite transformar resultados taxonómicos brutos en reportes interpretativos para la toma de decisiones en agricultura de precisión.

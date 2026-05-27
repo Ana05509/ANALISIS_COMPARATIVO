@@ -56,18 +56,25 @@ class SubirDatosForm(forms.Form):
         label="Marcador molecular",
         widget=forms.Select(attrs={"class": "form-control"}),
     )
+    
+    # CORRECCIÓN AQUÍ: Se añade id="id_cultivo" para que actúe el JavaScript
     cultivo = forms.ModelChoiceField(
         queryset=Cultivo.objects.all(),
-        required=False,
+        required=True,
         label="Cultivo",
-        widget=forms.Select(attrs={"class": "form-control"}),
+        empty_label="Seleccione un cultivo",
+        widget=forms.Select(attrs={"class": "form-control", "id": "id_cultivo"}),
     )
+    
+    # CORRECCIÓN AQUÍ: Se añade id="id_variedad_clon" para que actúe el JavaScript
     variedad = forms.ModelChoiceField(
         queryset=VariedadClon.objects.all(),
-        required=False,
+        required=True,
         label="Variedad / Clon",
-        widget=forms.Select(attrs={"class": "form-control"}),
+        empty_label="---------",
+        widget=forms.Select(attrs={"class": "form-control", "id": "id_variedad_clon"}),
     )
+    
     nivel = forms.ChoiceField(
         choices=NIVEL_CHOICES,
         initial="genus",
@@ -80,9 +87,16 @@ class SubirDatosForm(forms.Form):
         label="Top N",
         widget=forms.Select(attrs={"class": "form-control"}),
     )
+    
+    # CORRECCIÓN OPCIONAL: Si estás usando una caja drag & drop interactiva en HTML, 
+    # a veces requiere que el input tenga id="file-upload" o clase específica para ocultarse
     archivo = forms.FileField(
         label="Archivo CSV / Excel",
-        widget=forms.FileInput(attrs={"class": "form-control", "accept": ".csv,.tsv,.xlsx,.xls"}),
+        widget=forms.FileInput(attrs={
+            "class": "form-control", 
+            "accept": ".csv,.tsv,.xlsx,.xls",
+            "id": "file-upload"
+        }),
     )
 
     def clean_top_n(self):

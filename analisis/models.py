@@ -9,12 +9,19 @@ class Cultivo(models.Model):
     def __str__(self):
         return self.nombre
 
+
 class VariedadClon(models.Model):
     cultivo = models.ForeignKey(Cultivo, on_delete=models.CASCADE)
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True)
+
     class Meta:
         unique_together = ('cultivo', 'nombre')
+
+    # CORRECCIÓN VISUAL: Muestra el nombre real del Clon (ej: CCN51) en lugar de "object (1)"
+    def __str__(self):
+        return self.nombre
+
 
 class MuestraSuelo(models.Model):
     codigo = models.CharField(max_length=100)
@@ -29,6 +36,9 @@ class MuestraSuelo(models.Model):
     observaciones = models.TextField(blank=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"Muestra: {self.codigo} - {self.cultivo.nombre}"
+
 
 class ArchivoMolecular(models.Model):
     TIPOS_ANALISIS = [
@@ -41,6 +51,10 @@ class ArchivoMolecular(models.Model):
     archivo = models.FileField(upload_to="archivos/")
     fecha_carga = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"{self.tipo_analisis} - Muestra: {self.muestra.codigo}"
+
+
 class ResultadoTaxonomico(models.Model):
     archivo = models.ForeignKey(ArchivoMolecular, on_delete=models.CASCADE)
     kingdom = models.CharField(max_length=255, blank=True)
@@ -52,6 +66,9 @@ class ResultadoTaxonomico(models.Model):
     species = models.CharField(max_length=255, blank=True)
     num_hits = models.FloatField(default=0)
     porcentaje_hits = models.FloatField(default=0)
+
+    def __str__(self):
+        return f"{self.genus} {self.species} ({self.porcentaje_hits}%)"
 
 
 class CatalogoMicroorganismo(models.Model):
@@ -68,8 +85,13 @@ class CatalogoMicroorganismo(models.Model):
     descripcion = models.TextField(blank=True)
     referencia = models.TextField(blank=True)
 
+    def __str__(self):
+        return f"{self.nombre} [{self.get_clasificacion_display()}]"
 
-# USUARIO
+
+# =========================================================
+# USUARIOS
+# =========================================================
 
 class Usuario(AbstractUser):
 
