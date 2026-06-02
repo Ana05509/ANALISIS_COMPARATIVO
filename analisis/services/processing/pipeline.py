@@ -1,4 +1,7 @@
+# Pipeline bioinformático para la normalización, limpieza y cálculo 
+# del residuo de abundancia.
 import pandas as pd
+import re
 
 COLUMNAS_REQUERIDAS = [
     "kingdom", "phylum", "class", "order",
@@ -7,105 +10,115 @@ COLUMNAS_REQUERIDAS = [
 
 NIVELES_VALIDOS = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
 
-TRADUCCION_COLUMNAS = {
-    "kingdom": "Reino", "phylum": "Filo", "class": "Clase",
-    "order": "Orden", "family": "Familia", "genus": "Género",
-    "species": "Especie", "num_hits": "Número de Hits", "%_hits": "% de Abundancia",
-}
 
+class PipelineProcesamiento:
+    """Motor de procesamiento y normalización de perfiles taxonómicos masivos."""
 
-def cargar_archivo(ruta_archivo):
-    if ruta_archivo.endswith(".csv"):
-        df = pd.read_csv(ruta_archivo)
-    elif ruta_archivo.endswith((".xlsx", ".xls")):
-        df = pd.read_excel(ruta_archivo)
-    else:
-        raise ValueError("Formato no soportado. Use CSV o Excel.")
-    df.columns = df.columns.str.strip().str.lower()
-    return df
+    @staticmethod
+    def validar_columnas(df):
+        """Valida la presencia de la estructura de datos obligatoria."""
+        faltantes = [c for c in COLUMNAS_REQUERIDAS if c not in df.columns]
+        if faltantes:
+            raise ValueError(f"El archivo no cumple con el estándar molecular. Columnas faltantes: {faltantes}")
 
+    @staticmethod
+    def limpiar_datos(df):
+        """Limpia strings, elimina caracteres especiales taxonómicos y asegura tipos primitivos rígidos."""
+        df = df.copy()
+        
+        # Limpieza inicial de espacios y strings vacíos
+        for col in df.columns:
+            if df[col].dtype == "object":
+                df[col] = df[col].astype(str).str.strip()
+        
+        # Reemplazar nulos textuales por Unclassified de forma segura sin usar inplace
+        valores_nulos = ["", "nan", "None", "NaN", "unclassified", "unknown"]
+        df.replace(valores_nulos, "Unclassified", inplace=True)
 
-def validar_columnas(df):
-    faltantes = [c for c in COLUMNAS_REQUERIDAS if c not in df.columns]
-    if faltantes:
-        raise ValueError(f"Faltan columnas requeridas: {faltantes}")
+        # Rellenar remanentes NaN reales según el tipo de columna
+        for col in df.columns:
+            if df[col].dtype in ["object", "str"]:
+                df[col] = df[col].fillna("Unclassified")
+            elif df[col].dtype in ["int64", "float64"]:
+                df[col] = df[col].fillna(0)
 
+        # Tratamiento específico de nomenclatura botánica/microbiana para especies
+        if "species" in df.columns:
+            df["species"] = (
+                df["species"]
+                .str.replace(r"\(.*?\)", "", regex=True)
+                .str.replace("_", " ", regex=False)
+                .str.replace(r"\bsp\.?\b", "sp", regex=True)
+                .str.strip()
+            )
 
-def limpiar_datos(df):
-    df = df.copy()
-    for col in df.select_dtypes(include=["object"]).columns:
-        df[col] = df[col].astype(str).str.strip()
-    df.replace(["", "nan", "None", "NaN"], "Unclassified", inplace=True)
-    
-    # Fill NaN values column-by-column based on dtype
-    for col in df.columns:
-        if df[col].isna().any():
-            if df[col].dtype == 'object' or df[col].dtype == 'str':
-                df[col].fillna("Unclassified", inplace=True)
-            elif df[col].dtype in ['int64', 'float64']:
-                df[col].fillna(0, inplace=True)
+        # Casteo forzado y blindado de datos cuantitativos
+        df["num_hits"] = pd.to_numeric(df["num_hits"], errors="coerce").fillna(0).astype(int)
+        df["%_hits"] = pd.to_numeric(
+            df["%_hits"].astype(str).str.replace(",", ".", regex=False),
+            errors="coerce"
+        ).fillna(0.0).astype(float)
+        
+        return df
 
-    if "species" in df.columns:
-        df["species"] = (
-            df["species"]
-            .str.replace(r"\(.*?\)", "", regex=True)
-            .str.replace("_", " ")
-            .str.replace(r"\bsp\.?\b", "sp", regex=True)
-            .str.strip()
-        )
+    @staticmethod
+    def procesar_archivo_df(df, top_n=10, nivel="genus"):
+        """
+        Procesa el DataFrame taxonómico. Extrae el Top N dominante y consolida el
+        residuo matemático en la fila 'Others' para preservar el 100% de la abundancia.
+        """
+        df.columns = df.columns.str.strip().str.lower()
+        PipelineProcesamiento.validar_columnas(df)
+        
+        total_registros = len(df)
+        df = PipelineProcesamiento.limpiar_datos(df)
 
-    df["num_hits"] = pd.to_numeric(df["num_hits"], errors="coerce").fillna(0).astype(int)
-    df["%_hits"] = pd.to_numeric(
-        df["%_hits"].astype(str).str.replace(",", ".", regex=False),
-        errors="coerce"
-    ).fillna(0)
-    return df
+        nivel_clean = nivel if nivel in NIVELES_VALIDOS else "genus"
+        if top_n not in [5, 10, 25, 50]:
+            top_n = 10
 
+        # Ordenar por abundancia descendente
+        df_sorted = df.sort_values(by="%_hits", ascending=False).copy()
 
-def procesar_archivo_df(df, top_n=10, nivel="genus"):
-    """
-    Pipeline completo. Preserva todas las columnas taxonómicas en cada
-    registro para que upload_service pueda mapearlas a ResultadoTaxonomico.
-    """
-    df.columns = df.columns.str.strip().str.lower()
-    validar_columnas(df)
-    total_registros = len(df)
-    df = limpiar_datos(df)
+        # Separar el bloque dominante del residuo ecológico
+        df_top = df_sorted.head(top_n).copy()
+        df_residuo = df_sorted.iloc[top_n:].copy()
 
-    if nivel not in NIVELES_VALIDOS:
-        nivel = "genus"
+        registros = []
+        for _, row in df_top.iterrows():
+            registros.append({
+                "kingdom": str(row["kingdom"]),
+                "phylum": str(row["phylum"]),
+                "tax_class": str(row["class"]),  # Guardado seguro evitando la palabra reservada 'class'
+                "order": str(row["order"]),
+                "family": str(row["family"]),
+                "genus": str(row["genus"]),
+                "species": str(row["species"]),
+                "num_hits": int(row["num_hits"]),
+                "%_hits": round(float(row["%_hits"]), 5),
+            })
 
-    opciones_top_n = [5, 10, 25, 50]
-    if top_n not in opciones_top_n:
-        top_n = 10
+        # CÁLCULO CIENTÍFICO DE "OTHERS": Agrupar el remanente ecológico si existe
+        if not df_residuo.empty:
+            sum_num_hits = int(df_residuo["num_hits"].sum())
+            sum_porcentaje = round(float(df_residuo["%_hits"].sum()), 5)
 
-    # Tomar el top N directamente de los datos originales (sin perder columnas)
-    df_sorted = df.sort_values(by="%_hits", ascending=False).head(top_n).copy()
-    df_sorted["%_hits"]   = df_sorted["%_hits"].round(5)
-    df_sorted["num_hits"] = df_sorted["num_hits"].astype(int)
+            if sum_porcentaje > 0 or sum_num_hits > 0:
+                registros.append({
+                    "kingdom": "Unclassified",
+                    "phylum": "Unclassified",
+                    "tax_class": "Unclassified",
+                    "order": "Unclassified",
+                    "family": "Unclassified",
+                    "genus": "Others",
+                    "species": "Others sp",
+                    "num_hits": sum_num_hits,
+                    "%_hits": sum_porcentaje,
+                })
 
-    registros = []
-    for _, row in df_sorted.iterrows():
-        registros.append({
-            "kingdom":  str(row.get("kingdom", "")),
-            "phylum":   str(row.get("phylum", "")),
-            "class":    str(row.get("class", "")),
-            "order":    str(row.get("order", "")),
-            "family":   str(row.get("family", "")),
-            "genus":    str(row.get("genus", "")),
-            "species":  str(row.get("species", "")),
-            "num_hits": int(row["num_hits"]),
-            "%_hits":   float(row["%_hits"]),
-        })
-
-    return {
-        "data":            registros,
-        "total_registros": total_registros,
-        "nivel":           nivel,
-        "top_n":           top_n,
-    }
-
-
-def procesar_archivo(ruta_archivo, top_n=10, nivel="genus"):
-    df = cargar_archivo(ruta_archivo)
-    return procesar_archivo_df(df, top_n=top_n, nivel=nivel)
+        return {
+            "data": registros,
+            "total_registros": total_registros,
+            "nivel": nivel_clean,
+            "top_n": top_n,
+        }

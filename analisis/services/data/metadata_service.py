@@ -1,297 +1,170 @@
-"""
-metadata_service.py
--------------------
-Responsabilidad: Gestionar los metadatos de las muestras agrícolas antes y
-después de cargar los archivos moleculares (16S / ITS).
-
-Relación con README:
-  - Cubre "Gestión de Muestras Agrícolas" y "Registro Estructurado".
-  - Soporta la segmentación por Cultivo + VariedadClon (Cacao CCN51, Clon 100, etc.).
-  - El CSV de referencia es data/metadata/muestras.csv.
-
-Relación con models.py:
-  - Opera sobre: Cultivo, VariedadClon, MuestraSuelo, ArchivoMolecular.
-  - No toca ResultadoTaxonomico ni CatalogoMicroorganismo.
-"""
+# services/data/metadata_service.py
+# Componente de Infraestructura para el Registro Estructurado y Trazabilidad Agrícola.
 
 import csv
 import io
 from pathlib import Path
-from django.core.exceptions import ValidationError
+from typing import List, Dict, Any, Tuple, Union, Sequence
+from django.db import transaction
+from django.db.models import Count
 from analisis.models import Cultivo, VariedadClon, MuestraSuelo, ArchivoMolecular
 
 
-# ---------------------------------------------------------------------------
-# Cultivo
-# ---------------------------------------------------------------------------
+class MetadataService:
+    """Servicio encargado de la gestión, validación e ingesta masiva de metadatos de muestras de suelo."""
 
-def obtener_o_crear_cultivo(nombre: str, descripcion: str = "") -> Cultivo:
-    """
-    Devuelve un Cultivo existente o lo crea si no existe.
-    Nombre se normaliza a Title Case para consistencia.
-
-    Ejemplo:
-        cultivo = obtener_o_crear_cultivo("Cacao", "Cultivo principal del proyecto")
-    """
-    nombre = nombre.strip().title()
-    cultivo, _ = Cultivo.objects.get_or_create(
-        nombre=nombre,
-        defaults={"descripcion": descripcion},
-    )
-    return cultivo
-
-
-def listar_cultivos() -> list[dict]:
-    """
-    Retorna todos los cultivos registrados como lista de dicts.
-    Útil para poblar selects en formularios (forms.py).
-    """
-    return list(Cultivo.objects.values("id", "nombre", "descripcion"))
-
-
-# ---------------------------------------------------------------------------
-# VariedadClon
-# ---------------------------------------------------------------------------
-
-def obtener_o_crear_variedad(
-    cultivo: Cultivo,
-    nombre_variedad: str,
-    descripcion: str = "",
-) -> VariedadClon:
-    """
-    Devuelve o crea una VariedadClon asociada al Cultivo dado.
-
-    Ejemplo:
-        variedad = obtener_o_crear_variedad(cultivo_cacao, "CCN51")
-    """
-    nombre_variedad = nombre_variedad.strip()
-    variedad, _ = VariedadClon.objects.get_or_create(
-        cultivo=cultivo,
-        nombre=nombre_variedad,
-        defaults={"descripcion": descripcion},
-    )
-    return variedad
-
-
-def listar_variedades(cultivo_id: int) -> list[dict]:
-    """
-    Retorna todas las variedades/clones de un cultivo específico.
-    Útil para cargar opciones dependientes en el formulario de subida.
-    """
-    return list(
-        VariedadClon.objects.filter(cultivo_id=cultivo_id)
-        .values("id", "nombre", "descripcion")
-    )
-
-
-# ---------------------------------------------------------------------------
-# MuestraSuelo
-# ---------------------------------------------------------------------------
-
-def registrar_muestra(
-    codigo: str,
-    cultivo: Cultivo,
-    variedad_clon: VariedadClon | None = None,
-    tipo_muestra: str = "Suelo",
-    observaciones: str = "",
-) -> MuestraSuelo:
-    """
-    Crea y guarda una nueva MuestraSuelo en la base de datos.
-
-    Parámetros:
-        codigo          : Identificador único de la muestra (ej. "CCN51-M01").
-        cultivo         : Instancia de Cultivo.
-        variedad_clon   : Instancia de VariedadClon (opcional).
-        tipo_muestra    : Por defecto "Suelo" según el modelo.
-        observaciones   : Notas libres del técnico agrícola.
-
-    Relación con roles (README):
-        Este método es invocado por el Técnico Agrícola / Usuario Final,
-        quien solo registra metadatos sin acceder al pipeline.
-    """
-    if not codigo.strip():
-        raise ValidationError("El código de muestra no puede estar vacío.")
-
-    muestra = MuestraSuelo.objects.create(
-        codigo=codigo.strip(),
-        cultivo=cultivo,
-        variedad_clon=variedad_clon,
-        tipo_muestra=tipo_muestra,
-        observaciones=observaciones,
-    )
-    return muestra
-
-
-def obtener_muestra_por_codigo(codigo: str) -> MuestraSuelo | None:
-    """
-    Busca una MuestraSuelo por su código. Retorna None si no existe.
-    """
-    try:
-        return MuestraSuelo.objects.select_related("cultivo", "variedad_clon").get(
-            codigo=codigo.strip()
+    @staticmethod
+    def obtener_o_crear_cultivo(nombre: str, descripcion: str = "") -> Cultivo:
+        """Devuelve un Cultivo existente o lo crea, normalizando el nombre a Title Case."""
+        if not nombre:
+            raise ValueError("El nombre del cultivo no puede estar vacío.")
+        
+        nombre_normalizado = nombre.strip().title()
+        cultivo, _ = Cultivo.objects.get_or_create(
+            nombre=nombre_normalizado,
+            defaults={"descripcion": descripcion}
         )
-    except MuestraSuelo.DoesNotExist:
-        return None
+        return cultivo
 
-
-def listar_muestras_por_cultivo(cultivo_id: int) -> list[dict]:
-    """
-    Retorna todas las muestras de un cultivo, con datos de variedad incluidos.
-    Útil para el dashboard y el historial.
-    """
-    return list(
-        MuestraSuelo.objects.filter(cultivo_id=cultivo_id)
-        .select_related("variedad_clon")
-        .values(
-            "id",
-            "codigo",
-            "variedad_clon__nombre",
-            "tipo_muestra",
-            "fecha_registro",
-            "observaciones",
+    @staticmethod
+    def obtener_o_crear_variedad(cultivo: Cultivo, nombre: str, descripcion: str = "") -> VariedadClon:
+        """Devuelve una Variedad/Clon asociada a un cultivo, normalizando el nombre a Upper Case."""
+        if not nombre:
+            raise ValueError("El nombre de la variedad/clon no puede estar vacío.")
+            
+        nombre_normalizado = nombre.strip().upper()
+        variedad, _ = VariedadClon.objects.get_or_create(
+            cultivo=cultivo,
+            nombre=nombre_normalizado,
+            defaults={"descripcion": descripcion}
         )
-    )
+        return variedad
 
+    @staticmethod
+    def registrar_muestra(
+        codigo_muestra: str, 
+        variedad: VariedadClon, 
+        finca: str = "", 
+        lote: str = ""
+    ) -> Tuple[MuestraSuelo, bool]:
+        """Registra o actualiza una muestra de suelo específica asegurando la unicidad de su código."""
+        if not codigo_muestra:
+            raise ValueError("El código de la muestra es mandatorio para la trazabilidad.")
 
-# ---------------------------------------------------------------------------
-# Importación masiva desde CSV (data/metadata/muestras.csv)
-# ---------------------------------------------------------------------------
+        codigo_clean = codigo_muestra.strip().upper()
+        muestra, creado = MuestraSuelo.objects.get_or_create(
+            codigo=codigo_clean,
+            defaults={
+                "variedad": variedad,
+                "finca": finca.strip(),
+                "lote": lote.strip()
+            }
+        )
+        return muestra, creado
 
-def importar_muestras_desde_csv(ruta_csv: str | Path) -> dict:
-    """
-    Importa muestras masivamente desde el archivo CSV de metadatos.
-    Formato esperado del CSV (encabezados):
-        codigo, cultivo, variedad_clon, tipo_muestra, observaciones
+    @staticmethod
+    def importar_metadatos_csv(contenido_csv: Union[str, bytes, io.StringIO]) -> Dict[str, int]:
+        """
+        RESOLUCIÓN DE RENDIMIENTO (Anti N+1) E INTEGRIDAD: Ingesta masiva de muestras agrícolas.
+        Usa cachés locales para evitar consultas repetitivas y envuelve todo en una transacción atómica.
+        
+        Espera columnas: codigo, cultivo, variedad, finca, lote
+        """
+        resumen = {"cultivos_creados": 0, "variedades_creadas": 0, "muestras_registradas": 0}
+        
+        # Normalizar el flujo de entrada a un lector de strings de Python
+        if isinstance(contenido_csv, bytes):
+            stream = io.StringIO(contenido_csv.decode("utf-8"))
+        elif isinstance(contenido_csv, str):
+            stream = io.StringIO(contenido_csv)
+        else:
+            stream = contenido_csv
 
-    Retorna:
-        {
-            "creadas": int,
-            "omitidas": int,      # ya existían
-            "errores": list[str], # filas con problemas
-        }
-    """
-    ruta_csv = Path(ruta_csv)
-    if not ruta_csv.exists():
-        raise FileNotFoundError(f"No se encontró el archivo: {ruta_csv}")
+        lector = csv.DictReader(stream)
+        if not lector.fieldnames:
+            return resumen
 
-    creadas  = 0
-    omitidas = 0
-    errores  = []
+        # Sanitizar nombres de columnas del CSV a minúsculas
+        lector.fieldnames = [col.strip().lower() for col in lector.fieldnames]
 
-    with open(ruta_csv, newline="", encoding="utf-8") as f:
-        lector = csv.DictReader(f)
-        for i, fila in enumerate(lector, start=2):  # fila 1 = encabezados
-            try:
-                codigo = fila.get("codigo", "").strip()
-                if not codigo:
-                    errores.append(f"Fila {i}: código vacío, se omite.")
-                    continue
+        # Cachés en memoria para demoler el problema N+1
+        cache_cultivos: Dict[str, Cultivo] = {}
+        cache_variedades: Dict[Tuple[int, str], VariedadClon] = {}
 
-                # Evitar duplicados
-                if MuestraSuelo.objects.filter(codigo=codigo).exists():
-                    omitidas += 1
-                    continue
+        # Forzar operación atómica: O se carga todo el lote de muestras perfecto, o no se guarda nada
+        with transaction.atomic():
+            for fila in lector:
+                col_codigo = fila.get("codigo", "").strip()
+                col_cultivo = fila.get("cultivo", "").strip()
+                col_variedad = fila.get("variedad", "").strip()
+                col_finca = fila.get("finca", "").strip()
+                col_lote = fila.get("lote", "").strip()
 
-                cultivo = obtener_o_crear_cultivo(fila.get("cultivo", "Desconocido"))
+                if not col_codigo or not col_cultivo or not col_variedad:
+                    continue  # Ignorar filas incompletas de forma defensiva
 
-                nombre_var = fila.get("variedad_clon", "").strip()
-                variedad   = obtener_o_crear_variedad(cultivo, nombre_var) if nombre_var else None
+                # 1. Resolver Cultivo usando la caché en memoria
+                cultivo_key = col_cultivo.title()
+                if cultivo_key not in cache_cultivos:
+                    cultivo = MetadataService.obtener_o_crear_cultivo(cultivo_key)
+                    cache_cultivos[cultivo_key] = cultivo
+                    resumen["cultivos_creados"] += 1
+                else:
+                    cultivo = cache_cultivos[cultivo_key]
 
-                registrar_muestra(
-                    codigo=codigo,
-                    cultivo=cultivo,
-                    variedad_clon=variedad,
-                    tipo_muestra=fila.get("tipo_muestra", "Suelo"),
-                    observaciones=fila.get("observaciones", ""),
+                # 2. Resolver Variedad usando la caché estructurada (ID_Cultivo, Nombre_Variedad)
+                variedad_key = (cultivo.id, col_variedad.upper())
+                if variedad_key not in cache_variedades:
+                    variedad = MetadataService.obtener_o_crear_variedad(cultivo, col_variedad)
+                    cache_variedades[variedad_key] = variedad
+                    resumen["variedades_creadas"] += 1
+                else:
+                    variedad = cache_variedades[variedad_key]
+
+                # 3. Registrar Muestra de suelo
+                _, creado = MetadataService.registrar_muestra(
+                    codigo_muestra=col_codigo,
+                    variedad=variedad,
+                    finca=col_finca,
+                    lote=col_lote
                 )
-                creadas += 1
+                if creado:
+                    resumen["muestras_registradas"] += 1
 
-            except Exception as e:
-                errores.append(f"Fila {i}: {str(e)}")
+        return resumen
 
-    return {"creadas": creadas, "omitidas": omitidas, "errores": errores}
+    @staticmethod
+    def listar_archivos_de_muestra(muestra_id: int) -> Sequence[Dict[str, Any]]:
+        """
+        RESOLUCIÓN DE TIPADO: Retorna el historial de archivos moleculares de una muestra.
+        Usa Sequence[Dict[str, Any]] ya que Django garantiza que las llaves de values() son strings,
+        satisfaciendo la invarianza de tipos de Pylance sin falsos positivos.
+        """
+        qs = ArchivoMolecular.objects.filter(muestra_id=muestra_id).values(
+            "id", "tipo_analisis", "archivo", "fecha_carga"
+        ).order_by("-fecha_carga")
+        
+        return list(qs)
 
-
-# ---------------------------------------------------------------------------
-# ArchivoMolecular: registro de metadatos del archivo subido
-# ---------------------------------------------------------------------------
-
-def registrar_archivo_molecular(
-    muestra: MuestraSuelo,
-    tipo_analisis: str,
-    archivo_django_file,
-) -> ArchivoMolecular:
-    """
-    Crea el registro del archivo molecular asociado a la muestra.
-
-    Parámetros:
-        muestra            : Instancia de MuestraSuelo ya registrada.
-        tipo_analisis      : "16S" o "ITS" (validado contra choices del modelo).
-        archivo_django_file: Objeto InMemoryUploadedFile / TemporaryUploadedFile
-                             proveniente del formulario de subida.
-
-    Relación con roles (README):
-        Invocado por el Analista Especialista al cargar los archivos 16S/ITS.
-    """
-    tipos_validos = [choice[0] for choice in ArchivoMolecular.TIPOS_ANALISIS]
-    if tipo_analisis not in tipos_validos:
-        raise ValidationError(
-            f"Tipo de análisis inválido: '{tipo_analisis}'. "
-            f"Opciones válidas: {tipos_validos}"
+    @staticmethod
+    def resumen_metadatos_dashboard() -> Dict[str, Any]:
+        """Genera los indicadores cuantitativos consolidados para el Dashboard principal de la UI."""
+        por_tipo = (
+            ArchivoMolecular.objects.values("tipo_analisis")
+            .annotate(total=Count("id"))
         )
+        
+        # Mapear QuerySet a un diccionario nativo ágil
+        tipo_dict = {str(item["tipo_analisis"]): int(item["total"]) for item in por_tipo}
 
-    archivo = ArchivoMolecular.objects.create(
-        muestra=muestra,
-        tipo_analisis=tipo_analisis,
-        archivo=archivo_django_file,
-    )
-    return archivo
-
-
-def obtener_archivos_de_muestra(muestra_id: int) -> list[dict]:
-    """
-    Lista los archivos moleculares registrados para una muestra.
-    Retorna info útil para el historial y la vista de detalle.
-    """
-    return list(
-        ArchivoMolecular.objects.filter(muestra_id=muestra_id)
-        .values("id", "tipo_analisis", "archivo", "fecha_carga")
-        .order_by("-fecha_carga")
-    )
-
-
-# ---------------------------------------------------------------------------
-# Resumen de metadatos para el dashboard
-# ---------------------------------------------------------------------------
-
-def resumen_metadatos() -> dict:
-    """
-    Estadísticas rápidas para poblar el dashboard principal.
-
-    Retorna:
-        {
-            "total_muestras"  : int,
-            "total_cultivos"  : int,
-            "total_variedades": int,
-            "total_archivos"  : int,
-            "por_tipo_analisis": {"16S": int, "ITS": int},
+        return {
+            "total_muestras": int(MuestraSuelo.objects.count()),
+            "total_cultivos": int(Cultivo.objects.count()),
+            "total_variedades": int(VariedadClon.objects.count()),
+            "total_archivos": int(ArchivoMolecular.objects.count()),
+            "por_tipo_analisis": {
+                "16S": tipo_dict.get("16S", 0),
+                "ITS": tipo_dict.get("ITS", 0)
+            },
         }
-    """
-    from django.db.models import Count
-
-    por_tipo = (
-        ArchivoMolecular.objects.values("tipo_analisis")
-        .annotate(total=Count("id"))
-    )
-    tipo_dict = {item["tipo_analisis"]: item["total"] for item in por_tipo}
-
-    return {
-        "total_muestras"   : MuestraSuelo.objects.count(),
-        "total_cultivos"   : Cultivo.objects.count(),
-        "total_variedades" : VariedadClon.objects.count(),
-        "total_archivos"   : ArchivoMolecular.objects.count(),
-        "por_tipo_analisis": {
-            "16S": tipo_dict.get("16S", 0),
-            "ITS": tipo_dict.get("ITS", 0),
-        },
-    }
+    

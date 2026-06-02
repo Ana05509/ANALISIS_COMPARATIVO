@@ -1,39 +1,35 @@
 {% extends "analisis/base.html" %}
 
-{% block title %}Comparar perfiles{% endblock %}
+{% block title %}Comparar Perfiles{% endblock %}
 {% block nav_comparar %}active{% endblock %}
-{% block topbar_title %}Comparar perfiles microbianos{% endblock %}
-
-{% block extra_css %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-{% endblock %}
+{% block topbar_title %}Análisis Comparativo Microbiano{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>Análisis comparativo</h1>
-    <p>Dominantes · Compartidos (Core) · Exclusivos por variedad o clon</p>
+    <h1>Análisis Comparativo</h1>
+    <p>Dominantes · Compartidos (Core) · Exclusivos por variedad o clon agrícola</p>
 </div>
 
-<!-- Formulario de comparación -->
 <div class="card" style="margin-bottom: 1.5rem;">
     <div class="card-title">Parámetros de comparación</div>
     <form method="post">
         {% csrf_token %}
         <input type="hidden" name="tipo" value="{{ tipo_actual }}">
+        
         <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end;">
-            <div>
-                <label class="form-label">Productos / variedades</label>
-                {{ form.productos }}
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Productos / Variedades</label>
+                <div class="django-select-custom">{{ form.productos }}</div>
             </div>
-            <div>
-                <label class="form-label">Nivel taxonómico</label>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Nivel Taxonómico</label>
                 {{ form.nivel }}
             </div>
-            <div>
+            <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">Top N</label>
                 {{ form.top_n }}
             </div>
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary" style="height: 38px;">
                 <i class="ti ti-arrows-diff" aria-hidden="true"></i> Comparar
             </button>
         </div>
@@ -41,7 +37,6 @@
 </div>
 
 {% if tabla %}
-<!-- Métricas BI -->
 <div class="metrics-grid">
     <div class="metric-card">
         <div class="metric-label">Taxa comparados</div>
@@ -61,57 +56,56 @@
     </div>
 </div>
 
-<!-- Análisis diferencial -->
 {% if dominantes or compartidos or exclusivos %}
-<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
 
     <div class="card card-sm">
-        <div class="card-title" style="color:var(--verde-dark);">
+        <div class="card-title" style="color: var(--verde-dark); margin-bottom: 0.5rem;">
             <i class="ti ti-trending-up" aria-hidden="true"></i> Dominantes
         </div>
-        <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 6px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
             {% for d in dominantes %}
-                <span style="font-size:12px; background:var(--verde-light); color:var(--verde-dark); padding:2px 8px; border-radius:20px;">{{ d }}</span>
+                <span style="font-size: 11px; font-family: 'DM Mono', monospace; background: var(--verde-light); color: var(--verde-dark); padding: 2px 8px; border-radius: 4px;">{{ d }}</span>
             {% empty %}
-                <span style="font-size:13px; color:var(--text-hint);">Sin dominantes identificados</span>
+                <span style="font-size: 13px; color: var(--text-hint);">Sin dominantes identificados</span>
             {% endfor %}
         </div>
     </div>
 
     <div class="card card-sm">
-        <div class="card-title" style="color: #185FA5;">
+        <div class="card-title" style="color: #185FA5; margin-bottom: 0.5rem;">
             <i class="ti ti-circles-relation" aria-hidden="true"></i> Compartidos (Core)
         </div>
-        <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 6px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
             {% for c in compartidos %}
-                <span style="font-size:12px; background:#E6F1FB; color:#0C447C; padding:2px 8px; border-radius:20px;">{{ c }}</span>
+                <span style="font-size: 11px; font-family: 'DM Mono', monospace; background: #E6F1FB; color: #0C447C; padding: 2px 8px; border-radius: 4px;">{{ c }}</span>
             {% empty %}
-                <span style="font-size:13px; color:var(--text-hint);">Sin taxa compartidos</span>
+                <span style="font-size: 13px; color: var(--text-hint);">Sin taxa compartidos</span>
             {% endfor %}
         </div>
     </div>
 
     <div class="card card-sm">
-        <div class="card-title" style="color: var(--amber);">
+        <div class="card-title" style="color: var(--amber); margin-bottom: 0.5rem;">
             <i class="ti ti-sparkles" aria-hidden="true"></i> Exclusivos
         </div>
-        <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 6px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
             {% for e in exclusivos %}
-                <span style="font-size:12px; background:var(--amber-light); color:#5a3a00; padding:2px 8px; border-radius:20px;">{{ e }}</span>
+                <span style="font-size: 11px; font-family: 'DM Mono', monospace; background: var(--amber-light); color: #5a3a00; padding: 2px 8px; border-radius: 4px;">{{ e }}</span>
             {% empty %}
-                <span style="font-size:13px; color:var(--text-hint);">Sin taxa exclusivos</span>
+                <span style="font-size: 13px; color: var(--text-hint);">Sin taxa exclusivos</span>
             {% endfor %}
         </div>
     </div>
 </div>
 {% endif %}
 
-<!-- Tabla comparativa -->
 <div class="card">
     <div class="card-title">Tabla comparativa — Top {{ top_actual }} por {{ nivel_actual }}</div>
-    <div style="margin-bottom: 0.75rem; font-size:13px; color:var(--text-hint);">
-        Taxón más abundante: <strong style="color:var(--text-primary);">{{ top_taxonomia }}</strong>
+    <div style="margin-bottom: 0.75rem; font-size: 13px; color: var(--text-muted);">
+        Taxón más abundante en el set: <strong style="color: var(--verde-dark); font-family: 'DM Mono', monospace;">{{ top_taxonomia }}</strong>
     </div>
+    
     <div class="table-wrap">
         <table id="tabla-comparativa">
             <thead>
@@ -128,7 +122,7 @@
             <tbody>
                 {% for fila in tabla %}
                 <tr>
-                    <td><strong>{{ fila.taxonomia }}</strong></td>
+                    <td class="td-mono" style="font-weight: 500; color: var(--text-primary);">{{ fila.taxonomia }}</td>
                     {% for key, val in fila.items %}
                         {% if key != 'taxonomia' and key != 'clasificacion' %}
                         <td class="td-mono">{{ val|floatformat:4 }}</td>
@@ -136,9 +130,9 @@
                     {% endfor %}
                     <td>
                         {% if fila.clasificacion == 'benefico' %}
-                            <span class="badge badge-benefico">Benéfico</span>
+                            <span class="badge badge-benefico"><i class="ti ti-shield-check"></i> Benéfico</span>
                         {% elif fila.clasificacion == 'fitopatogeno' %}
-                            <span class="badge badge-fitopatogeno">Fitopatógeno</span>
+                            <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle"></i> Fitopatógeno</span>
                         {% else %}
                             <span class="badge badge-sin-clas">Sin clasificación</span>
                         {% endif %}
@@ -150,41 +144,81 @@
     </div>
 </div>
 
-<!-- Gráfico de barras comparativo -->
-<div class="card" style="margin-top: 1.25rem;">
-    <div class="card-title">Abundancia relativa comparada</div>
-    <canvas id="chart-comparativo" height="100"></canvas>
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-title">Abundancia Relativa Comparada (%)</div>
+    <div style="position: relative; height: 340px; width: 100%;">
+        <canvas id="chart-comparativo"></canvas>
+    </div>
 </div>
-
-<script>
-const tablaData = {{ tabla_json|safe }};
-const labels = tablaData.map(r => r.taxonomia);
-const productos = Object.keys(tablaData[0] || {}).filter(k => k !== 'taxonomia' && k !== 'clasificacion');
-const colores = ['#1D9E75','#BA7517','#185FA5','#A32D2D','#0F6E56'];
-const datasets = productos.map((p, i) => ({
-    label: p,
-    data: tablaData.map(r => parseFloat(r[p] || 0).toFixed(4)),
-    backgroundColor: colores[i % colores.length] + '99',
-    borderColor: colores[i % colores.length],
-    borderWidth: 1,
-}));
-
-new Chart(document.getElementById('chart-comparativo'), {
-    type: 'bar',
-    data: { labels, datasets },
-    options: {
-        responsive: true,
-        plugins: { legend: { position: 'top' } },
-        scales: { y: { beginAtZero: true, title: { display: true, text: '% Abundancia' } } }
-    }
-});
-</script>
 
 {% else %}
 <div class="empty-state">
     <i class="ti ti-arrows-diff" aria-hidden="true"></i>
     <strong>Seleccione productos para comparar</strong>
-    <p>Elija dos o más productos y configure los parámetros del análisis.</p>
+    <p>Elija dos o más productos y configure los parámetros del análisis taxonómico masivo.</p>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. Forzar de forma dinámica que los inputs de Django adopten los estilos de BioSoil
+    const inputsForm = document.querySelectorAll('.card form select, .card form input[type="number"], .card form input[type="text"]');
+    inputsForm.forEach(el => {
+        el.classList.add('form-control');
+    });
+
+    {% if tabla %}
+    // 2. Construcción de gráficos con inyección de variables CSS nativas
+    const tablaData = {{ tabla_json|safe }};
+    const labels = tablaData.map(r => r.taxonomia);
+    const productos = Object.keys(tablaData[0] || {}).filter(k => k !== 'taxonomia' && k !== 'clasificacion');
+    
+    // Colores corporativos extraídos de tu :root
+    const vDark  = getComputedStyle(document.documentElement).getPropertyValue('--verde-dark').trim() || '#085041';
+    const verde  = getComputedStyle(document.documentElement).getPropertyValue('--verde').trim() || '#1D9E75';
+    const amber  = getComputedStyle(document.documentElement).getPropertyValue('--amber').trim() || '#BA7517';
+    const rojo   = getComputedStyle(document.documentElement).getPropertyValue('--rojo').trim() || '#A32D2D';
+    const teal   = getComputedStyle(document.documentElement).getPropertyValue('--teal').trim() || '#0F6E56';
+    const colores = [vDark, amber, verde, rojo, teal];
+
+    const datasets = productos.map((p, i) => ({
+        label: p,
+        data: tablaData.map(r => parseFloat(r[p] || 0).toFixed(4)),
+        backgroundColor: colores[i % colores.length] + 'BB', // Agrega opacidad suave alpha
+        borderColor: colores[i % colores.length],
+        borderWidth: 1.5,
+        borderRadius: 4
+    }));
+
+    new Chart(document.getElementById('chart-comparativo'), {
+        type: 'bar',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { 
+                    position: 'bottom',
+                    labels: { font: { family: 'Outfit', size: 13 } } 
+                } 
+            },
+            scales: { 
+                x: {
+                    ticks: { font: { family: 'DM Mono', size: 11 } }
+                },
+                y: { 
+                    beginAtZero: true, 
+                    title: { display: true, text: '% Abundancia Relativa', font: { family: 'Outfit' } },
+                    ticks: { font: { family: 'DM Mono' } }
+                } 
+            }
+        }
+    });
+    {% endif %}
+});
+</script>
 {% endblock %}

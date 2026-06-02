@@ -1,0 +1,144 @@
+Estructura del Proyecto:
+C:\Users\fherr\Documents\Proyecto_Analisis_Final\ANALISIS_COMPARATIVO
+
+├── analisis
+│   ├── data
+│   │   ├── catalogos
+│   │   │   ├── microorganismos_beneficos.csv
+│   │   │   └── microorganismos_fitopatogenos.csv
+│   │   ├── metadata
+│   │   │   └── muestra.csv
+│   │   ├── processed
+│   │   └── raw
+│   │       └── 16s
+│   │           └── its
+│   ├── migrations
+│   │   ├── 0001_initial.py
+│   │   └── __init__.py
+│   ├── services
+│   │   ├── business
+│   │   │   ├── __init__.py
+│   │   │   ├── analysis_service.py
+│   │   │   ├── catalog_service.py
+│   │   │   ├── comparison_service.py
+│   │   │   ├── export_service.py
+│   │   │   ├── report_service.py
+│   │   │   ├── statistics_service.py
+│   │   │   ├── upload_service.py
+│   │   │   └── visualization_service.py
+│   │   ├── data
+│   │   │   ├── __init__.py
+│   │   │   ├── excel_cervise.py
+│   │   │   ├── excel_service.py
+│   │   │   ├── file_service.py
+│   │   │   └── metadata_service.py
+│   │   ├── interpretation
+│   │   │   ├── __init__.py
+│   │   │   ├── beneficial_service.py
+│   │   │   ├── microorganism_classifier.py
+│   │   │   └── pathogen_service.py
+│   │   ├── processing
+│   │   │   ├── __init__.py
+│   │   │   ├── abundance.py
+│   │   │   ├── analytics.py
+│   │   │   ├── cleaning.py
+│   │   │   ├── diversity.py
+│   │   │   ├── pipeline.py
+│   │   │   └── taxonomy.py
+│   │   └── __init__.py
+│   ├── static
+│   │   ├── analisis
+│   │   │   └── css
+│   │   │       └── styles.css
+│   │   ├── images
+│   │   └── js
+│   │       ├── charts.js
+│   │       ├── comparison.js
+│   │       └── upload.js
+│   ├── templates
+│   │   ├── analisis
+│   │   │   ├── analisis_avanzado.html
+│   │   │   ├── base.html
+│   │   │   ├── catalogo_microorganismos.html
+│   │   │   ├── comparar.html
+│   │   │   ├── dashboard.html
+│   │   │   ├── detalle_producto.html
+│   │   │   ├── historial.html
+│   │   │   ├── reportes.html
+│   │   │   ├── resultados.html
+│   │   │   └── subir_datos.html
+│   │   ├── registration
+│   │   │   └── login.html
+│   │   └── __init__.py
+│   ├── templatetags
+│   │   ├── __init__.py
+│   │   └── custom_filters.py
+│   ├── test
+│   │   ├── __init__.py
+│   │   ├── test_catalog.py
+│   │   ├── test_comparison.py
+│   │   ├── test_comparison_service.py
+│   │   ├── test_models.py
+│   │   ├── test_models_comprehensive.py
+│   │   ├── test_pipeline.py
+│   │   ├── test_pipeline_comprehensive.py
+│   │   └── test_upload.py
+│   ├── views
+│   │   ├── __init__.py
+│   │   ├── analysis.py
+│   │   ├── catalogo.py
+│   │   ├── comparison.py
+│   │   ├── dashboard.py
+│   │   ├── historial.py
+│   │   ├── producto.py
+│   │   ├── reportes.py
+│   │   └── subir_datos.py
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── forms.py
+│   ├── models.py
+│   ├── static_style.css
+│   ├── templates_base.html
+│   ├── tests.py
+│   └── urls.py
+├── config
+│   ├── __init__.py
+│   ├── asgi.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+├── docs
+│   ├── ARCHITECTURE.md
+│   ├── COMPLETE_PROJECT_SUMMARY.md
+│   ├── COMPLETE_TREE_STRUCTURE.md
+│   ├── COMPREHENSIVE_VISUAL_SUMMARY.md
+│   ├── DATABASE.md
+│   ├── GET_STARTED_NOW.md
+│   ├── HOW_TO_RUN_TESTS.md
+│   ├── INTEGRATION_TESTS_TEMPLATE.md
+│   ├── PHASE1_WEEK1_SUMMARY.md
+│   ├── PHASE1_WEEK2_REPORT.md
+│   ├── README_WEEK2_STATUS.md
+│   └── VERIFY_OPTIMIZATION.md
+├── media
+│   └── archivos
+│       ├── Cacao_CCN51.summary.csv
+│       └── Clon_800.summary.csv
+├── static
+├── .coverage
+├── .gitattributes
+├── .gitignore
+├── auditar_proyecto.py
+├── manage.py
+├── pyrightconfig.json
+├── pytest.ini
+├── README.md
+├── README_REPARACION.md
+├── repair_imports.py
+├── REPARACION_COMPLETA.md
+├── requirements.txt
+├── requirements_new.txt
+├── ROADMAP_AND_NEXT_STEPS.md
+├── STATUS_FINAL.md
+└── test_imports.py

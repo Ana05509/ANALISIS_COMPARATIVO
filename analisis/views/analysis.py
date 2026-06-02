@@ -19,160 +19,47 @@ from ..services.business.comparison_service import (
 from ..services.business.visualization_service import VisualizationService
 from ..services.business.statistics_service import StatisticalAnalyzer
 from ..models import ResultadoTaxonomico
-from django.db.models import F, Sum
-
 
 @login_required
 def analisis_avanzado(request):
     tipo       = request.GET.get("tipo", "16S")
     top_n_raw  = request.GET.get("top_n", "10")
     nivel      = request.GET.get("nivel", "genus")
-    variedad_id = request.GET.get("producto_id", None)   # URL usa producto_id → internamente variedad_id
+    variedad_id = request.GET.get("producto_id", None)   
     muestra_id = request.GET.get("muestra_id", None)
 
     opciones_top_n = [5, 10, 25, 50]
     try:
-        top_n = int(top_n_raw)
-        if top_n not in opciones_top_n:
-            top_n = 10
-    except (ValueError, TypeError):
+        top_n = int(top_n_raw) if int(top_n_raw) in opciones_top_n else 10
+    except ValueError:
         top_n = 10
 
-    if tipo not in ("16S", "ITS"):
-        tipo = "16S"
-
-    niveles_validos = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
-    if nivel not in niveles_validos:
-        nivel = "genus"
-
+    contexto = {}
     try:
         contexto = obtener_analisis_avanzado(
-            tipo=tipo,
-            top_n=top_n,
-            nivel=nivel,
-            variedad_id=variedad_id,
-            muestra_id=muestra_id,
-        )
-    except Exception as e:
-        messages.error(request, f"Error al procesar el análisis: {str(e)}")
-        contexto = {}
-
-    try:
-        contexto["top_microorganismos"] = obtener_top_n(
-            tipo=tipo,
-            n=top_n,
-            nivel=nivel,
-            variedad_id=variedad_id,
-        )
-    except Exception:
-        contexto["top_microorganismos"] = []
-
-    try:
-        contexto["diversidad"] = obtener_diversidad(
-            tipo=tipo,
-            nivel=nivel,
-            variedad_id=variedad_id,
-        )
-    except Exception:
-        contexto["diversidad"] = None
-
-    if variedad_id or muestra_id:
-        try:
-            contexto["analisis_diferencial"] = obtener_analisis_diferencial(
-                tipo=tipo,
-                nivel=nivel,
-                variedad_id=variedad_id,
-                muestra_id=muestra_id,
-            )
-            contexto["exclusivos"] = obtener_microorganismos_exclusivos(
-                tipo=tipo,
-                variedad_id=variedad_id,
-            )
-            contexto["compartidos"] = obtener_microorganismos_compartidos(
-                tipo=tipo,
-                variedad_id=variedad_id,
-            )
-        except Exception:
-            contexto["analisis_diferencial"] = None
-            contexto["exclusivos"] = []
-            contexto["compartidos"] = []
-
-    # ========== PHASE 2: ESTADÍSTICA AVANZADA ==========
-    
-    graficos_json = {}
-    estadisticas = {}
-    
-    try:
-        # Obtener datos para estadística
-        qs = ResultadoTaxonomico.objects.filter(
-            archivo__tipo_analisis=tipo
+            tipo=tipo, top_n=top_n, nivel=nivel, variedad_id=variedad_id, muestra_id=muestra_id
         )
         
-        if variedad_id:
-            qs = qs.filter(archivo__muestra__variedad_clon_id=variedad_id)
-        if muestra_id:
-            qs = qs.filter(archivo__muestra_id=muestra_id)
-        
-        if qs.exists():
-            # Convertir a DataFrame
-            data = list(
-                qs.values(nombre_tax=F("genus"))
-                .annotate(total_hits=Sum("num_hits"), total_porcentaje=Sum("porcentaje_hits"))
-                .order_by("-total_porcentaje")[:top_n]
-            )
-            
-            if data:
-                df_stats = pd.DataFrame(data)
-                
-                # Calcular estadísticas descriptivas
-                analyzer = StatisticalAnalyzer()
-                estadisticas["descriptivas"] = analyzer.calcular_descriptivas(
-                    pd.DataFrame({"% _hits": [d['total_porcentaje'] for d in data]})
-                )
-                
-                # Test de normalidad
-                estadisticas["normalidad"] = analyzer.test_normalidad_shapiro(
-                    pd.DataFrame({"%_hits": [d['total_porcentaje'] for d in data]})
-                )
-                
-                # Gráficos adicionales
-                viz = VisualizationService()
-                
-                # Gráfico de línea de abundancia acumulada
-                df_sorted = pd.DataFrame(data).sort_values('total_porcentaje', ascending=False)
-                df_sorted['acumulada'] = df_sorted['total_porcentaje'].cumsum()
-                
-                fig_linea = viz.crear_grafico_diversidad_linea(
-                    df_sorted,
-                    x='nombre_tax',
-                    y='acumulada',
-                    titulo=f'Abundancia Acumulada - {tipo}'
-                )
-                
-                if fig_linea:
-                    graficos_json["grafico_acumulada"] = json.loads(fig_linea.to_json())
-    
+        # Inyección estadística (Fase 2)
+        if "datos_tabla" in contexto and contexto["datos_tabla"]:
+            df = pd.DataFrame(contexto["datos_tabla"])
+            analyzer = StatisticalAnalyzer()
+            contexto["estadisticas"] = analyzer.calcular_indices_diversidad(df)
+        else:
+            contexto["estadisticas"] = {}
+
     except Exception as e:
-        print(f"Error en estadística Phase 2: {e}")
-        messages.warning(request, "No se pudieron calcular algunas estadísticas")
+        messages.error(request, f"Error al computar los perfiles filogenéticos: {str(e)}")
 
     contexto.update({
-        "tipo":                   tipo,
-        "top_n":                  top_n,
-        "nivel":                  nivel,
-        "producto_id":            variedad_id,
-        "muestra_id":             muestra_id,
-        "opciones_top_n":         opciones_top_n,
-        "niveles_taxonomicos":    niveles_validos,
-        "marcadores_disponibles": ["16S", "ITS"],
-        
-        # PHASE 2
-        "graficos_json":           json.dumps(graficos_json),
-        "estadisticas":            estadisticas,
+        "tipo_actual": tipo,
+        "top_n_actual": top_n,
+        "nivel_actual": nivel,
+        "opciones_top_n": opciones_top_n,
+        "niveles_taxonomicos": ["kingdom", "phylum", "tax_class", "order", "family", "genus", "species"],
     })
 
     return render(request, "analisis/analisis_avanzado.html", contexto)
-
 
 @login_required
 def resultado_analisis(request, muestra_id):
@@ -185,11 +72,10 @@ def resultado_analisis(request, muestra_id):
         )
         contexto["muestra_id"] = muestra_id
     except Exception as e:
-        messages.error(request, f"No se pudo cargar el resultado de la muestra: {str(e)}")
+        messages.error(request, f"No se pudo estructurar el reporte de la muestra: {str(e)}")
         return redirect("analisis:analisis_avanzado")
 
     return render(request, "analisis/resultados.html", contexto)
-
 
 @login_required
 @require_POST
@@ -204,13 +90,9 @@ def exportar_analisis(request):
 
     try:
         resultado = generar_reporte_analisis(
-            tipo=tipo,
-            top_n=top_n,
-            nivel=nivel,
-            producto_id=variedad_id,
-            formato=formato,
-            usuario=request.user,
+            tipo=tipo, producto_id=variedad_id, formato=formato,
+            top_n=top_n, nivel=nivel, usuario=request.user,
         )
-        return JsonResponse({"ok": True, "url_reporte": resultado.get("url")})
+        return JsonResponse({"ok": True, "url": resultado.get("url")})
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)

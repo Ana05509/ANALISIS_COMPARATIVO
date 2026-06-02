@@ -1,8 +1,8 @@
 {% extends "analisis/base.html" %}
 
-{% block title %}Resultados{% endblock %}
+{% block title %}Resultados Taxonómicos{% endblock %}
 {% block nav_analisis %}active{% endblock %}
-{% block topbar_title %}Resultados del análisis{% endblock %}
+{% block topbar_title %}Resultados del Análisis{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'analisis:historial' %}" class="btn btn-outline btn-sm">
@@ -12,9 +12,9 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>Composición taxonómica</h1>
+    <h1>Composición Taxonómica</h1>
     <p>
-        Muestra #{{ muestra_id }} —
+        Muestra ID: <span class="td-mono" style="font-weight: 600; color: var(--text-primary);">#{{ muestra_id }}</span> — 
         <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual }}</span>
     </p>
 </div>
@@ -22,59 +22,66 @@
 {% if resumen %}
 <div class="metrics-grid">
     <div class="metric-card">
-        <div class="metric-label">Total taxa</div>
+        <div class="metric-label">Total Taxa Detectados</div>
         <div class="metric-value">{{ resumen|length }}</div>
     </div>
     <div class="metric-card verde">
-        <div class="metric-label">Nivel analizado</div>
-        <div class="metric-value" style="font-size:18px; text-transform:capitalize;">{{ nivel_actual }}</div>
+        <div class="metric-label">Nivel Analizado</div>
+        <div class="metric-value" style="font-size: 20px; text-transform: capitalize; font-weight: 600;">{{ nivel_actual }}</div>
     </div>
     {% if diversidad %}
     <div class="metric-card">
-        <div class="metric-label">Shannon H'</div>
-        <div class="metric-value">{{ diversidad.shannon }}</div>
-        <div class="metric-sub">Diversidad alfa</div>
+        <div class="metric-label">Índice Shannon (H')</div>
+        <div class="metric-value td-mono">{{ diversidad.shannon }}</div>
+        <div class="metric-sub">Diversidad alfa general</div>
     </div>
     <div class="metric-card">
-        <div class="metric-label">Riqueza (S)</div>
-        <div class="metric-value">{{ diversidad.riqueza }}</div>
-        <div class="metric-sub">Taxa únicos</div>
+        <div class="metric-label">Riqueza de Especies (S)</div>
+        <div class="metric-value td-mono">{{ diversidad.riqueza }}</div>
+        <div class="metric-sub">Taxa únicos identificados</div>
     </div>
     {% endif %}
 </div>
 
 <div class="card">
-    <div class="card-title">Top {{ top_actual }} — {{ nivel_actual|capfirst }}</div>
-    <div class="table-wrap" style="margin-top:0.75rem;">
-        <table>
+    <div class="card-title">Distribución de Abundancia — Top {{ top_actual }} por {{ nivel_actual|capfirst }}</div>
+    
+    <div class="table-wrap" style="margin-top: 1rem;">
+        <table id="tabla-resultados">
             <thead>
                 <tr>
-                    <th>#</th>
+                    <th style="width: 60px;">#</th>
                     <th>Taxonomía</th>
-                    <th>Num. Hits</th>
-                    <th>% Abundancia</th>
-                    <th>Clasificación</th>
+                    <th>Núm. Hits</th>
+                    <th style="width: 40%;">% Abundancia Relativa</th>
+                    <th>Clasificación Biológica</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in resumen %}
                 <tr>
-                    <td class="td-mono" style="color:var(--text-hint);">{{ forloop.counter }}</td>
-                    <td><strong>{{ item.taxonomia }}</strong></td>
-                    <td class="td-mono">{{ item.num_hits }}</td>
+                    <td class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
                     <td>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <div style="flex:1; height:6px; background:var(--gris-light); border-radius:3px; min-width:60px;">
-                                <div style="height:6px; background:var(--verde); border-radius:3px; width:{{ item.porcentaje_hits|floatformat:0 }}%;"></div>
+                        <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
+                            {{ item.taxonomia }}
+                        </strong>
+                    </td>
+                    <td class="td-mono" style="color: var(--text-primary);">{{ item.num_hits }}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
+                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.porcentaje_hits|floatformat:2 }}%;"></div>
                             </div>
-                            <span class="td-mono">{{ item.porcentaje_hits|floatformat:4 }}%</span>
+                            <span class="td-mono" style="font-weight: 500; min-width: 75px; text-align: right;">
+                                {{ item.porcentaje_hits|floatformat:4 }}%
+                            </span>
                         </div>
                     </td>
                     <td>
                         {% if item.clasificacion == 'benefico' %}
-                            <span class="badge badge-benefico">Benéfico</span>
+                            <span class="badge badge-benefico"><i class="ti ti-shield-check"></i> Benéfico</span>
                         {% elif item.clasificacion == 'fitopatogeno' %}
-                            <span class="badge badge-fitopatogeno">Fitopatógeno</span>
+                            <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle"></i> Fitopatógeno</span>
                         {% else %}
                             <span class="badge badge-sin-clas">Sin clasificación</span>
                         {% endif %}
@@ -88,8 +95,8 @@
 {% else %}
 <div class="empty-state">
     <i class="ti ti-chart-dots" aria-hidden="true"></i>
-    <strong>Sin resultados</strong>
-    <p>No se encontraron datos para esta muestra.</p>
+    <strong>Sin registros taxonómicos</strong>
+    <p>No se encontraron datos procesados ni hits moleculares mapeados para esta muestra.</p>
 </div>
 {% endif %}
 {% endblock %}

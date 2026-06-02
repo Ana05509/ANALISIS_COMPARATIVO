@@ -7,13 +7,9 @@ from ..models import MuestraSuelo, ArchivoMolecular
 
 MARCADORES_VALIDOS = ("16S", "ITS")
 
-
 @login_required
 def historial(request):
-    """
-    Historial de muestras procesadas por marcador molecular.
-    README: "Gestión de Muestras Agrícolas", "Segmentación Detallada"
-    """
+    """Historial de muestras procesadas en los laboratorios."""
     tipo_raw = request.GET.get("tipo", "16S")
     tipo = tipo_raw if tipo_raw in MARCADORES_VALIDOS else "16S"
     busqueda = request.GET.get("q", "").strip()
@@ -35,15 +31,14 @@ def historial(request):
         ).select_related("muestra__variedad_clon").order_by("-id")
 
     except Exception as e:
-        messages.error(request, f"Error al cargar el historial: {str(e)}")
+        messages.error(request, f"Error al consultar la bitácora histórica: {str(e)}")
         muestras = MuestraSuelo.objects.none()
         analisis = ArchivoMolecular.objects.none()
 
     return render(request, "analisis/historial.html", {
-        "productos":              muestras,
+        "muestras":               muestras,
         "analisis":               analisis,
         "tipo_actual":            tipo,
-        "marcadores_disponibles": MARCADORES_VALIDOS,
         "busqueda":               busqueda,
-        "total_productos":        muestras.count(),
+        "marcadores_disponibles": MARCADORES_VALIDOS,
     })

@@ -1,9 +1,12 @@
+# services/business/export_service.py
+# Motor optimizado para la generación de reportes interpretativos y exportación masiva de datos biológicos.
+
 import io
 from datetime import datetime
-
 import pandas as pd
 from django.db.models import F, Sum
 from django.http import HttpResponse
+from collections import deque
 
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo
 
@@ -16,105 +19,148 @@ MAPA_NIVELES = {
     "order": "order", "family": "family", "genus": "genus", "species": "species"
 }
 
-_historial_reportes: list[dict] = []
+# PROTECCIÓN CONTRA OUT-OF-MEMORY: Reemplazamos la lista infinita por un buffer circular indexado (Máx 200 registros)
+_historial_reportes = deque(maxlen=200)
 
 
-def _construir_dataframe(tipo, variedad_id, nivel, top_n):
-    campo_db = MAPA_NIVELES.get(nivel, "genus")
-    qs = ResultadoTaxonomico.objects.filter(archivo__tipo_analisis=tipo)
-    if variedad_id:
-        qs = qs.filter(archivo__muestra__variedad_clon_id=variedad_id)
+class ExportService:
+    """Servicio empresarial para el procesamiento, empaquetado e historial de reportes metagenómicos."""
 
-    if not qs.exists():
-        return pd.DataFrame()
+    @staticmethod
+    def _construir_dataframe(tipo, variedad_id, nivel, top_n):
+        """
+        Construye el set de datos optimizando las consultas SQL en un solo bloque.
+        Evita el antipatrón N+1 unificando la taxonomía y clasificaciones funcionales.
+        """
+        campo_db = MAPA_NIVELES.get(nivel, "genus")
+        qs = ResultadoTaxonomico.objects.filter(archivo__tipo_analisis=tipo)
+        
+        if variedad_id:
+            qs = qs.filter(archivo__muestra__variedad_clon_id=variedad_id)
 
-    data = list(
-        qs.values(tax=F(campo_db))
-        .annotate(num_hits=Sum("num_hits"), porcentaje_hits=Sum("porcentaje_hits"))
-        .order_by("-porcentaje_hits")[:top_n]
-    )
+        if not qs.exists():
+            return pd.DataFrame()
 
-    df = pd.DataFrame(data)
-    df["porcentaje_hits"] = df["porcentaje_hits"].round(5)
+        # Agregación óptima en la BD de los taxones dominantes
+        data = list(
+            qs.values(tax=F(campo_db))
+            .annotate(
+                total_num_hits=Sum("num_hits"), 
+                total_porcentaje=Sum("porcentaje_hits")
+            )
+            .order_by("-total_porcentaje")[:top_n]
+        )
 
-    # Enriquecer con clasificación funcional del catálogo
-    df["clasificacion"] = df["tax"].apply(
-        lambda nombre: CatalogoMicroorganismo.objects.filter(
-            nombre__iexact=nombre, nivel=nivel
-        ).values_list("clasificacion", flat=True).first() or "sin_clasificar"
-    )
+        if not data:
+            return pd.DataFrame()
 
-    return df
+        df = pd.DataFrame(data)
+        df.rename(columns={"total_num_hits": "num_hits", "total_porcentaje": "porcentaje_hits"}, inplace=True)
+        df["porcentaje_hits"] = df["porcentaje_hits"].round(5)
 
+        # SOLUCIÓN AL N+1: Extraemos todas las clasificaciones requeridas de un solo viaje SQL (Mapeo en Memoria)
+        lista_taxones = df["tax"].dropna().unique().tolist()
+        catalogo_map = {
+            obj["nombre"].lower(): obj["clasificacion"]
+            for obj in CatalogoMicroorganismo.objects.filter(
+                nombre__in=lista_taxones, nivel=nivel
+            ).values("nombre", "clasificacion")
+        }
 
-def generar_reporte_analisis(tipo="16S", producto_id=None, formato="pdf",
-                              top_n=10, nivel="genus", usuario=None):
-    """
-    README: "Salida de Resultados: reportes interpretativos para usuarios finales"
-    """
-    if tipo not in MARCADORES_VALIDOS:   tipo = "16S"
-    if formato not in FORMATOS_VALIDOS:  formato = "pdf"
-    if top_n not in OPCIONES_TOP_N:      top_n = 10
-    if nivel not in NIVELES_VALIDOS:     nivel = "genus"
+        # Asignación segura en O(1) tiempo de ejecución por fila
+        df["clasificacion"] = df["tax"].apply(
+            lambda nombre: catalogo_map.get(str(nombre).lower(), "sin_clasificar")
+        )
 
-    df = _construir_dataframe(tipo, producto_id, nivel, top_n)
-    if df.empty:
-        raise ValueError("No hay datos disponibles para generar el reporte.")
+        return df
 
-    total_beneficos     = int((df["clasificacion"] == "benefico").sum())
-    total_fitopatogenos = int((df["clasificacion"] == "fitopatogeno").sum())
-    total_sin_clas      = int((df["clasificacion"] == "sin_clasificar").sum())
+    @staticmethod
+    def generar_reporte_analisis(tipo="16S", variedad_id=None, formato="pdf",
+                                 top_n=10, nivel="genus", usuario=None):
+        """
+        Genera y registra el reporte de análisis interpretativo con metadatos estructurados.
+        """
+        # Sanitización estricta de parámetros
+        tipo_clean = tipo if tipo in MARCADORES_VALIDOS else "16S"
+        formato_clean = formato if formato in FORMATOS_VALIDOS else "pdf"
+        top_n_clean = top_n if top_n in OPCIONES_TOP_N else 10
+        nivel_clean = nivel if nivel in NIVELES_VALIDOS else "genus"
 
-    reporte_id  = len(_historial_reportes) + 1
-    fecha_hora  = datetime.now().strftime("%Y%m%d_%H%M%S")
-    nombre_arch = f"reporte_{tipo}_{nivel}_top{top_n}_{fecha_hora}.{formato}"
+        # Corrección de consistencia: se usa uniformemente variedad_id
+        df = ExportService._construir_dataframe(tipo_clean, variedad_id, nivel_clean, top_n_clean)
+        if df.empty:
+            raise ValueError("No hay datos biométricos disponibles para los criterios seleccionados.")
 
-    entrada = {
-        "id": reporte_id, "nombre": nombre_arch, "tipo": tipo,
-        "nivel": nivel, "top_n": top_n, "producto_id": producto_id,
-        "formato": formato, "fecha": fecha_hora,
-        "usuario": str(usuario) if usuario else "Sistema",
-        "total_beneficos": total_beneficos,
-        "total_fitopatogenos": total_fitopatogenos,
-        "total_sin_clas": total_sin_clas,
-        "total_registros": len(df),
-        "datos": df.to_dict(orient="records"),
-        "url": f"/media/reportes/{nombre_arch}",
-    }
-    _historial_reportes.append(entrada)
-    return {"url": entrada["url"], "reporte_id": reporte_id}
+        # Métricas directas desde memoria con Pandas (Altamente eficiente)
+        total_beneficos = int((df["clasificacion"] == "benefico").sum())
+        total_fitopatogenos = int((df["clasificacion"] == "fitopatogeno").sum())
+        total_sin_clas = int((df["clasificacion"] == "sin_clasificar").sum())
 
+        reporte_id = len(_historial_reportes) + 1
+        fecha_hora = datetime.now().strftime("%Y%m%d_%H%M%S")
+        nombre_arch = f"reporte_{tipo_clean}_{nivel_clean}_top{top_n_clean}_{fecha_hora}.{formato_clean}"
 
-def obtener_historial_reportes(tipo=""):
-    if tipo in MARCADORES_VALIDOS:
-        return [r for r in _historial_reportes if r["tipo"] == tipo]
-    return list(_historial_reportes)
+        entrada = {
+            "id": reporte_id, 
+            "nombre": nombre_arch, 
+            "tipo": tipo_clean,
+            "nivel": nivel_clean, 
+            "top_n": top_n_clean, 
+            "variedad_id": variedad_id,
+            "formato": formato_clean, 
+            "fecha": fecha_hora,
+            "usuario": str(usuario) if usuario else "Sistema",
+            "total_beneficos": total_beneficos,
+            "total_fitopatogenos": total_fitopatogenos,
+            "total_sin_clas": total_sin_clas,
+            "total_registros": len(df),
+            "datos": df.to_dict(orient="records"),
+            "url": f"/media/reportes/{nombre_arch}",
+        }
+        
+        _historial_reportes.append(entrada)
+        return {"url": entrada["url"], "reporte_id": reporte_id}
 
+    @staticmethod
+    def obtener_historial_reportes(tipo=""):
+        """Recupera la lista histórica controlada de reportes."""
+        if tipo in MARCADORES_VALIDOS:
+            return [r for r in _historial_reportes if r["tipo"] == tipo]
+        return list(_historial_reportes)
 
-def obtener_reporte_por_id(reporte_id):
-    try:
-        reporte_id = int(reporte_id)
-    except (TypeError, ValueError):
-        return None
-    return next((r for r in _historial_reportes if r["id"] == reporte_id), None)
+    @staticmethod
+    def obtener_reporte_por_id(reporte_id):
+        """Busca un reporte específico dentro del buffer histórico."""
+        try:
+            r_id = int(reporte_id)
+        except (TypeError, ValueError):
+            return None
+        return next((r for r in _historial_reportes if r["id"] == r_id), None)
 
+    @staticmethod
+    def exportar_excel(tipo="16S", variedad_id=None, nivel="genus", top_n=10):
+        """
+        Genera una descarga directa en HTTP con una tabla dinámica formateada en Excel (Openpyxl).
+        """
+        tipo_clean = tipo if tipo in MARCADORES_VALIDOS else "16S"
+        nivel_clean = nivel if nivel in NIVELES_VALIDOS else "genus"
+        top_n_clean = top_n if top_n in OPCIONES_TOP_N else 10
 
-def exportar_excel(tipo="16S", variedad_id=None, nivel="genus", top_n=10):
-    """README: "Salida de Resultados: tablas dinámicas" """
-    df = _construir_dataframe(tipo, variedad_id, nivel, top_n)
-    if df.empty:
-        raise ValueError("No hay datos para exportar.")
+        df = ExportService._construir_dataframe(tipo_clean, variedad_id, nivel_clean, top_n_clean)
+        if df.empty:
+            raise ValueError("No se encontraron registros moleculares para estructurar el archivo Excel.")
 
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name=f"Análisis_{tipo}")
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name=f"Analisis_{tipo_clean}")
 
-    buffer.seek(0)
-    fecha   = datetime.now().strftime("%Y%m%d")
-    nombre  = f"analisis_{tipo}_{nivel}_top{top_n}_{fecha}.xlsx"
-    response = HttpResponse(
-        buffer,
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-    response["Content-Disposition"] = f'attachment; filename="{nombre}"'
-    return response
+        buffer.seek(0)
+        fecha = datetime.now().strftime("%Y%m%d")
+        nombre = f"analisis_{tipo_clean}_{nivel_clean}_top{top_n_clean}_{fecha}.xlsx"
+        
+        response = HttpResponse(
+            buffer.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        return response

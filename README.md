@@ -58,54 +58,7 @@ El motor de procesamiento actual ya integra las siguientes capacidades técnicas
 
 > **Nota Científica:** La clasificación de "Benéficos" y "Fitopatógenos" se basa en bases de datos referenciales integradas en el sistema para los marcadores 16S (Bacterias) e ITS (Hongos).
 
-# 🏗️ Arquitectura Técnica (Phase 1)
 
-## Stack Tecnológico
-
-| Capa | Tecnología | Versión | Propósito |
-|------|-----------|---------|----------|
-| **Framework** | Django | 6.0.4 | Backend web, ORM, admin |
-| **Database** | SQLite (dev) / PostgreSQL (prod) | 3/15 | Persistencia, migraciones |
-| **Processing** | Pandas + NumPy | 3.0.2 / 2.4.4 | Pipeline bioinformático |
-| **Testing** | pytest + pytest-django | 7.4.3 | 60+ unit tests, >80% coverage |
-| **Frontend** | HTML5 + CSS3 + JS Vanilla | - | Responsive, accesible |
-
-## Estructura de Directorios
-
-```
-ANALISIS_COMPARATIVO/
-├─ analisis/                    # Django app
-│  ├─ models.py                 # 7 models (Cultivo, Muestra, Archivo, Resultado, etc.)
-│  ├─ views/                    # Vistas desacopladas
-│  │  ├─ dashboard.py
-│  │  ├─ subir_datos.py
-│  │  ├─ comparar.py
-│  │  └─ ...
-│  ├─ services/                 # Lógica de negocio
-│  │  ├─ processing/            # Pipeline bioinformático
-│  │  ├─ business/              # Servicios de negocio
-│  │  └─ interpretation/        # Clasificación de microorganismos
-│  ├─ test/                     # 60+ tests (unit + integration ready)
-│  │  ├─ test_pipeline_comprehensive.py
-│  │  ├─ test_models_comprehensive.py
-│  │  └─ test_comparison_service.py
-│  ├─ templates/                # HTML Jinja2
-│  ├─ static/                   # CSS + JS
-│  └─ migrations/               # Migraciones Django
-├─ config/                      # Configuración Django
-├─ docs/                        # Documentación técnica
-├─ conftest.py                  # Pytest fixtures + factories
-├─ pytest.ini                   # Configuración de tests
-├─ requirements.txt             # Dependencias producción
-├─ requirements-testing.txt     # Dependencias testing
-└─ ARCHITECTURE.md              # 6-layer design (24 KB)
-└─ DATABASE.md                  # Schema + migration guide (16 KB)
-└─ WEEK2_EXECUTION_GUIDE.md    # Step-by-step instructions (13 KB)
-```
-
-## Capas de Arquitectura (6-Layer)
-
-```
 ┌─────────────────────────────────────┐
 │  PRESENTATION (Templates + Static)  │
 ├─────────────────────────────────────┤

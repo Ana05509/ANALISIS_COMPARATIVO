@@ -2,14 +2,14 @@
 
 {% block title %}{{ producto.nombre }}{% endblock %}
 {% block nav_historial %}active{% endblock %}
-{% block topbar_title %}Detalle del producto{% endblock %}
+{% block topbar_title %}Detalle del Producto{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'analisis:historial' %}" class="btn btn-outline btn-sm">
     <i class="ti ti-arrow-left" aria-hidden="true"></i> Historial
 </a>
 <a href="{% url 'analisis:analisis_avanzado' %}?producto_id={{ producto.id }}&tipo={{ producto.tipo }}" class="btn btn-primary btn-sm">
-    <i class="ti ti-chart-dots" aria-hidden="true"></i> Analizar
+    <i class="ti ti-chart-dots" aria-hidden="true"></i> Analizar Perfil
 </a>
 {% endblock %}
 
@@ -17,68 +17,72 @@
 <div class="page-header">
     <h1>{{ producto.nombre }}</h1>
     <p>
-        <span class="{% if producto.tipo == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ producto.tipo }}</span>
-        {% if producto.variedad %}— {{ producto.variedad }}{% endif %}
+        Marcador Secuenciado: <span class="{% if producto.tipo == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ producto.tipo }}</span>
+        {% if producto.variedad %} — <span style="color: var(--text-muted); font-weight: 500;">{{ producto.variedad }}</span>{% endif %}
     </p>
 </div>
 
-<!-- Métricas del producto -->
 <div class="metrics-grid">
     <div class="metric-card">
-        <div class="metric-label">Total análisis</div>
-        <div class="metric-value">{{ total_analisis }}</div>
+        <div class="metric-label">Total Análisis Organizados</div>
+        <div class="metric-value td-mono">{{ total_analisis }}</div>
     </div>
     <div class="metric-card verde">
-        <div class="metric-label">Benéficos ✅</div>
-        <div class="metric-value">{{ total_beneficos }}</div>
+        <div class="metric-label">Benéficos Detectados ✅</div>
+        <div class="metric-value td-mono">{{ total_beneficos }}</div>
     </div>
     <div class="metric-card amber">
-        <div class="metric-label">Fitopatógenos ⚠️</div>
-        <div class="metric-value">{{ total_fitopatogenos }}</div>
+        <div class="metric-label">Fitopatógenos Identificados ⚠️</div>
+        <div class="metric-value td-mono">{{ total_fitopatogenos }}</div>
     </div>
     <div class="metric-card">
-        <div class="metric-label">Sin clasificación</div>
-        <div class="metric-value">{{ total_sin_clasificacion }}</div>
+        <div class="metric-label">Sin Clasificación Biológica</div>
+        <div class="metric-value td-mono">{{ total_sin_clasificacion }}</div>
     </div>
 </div>
 
-<!-- Tabla de análisis asociados -->
 <div class="card">
-    <div class="card-title">Microorganismos identificados</div>
+    <div class="card-title">Composición y Microorganismos Identificados</div>
 
     {% if analisis %}
-    <div class="table-wrap" style="margin-top:0.75rem;">
+    <div class="table-wrap" style="margin-top: 1rem;">
         <table>
             <thead>
                 <tr>
-                    <th>#</th>
+                    <th style="width: 60px;">#</th>
                     <th>Taxonomía</th>
                     <th>Nivel</th>
-                    <th>Num. Hits</th>
-                    <th>% Abundancia</th>
-                    <th>Clasificación</th>
+                    <th>Núm. Hits</th>
+                    <th style="width: 40%;">% Abundancia Relativa</th>
+                    <th>Estatus Ecológico</th>
                 </tr>
             </thead>
             <tbody>
                 {% for a in analisis %}
                 <tr>
-                    <td class="td-mono" style="color:var(--text-hint);">{{ forloop.counter }}</td>
-                    <td><strong>{{ a.taxonomia }}</strong></td>
-                    <td style="font-size:12px; color:var(--text-hint); text-transform:capitalize;">{{ a.nivel }}</td>
-                    <td class="td-mono">{{ a.num_hits }}</td>
+                    <td class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
                     <td>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <div style="flex:1; height:5px; background:var(--gris-light); border-radius:3px; min-width:50px;">
-                                <div style="height:5px; background:var(--verde); border-radius:3px; width:{{ a.porcentaje_hits|floatformat:0 }}%;"></div>
+                        <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
+                            {{ a.taxonomia }}
+                        </strong>
+                    </td>
+                    <td style="font-size: 12px; color: var(--text-muted); text-transform: capitalize;">{{ a.nivel }}</td>
+                    <td class="td-mono" style="color: var(--text-primary); layout: fixed;">{{ a.num_hits }}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
+                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ a.porcentaje_hits|floatformat:2 }}%;"></div>
                             </div>
-                            <span class="td-mono">{{ a.porcentaje_hits|floatformat:4 }}%</span>
+                            <span class="td-mono" style="font-weight: 500; min-width: 75px; text-align: right;">
+                                {{ a.porcentaje_hits|floatformat:4 }}%
+                            </span>
                         </div>
                     </td>
                     <td>
                         {% if a.clasificacion == 'benefico' %}
-                            <span class="badge badge-benefico">Benéfico</span>
+                            <span class="badge badge-benefico"><i class="ti ti-shield-check"></i> Benéfico</span>
                         {% elif a.clasificacion == 'fitopatogeno' %}
-                            <span class="badge badge-fitopatogeno">Fitopatógeno</span>
+                            <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle"></i> Fitopatógeno</span>
                         {% else %}
                             <span class="badge badge-sin-clas">Sin clasificación</span>
                         {% endif %}
@@ -91,8 +95,8 @@
     {% else %}
     <div class="empty-state">
         <i class="ti ti-flask-2" aria-hidden="true"></i>
-        <strong>Sin análisis disponibles</strong>
-        <p>Este producto no tiene resultados procesados aún.</p>
+        <strong>Sin lecturas cargadas</strong>
+        <p>Este producto no cuenta con perfiles de secuenciación ni alineamientos en la base de datos.</p>
     </div>
     {% endif %}
 </div>

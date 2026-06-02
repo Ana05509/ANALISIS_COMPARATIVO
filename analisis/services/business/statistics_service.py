@@ -1,12 +1,10 @@
 # services/business/statistics_service.py
-# Módulo de análisis estadístico avanzado
-# README: "Análisis Comparativo: estadística para biodiversidad microbiana"
+# Motor de análisis estadístico avanzado para biodiversidad microbiana y metagenómica de suelos.
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from scipy import stats
-from scipy.cluster.hierarchy import dendrogram, linkage
-from scipy.spatial.distance import pdist, squareform
+from scipy.cluster.hierarchy import linkage
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
@@ -15,182 +13,202 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-class StatisticalAnalyzer:
-    """Análisis estadístico avanzado de perfiles microbianos."""
+class StatisticsService:
+    """Análisis estadístico avanzado y blindado de perfiles microbianos y ecología de suelos."""
 
     @staticmethod
     def calcular_descriptivas(df, columna="%_hits"):
         """
-        Calcula estadísticas descriptivas de abundancia.
-        
-        Args:
-            df: DataFrame con datos microbianos
-            columna: Columna a analizar (default: "%_hits")
-        
-        Returns:
-            dict con mean, std, median, Q1, Q3, min, max, skew, kurtosis
+        Calcula estadísticas descriptivas robustas de abundancia microbiana.
+        Protegido contra sets vacíos o faltantes.
         """
         if df.empty or columna not in df.columns:
             return None
 
         datos = df[columna].dropna()
-        
+        if len(datos) == 0:
+            return None
+
+        media = float(datos.mean())
+        std_dev = float(datos.std()) if len(datos) > 1 else 0.0
+        variance = float(datos.var()) if len(datos) > 1 else 0.0
+
         return {
-            "media": float(datos.mean()),
+            "media": media,
             "mediana": float(datos.median()),
-            "desv_estandar": float(datos.std()),
-            "varianza": float(datos.var()),
+            "desv_estandar": std_dev,
+            "varianza": variance,
             "Q1": float(datos.quantile(0.25)),
             "Q3": float(datos.quantile(0.75)),
             "minimo": float(datos.min()),
             "maximo": float(datos.max()),
             "rango_intercuartil": float(datos.quantile(0.75) - datos.quantile(0.25)),
-            "asimetria": float(stats.skew(datos)),
-            "curtosis": float(stats.kurtosis(datos)),
-            "coef_variacion": float((datos.std() / datos.mean() * 100)) if datos.mean() != 0 else 0,
+            "asimetria": float(stats.skew(datos)) if len(datos) > 2 else 0.0,
+            "curtosis": float(stats.kurtosis(datos)) if len(datos) > 2 else 0.0,
+            "coef_variacion": float((std_dev / media * 100)) if media != 0 else 0.0,
         }
 
     @staticmethod
     def test_t_independiente(grupo_a, grupo_b, columna="%_hits"):
         """
-        Realiza test t de Student para dos muestras independientes.
-        
-        Args:
-            grupo_a, grupo_b: DataFrames de dos grupos
-            columna: Columna a analizar
-        
-        Returns:
-            dict con t-statistic, p-value, conclusión
+        Realiza test t de Student para muestras independientes con corrección de Welch.
+        Corregido usando acceso a atributos nominales para máxima compatibilidad con Pylance.
         """
-        if grupo_a.empty or grupo_b.empty or columna not in grupo_a.columns:
+        if grupo_a.empty or grupo_b.empty or columna not in grupo_a.columns or columna not in grupo_b.columns:
             return None
 
-        datos_a = grupo_a[columna].dropna()
-        datos_b = grupo_b[columna].dropna()
+        datos_a = grupo_a[columna].dropna().to_numpy(dtype=float)
+        datos_b = grupo_b[columna].dropna().to_numpy(dtype=float)
         
-        t_stat, p_value = stats.ttest_ind(datos_a, datos_b)
+        if len(datos_a) < 2 or len(datos_b) < 2:
+            return {"error": "Muestras insuficientes en uno de los grupos (mínimo 2 observaciones)."}
+
+        if np.var(datos_a) == 0 and np.var(datos_b) == 0:
+            return {
+                "t_statistic": 0.0,
+                "p_value": 1.0,
+                "significante": False,
+                "media_a": float(np.mean(datos_a)),
+                "media_b": float(np.mean(datos_b)),
+                "diferencia_medias": 0.0,
+                "df": int(len(datos_a) + len(datos_b) - 2)
+            }
+
+        # Acceder a las propiedades nominales (.statistic y .pvalue) resuelve la ambigüedad del objeto tuple
+        resultado_test = stats.ttest_ind(datos_a, datos_b, equal_var=False)
         
+        t_stat = float(getattr(resultado_test, 'statistic', 0.0))
+        p_val_raw = float(getattr(resultado_test, 'pvalue', 1.0))
+        
+        if np.isnan(t_stat) or np.isnan(p_val_raw):
+            return {"error": "No se pudo calcular el estadístico debido a colinealidad extrema."}
+
         return {
-            "t_statistic": float(t_stat),
-            "p_value": float(p_value),
-            "significante": p_value < 0.05,
-            "media_a": float(datos_a.mean()),
-            "media_b": float(datos_b.mean()),
-            "diferencia_medias": float(datos_a.mean() - datos_b.mean()),
-            "df": len(datos_a) + len(datos_b) - 2,
+            "t_statistic": t_stat,
+            "p_value": p_val_raw,
+            "significante": bool(p_val_raw < 0.05),
+            "media_a": float(np.mean(datos_a)),
+            "media_b": float(np.mean(datos_b)),
+            "diferencia_medias": float(np.mean(datos_a) - np.mean(datos_b)),
+            "df": int(len(datos_a) + len(datos_b) - 2),
         }
 
     @staticmethod
     def test_mann_whitney(grupo_a, grupo_b, columna="%_hits"):
         """
-        Realiza test de Mann-Whitney U (no-paramétrico).
-        Alternativa a t-test cuando datos no son normales.
+        Realiza el test no paramétrico de Mann-Whitney U con tipado seguro.
         """
-        if grupo_a.empty or grupo_b.empty or columna not in grupo_a.columns:
+        if grupo_a.empty or grupo_b.empty or columna not in grupo_a.columns or columna not in grupo_b.columns:
             return None
 
-        datos_a = grupo_a[columna].dropna()
-        datos_b = grupo_b[columna].dropna()
+        datos_a = grupo_a[columna].dropna().to_numpy(dtype=float)
+        datos_b = grupo_b[columna].dropna().to_numpy(dtype=float)
         
-        u_stat, p_value = stats.mannwhitneyu(datos_a, datos_b, alternative="two-sided")
-        
-        return {
-            "u_statistic": float(u_stat),
-            "p_value": float(p_value),
-            "significante": p_value < 0.05,
-            "mediana_a": float(datos_a.median()),
-            "mediana_b": float(datos_b.median()),
-            "diferencia_medianas": float(datos_a.median() - datos_b.median()),
-        }
+        if len(datos_a) == 0 or len(datos_b) == 0:
+            return None
+
+        try:
+            resultado_mw = stats.mannwhitneyu(datos_a, datos_b, alternative="two-sided")
+            u_stat = float(getattr(resultado_mw, 'statistic', 0.0))
+            p_val = float(getattr(resultado_mw, 'pvalue', 1.0))
+            
+            return {
+                "u_statistic": u_stat,
+                "p_value": p_val,
+                "significante": bool(p_val < 0.05),
+                "mediana_a": float(np.median(datos_a)),
+                "mediana_b": float(np.median(datos_b)),
+                "diferencia_medianas": float(np.median(datos_a) - np.median(datos_b)),
+            }
+        except Exception as e:
+            return {"error": f"Fallo en ejecución de Mann-Whitney: {str(e)}"}
 
     @staticmethod
     def test_anova(*grupos, columna="%_hits"):
-        """
-        Realiza ANOVA de una vía para múltiples grupos.
-        
-        Args:
-            *grupos: DataFrames de múltiples grupos
-            columna: Columna a analizar
-        
-        Returns:
-            dict con F-statistic, p-value
-        """
+        """Realiza ANOVA de una vía blindado contra grupos homogéneos sin varianza."""
         if not grupos or columna not in grupos[0].columns:
             return None
 
-        datos_grupos = [g[columna].dropna().values for g in grupos if not g.empty]
+        datos_grupos = [g[columna].dropna().to_numpy(dtype=float) for g in grupos if not g.empty]
+        datos_grupos = [d for d in datos_grupos if len(d) > 0]
         
         if len(datos_grupos) < 2:
             return None
 
-        f_stat, p_value = stats.f_oneway(*datos_grupos)
-        
-        return {
-            "f_statistic": float(f_stat),
-            "p_value": float(p_value),
-            "significante": p_value < 0.05,
-            "grupos": len(datos_grupos),
-            "observaciones": sum(len(g) for g in datos_grupos),
-        }
+        todos_datos = np.concatenate(datos_grupos)
+        if np.var(todos_datos) == 0:
+            return {
+                "f_statistic": 0.0,
+                "p_value": 1.0,
+                "significante": False,
+                "grupos": len(datos_grupos),
+                "observaciones": len(todos_datos),
+            }
+
+        try:
+            resultado_anova = stats.f_oneway(*datos_grupos)
+            f_stat = float(getattr(resultado_anova, 'statistic', 0.0))
+            p_val = float(getattr(resultado_anova, 'pvalue', 1.0))
+            
+            return {
+                "f_statistic": f_stat if not np.isnan(f_stat) else 0.0,
+                "p_value": p_val if not np.isnan(p_val) else 1.0,
+                "significante": bool(p_val < 0.05) if not np.isnan(p_val) else False,
+                "grupos": len(datos_grupos),
+                "observaciones": len(todos_datos),
+            }
+        except Exception as e:
+            return {"error": f"Error en cálculo de varianza ANOVA: {str(e)}"}
 
     @staticmethod
     def calcular_pca(df, n_componentes=2, columnas_excluir=None):
         """
-        Calcula PCA (Análisis de Componentes Principales).
-        
-        Args:
-            df: DataFrame con datos
-            n_componentes: Número de componentes a extraer
-            columnas_excluir: Columnas a excluir del análisis (ej: ['taxonomia'])
-        
-        Returns:
-            dict con transformed data, varianza explicada, loadings
+        Calcula PCA aislando de forma estricta las columnas categóricas o funcionales.
         """
         if df.empty:
             return None
 
-        # Preparar datos
         if columnas_excluir is None:
             columnas_excluir = []
         
         cols_numericas = df.select_dtypes(include=[np.number]).columns
         cols_uso = [c for c in cols_numericas if c not in columnas_excluir]
         
-        X = df[cols_uso].fillna(0)
+        X = df[cols_uso].fillna(0.0)
         
         if X.empty or X.shape[0] < 2:
-            return None
+            return {"error": "Filas/observaciones insuficientes para proyectar Componentes Principales."}
 
-        # Estandarizar
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+        varianzas = X.var(axis=0)
+        cols_validas = varianzas[varianzas > 0].index.tolist()
         
-        # PCA
-        pca = PCA(n_components=min(n_componentes, X_scaled.shape[1]))
-        X_pca = pca.fit_transform(X_scaled)
-        
-        return {
-            "componentes": X_pca.tolist(),
-            "varianza_explicada": pca.explained_variance_ratio_.tolist(),
-            "varianza_acumulada": np.cumsum(pca.explained_variance_ratio_).tolist(),
-            "loadings": pca.components_.tolist(),
-            "n_componentes": pca.n_components_,
-            "total_varianza": float(sum(pca.explained_variance_ratio_)),
-        }
+        if len(cols_validas) == 0:
+            return {"error": "Varianza idéntica a cero en todas las dimensiones del set biológico."}
+            
+        X_filtrado = X[cols_validas]
+
+        try:
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X_filtrado)
+            
+            comp_reales = min(n_componentes, X_scaled.shape[0], X_scaled.shape[1])
+            pca = PCA(n_components=comp_reales)
+            X_pca = pca.fit_transform(X_scaled)
+            
+            return {
+                "componentes": X_pca.tolist(),
+                "varianza_explicada": pca.explained_variance_ratio_.tolist(),
+                "varianza_acumulada": np.cumsum(pca.explained_variance_ratio_).tolist(),
+                "loadings": pca.components_.tolist(),
+                "n_componentes": int(pca.n_components_),
+                "total_varianza": float(sum(pca.explained_variance_ratio_)),
+            }
+        except Exception as e:
+            return {"error": f"Fallo algebraico en la descomposición del espacio PCA: {str(e)}"}
 
     @staticmethod
     def calcular_clustering_kmeans(df, n_clusters=3, columnas_excluir=None):
-        """
-        Realiza clustering K-Means.
-        
-        Args:
-            df: DataFrame con datos
-            n_clusters: Número de clusters
-            columnas_excluir: Columnas a excluir
-        
-        Returns:
-            dict con labels, centros, inercia
-        """
+        """Ejecuta particionamiento por K-Means adaptando el número de clusters al tamaño real del set."""
         if df.empty:
             return None
 
@@ -200,38 +218,47 @@ class StatisticalAnalyzer:
         cols_numericas = df.select_dtypes(include=[np.number]).columns
         cols_uso = [c for c in cols_numericas if c not in columnas_excluir]
         
-        X = df[cols_uso].fillna(0)
+        X = df[cols_uso].fillna(0.0)
         
-        if X.empty or X.shape[0] < n_clusters:
-            return None
+        n_muestras = X.shape[0]
+        if n_muestras < 2:
+            return {"error": "Observaciones insuficientes para entrenar centroides de clustering."}
 
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+        clusters_reales = max(2, min(int(n_clusters), n_muestras - 1)) if n_muestras > 2 else 1
         
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-        labels = kmeans.fit_predict(X_scaled)
-        
-        return {
-            "labels": labels.tolist(),
-            "centros": kmeans.cluster_centers_.tolist(),
-            "inercia": float(kmeans.inertia_),
-            "n_clusters": n_clusters,
-            "iteraciones": kmeans.n_iter_,
-        }
+        if clusters_reales == 1:
+            return {
+                "labels": [0] * n_muestras,
+                "centros": [],
+                "inercia": 0.0,
+                "n_clusters": 1,
+                "iteraciones": 0
+            }
+
+        try:
+            varianzas = X.var(axis=0)
+            cols_validas = varianzas[varianzas > 0].index.tolist()
+            X_input = X[cols_validas] if cols_validas else X
+
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X_input)
+            
+            kmeans = KMeans(n_clusters=clusters_reales, random_state=42, n_init='auto')
+            labels = kmeans.fit_predict(X_scaled)
+            
+            return {
+                "labels": labels.tolist(),
+                "centros": kmeans.cluster_centers_.tolist(),
+                "inercia": float(kmeans.inertia_),
+                "n_clusters": clusters_reales,
+                "iteraciones": int(kmeans.n_iter_ or 0),
+            }
+        except Exception as e:
+            return {"error": f"Error en el algoritmo de partición K-Means: {str(e)}"}
 
     @staticmethod
     def calcular_dendrograma_datos(df, columnas_excluir=None, metodo="ward"):
-        """
-        Prepara datos para dendrograma (clustering jerárquico).
-        
-        Args:
-            df: DataFrame con datos
-            columnas_excluir: Columnas a excluir
-            metodo: "ward", "complete", "average", "single"
-        
-        Returns:
-            dict con datos para ploteo
-        """
+        """Prepara la matriz de ligamiento para el árbol jerárquico de similitud de suelos."""
         if df.empty:
             return None
 
@@ -241,35 +268,31 @@ class StatisticalAnalyzer:
         cols_numericas = df.select_dtypes(include=[np.number]).columns
         cols_uso = [c for c in cols_numericas if c not in columnas_excluir]
         
-        X = df[cols_uso].fillna(0)
-        
+        X = df[cols_uso].fillna(0.0)
         if X.empty or X.shape[0] < 2:
             return None
 
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        
-        # Calcular matriz de distancias
-        Z = linkage(X_scaled, method=metodo)
-        
-        return {
-            "linkage_matrix": Z.tolist(),
-            "metodo": metodo,
-            "n_observaciones": X_scaled.shape[0],
-            "n_caracteristicas": X_scaled.shape[1],
-        }
+        try:
+            varianzas = X.var(axis=0)
+            cols_validas = varianzas[varianzas > 0].index.tolist()
+            X_input = X[cols_validas] if cols_validas else X
+
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X_input)
+            
+            Z = linkage(X_scaled, method=metodo)
+            return {
+                "linkage_matrix": Z.tolist(),
+                "metodo": metodo,
+                "n_observaciones": int(X_scaled.shape[0]),
+                "n_caracteristicas": int(X_scaled.shape[1]),
+            }
+        except Exception as e:
+            return {"error": f"Incapacidad de resolver ligamiento jerárquico: {str(e)}"}
 
     @staticmethod
     def calcular_similitud_jaccard(conjunto_a, conjunto_b):
-        """
-        Calcula índice de Jaccard entre dos conjuntos.
-        
-        Args:
-            conjunto_a, conjunto_b: Conjuntos (listas, sets)
-        
-        Returns:
-            float: Índice Jaccard (0 a 1)
-        """
+        """Calcula el índice de Jaccard clásico basado en presencia/ausencia de microorganismos."""
         set_a = set(conjunto_a) if not isinstance(conjunto_a, set) else conjunto_a
         set_b = set(conjunto_b) if not isinstance(conjunto_b, set) else conjunto_b
         
@@ -282,74 +305,86 @@ class StatisticalAnalyzer:
         return float(interseccion / union) if union > 0 else 0.0
 
     @staticmethod
-    def calcular_similitud_braycurtis(df_a, df_b, columna="%_hits"):
+    def calcular_similitud_braycurtis(df_a, df_b, columna_taxo="genus", columna_abundancia="%_hits"):
         """
-        Calcula distancia de Bray-Curtis entre dos muestras.
-        
-        Args:
-            df_a, df_b: DataFrames de dos muestras
-            columna: Columna de abundancia
-        
-        Returns:
-            float: Distancia Bray-Curtis (0 a 1)
+        Calcula el índice ecológico real de Bray-Curtis (Alineado por Taxonomía).
         """
-        if df_a.empty or df_b.empty or columna not in df_a.columns:
+        if df_a.empty or df_b.empty or columna_abundancia not in df_a.columns or columna_taxo not in df_a.columns:
             return None
 
-        datos_a = df_a[columna].fillna(0).values
-        datos_b = df_b[columna].fillna(0).values
-        
-        # Alinear longitudes
-        max_len = max(len(datos_a), len(datos_b))
-        datos_a = np.pad(datos_a, (0, max_len - len(datos_a)), mode='constant')
-        datos_b = np.pad(datos_b, (0, max_len - len(datos_b)), mode='constant')
-        
-        distancia = np.sum(np.abs(datos_a - datos_b)) / np.sum(datos_a + datos_b)
-        
+        serie_a = df_a.groupby(columna_taxo)[columna_abundancia].sum()
+        serie_b = df_b.groupby(columna_taxo)[columna_abundancia].sum()
+
+        all_taxa = serie_a.index.union(serie_b.index)
+        vector_a = serie_a.reindex(all_taxa, fill_value=0.0).to_numpy()
+        vector_b = serie_b.reindex(all_taxa, fill_value=0.0).to_numpy()
+
+        sum_abs_diff = np.sum(np.abs(vector_a - vector_b))
+        sum_total = np.sum(vector_a + vector_b)
+
+        if sum_total == 0:
+            return 0.0
+
+        distancia = sum_abs_diff / sum_total
         return float(distancia) if not np.isnan(distancia) else 0.0
 
     @staticmethod
     def test_normalidad_shapiro(df, columna="%_hits"):
         """
-        Test de Shapiro-Wilk para normalidad.
-        
-        Args:
-            df: DataFrame
-            columna: Columna a testear
-        
-        Returns:
-            dict con W-statistic, p-value
+        Test de Shapiro-Wilk para evaluación de normalidad con extracción segura.
         """
         if df.empty or columna not in df.columns:
             return None
 
-        datos = df[columna].dropna()
+        datos = df[columna].dropna().to_numpy(dtype=float)
+        n = len(datos)
         
-        if len(datos) < 3 or len(datos) > 5000:
-            return None
+        if n < 3 or n > 5000:
+            return {
+                "error": f"Tamaño muestral fuera de rango para Shapiro-Wilk (N={n}). Requiere entre 3 y 5000 observaciones."
+            }
 
-        w_stat, p_value = stats.shapiro(datos)
-        
-        return {
-            "w_statistic": float(w_stat),
-            "p_value": float(p_value),
-            "es_normal": p_value > 0.05,
-            "observaciones": len(datos),
-        }
+        if np.all(datos == datos[0]):
+            return {
+                "w_statistic": 1.0,
+                "p_value": 1.0,
+                "es_normal": True,
+                "observaciones": n,
+                "nota": "Distribución uniforme constante (Varianza Cero)"
+            }
+
+        try:
+            resultado_shapiro = stats.shapiro(datos)
+            w_stat = float(getattr(resultado_shapiro, 'statistic', resultado_shapiro[0]))
+            p_value = float(getattr(resultado_shapiro, 'pvalue', resultado_shapiro[1]))
+            
+            return {
+                "w_statistic": w_stat,
+                "p_value": p_value,
+                "es_normal": bool(p_value > 0.05),
+                "observaciones": n,
+            }
+        except Exception as e:
+            return {"error": f"Fallo al computar Shapiro-Wilk: {str(e)}"}
 
     @staticmethod
     def generar_reporte_estadistico(df, nivel="genus", top_n=10):
         """
-        Genera un reporte estadístico completo.
+        Genera el reporte analítico global del suelo sin sesgar métricas científicas.
         """
         if df.empty:
             return None
 
+        descriptivas_completas = StatisticsService.calcular_descriptivas(df, columna="%_hits")
+        test_normalidad_completo = StatisticsService.test_normalidad_shapiro(df, columna="%_hits")
+        
         top_df = df.nlargest(top_n, "%_hits")
         
         return {
-            "descriptivas": StatisticalAnalyzer.calcular_descriptivas(top_df),
-            "normalidad": StatisticalAnalyzer.test_normalidad_shapiro(top_df),
-            "taxa_analizados": len(top_df),
+            "descriptivas": descriptivas_completas,
+            "normalidad": test_normalidad_completo,
+            "taxa_analizados": len(df),
             "nivel": nivel,
+            "top_n_solicitado": top_n,
+            "dominancia_top_acumulada": float(top_df["%_hits"].sum()) if "%_hits" in top_df.columns else 0.0
         }
