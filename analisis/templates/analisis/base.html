@@ -566,9 +566,12 @@
                 {% if request.user.is_staff %}Administrador{% else %}Usuario{% endif %}
             </div>
         </div>
-        <a href="{% url 'logout' %}" class="user-logout" title="Cerrar sesión">
-            <i class="ti ti-logout" aria-hidden="true"></i>
-        </a>
+        <form action="{% url 'analisis:logout' %}" method="post" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="user-logout" title="Cerrar sesión" style="background: none; border: none; cursor: pointer; padding: 0;">
+                <i class="ti ti-logout" aria-hidden="true"></i>
+            </button>
+        </form>
     </div>
 </aside>
 

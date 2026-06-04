@@ -193,9 +193,9 @@
                 <a href="{% url 'analisis:catalogo' %}">Catálogo</a>
                 <a href="{% url 'analisis:reportes' %}">Reportes</a>
                 <a href="{% url 'admin:index' %}">Admin</a>
-                <a href="{% url 'logout' %}">Cerrar Sesión</a>
+                <a href="{% url 'analisis:logout' %}">Cerrar Sesión</a>
                 {% else %}
-                <a href="{% url 'login' %}">Iniciar Sesión</a>
+                <a href="{% url 'analisis:login' %}">Iniciar Sesión</a>
                 {% endif %}
             </nav>
         </div>

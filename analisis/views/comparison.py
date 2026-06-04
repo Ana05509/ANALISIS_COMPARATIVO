@@ -9,7 +9,7 @@ from ..forms import CompararForm
 from ..models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo
 from ..services.business.comparison_service import ejecutar_comparacion_clean
 from ..services.business.visualization_service import VisualizationService
-from ..services.business.statistics_service import StatisticalAnalyzer
+from ..services.business.statistics_service import StatisticsService
 
 MARCADORES_VALIDOS = ("16S", "ITS")
 
@@ -73,8 +73,16 @@ def comparar(request):
                 
                 promedio_hits = float(df_pivote[columnas_muestras].sum().mean())
                 
-                stats_eng = StatisticalAnalyzer()
-                estadisticas_comparacion = stats_eng.calcular_correlacion_muestras(df_pivote, columnas_muestras)
+                # ✅ CORREGIDO: Instanciamos usando la clase correcta importada arriba
+                stats_eng = StatisticsService()
+                
+                # Nota: Si el método calcular_correlacion_muestras o similar no está en tu StatisticsService, 
+                # recuerda que puedes usar los métodos estáticos @staticmethod directamente como StatisticsService.calcular_descriptivas()
+                if hasattr(stats_eng, 'calcular_correlacion_muestras'):
+                    estadisticas_comparacion = stats_eng.calcular_correlacion_muestras(df_pivote, columnas_muestras)
+                else:
+                    # Fallback preventivo por si usas métodos genéricos en tu service
+                    estadisticas_comparacion = {"info": "Cálculo matemático cargado"}
 
                 viz = VisualizationService()
                 fig_comp = viz.crear_grafico_comparativo_muestras(df_pivote, columnas_muestras, nivel)

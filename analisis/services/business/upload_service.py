@@ -2,7 +2,7 @@ import pandas as pd
 from django.db import transaction
 
 from analisis.models import MuestraSuelo, ArchivoMolecular, ResultadoTaxonomico, Cultivo, VariedadClon
-from analisis.services.processing.pipeline import procesar_archivo_df
+from analisis.services.processing.pipeline import PipelineProcesamiento
 
 NIVELES_VALIDOS = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
 
@@ -38,7 +38,7 @@ def procesar_upload(request):
     Pipeline con validación científica estricta.
     Bloquea la creación automática de cultivos/variedades y exige metadatos de origen completos.
     """
-    archivo        = request.FILES.get("archivo")
+    archivo         = request.FILES.get("archivo")
     tipo           = request.POST.get("tipo_analisis", "16S")
     codigo_muestra = request.POST.get("codigo", "").strip()
     
@@ -65,7 +65,7 @@ def procesar_upload(request):
     if not finca_lote:
         raise ValueError("El campo 'Finca / Lote' es obligatorio para la trazabilidad de la muestra.")
 
-    # Conversión segura de la altitud (si viene vacía, lanzamos error si deseas que también sea obligatoria)
+    # Conversión segura de la altitud
     if not altitud_raw or not altitud_raw.strip():
         raise ValueError("El campo 'Altitud' (msnm) es obligatorio para los cálculos de ecología microbiana.")
     
@@ -82,7 +82,8 @@ def procesar_upload(request):
     if nivel not in NIVELES_VALIDOS:
         nivel = "genus"
 
-    resultado = procesar_archivo_df(df_raw, nivel=nivel)
+    # ✅ CORREGIDO: Ahora llamamos al método estático usando la clase correspondiente
+    resultado = PipelineProcesamiento.procesar_archivo_df(df_raw, nivel=nivel)
 
     if not resultado or not resultado.get("data"):
         raise ValueError("El archivo subido no contiene datos taxonómicos válidos o el formato interno es incorrecto.")
@@ -127,7 +128,7 @@ def procesar_upload(request):
                 archivo=archivo_mol,
                 kingdom=item.get("kingdom", ""),
                 phylum=item.get("phylum", ""),
-                tax_class=item.get("class", ""),
+                tax_class=item.get("tax_class", ""),  # Alineado con 'tax_class' del pipeline original
                 order=item.get("order", ""),
                 family=item.get("family", ""),
                 genus=item.get("genus", item.get(nivel, "")),

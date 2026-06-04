@@ -9,7 +9,7 @@ from django.db.models import Count, F, Q, Sum
 from django.shortcuts import render
 
 from ..models import CatalogoMicroorganismo, MuestraSuelo, ResultadoTaxonomico
-from ..services.business.statistics_service import StatisticalAnalyzer
+from ..services.business.statistics_service import StatisticsService
 from ..services.business.visualization_service import VisualizationService
 
 MARCADORES_VALIDOS = ("16S", "ITS")
@@ -29,7 +29,7 @@ def dashboard(request):
         ).select_related("archivo__muestra__variedad_clon").order_by("-id")
 
         muestras = MuestraSuelo.objects.filter(
-            archivomolecular__tipo_analisis=tipo
+            archivos_moleculares__tipo_analisis=tipo
         ).select_related("cultivo", "variedad_clon").distinct().order_by("-id")
 
         total_analisis = analisis.count()

@@ -6,12 +6,7 @@ from django.views.decorators.http import require_POST
 import pandas as pd
 
 from ..models import MuestraSuelo, ResultadoTaxonomico
-from ..services.business.report_service import (
-    generar_reporte_analisis,
-    obtener_historial_reportes,
-    obtener_reporte_por_id,
-)
-from ..services.business.export_service import ExportService
+from ..services.business.report_service import ExportService
 from django.db.models import F, Sum
 
 MARCADORES_VALIDOS = ("16S", "ITS")
@@ -28,7 +23,7 @@ def reportes(request):
         muestras  = MuestraSuelo.objects.filter(
             archivomolecular__tipo_analisis=tipo
         ).distinct().order_by("-id")
-        historial = obtener_historial_reportes(tipo=tipo)
+        historial = ExportService.obtener_historial_reportes(tipo=tipo)
     except Exception as e:
         messages.error(request, f"Error al cargar los reportes: {str(e)}")
         muestras  = MuestraSuelo.objects.none()
@@ -72,15 +67,15 @@ def generar_reporte(request) -> HttpResponse:
         df_reporte = pd.DataFrame(datos_analisis).groupby(nivel, as_index=False).sum()
         df_reporte = df_reporte.sort_values(by="num_hits", ascending=False).head(top_n)
 
-        export_service = ExportService()
+        export_service = ExportService
 
         if formato == "html":
-            html_puro = export_service.exportar_html(df_reporte.to_html(classes="table table-striped"), f"reporte_{tipo}_{nivel}.html")
+            html_puro = ExportService.exportar_html(df_reporte.to_html(classes="table table-striped"), f"reporte_{tipo}_{nivel}.html")
             # Forzamos conversión a string por si el servicio devuelve un objeto inesperado
             return HttpResponse(str(html_puro), content_type="text/html")
         
         elif formato == "pdf":
-            response = export_service.exportar_pdf(
+            response = ExportService.exportar_pdf(
                 datos_analisis=datos_analisis,
                 df_datos=df_reporte,
                 usuario=request.user,
@@ -92,7 +87,7 @@ def generar_reporte(request) -> HttpResponse:
             return HttpResponse(bytes(response), content_type="application/pdf")
         
         elif formato == "json":
-            json_response = export_service.exportar_json(
+            json_response = ExportService.exportar_json(
                 df_reporte.to_dict('records'),
                 nombre_archivo=f"reporte_{tipo}_{nivel}.json"
             )
@@ -102,7 +97,7 @@ def generar_reporte(request) -> HttpResponse:
             return HttpResponse(str(json_response), content_type="application/json")
         
         else:  # Formato Excel u otros procesados por report_service
-            resultado = generar_reporte_analisis(
+            resultado = ExportService.generar_reporte_analisis(
                 tipo=tipo, producto_id=variedad_id, formato=formato,
                 top_n=top_n, nivel=nivel, usuario=request.user,
             )
@@ -118,7 +113,7 @@ def generar_reporte(request) -> HttpResponse:
 @login_required
 def detalle_reporte(request, reporte_id):
     """README: Técnico Agrícola accede al reporte final sin modificarlo."""
-    reporte = obtener_reporte_por_id(reporte_id)
+    reporte = ExportService.obtener_reporte_por_id(reporte_id)
     if reporte is None:
         messages.error(request, "Reporte no encontrado.")
         return redirect("analisis:reportes")

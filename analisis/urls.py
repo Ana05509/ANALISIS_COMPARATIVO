@@ -1,9 +1,14 @@
 from django.urls import path
 from . import views
+from .views.auth import CustomLoginView, CustomLogoutView
 
 app_name = "analisis"
 
 urlpatterns = [
+    # Autenticación
+    path("login/", CustomLoginView.as_view(), name="login"),
+    path("logout/", CustomLogoutView.as_view(), name="logout"),
+
     # Dashboard principal
     path("", views.dashboard, name="dashboard"),
 

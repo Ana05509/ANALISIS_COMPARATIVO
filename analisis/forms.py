@@ -27,7 +27,7 @@ class CompararForm(forms.Form):
     def __init__(self, *args, tipo="16S", **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["productos"].queryset = MuestraSuelo.objects.filter(
-            archivomolecular__tipo_analisis=tipo
+            archivos_moleculares__tipo_analisis=tipo
         ).distinct().order_by("-id")
 
     def clean_top_n(self):

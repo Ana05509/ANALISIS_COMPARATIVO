@@ -388,3 +388,8 @@ class StatisticsService:
             "top_n_solicitado": top_n,
             "dominancia_top_acumulada": float(top_df["%_hits"].sum()) if "%_hits" in top_df.columns else 0.0
         }
+    
+# =====================================================================
+# ALIAS DE COMPATIBILIDAD: Resuelve el puente con las vistas de Django
+# =====================================================================
+StatisticalAnalyzer = StatisticsService

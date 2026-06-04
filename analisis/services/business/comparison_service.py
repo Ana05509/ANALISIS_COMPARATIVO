@@ -127,7 +127,7 @@ def ejecutar_comparacion_clean(cleaned_data):
     ids = [m.id for m in muestras_sel] if muestras_sel else []
     
     muestras_base = MuestraSuelo.objects.filter(
-        archivomolecular__tipo_analisis=tipo
+        archivos_moleculares__tipo_analisis=tipo
     ).distinct().order_by("-id")
 
     vacio = {

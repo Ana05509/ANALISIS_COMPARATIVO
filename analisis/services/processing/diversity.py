@@ -5,7 +5,6 @@ import pandas as pd
 NIVELES_VALIDOS = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
 FILTROS_EXCLUSION = {"others", "unclassified", "unknown", "nan", "", "others sp"}
 
-
 class DiversityService:
     """Servicio bioinformático para la evaluación de biodiversidad microbiana en agroecosistemas."""
 
@@ -28,7 +27,6 @@ class DiversityService:
             df.index.to_series().astype(str).str.lower().isin(FILTROS_EXCLUSION).invert()
         )
         if "%_hits" in df.columns and any(col in df.columns for col in NIVELES_VALIDOS):
-            # Intentar buscar en las columnas de niveles taxonómicos si están presentes
             for nivel in NIVELES_VALIDOS:
                 if nivel in df.columns:
                     mask_validos = mask_validos & df[nivel].astype(str).str.lower().isin(FILTROS_EXCLUSION).invert()
@@ -40,19 +38,16 @@ class DiversityService:
     def calcular_shannon(df):
         """
         Índice de Shannon (H'): Mide la incertidumbre/diversidad considerando riqueza y equitatividad.
-        Re-normaliza las abundancias locales para evitar sesgos por truncamiento de datos.
         """
         if df.empty or "%_hits" not in df.columns:
             return 0.0
 
         abundancias = df["%_hits"].astype(float)
-        # Filtrar valores en cero o negativos
         abundancias = abundancias[abundancias > 0]
 
         if abundancias.empty:
             return 0.0
 
-        # Re-normalización ecológica: asegurar que sumen 1.0 de forma estricta en el fragmento evaluado
         total_suma = abundancias.sum()
         proporciones = abundancias / total_suma
 
@@ -93,9 +88,7 @@ class DiversityService:
 
     @staticmethod
     def calcular_diversidad_alfa(df):
-        """
-        Consolida el perfil de diversidad alfa para la caracterización de un lote biológico.
-        """
+        """Consolida el perfil de diversidad alfa para la caracterización de un lote biológico."""
         return {
             "riqueza": DiversityService.calcular_riqueza(df),
             "shannon": DiversityService.calcular_shannon(df),
@@ -114,18 +107,13 @@ class DiversityService:
         if df.empty or campo not in df.columns:
             return set()
 
-        # Extraer strings limpios en minúsculas sin espacios colaterales
         taxas_raw = df[campo].dropna().astype(str).str.strip().str.lower()
-        
-        # Aplicar el filtro de exclusión molecular estricto
         set_limpio = {t for t in taxas_raw if t not in FILTROS_EXCLUSION}
         return set_limpio
 
     @staticmethod
     def identificar_compartidos(df_a, df_b, nivel="genus"):
-        """
-        Core Microbiome: Taxones verdaderos presentes de forma simultánea en ambas muestras.
-        """
+        """Microbioma Núcleo: Taxones verdaderos presentes de forma simultánea en ambas muestras."""
         set_a = DiversityService._obtener_set_taxonomico_limpio(df_a, nivel)
         set_b = DiversityService._obtener_set_taxonomico_limpio(df_b, nivel)
         compartidos = set_a & set_b
@@ -133,9 +121,7 @@ class DiversityService:
 
     @staticmethod
     def identificar_exclusivos(df_a, df_b, nivel="genus"):
-        """
-        Biomarcadores Exclusivos: Identifica qué microorganismos diferencian a un cultivo de otro.
-        """
+        """Biomarcadores Exclusivos: Identifica qué microorganismos diferencian a un cultivo de otro."""
         set_a = DiversityService._obtener_set_taxonomico_limpio(df_a, nivel)
         set_b = DiversityService._obtener_set_taxonomico_limpio(df_b, nivel)
         return {
@@ -145,10 +131,7 @@ class DiversityService:
 
     @staticmethod
     def calcular_similitud_jaccard(df_a, df_b, nivel="genus"):
-        """
-        Índice de similitud comunitaria de Jaccard.
-        Efectivo para comparar Cacao CCN51 vs Variedades Nativas sin sesgo por remanentes 'Others'.
-        """
+        """Índice de similitud comunitaria de Jaccard."""
         set_a = DiversityService._obtener_set_taxonomico_limpio(df_a, nivel)
         set_b = DiversityService._obtener_set_taxonomico_limpio(df_b, nivel)
         
@@ -161,12 +144,10 @@ class DiversityService:
 
     @staticmethod
     def calcular_diversidad_beta(df_a, df_b, nivel="genus"):
-        """
-        Análisis Diferencial Completo de Diversidad Beta entre dos matrices biológicas.
-        """
+        """Análisis Diferencial Completo de Diversidad Beta entre dos matrices biológicas."""
         campo = nivel if nivel in NIVELES_VALIDOS else "genus"
         return {
-            "compartidos": DiversityService.identify_compartidos_si_fuese_necesario(df_a, df_b, campo), # Mapeado interno interno
+            "compartidos": DiversityService.identify_compartidos_si_fuese_necesario(df_a, df_b, campo),
             "compartidos_lista": DiversityService.identificar_compartidos(df_a, df_b, campo),
             "exclusivos": DiversityService.identificar_exclusivos(df_a, df_b, campo),
             "jaccard": DiversityService.calcular_similitud_jaccard(df_a, df_b, campo),
@@ -177,5 +158,5 @@ class DiversityService:
 
     @staticmethod
     def identify_compartidos_si_fuese_necesario(df_a, df_b, nivel):
-        """Helper para compatibilidad de interfaz que cuenta los compartidos."""
+        """Asistente para compatibilidad de interfaz que cuenta los compartidos."""
         return len(DiversityService.identificar_compartidos(df_a, df_b, nivel))

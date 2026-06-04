@@ -30,117 +30,19 @@ class AbundanceService:
 
     @staticmethod
     def normalizar_abundancias(df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Normaliza %_hits para asegurar que la muestra sume exactamente el 100.0% analítico,
-        mitigando errores de redondeo acumulado en el archivo de origen.
-        """
+        """Normaliza %_hits a escala 0-1."""
         df_copy = df.copy()
-        if "%_hits" not in df_copy.columns:
+        if "%_hits" not in df_copy.columns or df_copy["%_hits"].max() == df_copy["%_hits"].min():
             return df_copy
-
-        total = df_copy["%_hits"].sum()
-        if total == 0:
-            return df_copy
-            
-        df_copy["%_hits"] = (df_copy["%_hits"] / total * 100).round(5)
+        
+        max_val = df_copy["%_hits"].max()
+        min_val = df_copy["%_hits"].min()
+        df_copy["%_hits_normalizado"] = (df_copy["%_hits"] - min_val) / (max_val - min_val)
         return df_copy
-
-    @staticmethod
-    def calcular_abundancia_acumulada(df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Calcula la curva de distribución acumulada de mayor a menor abundancia.
-        Indispensable para las curvas de dominancia del dashboard de investigación.
-        """
-        df_copy = df.copy()
-        if "%_hits" not in df_copy.columns:
-            df_copy["%_hits_acumulado"] = 0.0
-            return df_copy
-
-        df_copy = df_copy.sort_values(by="%_hits", ascending=False)
-        df_copy["%_hits_acumulado"] = df_copy["%_hits"].cumsum().round(5)
-        return df_copy
-
-    @staticmethod
-    def comparar_abundancias(df_a: pd.DataFrame, df_b: pd.DataFrame, nivel="genus") -> pd.DataFrame:
-        """
-        Ejecuta el Análisis Diferencial entre dos comunidades microbianas (Ej: Cacao CCN51 vs Clon Nacional).
-        Agrupa previamente para evitar explosiones de productos cartesianos y duplicidades taxonómicas.
-        """
-        campo = nivel if nivel in NIVELES_VALIDOS else "genus"
-        
-        df_a_clean = df_a.copy()
-        df_b_clean = df_b.copy()
-        
-        for df_target in [df_a_clean, df_b_clean]:
-            if campo in df_target.columns:
-                df_target[campo] = df_target[campo].astype(str).str.strip()
-
-        agg_a = df_a_clean.groupby(campo, as_index=False).agg(**{"%_hits_a": pd.NamedAgg(column="%_hits", aggfunc="sum")})
-        agg_b = df_b_clean.groupby(campo, as_index=False).agg(**{"%_hits_b": pd.NamedAgg(column="%_hits", aggfunc="sum")})
-
-        merged = pd.merge(
-            agg_a,
-            agg_b,
-            on=campo,
-            how="outer"
-        ).fillna(0.0)
-
-        merged["diferencia"] = (merged["%_hits_a"] - merged["%_hits_b"]).round(5)
-        merged["diferencia_abs"] = merged["diferencia"].abs()
-
-        return merged.sort_values(by="diferencia_abs", ascending=False).reset_index(drop=True)
-
-    @staticmethod
-    def construir_matriz_abundancia_lote(dfs: List[pd.DataFrame], nombres_muestras: List[str], nivel="genus") -> pd.DataFrame:
-        """
-        Consolida N muestras (ej. 4 parcelas del mismo cultivo) en una matriz unificada.
-        Calcula estadísticas de variabilidad intra-cultivo (desviación estándar y promedio).
-        Diseñado para ser 100% inmune a problemas de tipos de Pylance.
-        """
-        campo = nivel if nivel in NIVELES_VALIDOS else "genus"
-        
-        if not dfs or len(dfs) != len(nombres_muestras):
-            return pd.DataFrame(columns=[campo, "promedio", "desviacion_estandar"])
-
-        muestras_procesadas = []
-        columnas_abundancia = []
-
-        # 1. Procesar, agrupar y renombrar de forma independiente cada muestra del lote
-        for idx, df_individual in enumerate(dfs):
-            nombre_col = f"abundancia_{nombres_muestras[idx]}"
-            columnas_abundancia.append(nombre_col)
-            
-            df_tmp = df_individual.copy()
-            if campo in df_tmp.columns:
-                df_tmp[campo] = df_tmp[campo].astype(str).str.strip()
-            
-            # Agrupación segura sin .rename() usando NamedAgg
-            agg_individual = df_tmp.groupby(campo, as_index=False).agg(
-                **{nombre_col: pd.NamedAgg(column="%_hits", aggfunc="sum")}
-            )
-            muestras_procesadas.append(agg_individual)
-
-        # 2. Consolidar de forma iterativa usando un merge externo continuo
-        matriz_global = muestras_procesadas[0]
-        for df_siguiente in muestras_procesadas[1:]:
-            matriz_global = pd.merge(matriz_global, df_siguiente, on=campo, how="outer")
-
-        # Rellenar con 0.0 aquellos microorganismos que no aparecieron en alguna de las parcelas
-        matriz_global = matriz_global.fillna(0.0)
-
-        # 3. Agregar métricas de control agronómico
-        # Promedio de presencia en el cultivo
-        matriz_global["promedio"] = matriz_global[columnas_abundancia].mean(axis=1).round(5)
-        # Desviación Estándar: Si es baja, significa que el microbioma es homogéneo en todo el cultivo
-        matriz_global["desviacion_estandar"] = matriz_global[columnas_abundancia].std(axis=1).fillna(0.0).round(5)
-
-        return matriz_global.sort_values(by="promedio", ascending=False).reset_index(drop=True)
 
     @staticmethod
     def identificar_dominantes(df: pd.DataFrame, umbral=1.0, nivel="genus") -> pd.DataFrame:
-        """
-        Filtra biomarcadores dominantes excluyendo categorías de control analítico.
-        """
+        """Filtra biomarcadores dominantes excluyendo categorías de control analítico."""
         if df.empty or "%_hits" not in df.columns:
             return df.copy()
 
@@ -158,9 +60,7 @@ class AbundanceService:
 
     @staticmethod
     def identificar_raros(df: pd.DataFrame, umbral=0.1, nivel="genus") -> pd.DataFrame:
-        """
-        Filtra el microbioma raro u oculto del suelo (presencia < 0.1%).
-        """
+        """Filtra el microbioma raro u oculto del suelo (presencia < 0.1%)."""
         if df.empty or "%_hits" not in df.columns:
             return df.copy()
 
@@ -169,10 +69,53 @@ class AbundanceService:
 
         if campo in df_copy.columns:
             mask = (
-                (df_copy["%_hits"] < umbral) & 
-                (df_copy["%_hits"] > 0) & 
+                (df_copy["%_hits"] < umbral) & (df_copy["%_hits"] > 0) &
                 (~df_copy[campo].astype(str).str.lower().isin(CATEGORIAS_CONTROL))
             )
             return df_copy[mask].copy()
-
+            
         return df_copy[(df_copy["%_hits"] < umbral) & (df_copy["%_hits"] > 0)].copy()
+
+
+# =====================================================================
+# FUNCIÓN SOLUCIÓN ENLACE: Requerida por analysis_service.py
+# =====================================================================
+def comparar_abundancias(df_a: pd.DataFrame, df_b: pd.DataFrame, nivel: str = "genus") -> List[dict]:
+    """
+    Realiza un análisis diferencial entre dos muestras (A y B) para un nivel taxonómico dado.
+    Calcula la diferencia de abundancia (%_hits) para cada microorganismo presente.
+    """
+    campo = nivel if nivel in NIVELES_VALIDOS else "genus"
+    
+    if df_a.empty or campo not in df_a.columns or "%_hits" not in df_a.columns:
+        df_a = pd.DataFrame(columns=[campo, "%_hits"])
+    if df_b.empty or campo not in df_b.columns or "%_hits" not in df_b.columns:
+        df_b = pd.DataFrame(columns=[campo, "%_hits"])
+
+    df_a_limpio = df_a[~df_a[campo].astype(str).str.lower().isin(CATEGORIAS_CONTROL)]
+    df_b_limpio = df_b[~df_b[campo].astype(str).str.lower().isin(CATEGORIAS_CONTROL)]
+
+    serie_a = df_a_limpio.groupby(campo)["%_hits"].mean()
+    serie_b = df_b_limpio.groupby(campo)["%_hits"].mean()
+
+    # Pylance Fix: Convertimos a diccionarios nativos para evitar el choque de tipos en .map()
+    mapa_a = serie_a.to_dict()
+    mapa_b = serie_b.to_dict()
+
+    df_comparativo = pd.DataFrame(index=serie_a.index.union(serie_b.index))
+    df_comparativo["abundancia_a"] = df_comparativo.index.map(mapa_a).fillna(0.0)
+    df_comparativo["abundancia_b"] = df_comparativo.index.map(mapa_b).fillna(0.0)
+    
+    df_comparativo["diferencia"] = df_comparativo["abundancia_a"] - df_comparativo["abundancia_b"]
+    df_comparativo = df_comparativo.sort_values(by="diferencia", ascending=False).reset_index()
+
+    resultado = []
+    for _, fila in df_comparativo.iterrows():
+        resultado.append({
+            "taxon": str(fila[campo]),
+            "abundancia_a": round(float(fila["abundancia_a"]), 4),
+            "abundancia_b": round(float(fila["abundancia_b"]), 4),
+            "diferencia": round(float(fila["diferencia"]), 4)
+        })
+        
+    return resultado

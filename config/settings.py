@@ -59,7 +59,9 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR / 'analisis' / 'templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -136,9 +138,9 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # URLs de redirección unificadas utilizando nombres de rutas mutuas
-LOGIN_URL = 'login'
+LOGIN_URL = 'analisis:login'
 LOGIN_REDIRECT_URL = 'analisis:dashboard'  # Redirige al dashboard de tu app tras loguearse
-LOGOUT_REDIRECT_URL = 'login'              # Redirige al login al salir
+LOGOUT_REDIRECT_URL = 'analisis:login'     # Redirige al login al salir
 
 # Configuración del proveedor de Google OAuth2
 SOCIALACCOUNT_PROVIDERS = {

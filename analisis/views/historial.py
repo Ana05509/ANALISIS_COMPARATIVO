@@ -16,14 +16,14 @@ def historial(request):
 
     try:
         muestras = MuestraSuelo.objects.filter(
-            archivomolecular__tipo_analisis=tipo
+            archivos_moleculares__tipo_analisis=tipo
         ).distinct().order_by("-id")
 
         if busqueda:
             muestras = muestras.filter(codigo__icontains=busqueda)
 
         muestras = muestras.annotate(
-            total_analisis=Count("archivomolecular__resultadotaxonomico", distinct=True)
+            total_analisis=Count("archivos_moleculares__resultadotaxonomico", distinct=True)
         )
 
         analisis = ArchivoMolecular.objects.filter(

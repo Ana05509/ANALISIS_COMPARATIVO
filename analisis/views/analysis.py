@@ -17,7 +17,7 @@ from ..services.business.comparison_service import (
     obtener_microorganismos_compartidos,
 )
 from ..services.business.visualization_service import VisualizationService
-from ..services.business.statistics_service import StatisticalAnalyzer
+from ..services.business.statistics_service import StatisticsService as StatisticalAnalyzer
 from ..models import ResultadoTaxonomico
 
 @login_required
@@ -40,9 +40,9 @@ def analisis_avanzado(request):
             tipo=tipo, top_n=top_n, nivel=nivel, variedad_id=variedad_id, muestra_id=muestra_id
         )
         
-        # Inyección estadística (Fase 2)
-        if "datos_tabla" in contexto and contexto["datos_tabla"]:
-            df = pd.DataFrame(contexto["datos_tabla"])
+        # CORRECCIÓN BUG: 'analysis_service' devuelve 'resumen', no 'datos_tabla'
+        if "resumen" in contexto and contexto["resumen"]:
+            df = pd.DataFrame(contexto["resumen"])
             analyzer = StatisticalAnalyzer()
             contexto["estadisticas"] = analyzer.calcular_indices_diversidad(df)
         else:

@@ -4,13 +4,8 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
-from ..services.business.catalog_service import (
-    obtener_catalogo_microorganismos,
-    buscar_microorganismos,
-    obtener_detalle_microorganismo,
-    obtener_estadisticas_catalogo,
-)
-from ..services.interpretation.microorganism_classifier import reclasificar_microorganismo
+from ..services.business.catalog_service import CatalogService
+from ..services.interpretation.microorganism_classifier import MicroorganismClassificationService
 
 CLASIFICACIONES_VALIDAS = {"benefico", "fitopatogeno", "neutral", "sin_clasificar"}
 
@@ -23,15 +18,15 @@ def catalogo_microorganismos(request):
     busqueda       = request.GET.get("q", "").strip()
 
     if busqueda:
-        microorganismos = buscar_microorganismos(
+        microorganismos = CatalogService.buscar_microorganismos(
             termino=busqueda, marcador=tipo_marcador, clasificacion=clasificacion,
         )
     else:
-        microorganismos = obtener_catalogo_microorganismos(
+        microorganismos = CatalogService.obtener_catalogo_microorganismos(
             marcador=tipo_marcador, clasificacion=clasificacion, nivel=nivel,
         )
 
-    estadisticas = obtener_estadisticas_catalogo()
+    estadisticas = CatalogService.obtener_estadisticas_catalogo()
 
     return render(request, "analisis/catalogo_microorganismos.html", {
         "microorganismos":       microorganismos,
@@ -51,7 +46,7 @@ def catalogo_microorganismos(request):
 
 @login_required
 def detalle_microorganismo(request, pk):
-    microorganismo = obtener_detalle_microorganismo(pk)
+    microorganismo = CatalogService.obtener_detalle_microorganismo(pk)
     if microorganismo is None:
         messages.error(request, "Microorganismo no localizado en la base del catálogo.")
         return redirect("analisis:catalogo")
@@ -73,7 +68,7 @@ def actualizar_clasificacion(request, pk):
     if nueva_clasificacion not in CLASIFICACIONES_VALIDAS:
         return JsonResponse({"ok": False, "error": "Clasificación inválida."}, status=400)
 
-    resultado = reclasificar_microorganismo(
+    resultado = MicroorganismClassificationService.reclasificar_microorganismo(
         pk=pk,
         nueva_clasificacion=nueva_clasificacion,
         usuario=request.user,
