@@ -1,227 +1,435 @@
-{% load static %}<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Análisis Comparativo de Perfiles Microbianos{% endblock %}</title>
+    <title>{% block title %}BioSoil Analytics{% endblock %} — Análisis Microbiano</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <style>
         :root {
-            --color-primary: #2c3e50;
-            --color-secondary: #27ae60;
-            --color-danger: #e74c3c;
-            --color-warning: #f39c12;
-            --color-info: #3498db;
-            --color-light: #ecf0f1;
+            --verde:        #1D9E75;
+            --verde-light:  #E1F5EE;
+            --verde-dark:   #085041;
+            --amber:        #BA7517;
+            --amber-light:  #FAEEDA;
+            --rojo:         #A32D2D;
+            --rojo-light:   #FCEBEB;
+            --gris:         #5F5E5A;
+            --gris-light:   #F1EFE8;
+            --gris-border:  #D3D1C7;
+            --teal:         #0F6E56;
+            --bg:           #F7F6F2;
+            --surface:      #FFFFFF;
+            --text-primary: #1a1a18;
+            --text-muted:   #5F5E5A;
+            --text-hint:    #888780;
+            --sidebar-w:    260px;
+            --radius:       10px;
+            --radius-lg:    16px;
+            --shadow-sm:    0 1px 3px rgba(0,0,0,0.06);
+            --shadow-md:    0 4px 16px rgba(0,0,0,0.08);
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f5f5;
-            color: var(--color-primary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 400;
             line-height: 1.6;
+            background: var(--bg);
+            color: var(--text-primary);
         }
 
-        header {
-            background-color: var(--color-primary);
-            color: white;
-            padding: 1rem 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        /* ── INTERFAZ DE USUARIO: CONTENEDORES CON PREFIJOS PROPIOS (Protege el Admin) ── */
+        .bs-app-layout-root {
+            display: flex !important;
+            min-height: 100vh !important;
+            width: 100% !important;
         }
 
-        nav {
+        .bs-app-sidebar {
+            width: var(--sidebar-w);
+            background: var(--surface);
+            border-right: 1px solid var(--gris-border);
             display: flex;
-            gap: 1rem;
-            align-items: center;
+            flex-direction: column;
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            z-index: 100;
         }
 
-        nav h1 {
-            font-size: 1.5rem;
-            margin-right: auto;
+        .bs-app-main-panel {
+            margin-left: var(--sidebar-w) !important;
+            flex: 1 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 100vh !important;
+            min-width: 0 !important; /* Protege contra desbordamientos */
         }
 
-        nav a {
-            color: white;
-            text-decoration: none;
-            padding: 0.5rem 1rem;
-            transition: background-color 0.3s;
+        /* ── COMPONENTES GENERALES DE LA APP ── */
+        .sidebar-brand {
+            padding: 1.5rem 1.25rem 1rem;
+            border-bottom: 1px solid var(--gris-border);
         }
 
-        nav a:hover {
-            background-color: var(--color-secondary);
-            border-radius: 4px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 15px;
-        }
-
-        .card {
-            background: white;
+        .brand-icon {
+            width: 36px; height: 36px;
+            background: var(--verde);
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .btn {
-            display: inline-block;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1rem;
-            text-decoration: none;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
-            background-color: var(--color-primary);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background-color: var(--color-secondary);
-        }
-
-        .btn-secondary {
-            background-color: var(--color-info);
-            color: white;
-        }
-
-        .btn-danger {
-            background-color: var(--color-danger);
-            color: white;
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        label {
-            display: block;
+            display: flex; align-items: center; justify-content: center;
             margin-bottom: 0.5rem;
+        }
+
+        .brand-icon i { color: #fff; font-size: 18px; }
+
+        .brand-name {
+            font-family: 'Fraunces', serif;
+            font-size: 17px;
+            font-weight: 500;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+
+        .brand-sub {
+            font-size: 11px;
+            color: var(--text-hint);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-top: 1px;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 1rem 0.75rem;
+            overflow-y: auto;
+        }
+
+        .nav-section-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-hint);
+            padding: 0.75rem 0.5rem 0.35rem;
             font-weight: 500;
         }
 
-        input[type="text"],
-        input[type="email"],
-        input[type="password"],
-        input[type="file"],
-        select,
-        textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: inherit;
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0.55rem 0.75rem;
+            border-radius: var(--radius);
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 400;
+            transition: background 0.15s, color 0.15s;
+            margin-bottom: 2px;
         }
 
-        .alert {
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border-radius: 4px;
+        .nav-link:hover {
+            background: var(--gris-light);
+            color: var(--text-primary);
         }
 
-        .alert-success {
-            background-color: #d4edda;
-            color: #155724;
-            border-left: 5px solid var(--color-secondary);
+        .nav-link.active {
+            background: var(--verde-light);
+            color: var(--verde-dark);
+            font-weight: 500;
         }
 
-        /* Compatibilidad dual para tags de error de Django ('error' o 'danger') */
-        .alert-error, .alert-danger {
-            background-color: #f8d7da;
-            color: #721c24;
-            border-left: 5px solid var(--color-danger);
+        .nav-link i { font-size: 17px; flex-shrink: 0; }
+
+        .nav-badge {
+            margin-left: auto;
+            background: var(--verde-light);
+            color: var(--verde-dark);
+            font-size: 11px;
+            font-weight: 500;
+            padding: 1px 7px;
+            border-radius: 20px;
         }
 
-        .alert-warning {
-            background-color: #fff3cd;
-            color: #856404;
-            border-left: 5px solid var(--color-warning);
+        .marker-tabs {
+            display: flex;
+            gap: 6px;
+            padding: 0.75rem 1rem;
+            border-top: 1px solid var(--gris-border);
         }
+
+        .marker-tab {
+            flex: 1;
+            padding: 0.4rem;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            border: 1px solid var(--gris-border);
+            color: var(--text-muted);
+            transition: all 0.15s;
+            font-family: 'DM Mono', monospace;
+        }
+
+        .marker-tab:hover { border-color: var(--verde); color: var(--verde); }
+
+        .marker-tab.active-16s {
+            background: var(--verde-light);
+            border-color: var(--verde);
+            color: var(--verde-dark);
+        }
+
+        .marker-tab.active-its {
+            background: var(--amber-light);
+            border-color: var(--amber);
+            color: var(--amber);
+        }
+
+        .sidebar-user {
+            padding: 0.85rem 1rem;
+            border-top: 1px solid var(--gris-border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 32px; height: 32px;
+            background: var(--verde-light);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--verde-dark);
+            flex-shrink: 0;
+        }
+
+        .user-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+        .user-role { font-size: 11px; color: var(--text-hint); }
+
+        .user-logout {
+            margin-left: auto;
+            color: var(--text-hint);
+            text-decoration: none;
+            font-size: 16px;
+            transition: color 0.15s;
+        }
+
+        .user-logout:hover { color: var(--rojo); }
+
+        .topbar {
+            background: var(--surface);
+            border-bottom: 1px solid var(--gris-border);
+            padding: 0 2rem;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .topbar-title {
+            font-family: 'Fraunces', serif;
+            font-size: 16px;
+            font-weight: 300;
+            color: var(--text-primary);
+        }
+
+        .topbar-actions { display: flex; align-items: center; gap: 10px; }
+
+        .page-content {
+            padding: 2rem;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .page-header { margin-bottom: 1.75rem; }
+
+        .page-header h1 {
+            font-family: 'Fraunces', serif;
+            font-size: 26px;
+            font-weight: 500;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+        }
+
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--gris-border);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+        }
+
+        .card-sm { padding: 1rem 1.25rem; }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-hint);
+            margin-bottom: 0.75rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin-bottom: 1.5rem;
+        }
+
+        .metric-card {
+            background: var(--surface);
+            border: 1px solid var(--gris-border);
+            border-radius: var(--radius);
+            padding: 1rem 1.25rem;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: var(--text-hint);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 26px;
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1;
+            font-family: 'DM Mono', monospace;
+        }
+
+        .metric-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .metric-card.verde { border-left: 3px solid var(--verde); }
+        .metric-card.verde .metric-value { color: var(--verde-dark); }
+        .metric-card.amber { border-left: 3px solid var(--amber); }
+        .metric-card.amber .metric-value { color: var(--amber); }
+        .metric-card.rojo { border-left: 3px solid var(--rojo); }
+        .metric-card.rojo .metric-value { color: var(--rojo); }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-benefico { background: var(--verde-light); color: var(--verde-dark); }
+        .badge-fitopatogeno { background: var(--amber-light); color: #5a3a00; }
+        .badge-sin-clas { background: var(--gris-light); color: var(--gris); }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0.5rem 1.1rem;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 500;
+            font-family: 'Outfit', sans-serif;
+            cursor: pointer;
+            border: 1px solid transparent;
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+
+        .btn-primary { background: var(--verde); color: #fff; border-color: var(--verde); }
+        .btn-primary:hover { background: var(--teal); border-color: var(--teal); }
+        .btn-outline { background: transparent; color: var(--text-primary); border-color: var(--gris-border); }
+        .btn-outline:hover { background: var(--gris-light); }
+        .btn-sm { padding: 0.35rem 0.75rem; font-size: 13px; }
+
+        .table-wrap { overflow-x: auto; border-radius: var(--radius-lg); border: 1px solid var(--gris-border); }
 
         table {
             width: 100%;
             border-collapse: collapse;
+            font-size: 14px;
         }
 
-        table th {
-            background-color: var(--color-primary);
-            color: white;
-            padding: 0.75rem;
+        thead th {
+            background: var(--gris-light);
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-hint);
+            padding: 0.65rem 1rem;
             text-align: left;
+            border-bottom: 1px solid var(--gris-border);
         }
 
-        table td {
-            padding: 0.75rem;
-            border-bottom: 1px solid #ddd;
+        tbody tr { border-bottom: 1px solid var(--gris-light); }
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: #fafaf8; }
+
+        tbody td { padding: 0.7rem 1rem; color: var(--text-primary); }
+        .td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
+
+        .form-group { margin-bottom: 1.25rem; }
+        .form-label { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
+
+        .form-control {
+            width: 100%;
+            padding: 0.55rem 0.85rem;
+            border: 1px solid var(--gris-border);
+            border-radius: var(--radius);
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            color: var(--text-primary);
+            background: var(--surface);
+            transition: border-color 0.15s;
         }
 
-        .main-content {
-            min-height: calc(100vh - 200px);
-            padding: 2rem 0;
-        }
+        .form-control:focus { outline: none; border-color: var(--verde); box-shadow: 0 0 0 3px rgba(29,158,117,0.12); }
+        select.form-control { cursor: pointer; }
 
-        footer {
-            background-color: var(--color-primary);
-            color: white;
-            text-align: center;
-            padding: 2rem 0;
-            margin-top: 2rem;
-        }
+        .alert { padding: 0.85rem 1rem; border-radius: var(--radius); font-size: 14px; display: flex; align-items: flex-start; gap: 10px; margin-bottom: 1rem; }
+        .alert-success { background: var(--verde-light); color: var(--verde-dark); }
+        .alert-error { background: var(--rojo-light); color: var(--rojo); }
+        .alert-warning { background: var(--amber-light); color: #5a3a00; }
+
+        .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-hint); }
+        .empty-state i { font-size: 48px; margin-bottom: 1rem; display: block; }
+        .empty-state p { font-size: 14px; margin-top: 0.5rem; }
+
+        .pill-16s { display: inline-block; background: var(--verde-light); color: var(--verde-dark); font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; }
+        .pill-its { display: inline-block; background: var(--amber-light); color: #5a3a00; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; }
+        
+        .messages-container { margin-bottom: 1rem; }
+
+        {% block extra_css %}{% endblock %}
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <header>
-        <div class="container">
-            <nav>
-                <h1>🧬 Análisis Microbianos</h1>
-                {% if user.is_authenticated %}
-                <a href="{% url 'analisis:dashboard' %}">Dashboard</a>
-                <a href="{% url 'analisis:subir_datos' %}">Subir Datos</a>
-                <a href="{% url 'analisis:comparar' %}">Comparar</a>
-                <a href="{% url 'analisis:catalogo' %}">Catálogo</a>
-                <a href="{% url 'analisis:reportes' %}">Reportes</a>
-                <a href="{% url 'admin:index' %}">Admin</a>
-                <a href="{% url 'analisis:logout' %}">Cerrar Sesión</a>
-                {% else %}
-                <a href="{% url 'analisis:login' %}">Iniciar Sesión</a>
-                {% endif %}
-            </nav>
-        </div>
-    </header>
 
-    <main class="main-content">
-        <div class="container">
-            {% if messages %}
-            {% for message in messages %}
-            <div class="alert alert-{% if message.tags == 'error' %}error{% else %}{{ message.tags }}{% endif %}">
-                {{ message }}
-            </div>
-            {% endfor %}
-            {% endif %}
-
-            {% block content %}
-            <p>Contenido no especificado</p>
-            {% endblock %}
-        </div>
-    </main>
-
-    <footer>
-        <div class="container">
-            <p>&copy; 2026 Análisis Compartivo de Perfiles Microbianos. Todos los derechos reservados.</p>
-        </div>
-    </footer >
+    {% block layout_wrapper %}
+        {% block content %}{% endblock %}
+    {% endblock %}
 
     {% block extra_js %}{% endblock %}
 </body>

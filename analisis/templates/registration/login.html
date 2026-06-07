@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{% load socialaccount %} <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -191,6 +191,57 @@
 
         .btn-login:hover { background: var(--verde-dark); }
 
+        /* Separador visual "O continuar con" */
+        .login-divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 1.5rem 0;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .login-divider::before,
+        .login-divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--gris-border);
+            opacity: 0.6;
+        }
+
+        .login-divider:not(:empty)::before { margin-right: .75em; }
+        .login-divider:not(:empty)::after { margin-left: .75em; }
+
+        /* Botón de Google Integrado */
+        .btn-google {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 0.65rem;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--gris-border);
+            border-radius: var(--radius);
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .btn-google:hover {
+            background: #fdfdfb;
+            border-color: var(--verde);
+        }
+
+        .btn-google i {
+            font-size: 18px;
+            color: #4285F4; /* Color oficial Google Blue */
+        }
+
         .error-msg {
             background: #FCEBEB;
             color: #A32D2D;
@@ -274,6 +325,13 @@
             </div>
             <button type="submit" class="btn-login">Iniciar sesión</button>
         </form>
+
+        <div class="login-divider">O continuar con</div>
+
+        <a href="{% provider_login_url 'google' %}" class="btn-google">
+            <i class="ti ti-brand-google" aria-hidden="true"></i>
+            <span>Correo Institucional UTC</span>
+        </a>
 
         <div class="login-footer">
             BioSoil Analytics &mdash; Análisis de Biodiversidad Microbiana

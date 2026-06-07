@@ -1,8 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-
-# IMPORTACIÓN MÍNIMA Y SEGURA DE UNFOLD
 from unfold.admin import ModelAdmin
+from django.contrib import messages
 
 from .models import (
     Cultivo,
@@ -25,15 +24,19 @@ admin.site.index_title = "Panel de Control Microbiológico"
 # =========================================================
 
 @admin.register(Cultivo)
-class CultivoAdmin(ModelAdmin): # <-- Aplica diseño Unfold
+class CultivoAdmin(ModelAdmin): 
 
     list_display = ("id", "nombre", "descripcion")
-
-    search_fields = ("nombreord", "nombre", "descripcion")
-
+    search_fields = ("nombre", "descripcion") # Nota: Corregido 'nombreord' a 'nombre'
     ordering = ("nombre",)
-
     list_per_page = 15
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if change:
+            messages.info(request, f"Cultivo '{obj.nombre}' actualizado correctamente.")
+        else:
+            messages.success(request, f"¡Éxito! Cultivo agrícola '{obj.nombre}' registrado en la plataforma.")
 
 
 # =========================================================
@@ -41,16 +44,12 @@ class CultivoAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 # =========================================================
 
 @admin.register(VariedadClon)
-class VariedadClonAdmin(ModelAdmin): # <-- Aplica diseño Unfold
+class VariedadClonAdmin(ModelAdmin): 
 
     list_display = ("id", "nombre", "cultivo")
-
-    list_filter = ("cultivo",) # Filtro nativo de Django compatible con Unfold
-
+    list_filter = ("cultivo",) 
     search_fields = ("nombre", "cultivo__nombre")
-
     ordering = ("nombre",)
-
     list_per_page = 20
 
 
@@ -59,7 +58,7 @@ class VariedadClonAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 # =========================================================
 
 @admin.register(MuestraSuelo)
-class MuestraSueloAdmin(ModelAdmin): # <-- Aplica diseño Unfold
+class MuestraSueloAdmin(ModelAdmin): 
 
     list_display = (
         "id",
@@ -78,12 +77,20 @@ class MuestraSueloAdmin(ModelAdmin): # <-- Aplica diseño Unfold
     )
 
     search_fields = ("codigo", "cultivo__nombre", "variedad_clon__nombre")
-
     ordering = ("-fecha_registro",)
-
     date_hierarchy = "fecha_registro"
-
     list_per_page = 20
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if change:
+            messages.info(request, f"Datos de la muestra microbiológica '{obj.codigo}' modificados con éxito.")
+        else:
+            messages.success(
+                request, 
+                f"¡Registro Exitoso! La muestra '{obj.codigo}' ha sido indexada. "
+                "Ya puedes proceder a vincular sus archivos secuenciación 16S / ITS."
+            )
 
 
 # =========================================================
@@ -91,7 +98,7 @@ class MuestraSueloAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 # =========================================================
 
 @admin.register(ArchivoMolecular)
-class ArchivoMolecularAdmin(ModelAdmin): # <-- Aplica diseño Unfold
+class ArchivoMolecularAdmin(ModelAdmin): 
 
     list_display = (
         "id",
@@ -106,12 +113,20 @@ class ArchivoMolecularAdmin(ModelAdmin): # <-- Aplica diseño Unfold
     )
 
     search_fields = ("muestra__codigo",)
-
     ordering = ("-fecha_carga",)
-
     date_hierarchy = "fecha_carga"
-
     list_per_page = 20
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if change:
+            messages.info(request, f"Configuración del archivo molecular de la muestra '{obj.muestra.codigo}' actualizada.")
+        else:
+            messages.success(
+                request, 
+                f"¡Secuenciación Cargada! Archivo analítico [{obj.tipo_analisis}] acoplado a la muestra '{obj.muestra.codigo}'. "
+                "El pipeline bioinformático comenzará a procesar la taxonomía."
+            )
 
 
 # =========================================================
@@ -119,7 +134,7 @@ class ArchivoMolecularAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 # =========================================================
 
 @admin.register(ResultadoTaxonomico)
-class ResultadoTaxonomicoAdmin(ModelAdmin): # <-- Aplica diseño Unfold
+class ResultadoTaxonomicoAdmin(ModelAdmin): 
 
     list_display = (
         "id",
@@ -142,7 +157,6 @@ class ResultadoTaxonomicoAdmin(ModelAdmin): # <-- Aplica diseño Unfold
     )
 
     ordering = ("-num_hits",)
-
     list_per_page = 30
 
 
@@ -151,7 +165,7 @@ class ResultadoTaxonomicoAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 # =========================================================
 
 @admin.register(CatalogoMicroorganismo)
-class CatalogoMicroorganismoAdmin(ModelAdmin): # <-- Aplica diseño Unfold
+class CatalogoMicroorganismoAdmin(ModelAdmin): 
 
     list_display = (
         "id",
@@ -166,9 +180,7 @@ class CatalogoMicroorganismoAdmin(ModelAdmin): # <-- Aplica diseño Unfold
     )
 
     search_fields = ("nombre",)
-
     ordering = ("nombre",)
-
     list_per_page = 20
 
 
@@ -177,7 +189,7 @@ class CatalogoMicroorganismoAdmin(ModelAdmin): # <-- Aplica diseño Unfold
 # =========================================================
 
 @admin.register(Usuario)
-class UsuarioAdmin(BaseUserAdmin, ModelAdmin): # <-- BaseUserAdmin + Unfold sin errores
+class UsuarioAdmin(BaseUserAdmin, ModelAdmin): 
 
     list_display = (
         "id",
@@ -198,10 +210,8 @@ class UsuarioAdmin(BaseUserAdmin, ModelAdmin): # <-- BaseUserAdmin + Unfold sin 
     )
 
     ordering = ("username",)
-
     list_per_page = 20
     
-    # Inyección dinámica del campo 'rol' para edición en tiempo de ejecución
     def get_fieldsets(self, request, obj=None):
         fieldsets = super().get_fieldsets(request, obj)
         fieldsets_list = list(fieldsets or [])

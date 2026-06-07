@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from django.templatetags.static import static
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -18,21 +19,22 @@ ALLOWED_HOSTS = os.environ.get(
 # APLICACIONES
 # ---------------------------
 INSTALLED_APPS = [
-    'unfold',  # Interfaz avanzada para el administrador (debe ir antes de admin)
-    'django.contrib.sites',  # Requerido obligatoriamente por django-allauth
+    'unfold',  # Interfaz avanzada para el administrador
+    
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',  # Mapeado aquí para no estorbar a Unfold
     
-    # Aplicaciones de autenticación de django-allauth
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',  # Proveedor específico de Google
     'analisis',
+    
 ]
 
 # ---------------------------
@@ -41,6 +43,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -103,11 +106,13 @@ AUTH_PASSWORD_VALIDATORS = [
 # ---------------------------
 # INTERNACIONALIZACIÓN
 # ---------------------------
-LANGUAGE_CODE = 'es-ec'
+LANGUAGE_CODE = 'es'
 TIME_ZONE = 'America/Guayaquil'
 USE_I18N = True
 USE_TZ = True
-
+LOCALE_PATHS = [
+    BASE_DIR / 'locale',
+]
 # ---------------------------
 # STATIC FILES (CSS, JS, Images)
 # ---------------------------
@@ -145,6 +150,11 @@ LOGOUT_REDIRECT_URL = 'analisis:login'     # Redirige al login al salir
 # Configuración del proveedor de Google OAuth2
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
+        'APP': {
+            'client_id': 'TU_CLIENT_ID_DE_GOOGLE_CLOUD.apps.googleusercontent.com',
+            'secret': 'TU_SECRET_KEY_DE_GOOGLE_CLOUD',
+            'key': ''
+        },
         'SCOPE': [
             'profile',
             'email',
@@ -159,6 +169,9 @@ SOCIALACCOUNT_PROVIDERS = {
 # ---------------------------
 # CONFIGURACIÓN INTERFAZ UNFOLD
 # ---------------------------
+# ---------------------------
+# CONFIGURACIÓN INTERFAZ UNFOLD
+# ---------------------------
 UNFOLD = {
     "SITE_TITLE": "TerraBioLab",
     "SITE_HEADER": "TerraBioLab UTC",
@@ -166,6 +179,11 @@ UNFOLD = {
     "SITE_SYMBOL": "biotech",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
+    
+    "STYLES": [
+        lambda request: static("css/unfold_fix.css"),
+    ],
+
     "COLORS": {
         "primary": {
             "50": "240 253 250",
@@ -184,4 +202,8 @@ UNFOLD = {
         "show_search": True,
         "show_all_applications": True,
     },
+    
+    # ─── TRADUCCIONES INTERNAS DE UNFOLD ──────────────────────────────────
+    "LIST_EMPTY_TITLE": "No se encontraron resultados",
+    "LIST_EMPTY_DESCRIPTION": "Esta sección no contiene registros aún. Crea un nuevo elemento o restablece los filtros.",
 }

@@ -1,606 +1,93 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}BioSoil Analytics{% endblock %} — Análisis Microbiano</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-    <style>
-        :root {
-            --verde:        #1D9E75;
-            --verde-light:  #E1F5EE;
-            --verde-dark:   #085041;
-            --amber:        #BA7517;
-            --amber-light:  #FAEEDA;
-            --rojo:         #A32D2D;
-            --rojo-light:   #FCEBEB;
-            --gris:         #5F5E5A;
-            --gris-light:   #F1EFE8;
-            --gris-border:  #D3D1C7;
-            --teal:         #0F6E56;
-            --bg:           #F7F6F2;
-            --surface:      #FFFFFF;
-            --text-primary: #1a1a18;
-            --text-muted:   #5F5E5A;
-            --text-hint:    #888780;
-            --sidebar-w:    260px;
-            --radius:       10px;
-            --radius-lg:    16px;
-            --shadow-sm:    0 1px 3px rgba(0,0,0,0.06);
-            --shadow-md:    0 4px 16px rgba(0,0,0,0.08);
-        }
-
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Outfit', sans-serif;
-            font-size: 15px;
-            font-weight: 400;
-            line-height: 1.6;
-            background: var(--bg);
-            color: var(--text-primary);
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* ── SIDEBAR ── */
-        .sidebar {
-            width: var(--sidebar-w);
-            background: var(--surface);
-            border-right: 1px solid var(--gris-border);
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            top: 0; left: 0; bottom: 0;
-            z-index: 100;
-        }
-
-        .sidebar-brand {
-            padding: 1.5rem 1.25rem 1rem;
-            border-bottom: 1px solid var(--gris-border);
-        }
-
-        .brand-icon {
-            width: 36px; height: 36px;
-            background: var(--verde);
-            border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            margin-bottom: 0.5rem;
-        }
-
-        .brand-icon i { color: #fff; font-size: 18px; }
-
-        .brand-name {
-            font-family: 'Fraunces', serif;
-            font-size: 17px;
-            font-weight: 500;
-            color: var(--text-primary);
-            letter-spacing: -0.3px;
-        }
-
-        .brand-sub {
-            font-size: 11px;
-            color: var(--text-hint);
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            margin-top: 1px;
-        }
-
-        .sidebar-nav {
-            flex: 1;
-            padding: 1rem 0.75rem;
-            overflow-y: auto;
-        }
-
-        .nav-section-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-hint);
-            padding: 0.75rem 0.5rem 0.35rem;
-            font-weight: 500;
-        }
-
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 0.55rem 0.75rem;
-            border-radius: var(--radius);
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 400;
-            transition: background 0.15s, color 0.15s;
-            margin-bottom: 2px;
-        }
-
-        .nav-link:hover {
-            background: var(--gris-light);
-            color: var(--text-primary);
-        }
-
-        .nav-link.active {
-            background: var(--verde-light);
-            color: var(--verde-dark);
-            font-weight: 500;
-        }
-
-        .nav-link i { font-size: 17px; flex-shrink: 0; }
-
-        .nav-badge {
-            margin-left: auto;
-            background: var(--verde-light);
-            color: var(--verde-dark);
-            font-size: 11px;
-            font-weight: 500;
-            padding: 1px 7px;
-            border-radius: 20px;
-        }
-
-        /* Marcador tabs en sidebar */
-        .marker-tabs {
-            display: flex;
-            gap: 6px;
-            padding: 0.75rem 1rem;
-            border-top: 1px solid var(--gris-border);
-        }
-
-        .marker-tab {
-            flex: 1;
-            padding: 0.4rem;
-            text-align: center;
-            font-size: 12px;
-            font-weight: 500;
-            border-radius: 6px;
-            cursor: pointer;
-            text-decoration: none;
-            border: 1px solid var(--gris-border);
-            color: var(--text-muted);
-            transition: all 0.15s;
-            font-family: 'DM Mono', monospace;
-        }
-
-        .marker-tab:hover { border-color: var(--verde); color: var(--verde); }
-
-        .marker-tab.active-16s {
-            background: var(--verde-light);
-            border-color: var(--verde);
-            color: var(--verde-dark);
-        }
-
-        .marker-tab.active-its {
-            background: var(--amber-light);
-            border-color: var(--amber);
-            color: var(--amber);
-        }
-
-        .sidebar-user {
-            padding: 0.85rem 1rem;
-            border-top: 1px solid var(--gris-border);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .user-avatar {
-            width: 32px; height: 32px;
-            background: var(--verde-light);
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--verde-dark);
-            flex-shrink: 0;
-        }
-
-        .user-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-        .user-role { font-size: 11px; color: var(--text-hint); }
-
-        .user-logout {
-            margin-left: auto;
-            color: var(--text-hint);
-            text-decoration: none;
-            font-size: 16px;
-            transition: color 0.15s;
-        }
-
-        .user-logout:hover { color: var(--rojo); }
-
-        /* ── MAIN CONTENT ── */
-        .main {
-            margin-left: var(--sidebar-w);
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-
-        .topbar {
-            background: var(--surface);
-            border-bottom: 1px solid var(--gris-border);
-            padding: 0 2rem;
-            height: 56px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 50;
-        }
-
-        .topbar-title {
-            font-family: 'Fraunces', serif;
-            font-size: 16px;
-            font-weight: 300;
-            color: var(--text-primary);
-        }
-
-        .topbar-actions { display: flex; align-items: center; gap: 10px; }
-
-        .page-content {
-            padding: 2rem;
-            flex: 1;
-        }
-
-        /* ── COMPONENTES ── */
-        .page-header {
-            margin-bottom: 1.75rem;
-        }
-
-        .page-header h1 {
-            font-family: 'Fraunces', serif;
-            font-size: 26px;
-            font-weight: 500;
-            color: var(--text-primary);
-            letter-spacing: -0.5px;
-            line-height: 1.2;
-        }
-
-        .page-header p {
-            color: var(--text-muted);
-            font-size: 14px;
-            margin-top: 4px;
-        }
-
-        /* Cards */
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--gris-border);
-            border-radius: var(--radius-lg);
-            padding: 1.5rem;
-        }
-
-        .card-sm { padding: 1rem 1.25rem; }
-
-        .card-title {
-            font-size: 13px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
-            color: var(--text-hint);
-            margin-bottom: 0.75rem;
-        }
-
-        /* Metric cards */
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 12px;
-            margin-bottom: 1.5rem;
-        }
-
-        .metric-card {
-            background: var(--surface);
-            border: 1px solid var(--gris-border);
-            border-radius: var(--radius);
-            padding: 1rem 1.25rem;
-        }
-
-        .metric-label {
-            font-size: 12px;
-            color: var(--text-hint);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }
-
-        .metric-value {
-            font-size: 26px;
-            font-weight: 600;
-            color: var(--text-primary);
-            line-height: 1;
-            font-family: 'DM Mono', monospace;
-        }
-
-        .metric-sub {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        .metric-card.verde .metric-value { color: var(--verde-dark); }
-        .metric-card.verde { border-left: 3px solid var(--verde); }
-        .metric-card.amber { border-left: 3px solid var(--amber); }
-        .metric-card.amber .metric-value { color: var(--amber); }
-        .metric-card.rojo { border-left: 3px solid var(--rojo); }
-        .metric-card.rojo .metric-value { color: var(--rojo); }
-
-        /* Badges de clasificación */
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .badge-benefico {
-            background: var(--verde-light);
-            color: var(--verde-dark);
-        }
-
-        .badge-fitopatogeno {
-            background: var(--amber-light);
-            color: #5a3a00;
-        }
-
-        .badge-sin-clas {
-            background: var(--gris-light);
-            color: var(--gris);
-        }
-
-        /* Botones */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 0.5rem 1.1rem;
-            border-radius: var(--radius);
-            font-size: 14px;
-            font-weight: 500;
-            font-family: 'Outfit', sans-serif;
-            cursor: pointer;
-            border: 1px solid transparent;
-            text-decoration: none;
-            transition: all 0.15s;
-        }
-
-        .btn-primary {
-            background: var(--verde);
-            color: #fff;
-            border-color: var(--verde);
-        }
-
-        .btn-primary:hover { background: var(--teal); border-color: var(--teal); }
-
-        .btn-outline {
-            background: transparent;
-            color: var(--text-primary);
-            border-color: var(--gris-border);
-        }
-
-        .btn-outline:hover { background: var(--gris-light); }
-
-        .btn-sm { padding: 0.35rem 0.75rem; font-size: 13px; }
-
-        /* Tabla */
-        .table-wrap { overflow-x: auto; border-radius: var(--radius-lg); border: 1px solid var(--gris-border); }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-
-        thead th {
-            background: var(--gris-light);
-            font-size: 11px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
-            color: var(--text-hint);
-            padding: 0.65rem 1rem;
-            text-align: left;
-            border-bottom: 1px solid var(--gris-border);
-        }
-
-        tbody tr { border-bottom: 1px solid var(--gris-light); }
-        tbody tr:last-child { border-bottom: none; }
-        tbody tr:hover { background: #fafaf8; }
-
-        tbody td {
-            padding: 0.7rem 1rem;
-            color: var(--text-primary);
-        }
-
-        .td-mono {
-            font-family: 'DM Mono', monospace;
-            font-size: 13px;
-        }
-
-        /* Formularios */
-        .form-group { margin-bottom: 1.25rem; }
-
-        .form-label {
-            display: block;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-muted);
-            margin-bottom: 6px;
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 0.55rem 0.85rem;
-            border: 1px solid var(--gris-border);
-            border-radius: var(--radius);
-            font-family: 'Outfit', sans-serif;
-            font-size: 14px;
-            color: var(--text-primary);
-            background: var(--surface);
-            transition: border-color 0.15s;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--verde);
-            box-shadow: 0 0 0 3px rgba(29,158,117,0.12);
-        }
-
-        select.form-control { cursor: pointer; }
-
-        /* Alertas */
-        .alert {
-            padding: 0.85rem 1rem;
-            border-radius: var(--radius);
-            font-size: 14px;
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            margin-bottom: 1rem;
-        }
-
-        .alert-success { background: var(--verde-light); color: var(--verde-dark); }
-        .alert-error { background: var(--rojo-light); color: var(--rojo); }
-        .alert-warning { background: var(--amber-light); color: #5a3a00; }
-
-        /* Empty state */
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: var(--text-hint);
-        }
-
-        .empty-state i { font-size: 48px; margin-bottom: 1rem; display: block; }
-        .empty-state p { font-size: 14px; margin-top: 0.5rem; }
-
-        /* Marcador pill */
-        .pill-16s {
-            display: inline-block;
-            background: var(--verde-light);
-            color: var(--verde-dark);
-            font-family: 'DM Mono', monospace;
-            font-size: 11px;
-            font-weight: 500;
-            padding: 2px 8px;
-            border-radius: 4px;
-        }
-
-        .pill-its {
-            display: inline-block;
-            background: var(--amber-light);
-            color: #5a3a00;
-            font-family: 'DM Mono', monospace;
-            font-size: 11px;
-            font-weight: 500;
-            padding: 2px 8px;
-            border-radius: 4px;
-        }
-
-        /* Mensajes Django */
-        .messages-container { margin-bottom: 1rem; }
-
-        {% block extra_css %}{% endblock %}
-    </style>
-</head>
-<body>
-
-<!-- SIDEBAR -->
-<aside class="sidebar">
-    <div class="sidebar-brand">
-        <div class="brand-icon">
-            <i class="ti ti-dna-2" aria-hidden="true"></i>
+{% extends "templates_base.html" %}
+
+{% block layout_wrapper %}
+<div class="bs-app-layout-root">
+    
+    <aside class="bs-app-sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <i class="ti ti-dna-2" aria-hidden="true"></i>
+            </div>
+            <div class="brand-name">BioSoil Analytics</div>
+            <div class="brand-sub">Análisis 16S &amp; ITS</div>
         </div>
-        <div class="brand-name">BioSoil Analytics</div>
-        <div class="brand-sub">Análisis 16S &amp; ITS</div>
-    </div>
 
-    <nav class="sidebar-nav">
-        <div class="nav-section-label">Principal</div>
-        <a href="{% url 'analisis:dashboard' %}" class="nav-link {% block nav_dashboard %}{% endblock %}">
-            <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard
-        </a>
-        <a href="{% url 'analisis:subir_datos' %}" class="nav-link {% block nav_subir %}{% endblock %}">
-            <i class="ti ti-upload" aria-hidden="true"></i> Cargar Muestra
-        </a>
+        <nav class="sidebar-nav">
+            <div class="nav-section-label">Principal</div>
+            <a href="{% url 'analisis:dashboard' %}" class="nav-link {% block nav_dashboard %}{% endblock %}">
+                <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard
+            </a>
+            <a href="{% url 'analisis:subir_datos' %}" class="nav-link {% block nav_subir %}{% endblock %}">
+                <i class="ti ti-upload" aria-hidden="true"></i> Cargar Muestra
+            </a>
 
-        <div class="nav-section-label">Análisis</div>
-        <a href="{% url 'analisis:comparar' %}" class="nav-link {% block nav_comparar %}{% endblock %}">
-            <i class="ti ti-arrows-diff" aria-hidden="true"></i> Comparar Perfiles
-        </a>
-        <a href="{% url 'analisis:analisis_avanzado' %}" class="nav-link {% block nav_analisis %}{% endblock %}">
-            <i class="ti ti-chart-dots" aria-hidden="true"></i> Análisis Avanzado
-        </a>
-        <a href="{% url 'analisis:historial' %}" class="nav-link {% block nav_historial %}{% endblock %}">
-            <i class="ti ti-history" aria-hidden="true"></i> Historial
-        </a>
+            <div class="nav-section-label">Análisis</div>
+            <a href="{% url 'analisis:comparar' %}" class="nav-link {% block nav_comparar %}{% endblock %}">
+                <i class="ti ti-arrows-diff" aria-hidden="true"></i> Comparar Perfiles
+            </a>
+            <a href="{% url 'analisis:analisis_avanzado' %}" class="nav-link {% block nav_analisis %}{% endblock %}">
+                <i class="ti ti-chart-dots" aria-hidden="true"></i> Análisis Avanzado
+            </a>
+            <a href="{% url 'analisis:historial' %}" class="nav-link {% block nav_historial %}{% endblock %}">
+                <i class="ti ti-history" aria-hidden="true"></i> Historial
+            </a>
 
-        <div class="nav-section-label">Catálogo</div>
-        <a href="{% url 'analisis:catalogo' %}" class="nav-link {% block nav_catalogo %}{% endblock %}">
-            <i class="ti ti-microphone-2" aria-hidden="true"></i> Microorganismos
-        </a>
-        <a href="{% url 'analisis:reportes' %}" class="nav-link {% block nav_reportes %}{% endblock %}">
-            <i class="ti ti-report" aria-hidden="true"></i> Reportes
-        </a>
-    </nav>
+            <div class="nav-section-label">Catálogo</div>
+            <a href="{% url 'analisis:catalogo' %}" class="nav-link {% block nav_catalogo %}{% endblock %}">
+                <i class="ti ti-microphone-2" aria-hidden="true"></i> Microorganismos
+            </a>
+            <a href="{% url 'analisis:reportes' %}" class="nav-link {% block nav_reportes %}{% endblock %}">
+                <i class="ti ti-report" aria-hidden="true"></i> Reportes
+            </a>
+        </nav>
 
-    <!-- Tabs de marcador -->
-    <div class="marker-tabs">
-        <a href="?tipo=16S" class="marker-tab {% if tipo_actual == '16S' or not tipo_actual %}active-16s{% endif %}">16S</a>
-        <a href="?tipo=ITS" class="marker-tab {% if tipo_actual == 'ITS' %}active-its{% endif %}">ITS</a>
-    </div>
-
-    <!-- Usuario -->
-    <div class="sidebar-user">
-        <div class="user-avatar">
-            {{ request.user.username|slice:":2"|upper }}
+        <div class="marker-tabs">
+            <a href="?tipo=16S" class="marker-tab {% if tipo_actual == '16S' or not tipo_actual %}active-16s{% endif %}">16S</a>
+            <a href="?tipo=ITS" class="marker-tab {% if tipo_actual == 'ITS' %}active-its{% endif %}">ITS</a>
         </div>
-        <div>
-            <div class="user-name">{{ request.user.username }}</div>
-            <div class="user-role">
-                {% if request.user.is_staff %}Administrador{% else %}Usuario{% endif %}
+
+        <div class="sidebar-user">
+            <div class="user-avatar">
+                {{ request.user.username|slice:":2"|upper }}
+            </div>
+            <div>
+                <div class="user-name">{{ request.user.username }}</div>
+                <div class="user-role">
+                    {% if request.user.is_staff %}Administrador{% else %}Usuario{% endif %}
+                </div>
+            </div>
+            <form action="{% url 'analisis:logout' %}" method="post" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="user-logout" title="Cerrar sesión" style="background: none; border: none; cursor: pointer; padding: 0;">
+                    <i class="ti ti-logout" aria-hidden="true"></i>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <main class="bs-app-main-panel">
+        <div class="topbar">
+            <span class="topbar-title">{% block topbar_title %}{% endblock %}</span>
+            <div class="topbar-actions">
+                {% block topbar_actions %}{% endblock %}
             </div>
         </div>
-        <form action="{% url 'analisis:logout' %}" method="post" style="display: inline;">
-            {% csrf_token %}
-            <button type="submit" class="user-logout" title="Cerrar sesión" style="background: none; border: none; cursor: pointer; padding: 0;">
-                <i class="ti ti-logout" aria-hidden="true"></i>
-            </button>
-        </form>
-    </div>
-</aside>
 
-<!-- MAIN -->
-<main class="main">
-    <div class="topbar">
-        <span class="topbar-title">{% block topbar_title %}{% endblock %}</span>
-        <div class="topbar-actions">
-            {% block topbar_actions %}{% endblock %}
-        </div>
-    </div>
-
-    <div class="page-content">
-        <!-- Mensajes Django -->
-        {% if messages %}
-        <div class="messages-container">
-            {% for message in messages %}
-            <div class="alert alert-{% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}success{% endif %}">
-                <i class="ti ti-{% if message.tags == 'error' %}alert-circle{% elif message.tags == 'warning' %}alert-triangle{% else %}circle-check{% endif %}" aria-hidden="true"></i>
-                {{ message }}
+        <div class="page-content">
+            {% if messages %}
+            <div class="messages-container">
+                {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}success{% endif %}">
+                    <i class="ti ti-{% if message.tags == 'error' %}alert-circle{% elif message.tags == 'warning' %}alert-triangle{% else %}circle-check{% endif %}" aria-hidden="true"></i>
+                    {{ message }}
+                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% endif %}
+
+            {% block content %}{% endblock %}
         </div>
-        {% endif %}
+    </main>
 
-        {% block content %}{% endblock %}
-    </div>
-</main>
-
-{% block extra_js %}{% endblock %}
-</body>
-</html>
+</div>
+{% endblock %}

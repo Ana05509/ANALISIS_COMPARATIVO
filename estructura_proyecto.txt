@@ -1,6 +1,7 @@
-Estructura del Proyecto:
-C:\Users\fherr\Documents\Proyecto_Analisis_Final\ANALISIS_COMPARATIVO
-
+============================================================
+ ESTRUCTURA DEL PROYECTO: ANALISIS_COMPARATIVO
+============================================================
+.
 ├── analisis
 │   ├── data
 │   │   ├── catalogos
@@ -46,15 +47,6 @@ C:\Users\fherr\Documents\Proyecto_Analisis_Final\ANALISIS_COMPARATIVO
 │   │   │   ├── pipeline.py
 │   │   │   └── taxonomy.py
 │   │   └── __init__.py
-│   ├── static
-│   │   ├── analisis
-│   │   │   └── css
-│   │   │       └── styles.css
-│   │   ├── images
-│   │   └── js
-│   │       ├── charts.js
-│   │       ├── comparison.js
-│   │       └── upload.js
 │   ├── templates
 │   │   ├── analisis
 │   │   │   ├── analisis_avanzado.html
@@ -69,7 +61,8 @@ C:\Users\fherr\Documents\Proyecto_Analisis_Final\ANALISIS_COMPARATIVO
 │   │   │   └── subir_datos.html
 │   │   ├── registration
 │   │   │   └── login.html
-│   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   └── templates_base.html
 │   ├── templatetags
 │   │   ├── __init__.py
 │   │   └── custom_filters.py
@@ -86,6 +79,7 @@ C:\Users\fherr\Documents\Proyecto_Analisis_Final\ANALISIS_COMPARATIVO
 │   ├── views
 │   │   ├── __init__.py
 │   │   ├── analysis.py
+│   │   ├── auth.py
 │   │   ├── catalogo.py
 │   │   ├── comparison.py
 │   │   ├── dashboard.py
@@ -98,8 +92,6 @@ C:\Users\fherr\Documents\Proyecto_Analisis_Final\ANALISIS_COMPARATIVO
 │   ├── apps.py
 │   ├── forms.py
 │   ├── models.py
-│   ├── static_style.css
-│   ├── templates_base.html
 │   ├── tests.py
 │   └── urls.py
 ├── config
@@ -121,24 +113,18 @@ C:\Users\fherr\Documents\Proyecto_Analisis_Final\ANALISIS_COMPARATIVO
 │   ├── PHASE1_WEEK2_REPORT.md
 │   ├── README_WEEK2_STATUS.md
 │   └── VERIFY_OPTIMIZATION.md
-├── media
-│   └── archivos
-│       ├── Cacao_CCN51.summary.csv
-│       └── Clon_800.summary.csv
 ├── static
+│   └── css
+│       └── unfold_fix.css
 ├── .coverage
 ├── .gitattributes
 ├── .gitignore
-├── auditar_proyecto.py
+├── estructura_proyecto.txt
+├── generar_estructura.py
 ├── manage.py
+├── project_analyzer.py
 ├── pyrightconfig.json
 ├── pytest.ini
 ├── README.md
-├── README_REPARACION.md
-├── repair_imports.py
-├── REPARACION_COMPLETA.md
-├── requirements.txt
-├── requirements_new.txt
-├── ROADMAP_AND_NEXT_STEPS.md
-├── STATUS_FINAL.md
-└── test_imports.py
+└── requirements.txt
+============================================================
