@@ -3,7 +3,7 @@ from django.urls import reverse_lazy
 
 class CustomLoginView(LoginView):
     """Vista de login personalizada usando el template en templates/registration/login.html"""
-    template_name = 'registration/login.html'
+    template_name = 'account/login.html'
 
 class CustomLogoutView(LogoutView):
     """Vista de logout personalizada"""

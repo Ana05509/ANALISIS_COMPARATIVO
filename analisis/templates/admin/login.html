@@ -1,0 +1,319 @@
+{% load i18n static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consola de Administración — TerraBioLab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    
+    <style>
+        :root {
+            --primary: #2a4538;
+            --primary-light: #3b604e;
+            --admin-gold: #b45309; 
+            --bg-base: #f0f4f1; 
+            /* Fondo de tarjeta ultra claro y sutil para dar la máxima visibilidad al video trasero */
+            --surface-glass-light: rgba(255, 255, 255, 0.45); 
+            --text-dark: #111827; 
+            --text-muted: #4b5563;
+            --border-light: rgba(255, 255, 255, 0.6);
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: 'Outfit', sans-serif; 
+            min-height: 100vh; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background-color: var(--bg-base);
+            overflow: hidden;
+            position: relative;
+            padding: 1.5rem;
+        }
+
+        /* CAPA DEL VIDEO DE FONDO - Máxima claridad y nitidez */
+        .system-bg-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            overflow: hidden;
+        }
+        .system-bg-video video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.65; /* Incrementado notablemente para que sea muy visible */
+        }
+        .system-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(240, 244, 241, 0.2) 0%, rgba(218, 227, 221, 0.4) 100%);
+            z-index: 2;
+        }
+
+        /* CONSOLA CENTRAL FLOTANTE CON ALTA TRANSPARENCIA */
+        .admin-box {
+            position: relative;
+            z-index: 3;
+            width: 100%;
+            max-width: 530px; /* Ancho máximo amplio */
+            background: var(--surface-glass-light);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid var(--border-light);
+            border-radius: 24px;
+            padding: 45px 40px; 
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Encabezado */
+        .box-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .sys-identity {
+            display: inline-flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 1.25rem;
+        }
+        .sys-identity i { color: var(--primary); font-size: 32px; } /* Icono grande */
+        .sys-identity span { color: var(--text-dark); font-size: 28px; font-weight: 800; letter-spacing: 0.5px; } /* Título imponente */
+
+        .sys-subtitle {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-dark);
+            background: rgba(255, 255, 255, 0.6);
+            border-left: 3px solid var(--primary);
+            padding: 12px 14px;
+            line-height: 1.4;
+            border-radius: 0 6px 6px 0;
+            text-align: left;
+        }
+
+        /* Alertas de Error Nativas de Django Admin */
+        .errornote {
+            background: rgba(254, 226, 226, 0.9);
+            border: 1px solid #fca5a5;
+            color: #991b1b;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            margin-bottom: 1.25rem;
+            list-style: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+        }
+        .errorlist { color: #ef4444; font-size: 12px; margin-top: 4px; list-style: none; font-family: 'JetBrains Mono', monospace; }
+
+        /* Estructura de Campos */
+        .form-row {
+            margin-bottom: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            position: relative;
+        }
+        .form-row label {
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        
+        /* Contenedor relativo especial para el input de password y el ojo */
+        .password-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        /* Inputs limpios e integrados */
+        .form-row input {
+            width: 100%;
+            padding: 12px 14px;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            border-radius: 10px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 14.5px;
+            color: var(--text-dark);
+            transition: var(--transition);
+        }
+        .form-row input:focus {
+            border-color: var(--primary);
+            background: #ffffff;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(42, 69, 56, 0.1);
+        }
+
+        /* Estilos específicos para el botón del Ojo de contraseña */
+        .toggle-password-btn {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            padding: 4px;
+            transition: var(--transition);
+            z-index: 10;
+        }
+        .toggle-password-btn:hover {
+            color: var(--primary);
+        }
+        
+        /* Ajuste para que el texto de la contraseña no choque con el ojo */
+        .form-row .password-wrapper input {
+            padding-right: 44px;
+        }
+
+        /* Botón de Envío */
+        .btn-submit-core {
+            width: 100%;
+            padding: 13px;
+            background: var(--primary); 
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 1.5rem;
+        }
+        .btn-submit-core:hover {
+            background: #1c3027;
+            box-shadow: 0 8px 16px -6px rgba(42, 69, 56, 0.3);
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 1.5rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: var(--transition);
+            width: 100%;
+        }
+        .back-link:hover { color: var(--primary); }
+
+        @media (max-width: 480px) {
+            .admin-box { padding: 25px 20px; border: none; background: #ffffff; box-shadow: none; border-radius: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="system-bg-video">
+        <video autoplay loop muted playsinline>
+            <source src="{% static 'videos/mi_video.mp4' %}" type="video/mp4">
+        </video>
+        <div class="system-overlay"></div>
+    </div>
+
+    <div class="admin-box">
+        
+        <div class="box-header">
+            <div class="sys-identity">
+                <i class="ti ti-shield-cog"></i>
+                <span>ADMINISTRADOR</span>
+            </div>
+            
+            <div class="sys-subtitle">
+                Introduzca credenciales autorizadas de soporte o administración.
+            </div>
+        </div>
+
+        {% if form.errors and not form.non_field_errors %}
+            <p class="errornote">Error: Compruebe las credenciales introducidas en el formulario.</p>
+        {% endif %}
+        
+        {% if form.non_field_errors %}
+            {% for error in form.non_field_errors %}
+                <p class="errornote">{{ error }}</p>
+            {% endfor %}
+        {% endif %}
+
+        <form action="{{ app_path }}" method="post" id="login-form">
+            {% csrf_token %}
+            
+            <div class="form-row {% if form.username.errors %}errors{% endif %}">
+                <label for="{{ form.username.id_for_label }}">Usuario Administrador:</label>
+                {{ form.username }}
+                {{ form.username.errors }}
+            </div>
+            
+            <div class="form-row {% if form.password.errors %}errors{% endif %}">
+                <label for="{{ form.password.id_for_label }}">Contraseña:</label>
+                <div class="password-wrapper">
+                    {{ form.password }}
+                    <button type="button" class="toggle-password-btn" id="togglePassword" title="Mostrar/ocultar contraseña">
+                        <i class="ti ti-eye" id="eyeIcon"></i>
+                    </button>
+                </div>
+                {{ form.password.errors }}
+            </div>
+
+            <button class="btn-submit-core" type="submit">
+                <i class="ti ti-terminal"></i> Iniciar Sesión Técnica
+            </button>
+        </form>
+
+        <a href="/" class="back-link">
+            <i class="ti ti-arrow-left"></i> Volver a la plataforma pública
+        </a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const togglePasswordButton = document.getElementById('togglePassword');
+            const passwordInput = document.querySelector('.password-wrapper input');
+            const eyeIcon = document.getElementById('eyeIcon');
+
+            if (togglePasswordButton && passwordInput) {
+                togglePasswordButton.addEventListener('click', function() {
+                    const isPassword = passwordInput.getAttribute('type') === 'password';
+                    passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+                    
+                    if (isPassword) {
+                        eyeIcon.classList.remove('ti-eye');
+                        eyeIcon.classList.add('ti-eye-off');
+                    } else {
+                        eyeIcon.classList.remove('ti-eye-off');
+                        eyeIcon.classList.add('ti-eye');
+                    }
+                });
+            }
+        });
+    </script>
+
+</body>
+</html>

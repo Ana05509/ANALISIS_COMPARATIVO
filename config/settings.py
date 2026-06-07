@@ -142,10 +142,13 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',   # Autenticación vía Google/Social
 ]
 
-# URLs de redirección unificadas utilizando nombres de rutas mutuas
+# URLs de redirección unificadas utilizando nombres de rutas mutuas con namespace
 LOGIN_URL = 'analisis:login'
 LOGIN_REDIRECT_URL = 'analisis:dashboard'  # Redirige al dashboard de tu app tras loguearse
-LOGOUT_REDIRECT_URL = 'analisis:login'     # Redirige al login al salir
+LOGOUT_REDIRECT_URL = 'analisis:login'
+
+ACCOUNT_LOGOUT_REDIRECT_URL = 'analisis:login'
+ACCOUNT_AUTHENTICATED_LOGIN_REDIRECTS = True    # Redirige al login al salir
 
 # Configuración del proveedor de Google OAuth2
 SOCIALACCOUNT_PROVIDERS = {
@@ -166,9 +169,6 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-# ---------------------------
-# CONFIGURACIÓN INTERFAZ UNFOLD
-# ---------------------------
 # ---------------------------
 # CONFIGURACIÓN INTERFAZ UNFOLD
 # ---------------------------
@@ -207,3 +207,11 @@ UNFOLD = {
     "LIST_EMPTY_TITLE": "No se encontraron resultados",
     "LIST_EMPTY_DESCRIPTION": "Esta sección no contiene registros aún. Crea un nuevo elemento o restablece los filtros.",
 }
+
+# ---------------------------
+# CONFIGURACIÓN DE CORREO ELECTRÓNICO
+# ---------------------------
+# Muestra los correos en la consola/terminal para pruebas de desarrollo
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# Le decimos a Allauth que use nuestro formulario con Nombre y Apellido
+ACCOUNT_SIGNUP_FORM_CLASS = 'analisis.forms.CustomSignupForm'

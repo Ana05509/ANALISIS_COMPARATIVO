@@ -101,3 +101,25 @@ class SubirDatosForm(forms.Form):
 
     def clean_top_n(self):
         return int(self.cleaned_data.get("top_n", 10))
+    
+    # =========================================================
+# FORMULARIO PERSONALIZADO DE REGISTRO (ALLAUTH)
+# =========================================================
+class CustomSignupForm(forms.Form):
+    first_name = forms.CharField(
+        max_length=30, 
+        label='Nombre',
+        widget=forms.TextInput(attrs={'placeholder': 'Ej: Juan'})
+    )
+    last_name = forms.CharField(
+        max_length=30, 
+        label='Apellido',
+        widget=forms.TextInput(attrs={'placeholder': 'Ej: Pérez'})
+    )
+
+    def signup(self, request, user):
+        # Guardar el nombre y apellido en el modelo de usuario de la base de datos
+        user.first_name = self.cleaned_data['first_name']
+        user.last_name = self.cleaned_data['last_name']
+        user.save()
+        return user

@@ -15,6 +15,7 @@
 │   │           └── its
 │   ├── migrations
 │   │   ├── 0001_initial.py
+│   │   ├── 0002_alter_archivomolecular_archivo_and_more.py
 │   │   └── __init__.py
 │   ├── services
 │   │   ├── business
@@ -48,6 +49,15 @@
 │   │   │   └── taxonomy.py
 │   │   └── __init__.py
 │   ├── templates
+│   │   ├── account
+│   │   │   ├── login.html
+│   │   │   ├── password_reset.html
+│   │   │   ├── password_reset_done.html
+│   │   │   ├── password_reset_from_key.html
+│   │   │   ├── password_reset_from_key_done.html
+│   │   │   └── signup.html
+│   │   ├── admin
+│   │   │   └── login.html
 │   │   ├── analisis
 │   │   │   ├── analisis_avanzado.html
 │   │   │   ├── base.html
@@ -59,7 +69,7 @@
 │   │   │   ├── reportes.html
 │   │   │   ├── resultados.html
 │   │   │   └── subir_datos.html
-│   │   ├── registration
+│   │   ├── socialaccount
 │   │   │   └── login.html
 │   │   ├── __init__.py
 │   │   └── templates_base.html
@@ -114,8 +124,9 @@
 │   ├── README_WEEK2_STATUS.md
 │   └── VERIFY_OPTIMIZATION.md
 ├── static
-│   └── css
-│       └── unfold_fix.css
+│   ├── css
+│   └── videos
+│       └── mi_video.mp4
 ├── .coverage
 ├── .gitattributes
 ├── .gitignore
