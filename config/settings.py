@@ -28,6 +28,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',  # Mapeado aquí para no estorbar a Unfold
+
+    "unfold.contrib.import_export", 
+    "import_export",
     
     'allauth',
     'allauth.account',
@@ -113,6 +116,7 @@ USE_TZ = True
 LOCALE_PATHS = [
     BASE_DIR / 'locale',
 ]
+
 # ---------------------------
 # STATIC FILES (CSS, JS, Images)
 # ---------------------------
@@ -181,21 +185,21 @@ UNFOLD = {
     "SHOW_VIEW_ON_SITE": False,
     
     "STYLES": [
-        lambda request: static("css/unfold_fix.css"),
+        lambda request: static("admin_personalizado.css"),
     ],
 
-    "COLORS": {
+"COLORS": {
         "primary": {
-            "50": "240 253 250",
-            "100": "204 251 241",
-            "200": "153 246 228",
-            "300": "94 234 212",
-            "400": "45 212 191",
-            "500": "20 184 166",
-            "600": "13 148 136",
-            "700": "15 118 110",
-            "800": "17 94 89",
-            "900": "19 78 74",
+            "50": "239 246 255",
+            "100": "219 234 254",
+            "200": "191 219 254",
+            "300": "147 197 253",
+            "400": "96 165 250",
+            "500": "59 130 246",  # Azul principal
+            "600": "37 99 235",
+            "700": "29 78 216",
+            "800": "30 64 175",
+            "900": "30 58 138",
         },
     },
     "SIDEBAR": {

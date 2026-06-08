@@ -1,60 +1,88 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from unfold.admin import ModelAdmin
+from django.utils.html import format_html
+from django.db import transaction
 from django.contrib import messages
+import pandas as pd
+import io
 
+# Importaciones de Unfold
+from unfold.admin import ModelAdmin
+from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
+
+# Importaciones de tu app
 from .models import (
-    Cultivo,
-    VariedadClon,
-    MuestraSuelo,
-    ArchivoMolecular,
-    ResultadoTaxonomico,
-    CatalogoMicroorganismo,
-    Usuario,
+    Cultivo, VariedadClon, MuestraSuelo, ArchivoMolecular,
+    ResultadoTaxonomico, CatalogoMicroorganismo, Usuario,
 )
+from analisis.services.processing.pipeline import PipelineProcesamiento
 
-# Títulos personalizados para el panel administrativo
-admin.site.site_header = "BioSoil Analytics"
-admin.site.site_title = "Administración BioSoil Analytics"
+# Configuración de cabeceras
+admin.site.site_header = "TerraBioLab UTC"
+admin.site.site_title  = "Administración TerraBioLab"
 admin.site.index_title = "Panel de Control Microbiológico"
+
+
+# =========================================================
+# OPTIMIZACIÓN: MIXIN GLOBAL PARA BOTONES AZULES
+# =========================================================
+class BotonEditarMixin:
+    """
+    Agrega automáticamente la columna con el botón azul '✏️ Editar' a cualquier modelo.
+    Esto evita repetir código HTML en cada tabla.
+    """
+    @admin.display(description="Acciones")
+    def acciones_columna(self, obj):
+        url = f"./{obj.pk}/change/"
+        return format_html(
+            '<a href="{}" style="background-color: #3b82f6; color: white; padding: 5px 14px; '
+            'border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; '
+            'display: inline-block; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">✏️ Editar</a>',
+            url
+        )
+
 
 # =========================================================
 # CULTIVOS
 # =========================================================
-
 @admin.register(Cultivo)
-class CultivoAdmin(ModelAdmin): 
-    list_display = ("id", "nombre", "descripcion")
-    search_fields = ("nombre", "descripcion") 
-    ordering = ("nombre",)
+class CultivoAdmin(BotonEditarMixin, ModelAdmin):
+    list_display  = ("id", "nombre", "descripcion", "acciones_columna")
+    list_display_links = ("id", "nombre")
+    search_fields = ("nombre", "descripcion")
+    ordering      = ("nombre",)
     list_per_page = 15
+
+    fieldsets = (
+        ("Información del Cultivo", {
+            "description": "Registre el cultivo agrícola principal. El nombre debe ser único.",
+            "fields": ("nombre", "descripcion"),
+        }),
+    )
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         if change:
             messages.info(request, f"Cultivo '{obj.nombre}' actualizado correctamente.")
         else:
-            messages.success(request, f"¡Éxito! Cultivo agrícola '{obj.nombre}' registrado en la plataforma.")
+            messages.success(request, f"¡Éxito! Cultivo '{obj.nombre}' registrado. Ahora puede crear sus variedades o clones.")
 
 
 # =========================================================
 # VARIEDADES / CLONES
 # =========================================================
-
 @admin.register(VariedadClon)
-class VariedadClonAdmin(ModelAdmin): 
-    list_display = ("id", "nombre", "cultivo")
-    list_filter = ("cultivo",) 
+class VariedadClonAdmin(BotonEditarMixin, ModelAdmin):
+    list_display  = ("id", "nombre", "cultivo", "acciones_columna")
+    list_display_links = ("id", "nombre")
+    list_filter   = ("cultivo",)
     search_fields = ("nombre", "cultivo__nombre")
-    # Autocomplete: Búsqueda rápida de cultivos en lugar de un select tradicional
-    autocomplete_fields = ["cultivo"]
-    ordering = ("nombre",)
+    ordering      = ("cultivo__nombre", "nombre")
     list_per_page = 20
-    
+
     fieldsets = (
-        ("Información de la Variedad", {
+        ("Clasificación Taxonómica Agrícola", {
             "fields": ("cultivo", "nombre", "descripcion"),
-            "description": "Especifique a qué cultivo pertenece esta variedad o clon."
         }),
     )
 
@@ -62,155 +90,222 @@ class VariedadClonAdmin(ModelAdmin):
 # =========================================================
 # MUESTRAS DE SUELO
 # =========================================================
-
 @admin.register(MuestraSuelo)
-class MuestraSueloAdmin(ModelAdmin): 
-    list_display = (
-        "id", "codigo", "cultivo", "variedad_clon", 
-        "tipo_muestra", "localidad", "fecha_registro"
-    )
-    list_filter = ("cultivo", "variedad_clon", "tipo_muestra", "fecha_registro")
+class MuestraSueloAdmin(BotonEditarMixin, ModelAdmin):
+    list_display = ("codigo", "cultivo", "variedad_clon", "localidad", "altitud_display", "tipo_muestra", "fecha_registro", "acciones_columna")
+    list_display_links = ("codigo",)
+    list_filter   = ("cultivo", "variedad_clon", "tipo_muestra", "fecha_registro")
     search_fields = ("codigo", "cultivo__nombre", "variedad_clon__nombre", "localidad", "finca_lote")
-    
-    # Búsqueda dinámica de FKs
-    autocomplete_fields = ["cultivo", "variedad_clon"]
-    
-    ordering = ("-fecha_registro",)
+    ordering      = ("-fecha_registro",)
     date_hierarchy = "fecha_registro"
-    list_per_page = 20
+    list_per_page  = 20
+    readonly_fields = ("fecha_registro",)
 
-    # Agrupación visual en tarjetas de Unfold
     fieldsets = (
-        ("Identificación de la Muestra", {
-            "fields": ("codigo", "tipo_muestra"),
-            "description": "Asigne un código único y el tipo de material analizado (ej. Suelo Rizosférico)."
-        }),
-        ("Vinculación Agronómica", {
-            "fields": ("cultivo", "variedad_clon"),
-            "description": "Especifique el cultivo y la variedad correspondientes a esta muestra."
-        }),
-        ("Datos Geográficos y Ecológicos", {
-            "fields": ("localidad", "finca_lote", "altitud"),
-            "description": "Información del origen que impacta en la ecología microbiana."
-        }),
-        ("Metadatos Adicionales", {
-            "fields": ("observaciones",),
-            "classes": ("collapse",), # Sección colapsable
-        }),
+        ("Identificación de la Muestra", {"fields": ("codigo", "tipo_muestra", "observaciones")}),
+        ("Clasificación Agrícola", {"fields": ("cultivo", "variedad_clon")}),
+        ("Georeferenciación", {"fields": ("localidad", "finca_lote", "altitud")}),
+        ("Registro de Sistema", {"fields": ("fecha_registro",), "classes": ("collapse",)}),
     )
+
+    @admin.display(description="Altitud (msnm)")
+    def altitud_display(self, obj):
+        return f"{obj.altitud} m" if obj.altitud is not None else "—"
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         if change:
-            messages.info(request, f"Datos de la muestra microbiológica '{obj.codigo}' modificados con éxito.")
+            messages.info(request, f"Datos de la muestra '{obj.codigo}' modificados.")
         else:
-            messages.success(
-                request, 
-                f"¡Registro Exitoso! La muestra '{obj.codigo}' ha sido indexada. "
-                "Ya puedes proceder a vincular sus archivos secuenciación 16S / ITS."
-            )
+            messages.success(request, f"¡Registro exitoso! Muestra '{obj.codigo}' indexada.")
 
 
 # =========================================================
-# ARCHIVOS MOLECULARES (Carga de CSVs)
+# LÓGICA DE ARCHIVOS MOLECULARES
 # =========================================================
+def _leer_archivo_molecular(archivo_field):
+    archivo_field.seek(0)
+    nombre = archivo_field.name.lower()
+    if nombre.endswith((".xlsx", ".xls")):
+        return pd.read_excel(archivo_field)
+    raw = archivo_field.read()
+    archivo_field.seek(0)
+    try:
+        return pd.read_csv(io.BytesIO(raw))
+    except Exception:
+        return pd.read_csv(io.BytesIO(raw), sep="\t")
+
+def _disparar_pipeline(archivo_mol, request):
+    ResultadoTaxonomico.objects.filter(archivo=archivo_mol).delete()
+    df_raw = _leer_archivo_molecular(archivo_mol.archivo)
+    resultado = PipelineProcesamiento.procesar_archivo_df(df_raw, nivel="genus")
+    
+    if not resultado or not resultado.get("data"):
+        raise ValueError("El archivo no contiene datos taxonómicos válidos.")
+        
+    with transaction.atomic():
+        ResultadoTaxonomico.objects.bulk_create([
+            ResultadoTaxonomico(
+                archivo=archivo_mol,
+                kingdom=item.get("kingdom", ""), phylum=item.get("phylum", ""),
+                tax_class=item.get("tax_class", ""), order=item.get("order", ""),
+                family=item.get("family", ""), genus=item.get("genus", ""),
+                species=item.get("species", ""), num_hits=item.get("num_hits", 0),
+                porcentaje_hits=item.get("%_hits", 0.0),
+            ) for item in resultado["data"]
+        ])
+    return resultado.get("total_registros", len(resultado["data"]))
 
 @admin.register(ArchivoMolecular)
-class ArchivoMolecularAdmin(ModelAdmin): 
-    list_display = ("id", "muestra", "tipo_analisis", "fecha_carga")
-    list_filter = ("tipo_analisis", "fecha_carga")
+class ArchivoMolecularAdmin(BotonEditarMixin, ModelAdmin):
+    list_display = ("id", "tipo_badge", "muestra", "archivo", "total_resultados", "fecha_carga", "acciones_columna")
+    list_display_links = ("id",)
+    list_filter   = ("tipo_analisis", "fecha_carga")
     search_fields = ("muestra__codigo",)
-    
-    autocomplete_fields = ["muestra"]
-    
-    ordering = ("-fecha_carga",)
+    ordering      = ("-fecha_carga",)
     date_hierarchy = "fecha_carga"
-    list_per_page = 20
+    list_per_page  = 20
+    readonly_fields = ("fecha_carga",)
 
     fieldsets = (
-        ("Contexto de la Secuenciación", {
-            "fields": ("muestra", "tipo_analisis"),
-            "description": "Seleccione a qué muestra de suelo pertenece y el tipo de marcador (16S o ITS)."
-        }),
-        ("Carga de Datos", {
-            "fields": ("archivo",),
-            "description": "Suba el archivo tabular (.csv o .xlsx) generado por el secuenciador. Asegúrese de que las columnas coincidan con el formato requerido."
-        }),
+        ("Vinculación con Muestra", {"fields": ("muestra",)}),
+        ("Archivo de Secuenciación", {"fields": ("tipo_analisis", "archivo")}),
+        ("Registro de Sistema", {"fields": ("fecha_carga",), "classes": ("collapse",)}),
     )
+
+    @admin.display(description="Resultados procesados")
+    def total_resultados(self, obj):
+        n = ResultadoTaxonomico.objects.filter(archivo=obj).count()
+        if n == 0:
+            return format_html('<span style="color:#A32D2D;font-weight:500;">{}</span>', "0 — sin procesar")
+        return format_html('<span style="color:#085041;font-weight:500;">{} registros</span>', n)
+
+    @admin.display(description="Tipo")
+    def tipo_badge(self, obj):
+        color, bg = ("#085041", "#E1F5EE") if obj.tipo_analisis == "16S" else ("#5a3a00", "#FAEEDA")
+        return format_html(
+            '<span style="background:{};color:{};padding:2px 8px;border-radius:4px;font-family:monospace;font-size:12px;font-weight:500;">{}</span>',
+            bg, color, obj.tipo_analisis
+        )
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
-        if change:
-            messages.info(request, f"Configuración del archivo molecular de la muestra '{obj.muestra.codigo}' actualizada.")
-        else:
-            messages.success(
-                request, 
-                f"¡Secuenciación Cargada! Archivo analítico [{obj.tipo_analisis}] acoplado a la muestra '{obj.muestra.codigo}'. "
-                "El pipeline bioinformático comenzará a procesar la taxonomía."
-            )
+        try:
+            total = _disparar_pipeline(obj, request)
+            if change:
+                messages.success(request, f"Archivo [{obj.tipo_analisis}] re-procesado. {total} registros actualizados.")
+            else:
+                messages.success(request, f"¡Pipeline completado! {total} registros procesados.")
+        except ValueError as e:
+            messages.error(request, f"Error en pipeline: {e}")
+        except Exception as e:
+            messages.error(request, f"Error inesperado: {e}")
 
 
 # =========================================================
 # RESULTADOS TAXONÓMICOS
 # =========================================================
-
 @admin.register(ResultadoTaxonomico)
-class ResultadoTaxonomicoAdmin(ModelAdmin): 
-    list_display = ("id", "archivo", "genus", "species", "num_hits", "porcentaje_hits")
-    list_filter = ("archivo__tipo_analisis",)
+class ResultadoTaxonomicoAdmin(ModelAdmin):
+    list_display  = ("id", "archivo", "genus", "species", "num_hits", "porcentaje_hits")
+    list_filter   = ("archivo__tipo_analisis",)
     search_fields = ("genus", "species", "phylum", "archivo__muestra__codigo")
-    
-    autocomplete_fields = ["archivo"]
-    
-    ordering = ("-num_hits",)
-    list_per_page = 30
+    ordering      = ("-porcentaje_hits",)
+    list_per_page  = 30
+
+    fieldsets = (
+        ("Contexto", {"fields": ("archivo",)}),
+        ("Taxonomía", {"fields": ("kingdom", "phylum", "tax_class", "order", "family", "genus", "species")}),
+        ("Abundancia", {"fields": ("num_hits", "porcentaje_hits")}),
+    )
 
 
 # =========================================================
 # CATÁLOGO MICROORGANISMOS
 # =========================================================
-
 @admin.register(CatalogoMicroorganismo)
-class CatalogoMicroorganismoAdmin(ModelAdmin): 
-    list_display = ("id", "nombre", "nivel", "clasificacion")
-    list_filter = ("clasificacion", "nivel")
+class CatalogoMicroorganismoAdmin(BotonEditarMixin, ModelAdmin):
+    list_display  = ("nombre", "nivel", "clasificacion_badge", "descripcion_corta", "acciones_columna")
+    list_display_links = ("nombre",)
+    list_filter   = ("clasificacion", "nivel")
     search_fields = ("nombre", "descripcion")
-    ordering = ("nombre",)
-    list_per_page = 20
+    ordering      = ("nombre",)
+    list_per_page  = 20
 
     fieldsets = (
-        ("Identificación del Taxón", {
-            "fields": ("nombre", "nivel"),
-            "description": "Ejemplo: Nombre: 'Bacillus', Nivel: 'genus'"
-        }),
-        ("Impacto Agronómico", {
-            "fields": ("clasificacion", "descripcion", "referencia"),
-            "description": "Clasifique el rol de este microorganismo en la salud del cultivo."
-        }),
+        ("Identificación Taxonómica", {"fields": ("nombre", "nivel")}),
+        ("Clasificación Funcional", {"fields": ("clasificacion", "descripcion", "referencia")}),
     )
+
+    @admin.display(description="Clasificación")
+    def clasificacion_badge(self, obj):
+        colores = {
+            "benefico": ("#E1F5EE", "#085041"), "fitopatogeno": ("#FAEEDA", "#5a3a00"),
+            "neutral": ("#F1EFE8", "#5F5E5A"), "sin_clasificar": ("#F1EFE8", "#888780"),
+        }
+        bg, color = colores.get(obj.clasificacion, ("#F1EFE8", "#5F5E5A"))
+        return format_html(
+            '<span style="background:{};color:{};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;">{}</span>',
+            bg, color, obj.get_clasificacion_display()
+        )
+
+    @admin.display(description="Descripción")
+    def descripcion_corta(self, obj):
+        return obj.descripcion[:80] + ("…" if len(obj.descripcion) > 80 else "") if obj.descripcion else "—"
+
+
+# =========================================================
+# FORMULARIOS PARA ARREGLAR LA CREACIÓN DE USUARIO (SOLUCIÓN)
+# =========================================================
+class CustomUserCreationForm(UserCreationForm):
+    class Meta:
+        model = Usuario
+        fields = ("username",)
+
+class CustomUserChangeForm(UserChangeForm):
+    class Meta:
+        model = Usuario
+        fields = "__all__"
 
 
 # =========================================================
 # USUARIOS
 # =========================================================
-
 @admin.register(Usuario)
-class UsuarioAdmin(BaseUserAdmin, ModelAdmin): 
-    list_display = ("id", "username", "email", "rol", "is_staff")
-    list_filter = ("rol", "is_staff")
-    search_fields = ("username", "email")
-    ordering = ("username",)
-    list_per_page = 20
-    
-    # Excelente forma de inyectar el rol manteniendo la seguridad de BaseUserAdmin
+class UsuarioAdmin(BaseUserAdmin, BotonEditarMixin, ModelAdmin):
+    # 🎯 Aplica los formularios de Unfold para evitar bordes rotos
+    form = CustomUserChangeForm
+    add_form = CustomUserCreationForm
+    change_password_form = AdminPasswordChangeForm
+
+    list_display  = ("username", "email", "nombre_completo", "rol_badge", "is_active", "is_staff", "date_joined", "acciones_columna")
+    list_display_links = ("username", "email")
+    list_filter   = ("rol", "is_staff", "is_active")
+    search_fields = ("username", "email", "first_name", "last_name")
+    ordering      = ("username",)
+    list_per_page  = 20
+
+    @admin.display(description="Nombre")
+    def nombre_completo(self, obj):
+        nombre = f"{obj.first_name} {obj.last_name}".strip()
+        return nombre if nombre else "—"
+
+    @admin.display(description="Rol")
+    def rol_badge(self, obj):
+        colores = {
+            "admin": ("#E1F5EE", "#085041"), "tecnico": ("#E6F1FB", "#0C447C"),
+            "agricultor": ("#FAEEDA", "#5a3a00"), "estudiante": ("#F1EFE8", "#5F5E5A"),
+        }
+        bg, color = colores.get(obj.rol, ("#F1EFE8", "#5F5E5A"))
+        return format_html(
+            '<span style="background:{};color:{};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;">{}</span>',
+            bg, color, dict(obj.ROLES).get(obj.rol, obj.rol)
+        )
+
     def get_fieldsets(self, request, obj=None):
-        fieldsets = super().get_fieldsets(request, obj)
-        fieldsets_list = list(fieldsets or [])
-        fieldsets_list.append((
-            "Información de Roles TerraBioLab",
-            {
-                "fields": ("rol",),
-                "description": "Asigne el rol adecuado para determinar los permisos de visualización en el Dashboard."
-            }
+        fieldsets = list(super().get_fieldsets(request, obj) or [])
+        fieldsets.append((
+            "Rol en TerraBioLab UTC",
+            {"fields": ("rol",), "description": "Asigne el rol para determinar los permisos de visualización."}
         ))
-        return fieldsets_list
+        return fieldsets
