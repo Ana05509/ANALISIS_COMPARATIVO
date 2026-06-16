@@ -153,6 +153,7 @@ LOGOUT_REDIRECT_URL = 'analisis:login'
 
 ACCOUNT_LOGOUT_REDIRECT_URL = 'analisis:login'
 ACCOUNT_AUTHENTICATED_LOGIN_REDIRECTS = True    # Redirige al login al salir
+ACCOUNT_SIGNUP_FORM_CLASS = 'analisis.signup_form.CustomSignupForm'
 
 # Configuración del proveedor de Google OAuth2
 SOCIALACCOUNT_PROVIDERS = {
@@ -217,5 +218,4 @@ UNFOLD = {
 # ---------------------------
 # Muestra los correos en la consola/terminal para pruebas de desarrollo
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-# Le decimos a Allauth que use nuestro formulario con Nombre y Apellido
-ACCOUNT_SIGNUP_FORM_CLASS = 'analisis.forms.CustomSignupForm'
+USE_DJANGO_JQUERY = True

@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from typing import Dict, List, Any, Optional
 
 class VisualizationService:
     """
@@ -12,43 +13,83 @@ class VisualizationService:
     """
 
     @staticmethod
-    def obtener_paquete_graficos_avanzados(df_pivote: pd.DataFrame, columnas_muestras: list, nivel: str, top_n: int = 10) -> dict:
+    def crear_grafico_abundancia_barras(df: pd.DataFrame, x: str, y: str, titulo: str = "") -> Optional[str]:
+        """Gráfico de barras simple para dashboard."""
+        if df.empty or x not in df.columns or y not in df.columns:
+            return None
+        fig = px.bar(df, x=x, y=y, title=titulo, template="plotly_white")
+        fig.update_layout(xaxis_tickangle=-45, height=500)
+        return str(fig.to_json())
+
+    @staticmethod
+    def crear_grafico_abundancia_pie(df: pd.DataFrame, nombres: str, valores: str, titulo: str = "") -> Optional[str]:
+        """Gráfico circular para dashboard."""
+        if df.empty or nombres not in df.columns or valores not in df.columns:
+            return None
+        fig = px.pie(df, names=nombres, values=valores, title=titulo)
+        return str(fig.to_json())
+
+    @staticmethod
+    def crear_grafico_comparativo_barras(df_comp: pd.DataFrame, muestra_1_nombre: str, muestra_2_nombre: str, top_n: int = 10) -> Optional[str]:
+        """Gráfico comparativo de barras para dos muestras con límite dinámico."""
+        if df_comp.empty:
+            return None
+            
+        # Buscar columnas de muestras (excluyendo 'taxonomia' y 'clasificacion')
+        muestras_cols = [c for c in df_comp.columns if c not in ['taxonomia', 'clasificacion']]
+        
+        if len(muestras_cols) < 2:
+            return None
+            
+        # Aplicamos el filtro dinámico top_n elegido por el usuario
+        top_taxa = df_comp.head(top_n) 
+        
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=top_taxa['taxonomia'], y=top_taxa[muestras_cols[0]], name=muestra_1_nombre))
+        fig.add_trace(go.Bar(x=top_taxa['taxonomia'], y=top_taxa[muestras_cols[1]], name=muestra_2_nombre))
+        
+        # Añadimos el top_n al título para que el usuario sepa qué está viendo
+        fig.update_layout(
+            barmode='group', 
+            title=f"Comparación: {muestra_1_nombre} vs {muestra_2_nombre} (Top {top_n})", 
+            xaxis_tickangle=-45
+        )
+        
+        return str(fig.to_json())
+
+    @staticmethod
+    def obtener_paquete_graficos_avanzados(df_pivote: pd.DataFrame, columnas_muestras: List[str], nivel: str, top_n: int = 10) -> Dict[str, Any]:
         """
         Coordinador analítico: Procesa el DataFrame de abundancias microbianas según el Top N elegido.
-        Retorna un diccionario estructurado en español con objetos JSON listos para el frontend.
+        Retorna un diccionario estructurado con objetos JSON (dict) listos para el frontend.
         """
-        paquete_graficos = {}
+        paquete_graficos: Dict[str, Any] = {}
         
-        # Validación inicial de datos de entrada
         if df_pivote.empty or not columnas_muestras:
             return paquete_graficos
 
-        # Asegurar casteo numérico limpio de las muestras antes de los cálculos estadísticos
-        for col in columnas_muestras:
-            df_pivote[col] = pd.to_numeric(df_pivote[col], errors='coerce').fillna(0)
-
-        # Clonación del DataFrame para proteger la inmutabilidad de los datos de la sesión
+        # Clonación y casteo numérico limpio
         df_analisis = df_pivote.copy()
-        
-        # Calcular la abundancia promedio para realizar el ordenamiento del Top N de microorganismos
+        for col in columnas_muestras:
+            df_analisis[col] = pd.to_numeric(df_analisis[col], errors='coerce').fillna(0)
+
+        # Calcular promedio para el ordenamiento del Top N
         df_analisis['__promedio_abundancia'] = df_analisis[columnas_muestras].mean(axis=1)
         df_ordenado = df_analisis.sort_values(by='__promedio_abundancia', ascending=False)
 
         # -----------------------------------------------------------------
-        # 1. GRÁFICO DE BARRAS APILADAS AL 100% (Composición Comunitaria)
+        # 1. GRÁFICO DE BARRAS APILADAS AL 100%
         # -----------------------------------------------------------------
         try:
             df_top = df_ordenado.head(top_n).copy()
-            df_resto = df_ordenado.tail(len(df_ordenado) - top_n)
+            df_resto = df_ordenado.iloc[top_n:]  # Más limpio y eficiente que .tail()
 
-            # Agrupación de taxones menos abundantes bajo la firma de 'Otros'
             if not df_resto.empty:
                 fila_otros = {nivel: "Otros microorganismos (< abundancia)"}
                 for col in columnas_muestras:
                     fila_otros[col] = df_resto[col].sum()
                 df_top = pd.concat([df_top, pd.DataFrame([fila_otros])], ignore_index=True)
 
-            # Transformación de matriz ancha a formato largo para Plotly Express
             df_formato_largo = df_top.melt(
                 id_vars=[nivel], 
                 value_vars=columnas_muestras,
@@ -62,27 +103,18 @@ class VisualizationService:
                 template="plotly_white"
             )
             fig_barras.update_layout(
-                barmode="stack",
-                barnorm="percent",
-                yaxis_title="Abundancia Relativa (%)", 
-                xaxis_title="Muestras Evaluadas",
-                height=520, 
-                legend_title=nivel.capitalize()
+                barmode="stack", barnorm="percent",
+                yaxis_title="Abundancia Relativa (%)", xaxis_title="Muestras Evaluadas",
+                height=520, legend_title=nivel.capitalize()
             )
             
-            # Validación estricta de tipo para erradicar advertencias de Pylance y asegurar datos
-            json_barras = fig_barras.to_json()
-            if isinstance(json_barras, str):
-                paquete_graficos["grafico_barras_apiladas"] = json.loads(json_barras)
-            else:
-                raise TypeError("El motor de Plotly no generó una cadena JSON válida para el gráfico de barras.")
+            paquete_graficos["grafico_barras_apiladas"] = fig_barras.to_dict()
             
         except Exception as e:
-            print(f"\n[ERROR DE VISUALIZACIÓN] Gráfico de Barras Apiladas falló. Detalles: {str(e)}")
-            paquete_graficos["error_barras"] = f"No se pudo estructurar el gráfico de barras apiladas: {str(e)}"
+            paquete_graficos["error_barras"] = f"Error en barras apiladas: {str(e)}"
 
         # -----------------------------------------------------------------
-        # 2. MAPA DE CALOR INTERACTIVO (Core Microbioma / Patrones)
+        # 2. MAPA DE CALOR INTERACTIVO
         # -----------------------------------------------------------------
         try:
             df_datos_mapa = df_ordenado.head(top_n)
@@ -96,32 +128,25 @@ class VisualizationService:
             ))
             fig_heatmap.update_layout(
                 title=f"Mapa de Calor - Patrones de Abundancia Core (Top {top_n})",
-                xaxis_title="Muestras de Suelo", 
-                yaxis_title=nivel.capitalize(),
+                xaxis_title="Muestras de Suelo", yaxis_title=nivel.capitalize(),
                 height=400 + (top_n * 6)
             )
             
-            json_heatmap = fig_heatmap.to_json()
-            if isinstance(json_heatmap, str):
-                paquete_graficos["grafico_heatmap"] = json.loads(json_heatmap)
-            else:
-                raise TypeError("El motor de Plotly no generó una cadena JSON válida para el Mapa de Calor.")
+            paquete_graficos["grafico_heatmap"] = json.loads(str(fig_heatmap.to_json()))
             
         except Exception as e:
-            print(f"\n[ERROR DE VISUALIZACIÓN] Gráfico de Mapa de Calor falló. Detalles: {str(e)}")
-            paquete_graficos["error_heatmap"] = f"No se pudo estructurar el mapa de calor: {str(e)}"
+            paquete_graficos["error_heatmap"] = f"Error en mapa de calor: {str(e)}"
 
         # -----------------------------------------------------------------
-        # 3. ANÁLISIS DE COMPONENTES PRINCIPALES - PCA (Beta Diversidad)
+        # 3. ANÁLISIS DE COMPONENTES PRINCIPALES (PCA)
         # -----------------------------------------------------------------
         try:
             df_datos_pca = df_ordenado.head(top_n)
             
-            # Un PCA requiere matemáticamente al menos 2 dimensiones (muestras) y 2 variables (taxones)
-            if len(columnas_muestras) >= 2 and len(df_datos_pca) >= 2:
+            # Subimos el umbral mínimo a 3 muestras para que el PCA bidimensional tenga sentido biológico
+            if len(columnas_muestras) >= 3 and len(df_datos_pca) >= 2:
                 df_pca_entrada = df_datos_pca[columnas_muestras].set_index(df_datos_pca[nivel]).T
                 
-                # Escalado estándar (Media = 0, Varianza = 1) antes de aplicar PCA
                 datos_escalados = StandardScaler().fit_transform(df_pca_entrada)
                 pca = PCA(n_components=2)
                 componentes_principales = pca.fit_transform(datos_escalados)
@@ -147,16 +172,11 @@ class VisualizationService:
                     height=500
                 )
                 
-                json_pca = fig_pca.to_json()
-                if isinstance(json_pca, str):
-                    paquete_graficos["grafico_pca"] = json.loads(json_pca)
-                else:
-                    raise TypeError("El motor de Plotly no generó una cadena JSON válida para el análisis PCA.")
+                paquete_graficos["grafico_pca"] = json.loads(str(fig_pca.to_json()))
             else:
-                raise ValueError("Se requieren al menos 2 muestras válidas de suelo para computar un plano de Componentes Principales (PCA).")
+                paquete_graficos["error_pca"] = "Se requieren al menos 3 muestras para un análisis de componentes principales (PCA) representativo."
                 
         except Exception as e:
-            print(f"\n[ERROR DE VISUALIZACIÓN] Gráfico Estadístico PCA falló. Detalles: {str(e)}")
-            paquete_graficos["error_pca"] = f"No se pudo estructurar el gráfico ecológico PCA: {str(e)}"
+            paquete_graficos["error_pca"] = f"Error en cálculo de ecología PCA: {str(e)}"
 
         return paquete_graficos

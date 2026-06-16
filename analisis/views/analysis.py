@@ -22,11 +22,11 @@ from ..models import ResultadoTaxonomico
 
 @login_required
 def analisis_avanzado(request):
-    tipo       = request.GET.get("tipo", "16S")
-    top_n_raw  = request.GET.get("top_n", "10")
-    nivel      = request.GET.get("nivel", "genus")
+    tipo        = request.GET.get("tipo", "16S")
+    top_n_raw   = request.GET.get("top_n", "10")
+    nivel       = request.GET.get("nivel", "genus")
     variedad_id = request.GET.get("producto_id", None)   
-    muestra_id = request.GET.get("muestra_id", None)
+    muestra_id  = request.GET.get("muestra_id", None)
 
     opciones_top_n = [5, 10, 25, 50]
     try:
@@ -40,11 +40,26 @@ def analisis_avanzado(request):
             tipo=tipo, top_n=top_n, nivel=nivel, variedad_id=variedad_id, muestra_id=muestra_id
         )
         
-        # CORRECCIÓN BUG: 'analysis_service' devuelve 'resumen', no 'datos_tabla'
         if "resumen" in contexto and contexto["resumen"]:
             df = pd.DataFrame(contexto["resumen"])
-            analyzer = StatisticalAnalyzer()
-            contexto["estadisticas"] = analyzer.calcular_indices_diversidad(df)
+            
+            # La columna que contiene el nombre del taxón es 'nombre_tax'
+            if "nombre_tax" in df.columns:
+                df["taxonomia"] = df["nombre_tax"]
+            elif nivel in df.columns:
+                df["taxonomia"] = df[nivel]
+            else:
+                # Fallback: usar el índice
+                df["taxonomia"] = df.index.astype(str)
+                
+            # Asegurar columna de abundancia
+            if "total_porcentaje" not in df.columns:
+                df["total_porcentaje"] = 0.0
+                
+            from analisis.services.processing.diversity import DiversityService
+            df_agrupado = df.groupby("taxonomia", as_index=False)["total_porcentaje"].sum()
+            contexto["estadisticas"] = DiversityService.calcular_diversidad_alfa(df_agrupado)
+            
         else:
             contexto["estadisticas"] = {}
 
@@ -61,27 +76,41 @@ def analisis_avanzado(request):
 
     return render(request, "analisis/analisis_avanzado.html", contexto)
 
+
 @login_required
 def resultado_analisis(request, muestra_id):
     try:
+        nivel = request.GET.get("nivel", "genus")
         contexto = obtener_analisis_avanzado(
             tipo=request.GET.get("tipo", "16S"),
             top_n=10,
-            nivel="genus",
+            nivel=nivel,
             muestra_id=muestra_id,
         )
         contexto["muestra_id"] = muestra_id
+        
+        if "resumen" in contexto and contexto["resumen"]:
+            df = pd.DataFrame(contexto["resumen"])
+            
+            # Aplicando el mismo fallback para evitar un KeyError en esta vista
+            if "nombre_tax" in df.columns:
+                df["taxonomia"] = df["nombre_tax"]
+            elif nivel in df.columns:
+                df["taxonomia"] = df[nivel]
+            else:
+                df["taxonomia"] = df.index.astype(str)
+
     except Exception as e:
         messages.error(request, f"No se pudo estructurar el reporte de la muestra: {str(e)}")
         return redirect("analisis:analisis_avanzado")
 
     return render(request, "analisis/resultados.html", contexto)
 
+
 @login_required
 @require_POST
 def exportar_analisis(request):
-    from ..services.business.report_service import generar_reporte_analisis
-
+    from analisis.services.business.report_generation_service import ReportGenerationService
     tipo        = request.POST.get("tipo", "16S")
     top_n       = int(request.POST.get("top_n", 10))
     nivel       = request.POST.get("nivel", "genus")
@@ -89,10 +118,11 @@ def exportar_analisis(request):
     formato     = request.POST.get("formato", "pdf")
 
     try:
-        resultado = generar_reporte_analisis(
-            tipo=tipo, producto_id=variedad_id, formato=formato,
+        resultado = ReportGenerationService.generar_reporte_analisis( 
+            tipo=tipo, variedad_id=variedad_id, formato=formato,
             top_n=top_n, nivel=nivel, usuario=request.user,
         )
+        
         return JsonResponse({"ok": True, "url": resultado.get("url")})
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)

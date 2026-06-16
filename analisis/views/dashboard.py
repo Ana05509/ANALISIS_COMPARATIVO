@@ -11,6 +11,8 @@ from django.shortcuts import render
 from ..models import CatalogoMicroorganismo, MuestraSuelo, ResultadoTaxonomico
 from ..services.business.statistics_service import StatisticsService
 from ..services.business.visualization_service import VisualizationService
+# Import necesario para el cálculo de diversidad
+from analisis.services.processing.diversity import DiversityService
 
 MARCADORES_VALIDOS = ("16S", "ITS")
 
@@ -18,10 +20,12 @@ MARCADORES_VALIDOS = ("16S", "ITS")
 def dashboard(request):
     """
     Vista principal del dashboard de análisis microbianos.
-    Adaptado para discriminar qué ve un estudiante de agronomía frente a un administrador.
     """
     tipo_raw = request.GET.get("tipo", "16S")
     tipo = tipo_raw if tipo_raw in MARCADORES_VALIDOS else "16S"
+    
+    # Inicialización de contexto para estadísticas
+    contexto_estadisticas = {}
 
     try:
         analisis = ResultadoTaxonomico.objects.filter(
@@ -68,7 +72,7 @@ def dashboard(request):
             archivo__tipo_analisis=tipo
         ).select_related("archivo__muestra").order_by("-id")[:5]
 
-        # --- GENERACIÓN DE GRÁFICOS INTERACTIVOS (FASE 2) ---
+        # --- GENERACIÓN DE GRÁFICOS Y ESTADÍSTICAS ---
         graficos_json = {}
         try:
             raw_data = list(ResultadoTaxonomico.objects.filter(
@@ -79,6 +83,10 @@ def dashboard(request):
                 df_genera = pd.DataFrame(raw_data).groupby("genus", as_index=False).sum()
                 df_genera = df_genera.sort_values(by="porcentaje_hits", ascending=False).head(15)
                 df_genera.rename(columns={"porcentaje_hits": "total_porcentaje"}, inplace=True)
+
+                # Cálculo de Diversidad Alfa con DiversityService
+                df_div = df_genera.rename(columns={"genus": "taxonomia", "total_porcentaje": "%_hits"})
+                contexto_estadisticas = DiversityService.calcular_diversidad_alfa(df_div)
 
                 viz = VisualizationService()
                 
@@ -103,8 +111,8 @@ def dashboard(request):
                     graficos_json["grafico_pie"] = json.loads(str(fig_pie))
         
         except Exception as e:
-            print(f"Error generando gráficos: {e}")
-            messages.warning(request, "No se pudieron generar algunos gráficos interactivos debido a la data.")
+            print(f"Error generando gráficos o estadísticas: {e}")
+            messages.warning(request, "No se pudieron generar algunos gráficos o estadísticas.")
 
     except Exception as e:
         messages.error(request, f"Error crítico al cargar el dashboard: {str(e)}")
@@ -116,12 +124,13 @@ def dashboard(request):
         "productos":             muestras,
         "total_analisis":        total_analisis,
         "total_productos":       total_muestras,
-        "total_beneficos":         total_beneficos,
-        "total_fitopatogenos":     total_fitopatogenos,
+        "total_beneficos":       total_beneficos,
+        "total_fitopatogenos":   total_fitopatogenos,
         "total_sin_clasificacion": total_sin_clasificacion,
-        "productos_por_variedad":  muestras_por_variedad,
-        "tipo_actual":            tipo,
-        "marcadores_disponibles":  MARCADORES_VALIDOS,
-        "graficos_json":           json.dumps(graficos_json),
-        "es_estudiante":           request.user.rol == 'estudiante', # Bandera para ocultar celdas en el template
+        "productos_por_variedad": muestras_por_variedad,
+        "tipo_actual":           tipo,
+        "marcadores_disponibles": MARCADORES_VALIDOS,
+        "graficos_json":         json.dumps(graficos_json),
+        "estadisticas":          contexto_estadisticas, # Se pasa al contexto
+        "es_estudiante":         request.user.rol == 'estudiante',
     })

@@ -172,52 +172,74 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     {% if tabla %}
-    // 2. Construcción de gráficos con inyección de variables CSS nativas
-    const tablaData = {{ tabla_json|safe }};
-    const labels = tablaData.map(r => r.taxonomia);
-    const productos = Object.keys(tablaData[0] || {}).filter(k => k !== 'taxonomia' && k !== 'clasificacion');
-    
-    // Colores corporativos extraídos de tu :root
-    const vDark  = getComputedStyle(document.documentElement).getPropertyValue('--verde-dark').trim() || '#085041';
-    const verde  = getComputedStyle(document.documentElement).getPropertyValue('--verde').trim() || '#1D9E75';
-    const amber  = getComputedStyle(document.documentElement).getPropertyValue('--amber').trim() || '#BA7517';
-    const rojo   = getComputedStyle(document.documentElement).getPropertyValue('--rojo').trim() || '#A32D2D';
-    const teal   = getComputedStyle(document.documentElement).getPropertyValue('--teal').trim() || '#0F6E56';
-    const colores = [vDark, amber, verde, rojo, teal];
-
-    const datasets = productos.map((p, i) => ({
-        label: p,
-        data: tablaData.map(r => parseFloat(r[p] || 0).toFixed(4)),
-        backgroundColor: colores[i % colores.length] + 'BB', // Agrega opacidad suave alpha
-        borderColor: colores[i % colores.length],
-        borderWidth: 1.5,
-        borderRadius: 4
-    }));
-
-    new Chart(document.getElementById('chart-comparativo'), {
-        type: 'bar',
-        data: { labels, datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { 
-                legend: { 
-                    position: 'bottom',
-                    labels: { font: { family: 'Outfit', size: 13 } } 
-                } 
-            },
-            scales: { 
-                x: {
-                    ticks: { font: { family: 'DM Mono', size: 11 } }
-                },
-                y: { 
-                    beginAtZero: true, 
-                    title: { display: true, text: '% Abundancia Relativa', font: { family: 'Outfit' } },
-                    ticks: { font: { family: 'DM Mono' } }
-                } 
-            }
+    // 2. Construcción segura del gráfico (Try-Catch y validación estricta)
+    try {
+        const tablaData = {{ tabla_json|safe }};
+        
+        // Prevención de inyección vacía o malformada
+        if (!Array.isArray(tablaData) || tablaData.length === 0) {
+            console.warn("Datos comparativos insuficientes para renderizar el gráfico.");
+            return;
         }
-    });
+
+        const labels = tablaData.map(r => r.taxonomia || 'Desconocido');
+        const productos = Object.keys(tablaData[0] || {}).filter(k => k !== 'taxonomia' && k !== 'clasificacion');
+        
+        // Colores corporativos extraídos de tu :root
+        const vDark  = getComputedStyle(document.documentElement).getPropertyValue('--verde-dark').trim() || '#085041';
+        const verde  = getComputedStyle(document.documentElement).getPropertyValue('--verde').trim() || '#1D9E75';
+        const amber  = getComputedStyle(document.documentElement).getPropertyValue('--amber').trim() || '#BA7517';
+        const rojo   = getComputedStyle(document.documentElement).getPropertyValue('--rojo').trim() || '#A32D2D';
+        const teal   = getComputedStyle(document.documentElement).getPropertyValue('--teal').trim() || '#0F6E56';
+        const colores = [vDark, amber, verde, rojo, teal];
+
+        const datasets = productos.map((p, i) => ({
+            label: p,
+            data: tablaData.map(r => parseFloat(r[p] || 0).toFixed(4)),
+            backgroundColor: colores[i % colores.length] + 'BB', // Agrega opacidad suave alpha
+            borderColor: colores[i % colores.length],
+            borderWidth: 1.5,
+            borderRadius: 4
+        }));
+
+        const ctx = document.getElementById('chart-comparativo');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { 
+                            position: 'bottom',
+                            labels: { font: { family: 'Outfit, sans-serif', size: 13 } } 
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let val = context.parsed.y;
+                                    return ` ${context.dataset.label}: ${val.toFixed(4)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: { 
+                        x: {
+                            ticks: { font: { family: 'DM Mono, monospace', size: 11 } }
+                        },
+                        y: { 
+                            beginAtZero: true, 
+                            title: { display: true, text: '% Abundancia Relativa', font: { family: 'Outfit, sans-serif' } },
+                            ticks: { font: { family: 'DM Mono, monospace' } }
+                        } 
+                    }
+                }
+            });
+        }
+    } catch (err) {
+        console.error("Error crítico controlado al renderizar el gráfico comparativo:", err);
+    }
     {% endif %}
 });
 </script>

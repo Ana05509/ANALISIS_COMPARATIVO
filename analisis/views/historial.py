@@ -23,7 +23,7 @@ def historial(request):
             muestras = muestras.filter(codigo__icontains=busqueda)
 
         muestras = muestras.annotate(
-            total_analisis=Count("archivos_moleculares__resultadotaxonomico", distinct=True)
+            total_analisis=Count("archivos_moleculares__resultados_taxonomicos", distinct=True)
         )
 
         analisis = ArchivoMolecular.objects.filter(

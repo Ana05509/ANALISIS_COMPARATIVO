@@ -6,3 +6,4 @@ from .producto import ver_producto
 from .analysis import analisis_avanzado
 from .catalogo import catalogo_microorganismos, detalle_microorganismo, actualizar_clasificacion
 from .reportes import reportes, generar_reporte, detalle_reporte
+from .subir_datos import subir_datos, cargar_variedades

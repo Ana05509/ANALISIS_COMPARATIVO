@@ -14,8 +14,8 @@
 <div class="page-header">
     <h1>Composición Taxonómica</h1>
     <p>
-        Muestra ID: <span class="td-mono" style="font-weight: 600; color: var(--text-primary);">#{{ muestra_id }}</span> — 
-        <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual }}</span>
+        Muestra ID: <span class="td-mono" style="font-weight: 600; color: var(--text-primary);">#{{ muestra_id|default:"-" }}</span> — 
+        <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span>
     </p>
 </div>
 
@@ -27,24 +27,24 @@
     </div>
     <div class="metric-card verde">
         <div class="metric-label">Nivel Analizado</div>
-        <div class="metric-value" style="font-size: 20px; text-transform: capitalize; font-weight: 600;">{{ nivel_actual }}</div>
+        <div class="metric-value" style="font-size: 20px; text-transform: capitalize; font-weight: 600;">{{ nivel_actual|default:"-" }}</div>
     </div>
     {% if diversidad %}
     <div class="metric-card">
         <div class="metric-label">Índice Shannon (H')</div>
-        <div class="metric-value td-mono">{{ diversidad.shannon }}</div>
+        <div class="metric-value td-mono">{{ diversidad.shannon|default:"0.00" }}</div>
         <div class="metric-sub">Diversidad alfa general</div>
     </div>
     <div class="metric-card">
         <div class="metric-label">Riqueza de Especies (S)</div>
-        <div class="metric-value td-mono">{{ diversidad.riqueza }}</div>
+        <div class="metric-value td-mono">{{ diversidad.riqueza|default:"0" }}</div>
         <div class="metric-sub">Taxa únicos identificados</div>
     </div>
     {% endif %}
 </div>
 
 <div class="card">
-    <div class="card-title">Distribución de Abundancia — Top {{ top_actual }} por {{ nivel_actual|capfirst }}</div>
+    <div class="card-title">Distribución de Abundancia — Top {{ top_actual|default:"10" }} por {{ nivel_actual|default:"-"|capfirst }}</div>
     
     <div class="table-wrap" style="margin-top: 1rem;">
         <table id="tabla-resultados">
@@ -63,17 +63,17 @@
                     <td class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
                     <td>
                         <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
-                            {{ item.taxonomia }}
+                            {{ item.taxonomia|default:"Desconocido" }}
                         </strong>
                     </td>
-                    <td class="td-mono" style="color: var(--text-primary);">{{ item.num_hits }}</td>
+                    <td class="td-mono" style="color: var(--text-primary);">{{ item.num_hits|default:"0" }}</td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.porcentaje_hits|floatformat:2 }}%;"></div>
+                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.porcentaje_hits|default:0|floatformat:2 }}%;"></div>
                             </div>
                             <span class="td-mono" style="font-weight: 500; min-width: 75px; text-align: right;">
-                                {{ item.porcentaje_hits|floatformat:4 }}%
+                                {{ item.porcentaje_hits|default:0|floatformat:4 }}%
                             </span>
                         </div>
                     </td>

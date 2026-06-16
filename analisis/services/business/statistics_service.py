@@ -208,7 +208,7 @@ class StatisticsService:
 
     @staticmethod
     def calcular_clustering_kmeans(df, n_clusters=3, columnas_excluir=None):
-        """Ejecuta particionamiento por K-Means adaptando el número de clusters al tamaño real del set."""
+        """Ejecuta particionamiento por K-Means idóneo para matrices consolidadas transpuertas."""
         if df.empty:
             return None
 
@@ -305,7 +305,7 @@ class StatisticsService:
         return float(interseccion / union) if union > 0 else 0.0
 
     @staticmethod
-    def calcular_similitud_braycurtis(df_a, df_b, columna_taxo="genus", columna_abundancia="%_hits"):
+    def calcular_similitud_braycurtis(df_a, df_b, columna_taxo="Genus", columna_abundancia="%_hits"):
         """
         Calcula el índice ecológico real de Bray-Curtis (Alineado por Taxonomía).
         """
@@ -368,7 +368,7 @@ class StatisticsService:
             return {"error": f"Fallo al computar Shapiro-Wilk: {str(e)}"}
 
     @staticmethod
-    def generar_reporte_estadistico(df, nivel="genus", top_n=10):
+    def generar_reporte_estadistico(df, nivel="Genus", top_n=10):
         """
         Genera el reporte analítico global del suelo sin sesgar métricas científicas.
         """
@@ -389,6 +389,27 @@ class StatisticsService:
             "dominancia_top_acumulada": float(top_df["%_hits"].sum()) if "%_hits" in top_df.columns else 0.0
         }
     
+    @staticmethod
+    def calcular_indices_diversidad(df: pd.DataFrame, columna_taxo="Genus", columna_abundancia="%_hits") -> dict:
+        """
+        Método puente para calcular índices de diversidad alfa (CORREGIDO E INDENTADO).
+        Requerido por analysis.py y dashboard.py.
+        """
+        if df.empty or columna_abundancia not in df.columns:
+            return {}
+        
+        from analisis.services.processing.diversity import DiversityService
+        
+        # Validación defensiva en caso de que la columna cambie de nombre
+        col_real = columna_taxo if columna_taxo in df.columns else df.columns[0]
+        
+        # Agrupar por taxonomía para evitar duplicados y calcular
+        df_agrupado = df.groupby(col_real, as_index=False)[columna_abundancia].sum()
+        resultado = DiversityService.calcular_diversidad_alfa(df_agrupado)
+        
+        return resultado if resultado else {}
+
+
 # =====================================================================
 # ALIAS DE COMPATIBILIDAD: Resuelve el puente con las vistas de Django
 # =====================================================================

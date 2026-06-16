@@ -8,9 +8,11 @@
 <a href="{% url 'analisis:historial' %}" class="btn btn-outline btn-sm">
     <i class="ti ti-arrow-left" aria-hidden="true"></i> Historial
 </a>
+{% if request.user.is_staff %}
 <a href="{% url 'analisis:analisis_avanzado' %}?producto_id={{ producto.id }}&tipo={{ producto.tipo }}" class="btn btn-primary btn-sm">
     <i class="ti ti-chart-dots" aria-hidden="true"></i> Analizar Perfil
 </a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -25,19 +27,19 @@
 <div class="metrics-grid">
     <div class="metric-card">
         <div class="metric-label">Total Análisis Organizados</div>
-        <div class="metric-value td-mono">{{ total_analisis }}</div>
+        <div class="metric-value td-mono">{{ total_analisis|default:"0" }}</div>
     </div>
     <div class="metric-card verde">
         <div class="metric-label">Benéficos Detectados ✅</div>
-        <div class="metric-value td-mono">{{ total_beneficos }}</div>
+        <div class="metric-value td-mono">{{ total_beneficos|default:"0" }}</div>
     </div>
     <div class="metric-card amber">
         <div class="metric-label">Fitopatógenos Identificados ⚠️</div>
-        <div class="metric-value td-mono">{{ total_fitopatogenos }}</div>
+        <div class="metric-value td-mono">{{ total_fitopatogenos|default:"0" }}</div>
     </div>
     <div class="metric-card">
         <div class="metric-label">Sin Clasificación Biológica</div>
-        <div class="metric-value td-mono">{{ total_sin_clasificacion }}</div>
+        <div class="metric-value td-mono">{{ total_sin_clasificacion|default:"0" }}</div>
     </div>
 </div>
 
@@ -63,18 +65,18 @@
                     <td class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
                     <td>
                         <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
-                            {{ a.taxonomia }}
+                            {{ a.taxonomia|default:"Desconocido" }}
                         </strong>
                     </td>
-                    <td style="font-size: 12px; color: var(--text-muted); text-transform: capitalize;">{{ a.nivel }}</td>
-                    <td class="td-mono" style="color: var(--text-primary); layout: fixed;">{{ a.num_hits }}</td>
+                    <td style="font-size: 12px; color: var(--text-muted); text-transform: capitalize;">{{ a.nivel|default:"-" }}</td>
+                    <td class="td-mono" style="color: var(--text-primary); layout: fixed;">{{ a.num_hits|default:"0" }}</td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ a.porcentaje_hits|floatformat:2 }}%;"></div>
+                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ a.porcentaje_hits|default:0|floatformat:2 }}%;"></div>
                             </div>
                             <span class="td-mono" style="font-weight: 500; min-width: 75px; text-align: right;">
-                                {{ a.porcentaje_hits|floatformat:4 }}%
+                                {{ a.porcentaje_hits|default:0|floatformat:4 }}%
                             </span>
                         </div>
                     </td>

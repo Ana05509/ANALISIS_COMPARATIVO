@@ -5,9 +5,11 @@
 {% block topbar_title %}Dashboard de Control{% endblock %}
 
 {% block topbar_actions %}
+{% if user.is_staff or user.rol == 'tecnico' %}
 <a href="{% url 'analisis:subir_datos' %}" class="btn btn-primary btn-sm">
     <i class="ti ti-upload" aria-hidden="true"></i> Nueva Muestra
 </a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -145,37 +147,40 @@
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    var graficosData = {{ graficos_json|safe }};
-    
-    // Tipografía común para armonizar con BioSoil
+    // 1. Obtención e inyección segura de datos desde Django
+    const graficosData = {{ graficos_json|safe }};
+    if (!graficosData) return;
+
+    // 2. Estilos comunes de tipografía para la interfaz de BioSoil
     const fontLayout = { family: 'Outfit, sans-serif', size: 12, color: '#334155' };
 
-    // 1. Renderizar Gráfico de Barras con sobreescritura limpia de estilos
-    if (graficosData.grafico_barras && Object.keys(graficosData.grafico_barras).length > 0) {
-        let layoutB = graficosData.grafico_barras.layout || {};
-        layoutB.font = fontLayout;
-        layoutB.paper_bgcolor = 'rgba(0,0,0,0)';
-        layoutB.plot_bgcolor = 'rgba(0,0,0,0)';
-        layoutB.margin = { l: 50, r: 20, t: 40, b: 50 };
+    // 3. Función optimizada para procesar y renderizar gráficos
+    const renderGraph = (divId, dataObj) => {
+        const container = document.getElementById(divId);
         
-        Plotly.newPlot('grafico-barras', graficosData.grafico_barras.data, layoutB, {
-            responsive: true, 
-            displayModeBar: false
-        });
-    }
-    
-    // 2. Renderizar Gráfico de Torta/Pastel
-    if (graficosData.grafico_pie && Object.keys(graficosData.grafico_pie).length > 0) {
-        let layoutP = graficosData.grafico_pie.layout || {};
-        layoutP.font = fontLayout;
-        layoutP.paper_bgcolor = 'rgba(0,0,0,0)';
-        layoutP.margin = { l: 20, r: 20, t: 40, b: 20 };
+        // Validar que el nodo exista en el DOM y que contenga información válida
+        if (!container || !dataObj || Object.keys(dataObj).length === 0 || dataObj === "null") return;
+
+        // Clonar el layout para evitar mutaciones directas sobre el objeto original
+        let layout = { ...(dataObj.layout || {}) };
+        layout.font = fontLayout;
+        layout.paper_bgcolor = 'rgba(0,0,0,0)';
+        layout.plot_bgcolor = 'rgba(0,0,0,0)';
         
-        Plotly.newPlot('grafico-pie', graficosData.grafico_pie.data, layoutP, {
-            responsive: true, 
-            displayModeBar: false
-        });
-    }
+        // Ejecución aislada por gráfico para mitigar caídas en cascada
+        try {
+            Plotly.newPlot(divId, dataObj.data, layout, { 
+                responsive: true, 
+                displayModeBar: false 
+            });
+        } catch (err) {
+            console.error(`Error crítico al renderizar el gráfico [${divId}]:`, err);
+        }
+    };
+
+    // 4. Invocación controlada de los componentes visuales
+    renderGraph('grafico-barras', graficosData.grafico_barras);
+    renderGraph('grafico-pie', graficosData.grafico_pie);
 });
 </script>
 {% endif %}

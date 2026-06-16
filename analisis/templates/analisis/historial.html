@@ -7,14 +7,13 @@
 {% block content %}
 <div class="page-header">
     <h1>Historial de análisis</h1>
-    <p>Registro de muestras procesadas — <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual }}</span></p>
+    <p>Registro de muestras procesadas — <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"General" }}</span></p>
 </div>
 
-<!-- Búsqueda -->
 <div class="card card-sm" style="margin-bottom:1.25rem;">
     <form method="get" style="display:flex; gap:10px; align-items:center;">
         <input type="hidden" name="tipo" value="{{ tipo_actual }}">
-        <input type="text" name="q" value="{{ busqueda }}" placeholder="Buscar por nombre de producto..." class="form-control" style="max-width:360px;">
+        <input type="text" name="q" value="{{ busqueda|default:'' }}" placeholder="Buscar por nombre de producto..." class="form-control" style="max-width:360px;">
         <button type="submit" class="btn btn-outline btn-sm">
             <i class="ti ti-search" aria-hidden="true"></i> Buscar
         </button>
@@ -23,11 +22,10 @@
             <i class="ti ti-x" aria-hidden="true"></i> Limpiar
         </a>
         {% endif %}
-        <span style="margin-left:auto; font-size:13px; color:var(--text-hint);">{{ total_productos }} producto(s)</span>
+        <span style="margin-left:auto; font-size:13px; color:var(--text-hint);">{{ total_productos|default:"0" }} producto(s)</span>
     </form>
 </div>
 
-<!-- Tabla -->
 <div class="card">
     {% if productos %}
     <div class="table-wrap">
@@ -44,12 +42,12 @@
             <tbody>
                 {% for p in productos %}
                 <tr>
-                    <td><strong>{{ p.nombre }}</strong></td>
+                    <td><strong>{{ p.nombre|default:"Sin nombre" }}</strong></td>
                     <td style="color:var(--text-muted); font-size:13px;">{{ p.variedad|default:"—" }}</td>
                     <td>
-                        <span class="{% if p.tipo == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ p.tipo }}</span>
+                        <span class="{% if p.tipo == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ p.tipo|default:"N/A" }}</span>
                     </td>
-                    <td class="td-mono">{{ p.total_analisis }}</td>
+                    <td class="td-mono">{{ p.total_analisis|default:"0" }}</td>
                     <td>
                         <div style="display:flex; gap:6px;">
                             <a href="{% url 'analisis:ver_producto' p.id %}" class="btn btn-outline btn-sm">
@@ -70,6 +68,9 @@
         <i class="ti ti-history" aria-hidden="true"></i>
         <strong>Sin registros</strong>
         <p>No se encontraron muestras {% if busqueda %}para "{{ busqueda }}"{% endif %}.</p>
+        {% if busqueda %}
+            <a href="{% url 'analisis:historial' %}?tipo={{ tipo_actual }}" class="btn btn-outline btn-sm">Ver todas las muestras</a>
+        {% endif %}
     </div>
     {% endif %}
 </div>

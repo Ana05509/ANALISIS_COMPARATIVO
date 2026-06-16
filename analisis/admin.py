@@ -3,6 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.db import transaction
 from django.contrib import messages
+from django import forms  
 import pandas as pd
 import io
 
@@ -88,10 +89,30 @@ class VariedadClonAdmin(BotonEditarMixin, ModelAdmin):
 
 
 # =========================================================
-# MUESTRAS DE SUELO
+# MUESTRAS DE SUELO (FORMULARIO CON PLACEHOLDERS)
 # =========================================================
+class MuestraSueloForm(forms.ModelForm):
+    """
+    Formulario encargado de inyectar las guías de texto invisibles (placeholders)
+    que desaparecen al escribir dentro de los inputs de Unfold.
+    """
+    class Meta:
+        model = MuestraSuelo
+        fields = '__all__'
+        widgets = {
+            'codigo': forms.TextInput(attrs={'placeholder': 'Ej: MUESTRA-001, SUELO-CACAO-01...'}),
+            'tipo_muestra': forms.TextInput(attrs={'placeholder': 'Ej: Suelo, Suelo Rizosférico...'}),
+            'observaciones': forms.Textarea(attrs={'placeholder': 'Escribe notas opcionales sobre el estado o recolección del suelo...', 'rows': 2}),
+            'localidad': forms.TextInput(attrs={'placeholder': 'Ej: Manabí, Guayas, Loja...'}),
+            'finca_lote': forms.TextInput(attrs={'placeholder': 'Ej: Finca La Esperanza - Lote Norte'}),
+            'altitud': forms.NumberInput(attrs={'placeholder': 'Ej: 250'}),
+        }
+
+
 @admin.register(MuestraSuelo)
 class MuestraSueloAdmin(BotonEditarMixin, ModelAdmin):
+    form = MuestraSueloForm  # 🌟 Acoplamos el formulario con guías de texto
+    
     list_display = ("codigo", "cultivo", "variedad_clon", "localidad", "altitud_display", "tipo_muestra", "fecha_registro", "acciones_columna")
     list_display_links = ("codigo",)
     list_filter   = ("cultivo", "variedad_clon", "tipo_muestra", "fecha_registro")
@@ -108,9 +129,26 @@ class MuestraSueloAdmin(BotonEditarMixin, ModelAdmin):
         ("Registro de Sistema", {"fields": ("fecha_registro",), "classes": ("collapse",)}),
     )
 
+    # 🌟 Forzamos la inyección del script de filtrado para Unfold
+    class Media:
+        js = (
+            'admin/js/filtro_cultivos.js',
+        )
+
     @admin.display(description="Altitud (msnm)")
     def altitud_display(self, obj):
         return f"{obj.altitud} m" if obj.altitud is not None else "—"
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "variedad_clon":
+            resolved = request.resolver_match
+            if resolved and resolved.kwargs.get('object_id'):
+                try:
+                    muestra_actual = MuestraSuelo.objects.get(pk=resolved.kwargs['object_id'])
+                    kwargs["queryset"] = VariedadClon.objects.filter(cultivo=muestra_actual.cultivo)
+                except MuestraSuelo.DoesNotExist:
+                    pass
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
@@ -156,6 +194,7 @@ def _disparar_pipeline(archivo_mol, request):
         ])
     return resultado.get("total_registros", len(resultado["data"]))
 
+
 @admin.register(ArchivoMolecular)
 class ArchivoMolecularAdmin(BotonEditarMixin, ModelAdmin):
     list_display = ("id", "tipo_badge", "muestra", "archivo", "total_resultados", "fecha_carga", "acciones_columna")
@@ -195,7 +234,7 @@ class ArchivoMolecularAdmin(BotonEditarMixin, ModelAdmin):
             if change:
                 messages.success(request, f"Archivo [{obj.tipo_analisis}] re-procesado. {total} registros actualizados.")
             else:
-                messages.success(request, f"¡Pipeline completado! {total} registros procesados.")
+                messages.success(request, f"¡Pipeline completado! {total} registros processed.")
         except ValueError as e:
             messages.error(request, f"Error en pipeline: {e}")
         except Exception as e:
@@ -255,7 +294,7 @@ class CatalogoMicroorganismoAdmin(BotonEditarMixin, ModelAdmin):
 
 
 # =========================================================
-# FORMULARIOS PARA ARREGLAR LA CREACIÓN DE USUARIO (SOLUCIÓN)
+# FORMULARIOS PARA LA CREACIÓN DE USUARIO
 # =========================================================
 class CustomUserCreationForm(UserCreationForm):
     class Meta:
@@ -273,7 +312,6 @@ class CustomUserChangeForm(UserChangeForm):
 # =========================================================
 @admin.register(Usuario)
 class UsuarioAdmin(BaseUserAdmin, BotonEditarMixin, ModelAdmin):
-    # 🎯 Aplica los formularios de Unfold para evitar bordes rotos
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
     change_password_form = AdminPasswordChangeForm

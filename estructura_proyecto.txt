@@ -9,13 +9,10 @@
 │   │   │   └── microorganismos_fitopatogenos.csv
 │   │   ├── metadata
 │   │   │   └── muestra.csv
-│   │   ├── processed
 │   │   └── raw
-│   │       └── 16s
-│   │           └── its
 │   ├── migrations
 │   │   ├── 0001_initial.py
-│   │   ├── 0002_alter_archivomolecular_archivo_and_more.py
+│   │   ├── 0002_alter_cultivo_options_alter_usuario_options_and_more.py
 │   │   └── __init__.py
 │   ├── services
 │   │   ├── business
@@ -24,7 +21,7 @@
 │   │   │   ├── catalog_service.py
 │   │   │   ├── comparison_service.py
 │   │   │   ├── export_service.py
-│   │   │   ├── report_service.py
+│   │   │   ├── report_generation_service.py
 │   │   │   ├── statistics_service.py
 │   │   │   ├── upload_service.py
 │   │   │   └── visualization_service.py
@@ -50,6 +47,8 @@
 │   │   └── __init__.py
 │   ├── templates
 │   │   ├── account
+│   │   │   ├── email.html
+│   │   │   ├── email_confirm.html
 │   │   │   ├── login.html
 │   │   │   ├── password_reset.html
 │   │   │   ├── password_reset_done.html
@@ -76,16 +75,6 @@
 │   ├── templatetags
 │   │   ├── __init__.py
 │   │   └── custom_filters.py
-│   ├── test
-│   │   ├── __init__.py
-│   │   ├── test_catalog.py
-│   │   ├── test_comparison.py
-│   │   ├── test_comparison_service.py
-│   │   ├── test_models.py
-│   │   ├── test_models_comprehensive.py
-│   │   ├── test_pipeline.py
-│   │   ├── test_pipeline_comprehensive.py
-│   │   └── test_upload.py
 │   ├── views
 │   │   ├── __init__.py
 │   │   ├── analysis.py
@@ -110,19 +99,6 @@
 │   ├── settings.py
 │   ├── urls.py
 │   └── wsgi.py
-├── docs
-│   ├── ARCHITECTURE.md
-│   ├── COMPLETE_PROJECT_SUMMARY.md
-│   ├── COMPLETE_TREE_STRUCTURE.md
-│   ├── COMPREHENSIVE_VISUAL_SUMMARY.md
-│   ├── DATABASE.md
-│   ├── GET_STARTED_NOW.md
-│   ├── HOW_TO_RUN_TESTS.md
-│   ├── INTEGRATION_TESTS_TEMPLATE.md
-│   ├── PHASE1_WEEK1_SUMMARY.md
-│   ├── PHASE1_WEEK2_REPORT.md
-│   ├── README_WEEK2_STATUS.md
-│   └── VERIFY_OPTIMIZATION.md
 ├── static
 │   ├── css
 │   └── videos
@@ -130,10 +106,11 @@
 ├── .coverage
 ├── .gitattributes
 ├── .gitignore
+├── analisis_proyect.py
 ├── estructura_proyecto.txt
-├── generar_estructura.py
+├── g_estruc.py
 ├── manage.py
-├── project_analyzer.py
+├── modelos_extraidos.py
 ├── pyrightconfig.json
 ├── pytest.ini
 ├── README.md

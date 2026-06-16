@@ -180,49 +180,63 @@
 {% if top_microorganismos %}
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    const topData = {{ top_microorganismos|safe }};
-    const labels  = topData.map(r => r.taxonomia);
-    const values  = topData.map(r => parseFloat(r.porcentaje_hits || 0));
-    
-    // Paleta de colores extendida y balanceada para microbiología BioSoil
-    const colores = ['#1D9E75','#0F6E56','#085041','#BA7517','#9E6515','#185FA5','#0C447C','#A32D2D','#5F5E5A','#888780'];
+    // 1. Inyección y parseo seguro utilizando bloques aislados en Try-Catch
+    try {
+        // Usamos el filtro |safe de Django pero controlamos la inicialización en JS
+        const topData = {{ top_microorganismos|safe }};
+        
+        if (!Array.isArray(topData) || topData.length === 0) {
+            console.warn("La data de microorganismos está vacía o no tiene el formato correcto.");
+            return;
+        }
 
-    const ctx = document.getElementById('chart-donut');
-    if (ctx) {
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: colores,
-                    borderWidth: 2,
-                    borderColor: '#ffffff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            boxWidth: 10,
-                            font: { family: 'Outfit, sans-serif', size: 11 },
-                            padding: 12
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(ctx) {
-                                return ` ${ctx.label}: ${ctx.parsed.toFixed(4)}%`;
+        const labels = topData.map(r => r.taxonomia || 'Desconocido');
+        const values = topData.map(r => parseFloat(r.porcentaje_hits || 0));
+        
+        // Paleta de colores extendida y balanceada para microbiología BioSoil
+        const colores = ['#1D9E75','#0F6E56','#085041','#BA7517','#9E6515','#185FA5','#0C447C','#A32D2D','#5F5E5A','#888780'];
+
+        const ctx = document.getElementById('chart-donut');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colores,
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 10,
+                                font: { family: 'Outfit, sans-serif', size: 11 },
+                                padding: 12
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const val = typeof ctx.parsed === 'number' ? ctx.parsed.toFixed(4) : ctx.parsed;
+                                    return ` ${ctx.label}: ${val}%`;
+                                }
                             }
                         }
-                    }
-                },
-                cutout: '65%' // Transforma el gráfico de pastel en un Donut estilizado de alta legibilidad
-            }
-        });
+                    },
+                    cutout: '65%' // Donut estilizado de alta legibilidad
+                }
+            });
+        }
+    } catch (err) {
+        // Evitamos que un error matemático o de inyección de JSON tumbe la ejecución de otros scripts de la página
+        console.error("Error crítico controlado al renderizar el gráfico donut de biodiversidad:", err);
     }
 });
 </script>

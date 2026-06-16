@@ -1,20 +1,18 @@
 import pandas as pd
 from django.db import transaction
+from django.http import HttpRequest
+from typing import Dict, Any
 
 from analisis.models import MuestraSuelo, ArchivoMolecular, ResultadoTaxonomico, Cultivo, VariedadClon
 from analisis.services.processing.pipeline import PipelineProcesamiento
 
-NIVELES_VALIDOS = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
-
-
-def validar_archivo(archivo):
+def validar_archivo(archivo) -> None:
     if not archivo.name.lower().endswith((".csv", ".tsv", ".xlsx", ".xls")):
         raise ValueError("Formato inválido. Use CSV, TSV o Excel.")
     if archivo.size > 10 * 1024 * 1024:
         raise ValueError("Archivo demasiado grande (máximo 10 MB).")
 
-
-def leer_archivo(archivo):
+def leer_archivo(archivo) -> pd.DataFrame:
     nombre = archivo.name.lower()
     if nombre.endswith((".xlsx", ".xls")):
         return pd.read_excel(archivo)
@@ -25,104 +23,78 @@ def leer_archivo(archivo):
         archivo.seek(0)
         return pd.read_csv(archivo, sep="\t")
 
-
-def procesar_upload(request):
-    """
-    Pipeline unificado desde la vista web pública. 
-    Aplica seek(0) para resguardar la persistencia íntegra del archivo en el FileField.
-    """
-    archivo         = request.FILES.get("archivo")
-    tipo            = request.POST.get("tipo_analisis", "16S")
-    codigo_muestra  = request.POST.get("codigo", "").strip()
-    cultivo_id      = request.POST.get("cultivo", None)
-    variedad_id     = request.POST.get("variedad_clon", None)
-    localidad       = request.POST.get("localidad", "").strip()
-    finca_lote      = request.POST.get("finca_lote", "").strip()
-    altitud_raw     = request.POST.get("altitud", None)
-
-    # Validaciones obligatorias de campos
+def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
+    archivo = request.FILES.get("archivo")
     if not archivo:
-        raise ValueError("No se ha proporcionado ningún archivo molecular.")
-    if not codigo_muestra:
-        raise ValueError("El código identificador de la muestra es obligatorio.")
-    if not cultivo_id:
-        raise ValueError("Debe seleccionar un Cultivo válido de la lista.")
-    if not variedad_id:
-        raise ValueError("Debe seleccionar una Variedad o Clon específico.")
-    if not localidad:
-        raise ValueError("El campo 'Localidad' es obligatorio para el análisis biogeográfico.")
-    if not finca_lote:
-        raise ValueError("El campo 'Finca / Lote' es obligatorio para la trazabilidad.")
-    if not altitud_raw or not str(altitud_raw).strip():
-        raise ValueError("El campo 'Altitud' (msnm) es obligatorio.")
-
-    try:
-        altitud = int(altitud_raw)
-    except ValueError:
-        raise ValueError("La altitud debe ser un número entero válido.")
-
+        raise ValueError("No se ha proporcionado ningún archivo para procesar.")
     validar_archivo(archivo)
+
+    # 1. Parámetros básicos
+    codigo_muestra = request.POST.get("nombre_producto", "").strip()
+    tipo = request.POST.get("tipo", "16S").strip()
+    localidad = request.POST.get("localidad", "").strip()
+    finca_lote = request.POST.get("finca_lote", "").strip()
+    altitud = float(request.POST.get("altitud") or 0.0)
+
+    # 2. Lógica de Cultivo y Variedad (Manual o Selección)
+    cultivo_id = request.POST.get("cultivo")
+    cultivo_manual = request.POST.get("cultivo_manual", "").strip()
+    variedad_id = request.POST.get("variedad_clon")
+    variedad_manual = request.POST.get("variedad_manual", "").strip()
+
+    if cultivo_manual:
+        cultivo, _ = Cultivo.objects.get_or_create(nombre=cultivo_manual)
+    elif cultivo_id:
+        cultivo = Cultivo.objects.get(id=cultivo_id)
+    else:
+        raise ValueError("Debe seleccionar o ingresar un Cultivo.")
+
+    if variedad_manual:
+        variedad, _ = VariedadClon.objects.get_or_create(nombre=variedad_manual, cultivo=cultivo)
+    elif variedad_id:
+        variedad = VariedadClon.objects.get(id=variedad_id, cultivo=cultivo)
+    else:
+        raise ValueError("Debe seleccionar o ingresar una Variedad/Clon.")
+
+    # 3. Pipeline
     df_raw = leer_archivo(archivo)
+    pipeline = PipelineProcesamiento()
+    resultado = pipeline.procesar_archivo_df(df_raw, top_n=10, nivel="genus")
 
-    nivel = request.POST.get("nivel", "genus")
-    if nivel not in NIVELES_VALIDOS:
-        nivel = "genus"
+    if not resultado or "data" not in resultado or not resultado["data"]:
+        raise ValueError("El archivo no contiene registros válidos.")
 
-    resultado = PipelineProcesamiento.procesar_archivo_df(df_raw, nivel=nivel)
-
-    if not resultado or not resultado.get("data"):
-        raise ValueError("El archivo no contiene datos taxonómicos válidos estructurados.")
-
+    # 4. Persistencia
     with transaction.atomic():
-        try:
-            cultivo = Cultivo.objects.get(id=cultivo_id)
-        except Cultivo.DoesNotExist:
-            raise ValueError("El cultivo seleccionado no existe en el catálogo.")
-
-        try:
-            variedad = VariedadClon.objects.get(id=variedad_id, cultivo=cultivo)
-        except VariedadClon.DoesNotExist:
-            raise ValueError("La variedad/clon no corresponde al cultivo elegido.")
-
-        # Crear registro de la Muestra
-        muestra = MuestraSuelo.objects.create(
+        muestra, _ = MuestraSuelo.objects.update_or_create(
             codigo=codigo_muestra,
-            cultivo=cultivo,
-            variedad_clon=variedad,
-            tipo_muestra=request.POST.get("tipo_muestra", "Suelo"),
-            observaciones=request.POST.get("observaciones", ""),
-            localidad=localidad,
-            finca_lote=finca_lote,
-            altitud=altitud,
+            defaults={
+                "cultivo": cultivo, "variedad_clon": variedad,
+                "tipo_muestra": request.POST.get("tipo_muestra", "Suelo").strip(),
+                "observaciones": request.POST.get("observaciones", "").strip(),
+                "localidad": localidad, "finca_lote": finca_lote, "altitud": altitud,
+            }
         )
 
-        # FIX: Devolver el cursor binario a cero para que Django guarde el archivo completo
         archivo.seek(0)
-        archivo_mol = ArchivoMolecular.objects.create(
-            muestra=muestra,
-            tipo_analisis=tipo,
-            archivo=archivo,
-        )
+        ArchivoMolecular.objects.filter(muestra=muestra, tipo_analisis=tipo).delete()
+        archivo_mol = ArchivoMolecular.objects.create(muestra=muestra, tipo_analisis=tipo, archivo=archivo)
 
-        # Volcado masivo de resultados taxonómicos procesados
-        ResultadoTaxonomico.objects.bulk_create([
-            ResultadoTaxonomico(
+        # Volcado con mapeo flexible para evitar "Unclassified" masivo
+        bulk_data = []
+        for item in resultado["data"]:
+            bulk_data.append(ResultadoTaxonomico(
                 archivo=archivo_mol,
-                kingdom=item.get("kingdom", "Unclassified"),
-                phylum=item.get("phylum", "Unclassified"),
-                tax_class=item.get("tax_class", "Unclassified"),
-                order=item.get("order", "Unclassified"),
-                family=item.get("family", "Unclassified"),
-                genus=item.get("genus", "Unclassified"),
-                species=item.get("species", "Unclassified"),
-                num_hits=item.get("num_hits", 0),
-                porcentaje_hits=item.get("%_hits", 0.0),
-            )
-            for item in resultado["data"]
-        ])
+                kingdom=item.get("kingdom") or item.get("Kingdom") or "Unclassified",
+                phylum=item.get("phylum") or item.get("Phylum") or "Unclassified",
+                tax_class=item.get("tax_class") or item.get("class") or item.get("Class") or "Unclassified",
+                order=item.get("order") or item.get("Order") or "Unclassified",
+                family=item.get("family") or item.get("Family") or "Unclassified",
+                genus=item.get("genus") or item.get("Genus") or "Unclassified",
+                species=item.get("species") or item.get("Species") or "Unclassified",
+                num_hits=int(item.get("num_hits") or item.get("Num_hits") or 0),
+                porcentaje_hits=float(item.get("%_hits") or item.get("porcentaje_hits") or 0.0),
+            ))
+        ResultadoTaxonomico.objects.bulk_create(bulk_data)
 
-    return {
-        "total_registros":      resultado.get("total_registros", len(resultado["data"])),
-        "muestra_id":           muestra.id,
-        "archivo_molecular_id": archivo_mol.id,
-    }
+    return {"total_registros": len(resultado["data"]), "muestra_id": muestra.id, "codigo": muestra.codigo}

@@ -1,119 +1,157 @@
 import json
 import pandas as pd
+from typing import Any, Dict, List, cast
 
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import JsonResponse, HttpResponse, HttpResponseBase
+from django.views.decorators.http import require_POST
 
-from ..forms import CompararForm
-from ..models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo
-from ..services.business.comparison_service import ejecutar_comparacion_clean
-from ..services.business.visualization_service import VisualizationService
-from ..services.business.statistics_service import StatisticsService
+# Importaciones Locales del Módulo usando rutas absolutas para robustez
+from analisis.models import MuestraSuelo
+
+# Servicios de Negocio - Arquitectura de Capas Estabilizada
+from analisis.services.business.comparison_service import ejecutar_comparacion_clean
+from analisis.services.business.visualization_service import VisualizationService
+from analisis.services.business.statistics_service import StatisticsService
+from analisis.services.business.export_service import ExportService
+from analisis.services.business.report_generation_service import ReportGenerationService
+
 
 MARCADORES_VALIDOS = ("16S", "ITS")
+FORMATOS_VALIDOS = ("pdf", "excel", "html", "json")
 
 
-def _contar_clasificaciones(tabla):
+def _contar_clasificaciones(tabla: List[Dict[str, Any]]) -> Dict[str, int]:
     """
-    Cuenta por clasificación funcional en la tabla pivote.
-    README: "Clasificación Funcional: Benéficos ✅, Fitopatógenos ⚠️, Sin clasificación ⚪"
+    Helper para procesar el conteo de clasificaciones funcionales de microorganismos.
     """
     conteo = {"benefico": 0, "fitopatogeno": 0, "sin_clasificar": 0}
     for fila in tabla:
         clave = fila.get("clasificacion", "sin_clasificar")
         if clave in conteo:
             conteo[clave] += 1
-        else:
-            conteo["sin_clasificar"] += 1
     return conteo
-
 
 @login_required
 def comparar(request):
     """
-    Vista de comparación de perfiles microbianos entre muestras/variedades.
-    README: "Análisis Diferencial: Dominantes, Compartidos y Exclusivos"
+    Vista de comparación actualizada para consumir la estructura 
+    retornada por ejecutar_comparacion_clean.
     """
-    tipo_raw = request.POST.get("tipo", "16S") if request.method == "POST" else request.GET.get("tipo", "16S")
-    tipo = tipo_raw if tipo_raw in MARCADORES_VALIDOS else "16S"
+    from analisis.forms import CompararForm
 
-    muestras = MuestraSuelo.objects.all().order_by("-id")
-    contexto_base = {
-        "productos": muestras,
-        "tipo_actual": tipo,
-        "marcadores_disponibles": MARCADORES_VALIDOS,
+    form = CompararForm(request.GET or None)
+    contexto: Dict[str, Any] = {
+        "form": form,
+        "marcador_seleccionado": None,
+        "tabla_comparativa": [],
+        "graficos_json": "{}",
+        "conteo_clasificaciones": {"benefico": 0, "fitopatogeno": 0, "sin_clasificar": 0},
+        "exclusivos_m1": [],
+        "exclusivos_m2": [],
     }
 
-    if request.method == "POST":
-        form = CompararForm(request.POST, tipo=tipo)
-        if form.is_valid():
-            # Extraemos de forma segura los datos limpios para el contexto
-            nivel = form.cleaned_data.get("nivel", "genus")
-            top_n = form.cleaned_data.get("top_n", 10)
+    if request.GET and form.is_valid():
+        muestra_1 = form.cleaned_data.get("muestra_1")
+        muestra_2 = form.cleaned_data.get("muestra_2")
+        marcador  = form.cleaned_data.get("marcador")
 
-            # SOLUCIÓN PYLANCE: Se envía el diccionario limpio esperado por la firma del servicio
-            resultado = ejecutar_comparacion_clean(form.cleaned_data)
+        if muestra_1 and muestra_2:
+            contexto["marcador_seleccionado"] = marcador
 
-            tabla = resultado.get("tabla_pivote", [])
-            conteo = _contar_clasificaciones(tabla)
-
-            total_taxonomias = len(tabla)
-            top_taxonomia = tabla[0].get("taxonomia", "N/A") if total_taxonomias > 0 else "N/A"
-            
-            df_pivote = pd.DataFrame(tabla)
-            promedio_hits = 0
-            estadisticas_comparacion = {}
-            graficos_json = {}
-
-            if not df_pivote.empty:
-                columnas_muestras = [col for col in df_pivote.columns if col not in ["taxonomia", "clasificacion"]]
-                for col in columnas_muestras:
-                    df_pivote[col] = pd.to_numeric(df_pivote[col], errors='coerce').fillna(0)
+            try:
+                # RECEPTOR DE ESTRUCTURA: Recibe el diccionario completo del servicio
+                resultado_comp = ejecutar_comparacion_clean(form.cleaned_data)
                 
-                promedio_hits = float(df_pivote[columnas_muestras].sum().mean())
+                # Transformación de datos adaptada a la nueva estructura
+                tabla_datos = resultado_comp.get("tabla", [])
                 
-                # ✅ CORREGIDO: Instanciamos usando la clase correcta importada arriba
-                stats_eng = StatisticsService()
-                
-                # Nota: Si el método calcular_correlacion_muestras o similar no está en tu StatisticsService, 
-                # recuerda que puedes usar los métodos estáticos @staticmethod directamente como StatisticsService.calcular_descriptivas()
-                if hasattr(stats_eng, 'calcular_correlacion_muestras'):
-                    estadisticas_comparacion = stats_eng.calcular_correlacion_muestras(df_pivote, columnas_muestras)
+                if tabla_datos:
+                    # Convertimos la lista de dicts a DataFrame para las visualizaciones
+                    df_comp = pd.DataFrame(tabla_datos)
+                    
+                    contexto["tabla_comparativa"] = tabla_datos
+                    contexto["conteo_clasificaciones"] = _contar_clasificaciones(tabla_datos)
+                    
+                    # Asignación de exclusivos (ajustar lógica según cómo el servicio los entregue)
+                    exclusivos = resultado_comp.get("exclusivos", [])
+                    # Si 'exclusivos' llega como lista única, distribuimos; 
+                    # si viene como dict, asigna directamente según clave.
+                    contexto["exclusivos_m1"] = exclusivos[:len(exclusivos)//2] 
+                    contexto["exclusivos_m2"] = exclusivos[len(exclusivos)//2:]
+
+                    # Renderizado de Gráficos
+                    viz_service = VisualizationService()
+                    fig = viz_service.crear_grafico_comparativo_barras(
+                        df_comp, 
+                        muestra_1_nombre=str(muestra_1.codigo), 
+                        muestra_2_nombre=str(muestra_2.codigo)
+                    )
+                    if fig is not None:
+                        contexto["graficos_json"] = json.dumps(json.loads(str(fig)))
+
                 else:
-                    # Fallback preventivo por si usas métodos genéricos en tu service
-                    estadisticas_comparacion = {"info": "Cálculo matemático cargado"}
+                    messages.info(request, "No se encontraron taxones coincidentes bajo los filtros estipulados.")
 
-                viz = VisualizationService()
-                fig_comp = viz.crear_grafico_comparativo_muestras(df_pivote, columnas_muestras, nivel)
-                if fig_comp is not None:
-                    graficos_json["grafico_comparativo"] = json.loads(str(fig_comp))
+            except Exception as e:
+                messages.error(request, f"Error en el procesamiento comparativo: {str(e)}")
+        else:
+            messages.error(request, "Las muestras seleccionadas no son válidas.")
 
-            context = {
-                "tabla_pivote":    tabla,
-                "tabla_json":      json.dumps(tabla),
-                "dominantes":      resultado.get("dominantes", []),
-                "compartidos":     resultado.get("compartidos", []),
-                "exclusivos":      resultado.get("exclusivos", []),
-                "total_productos": muestras.count(),
-                "total_taxonomias": total_taxonomias,
-                "top_taxonomia":   top_taxonomia,
-                "promedio_hits":   promedio_hits,
-                "total_beneficos":          conteo["benefico"],
-                "total_fitopatogenos":      conteo["fitopatogeno"],
-                "total_sin_clasificacion":  conteo["sin_clasificar"],
-                "form":            form,
-                "productos":       muestras,
-                "tipo_actual":     tipo,
-                "nivel_actual":    nivel,
-                "top_actual":      top_n,
-                "marcadores_disponibles": MARCADORES_VALIDOS,
-                "graficos_json":            json.dumps(graficos_json),
-                "estadisticas_comparacion": estadisticas_comparacion,
-            }
-            return render(request, "analisis/dashboard.html", context)
+    return render(request, "analisis/comparar.html", contexto)
 
-        return render(request, "analisis/dashboard.html", contexto_base)
+@require_POST
+def exportar_reporte_comparativo(request) -> HttpResponseBase:
+    """
+    Exportación polimórfica de los resultados de la comparación.
+    Garantiza retornar un HttpResponseBase estricto para satisfacer a Pylance y @login_required.
+    """
+    try:
+        tipo         = request.POST.get("marcador", "16S")
+        nivel        = request.POST.get("nivel", "genus")
+        formato      = request.POST.get("formato", "pdf")
+        top_n        = int(request.POST.get("top_n", 10))
+        variedad_id  = request.POST.get("producto_id", None)
 
-    contexto_base["form"] = CompararForm(tipo=tipo)
-    return render(request, "analisis/dashboard.html", contexto_base)
+        if formato not in FORMATOS_VALIDOS:
+            return JsonResponse({"ok": False, "error": "Formato de exportación inválido"}, status=400)
+
+        # Dataset vacío base para el reporte
+        df_reporte = pd.DataFrame() 
+
+        if formato == "html":
+            html_puro = ExportService.generar_html_reporte(
+                df_reporte.to_html(classes="table table-striped"),
+                f"reporte_{tipo}_{nivel}.html"
+            )
+            # CORRECCIÓN PYLANCE: Retornar HttpResponse puro encapsulando el texto, nunca un str directo
+            return HttpResponse(str(html_puro), content_type="text/html")
+
+        elif formato == "pdf":
+            response = ExportService.exportar_pdf_response(
+                titulo=f"Reporte Comparativo {tipo}",
+                datos_analisis={},
+                df_datos=df_reporte,
+                usuario=request.user
+            )
+            return response
+
+        elif formato == "json":
+            json_response = ExportService.exportar_json(
+                df_reporte.to_dict('records'),
+                nombre_archivo=f"reporte_comparativo_{tipo}_{nivel}.json"
+            )
+            return json_response
+
+        else:
+            
+            resultado = ReportGenerationService.generar_reporte_analisis(
+                tipo=tipo, variedad_id=variedad_id, formato=formato,
+                top_n=top_n, nivel=nivel, usuario=request.user,
+            )
+            return JsonResponse({"ok": True, "url_reporte": resultado.get("url")})
+
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)

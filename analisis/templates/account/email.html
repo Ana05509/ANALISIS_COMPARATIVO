@@ -1,0 +1,139 @@
+{% extends "analisis/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="page-header mb-4">
+    <h1>Configuración de Cuenta</h1>
+    <p>Administra las direcciones de correo electrónico asociadas a tu perfil bioinformático.</p>
+</div>
+
+<div style="display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.5rem; align-items: start; margin-bottom: 1.5rem;">
+    
+    <div class="card" style="margin-bottom: 0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div class="card-title">
+            <i class="ti ti-mail" style="color: var(--verde, #1D9E75); margin-right: 6px;"></i> Mis Direcciones de Correo
+        </div>
+        
+        {% if emailaddresses %}
+        <p class="text-muted" style="font-size: 13px; margin-top: 0.5rem;">
+            Las siguientes direcciones están vinculadas a tu cuenta. Selecciona una para gestionarla:
+        </p>
+
+        <form action="{% url 'account_email' %}" method="post" style="margin-top: 1rem;">
+            {% csrf_token %}
+            <div class="table-wrap">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px; text-align: center;">Selección</th>
+                            <th>Correo Electrónico</th>
+                            <th style="text-align: right;">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emailaddress in emailaddresses %}
+                        <tr>
+                            <td style="text-align: center; vertical-align: middle;">
+                                <input type="radio" name="email" id="email_radio_{{ forloop.counter }}" 
+                                       value="{{ emailaddress.email }}" 
+                                       {% if emailaddress.primary or emailaddresses|length == 1 %}checked="checked"{% endif %}
+                                       style="accent-color: var(--verde, #1D9E75); width: 16px; height: 16px; cursor: pointer;">
+                            </td>
+                            <td>
+                                <label for="email_radio_{{ forloop.counter }}" style="cursor: pointer; display: block;">
+                                    <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
+                                        {{ emailaddress.email }}
+                                    </strong>
+                                </label>
+                            </td>
+                            <td style="text-align: right; vertical-align: middle;">
+                                <div style="display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end;">
+                                    {% if emailaddress.verified %}
+                                        <span class="badge badge-benefico" style="white-space: nowrap;"><i class="ti ti-shield-check"></i> Verificado</span>
+                                    {% else %}
+                                        <span class="badge badge-fitopatogeno" style="white-space: nowrap;"><i class="ti ti-clock"></i> Pendiente</span>
+                                    {% endif %}
+                                    
+                                    {% if emailaddress.primary %}
+                                        <span class="badge badge-sin-clas" style="background: rgba(24, 95, 165, 0.1); color: #185FA5; border: 1px solid rgba(24, 95, 165, 0.2); white-space: nowrap;">
+                                            <i class="ti ti-star-filled"></i> Principal
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 1.5rem; flex-wrap: wrap;">
+                <button class="btn btn-primary" type="submit" name="action_primary" style="height: 38px; font-size: 13px;">
+                    <i class="ti ti-star"></i> Definir como principal
+                </button>
+                <button class="btn btn-secondary" type="submit" name="action_send" style="height: 38px; font-size: 13px; background: #fff; color: var(--text-primary); border: 1px solid var(--border-color, #e2e8f0);">
+                    <i class="ti ti-refresh"></i> Reenviar Verificación
+                </button>
+                <button class="btn btn-danger" type="submit" name="action_remove" style="height: 38px; font-size: 13px; background: #A32D2D; color: #fff; border: none; border-radius: 4px; padding: 0 12px; cursor: pointer;">
+                    <i class="ti ti-trash"></i> Eliminar
+                </button>
+            </div>
+        </form>
+        {% else %}
+        <div class="empty-state" style="padding: 2rem; text-center;">
+            <i class="ti ti-mail-off"></i>
+            <strong>Sin correos registrados</strong>
+            <p>Paradójicamente no hay correos vinculados. Añade uno a la derecha.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="card" style="margin-bottom: 0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div class="card-title">
+            <i class="ti ti-plus" style="color: var(--verde, #1D9E75); margin-right: 6px;"></i> Añadir Correo Electrónico
+        </div>
+        
+        <form style="margin-top: 1rem;" method="post" action="{% url 'account_email' %}">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label class="form-label" style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px;">
+                    Nueva dirección de correo
+                </label>
+                <input type="email" name="email" placeholder="ejemplo@correo.com" class="form-control" 
+                       style="width: 100%; height: 38px; padding: 8px 12px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 4px; font-size: 14px;" required>
+                {% if form.email.errors %}
+                    <div style="color: #A32D2D; font-size: 12px; margin-top: 4px;">
+                        {{ form.email.errors|striptags }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <button class="btn btn-primary w-100" type="submit" name="action_add" style="height: 38px; margin-top: 0.5rem;">
+                <i class="ti ti-plus"></i> Vincular Cuenta
+            </button>
+        </form>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Script opcional por si deseas lanzar advertencias interactivas antes de eliminar un correo principal
+    document.addEventListener("DOMContentLoaded", function() {
+        const deleteBtn = document.querySelector('button[name="action_remove"]');
+        if (deleteBtn) {
+            deleteBtn.addEventListener("click", function(e) {
+                const checkedRadio = document.querySelector('input[name="email"]:checked');
+                if (checkedRadio) {
+                    const isConfirm = confirm("¿Estás seguro de que deseas eliminar la dirección seleccionada?");
+                    if (!isConfirm) {
+                        e.preventDefault();
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

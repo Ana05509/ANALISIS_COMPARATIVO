@@ -13,19 +13,61 @@
 
 <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; align-items: start;">
 
-    <!-- Formulario principal -->
     <div class="card">
         <div class="card-title">Datos del archivo</div>
+        {% if form.errors %}
+        <div style="background: var(--rojo-light); color: var(--rojo); padding: 1rem; border-radius: var(--radius); margin-bottom: 1rem;">
+            <strong>Error en la carga:</strong> Por favor, verifica los campos obligatorios.
+        </div>
+        {% endif %}
 
         <form method="post" enctype="multipart/form-data" id="upload-form">
             {% csrf_token %}
 
-            <div class="form-group">
-                <label class="form-label">Nombre del producto / cultivo</label>
-                {{ form.nombre_producto }}
-                {% if form.nombre_producto.errors %}
-                    <span style="font-size:12px; color:var(--rojo);">{{ form.nombre_producto.errors.0 }}</span>
-                {% endif %}
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Código de muestra</label>
+                    {{ form.nombre_producto }}
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="cultivo">Cultivo principal</label>
+                    <select name="cultivo" id="cultivo" class="form-control" required>
+                        <option value="">Seleccione cultivo</option>
+                        {% for cultivo in cultivos %}
+                            <option value="{{ cultivo.id }}">{{ cultivo.nombre }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <input type="text" name="cultivo_manual" id="cultivo_manual" class="form-control mt-1" placeholder="Escriba un cultivo nuevo" style="display:none; margin-top: 0.5rem;">
+                    
+                    <button type="button" id="toggleCultivoBtn" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 12px; margin-top: 0.5rem;">
+                        Ingresar manualmente
+                    </button>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Localidad</label>
+                    {{ form.localidad }}
+                    {% if form.localidad.errors %}
+                        <span style="font-size:12px; color:var(--rojo);">{{ form.localidad.errors.0 }}</span>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="variedad_clon">Variedad / clon</label>
+                    <select name="variedad_clon" id="variedad_clon" class="form-control" required>
+                        <option value="">Primero seleccione un cultivo</option>
+                    </select>
+                    
+                    <input type="text" name="variedad_manual" id="variedad_manual" class="form-control mt-1" placeholder="Escriba una variedad nueva" style="display:none; margin-top: 0.5rem;">
+                    
+                    <button type="button" id="toggleVariedadBtn" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 12px; margin-top: 0.5rem;">
+                        Ingresar manualmente
+                    </button>
+                </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -34,129 +76,153 @@
                     {{ form.tipo }}
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Variedad / clon</label>
-                    {{ form.variedad }}
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div class="form-group">
                     <label class="form-label">Nivel taxonómico</label>
                     {{ form.nivel }}
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Top N microorganismos</label>
-                    {{ form.top_n }}
-                </div>
             </div>
 
-            <!-- Zona de carga de archivo -->
+            <div class="form-group">
+                <label class="form-label">Top N microorganismos</label>
+                {{ form.top_n }}
+            </div>
+
             <div class="form-group">
                 <label class="form-label">Archivo de resultados</label>
-                <div id="drop-zone" style="
-                    border: 2px dashed var(--gris-border);
-                    border-radius: var(--radius);
-                    padding: 2rem;
-                    text-align: center;
-                    cursor: pointer;
-                    transition: border-color 0.2s, background 0.2s;
-                    position: relative;
-                ">
+                <div id="drop-zone" style="border: 2px dashed var(--gris-border); border-radius: var(--radius); padding: 2rem; text-align: center; cursor: pointer; position: relative;">
                     <i class="ti ti-file-spreadsheet" style="font-size: 32px; color: var(--text-hint); display: block; margin-bottom: 0.5rem;" aria-hidden="true"></i>
-                    <p style="font-size: 14px; color: var(--text-muted);">
-                        Arrastre su archivo CSV o Excel aquí
-                    </p>
-                    <p style="font-size: 12px; color: var(--text-hint); margin-top: 4px;">
-                        Máximo 5MB — Columnas requeridas: <code style="font-family:'DM Mono',monospace;">tax_level, kingdom, phylum, class, order, family, genus, species, num_hits, %_hits</code>
-                    </p>
-                    <div id="file-name" style="margin-top: 0.75rem; font-size: 13px; font-weight: 500; color: var(--verde); display: none;"></div>
-                    <input type="file" name="archivo" id="archivo-input" accept=".csv,.tsv,.xlsx,.xls"
-                        style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;">
+                    <p style="font-size: 14px; color: var(--text-muted);">Arrastre su archivo CSV o Excel aquí</p>
+                    <input type="file" name="archivo" id="archivo-input" accept=".csv,.tsv,.xlsx,.xls" style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;">
                 </div>
-                {% if form.archivo.errors %}
-                    <span style="font-size:12px; color:var(--rojo);">{{ form.archivo.errors.0 }}</span>
-                {% endif %}
+                <div id="file-name" style="margin-top: 0.75rem; font-size: 13px; font-weight: 500; color: var(--verde); display: none;"></div>
             </div>
 
-            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 0.5rem;">
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem;">
                 <a href="{% url 'analisis:dashboard' %}" class="btn btn-outline">Cancelar</a>
                 <button type="submit" class="btn btn-primary" id="submit-btn">
-                    <i class="ti ti-player-play" aria-hidden="true"></i> Procesar archivo
+                    Procesar archivo
                 </button>
             </div>
         </form>
     </div>
 
-    <!-- Panel informativo -->
     <div style="display: flex; flex-direction: column; gap: 1rem;">
-
         <div class="card card-sm">
             <div class="card-title">Validaciones del pipeline</div>
             <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 0.5rem;">
                 {% for col in "tax_level,kingdom,phylum,class,order,family,genus,species,num_hits,%_hits"|split:"," %}
                 <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
-                    <i class="ti ti-check" style="color:var(--verde); font-size:15px;" aria-hidden="true"></i>
-                    <code style="font-family:'DM Mono',monospace; font-size:12px; background:var(--gris-light); padding:2px 6px; border-radius:4px;">{{ col }}</code>
+                    <i class="ti ti-check" style="color:var(--verde);"></i>
+                    <code>{{ col }}</code>
                 </div>
                 {% endfor %}
             </div>
-        </div>
-
-        <div class="card card-sm">
-            <div class="card-title">Clasificación funcional aplicada</div>
-            <div style="display:flex; flex-direction:column; gap:8px; margin-top:0.5rem;">
-                <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
-                    <span class="badge badge-benefico"><i class="ti ti-circle-check" aria-hidden="true"></i> Benéfico</span>
-                    <span style="color:var(--text-muted);">Base referencial 16S/ITS</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
-                    <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Fitopatógeno</span>
-                    <span style="color:var(--text-muted);">Literatura científica</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
-                    <span class="badge badge-sin-clas">Sin clasificación</span>
-                    <span style="color:var(--text-muted);">No identificado</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="card card-sm" style="border-left: 3px solid var(--amber); background: var(--amber-light);">
-            <div style="font-size:13px; font-weight:500; color: #5a3a00; margin-bottom:4px;">
-                <i class="ti ti-info-circle" aria-hidden="true"></i> Nota científica
-            </div>
-            <p style="font-size:13px; color: #5a3a00; line-height:1.6;">
-                La clasificación de Benéficos y Fitopatógenos se basa en bases de datos referenciales integradas para marcadores 16S (Bacterias) e ITS (Hongos).
-            </p>
         </div>
     </div>
 </div>
 
 <script>
-const dropZone = document.getElementById('drop-zone');
-const fileInput = document.getElementById('archivo-input');
-const fileName  = document.getElementById('file-name');
-const submitBtn = document.getElementById('submit-btn');
+    // Mostrar nombre del archivo
+    const fileInput = document.getElementById('archivo-input');
+    const fileName = document.getElementById('file-name');
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            fileName.textContent = fileInput.files[0].name;
+            fileName.style.display = 'block';
+        }
+    });
 
-fileInput.addEventListener('change', () => {
-    if (fileInput.files.length > 0) {
-        fileName.textContent = fileInput.files[0].name;
-        fileName.style.display = 'block';
-        dropZone.style.borderColor = 'var(--verde)';
-    }
-});
+    // Cargar variedades vía AJAX cuando se selecciona un cultivo
+    document.getElementById('cultivo').addEventListener('change', function() {
+        var cultivoId = this.value;
+        var variedadSelect = document.getElementById('variedad_clon');
+        
+        // Si no hay cultivo ID, reseteamos el select
+        if (!cultivoId) {
+            variedadSelect.innerHTML = '<option value="">Primero seleccione un cultivo</option>';
+            return;
+        }
 
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.background = 'var(--verde-light)'; });
-dropZone.addEventListener('dragleave', () => { dropZone.style.background = ''; });
-dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.style.background = '';
-    fileInput.files = e.dataTransfer.files;
-    fileInput.dispatchEvent(new Event('change'));
-});
+        variedadSelect.innerHTML = '<option value="">Cargando...</option>';
+        
+        // RECUERDA: Ajustar la URL si usas un app_name en tu urls.py (ej. analisis:cargar_variedades)
+        fetch(`/cargar-variedades/?cultivo_id=${cultivoId}`)
+            .then(response => response.json())
+            .then(data => {
+                variedadSelect.innerHTML = '<option value="">Seleccione variedad</option>';
+                data.variedades.forEach(function(variedad) {
+                    var option = document.createElement('option');
+                    option.value = variedad.id;
+                    option.textContent = variedad.nombre;
+                    variedadSelect.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                variedadSelect.innerHTML = '<option value="">Error al cargar variedades</option>';
+            });
+    });
 
-document.getElementById('upload-form').addEventListener('submit', () => {
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="ti ti-loader" aria-hidden="true"></i> Procesando...';
-});
+    // Botón para alternar Cultivo Manual
+    document.getElementById('toggleCultivoBtn').addEventListener('click', function() {
+        var selectCultivo = document.getElementById('cultivo');
+        var inputManualCultivo = document.getElementById('cultivo_manual');
+        
+        // Elementos de variedad
+        var selectVariedad = document.getElementById('variedad_clon');
+        var inputManualVariedad = document.getElementById('variedad_manual');
+        var btnVariedad = document.getElementById('toggleVariedadBtn');
+
+        if (inputManualCultivo.style.display === 'none') {
+            // Cambiar Cultivo a Manual
+            selectCultivo.style.display = 'none';
+            inputManualCultivo.style.display = 'block';
+            inputManualCultivo.required = true;
+            selectCultivo.required = false;
+            selectCultivo.value = ""; // Limpiar el select
+            this.textContent = 'Seleccionar de la lista';
+
+            // FORZAR Variedad a manual (ya que un cultivo nuevo no tiene variedades previas)
+            selectVariedad.style.display = 'none';
+            inputManualVariedad.style.display = 'block';
+            inputManualVariedad.required = true;
+            selectVariedad.required = false;
+            selectVariedad.value = "";
+            btnVariedad.textContent = 'Seleccionar de la lista';
+            btnVariedad.style.display = 'none'; // Ocultamos el botón para evitar confusiones
+            
+        } else {
+            // Regresar Cultivo a la lista
+            selectCultivo.style.display = 'block';
+            inputManualCultivo.style.display = 'none';
+            inputManualCultivo.required = false;
+            selectCultivo.required = true;
+            inputManualCultivo.value = ""; // Limpiar el input manual
+            this.textContent = 'Ingresar manualmente';
+
+            // Restaurar el comportamiento de Variedad
+            btnVariedad.style.display = 'inline-block';
+            selectVariedad.innerHTML = '<option value="">Primero seleccione un cultivo</option>';
+        }
+    });
+    
+    // Botón para alternar Variedad Manual
+    document.getElementById('toggleVariedadBtn').addEventListener('click', function() {
+        var selectVariedad = document.getElementById('variedad_clon');
+        var inputManual = document.getElementById('variedad_manual');
+        
+        if (inputManual.style.display === 'none') {
+            selectVariedad.style.display = 'none';
+            inputManual.style.display = 'block';
+            inputManual.required = true;
+            selectVariedad.required = false;
+            this.textContent = 'Seleccionar de la lista';
+        } else {
+            selectVariedad.style.display = 'block';
+            inputManual.style.display = 'none';
+            inputManual.required = false;
+            selectVariedad.required = true;
+            this.textContent = 'Ingresar manualmente';
+        }
+    });
 </script>
 {% endblock %}
