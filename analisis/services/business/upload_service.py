@@ -31,8 +31,14 @@ def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
 
     # 1. Parámetros básicos
     codigo_muestra = request.POST.get("nombre_producto", "").strip()
+    if not codigo_muestra:
+        raise ValueError("El código de muestra es obligatorio.")
+    
     tipo = request.POST.get("tipo", "16S").strip()
     localidad = request.POST.get("localidad", "").strip()
+    if not localidad:
+        raise ValueError("La localidad es obligatoria.")
+    
     finca_lote = request.POST.get("finca_lote", "").strip()
     altitud = float(request.POST.get("altitud") or 0.0)
 
@@ -45,42 +51,55 @@ def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
     if cultivo_manual:
         cultivo, _ = Cultivo.objects.get_or_create(nombre=cultivo_manual)
     elif cultivo_id:
-        cultivo = Cultivo.objects.get(id=cultivo_id)
+        try:
+            cultivo = Cultivo.objects.get(id=cultivo_id)
+        except Cultivo.DoesNotExist:
+            raise ValueError("El cultivo seleccionado no existe.")
     else:
         raise ValueError("Debe seleccionar o ingresar un Cultivo.")
 
     if variedad_manual:
         variedad, _ = VariedadClon.objects.get_or_create(nombre=variedad_manual, cultivo=cultivo)
     elif variedad_id:
-        variedad = VariedadClon.objects.get(id=variedad_id, cultivo=cultivo)
+        try:
+            variedad = VariedadClon.objects.get(id=variedad_id, cultivo=cultivo)
+        except VariedadClon.DoesNotExist:
+            raise ValueError("La variedad seleccionada no existe para este cultivo.")
     else:
         raise ValueError("Debe seleccionar o ingresar una Variedad/Clon.")
 
-    # 3. Pipeline
+    # 3. Pipeline: guarda todos los taxones, sin truncar
     df_raw = leer_archivo(archivo)
     pipeline = PipelineProcesamiento()
-    resultado = pipeline.procesar_archivo_df(df_raw, top_n=10, nivel="genus")
+    resultado = pipeline.procesar_archivo_df(df_raw)
 
     if not resultado or "data" not in resultado or not resultado["data"]:
-        raise ValueError("El archivo no contiene registros válidos.")
+        raise ValueError("El archivo no contiene registros válidos o el formato es incorrecto.")
 
     # 4. Persistencia
     with transaction.atomic():
         muestra, _ = MuestraSuelo.objects.update_or_create(
             codigo=codigo_muestra,
             defaults={
-                "cultivo": cultivo, "variedad_clon": variedad,
+                "cultivo": cultivo,
+                "variedad_clon": variedad,
                 "tipo_muestra": request.POST.get("tipo_muestra", "Suelo").strip(),
                 "observaciones": request.POST.get("observaciones", "").strip(),
-                "localidad": localidad, "finca_lote": finca_lote, "altitud": altitud,
+                "localidad": localidad,
+                "finca_lote": finca_lote,
+                "altitud": altitud,
             }
         )
 
         archivo.seek(0)
         ArchivoMolecular.objects.filter(muestra=muestra, tipo_analisis=tipo).delete()
-        archivo_mol = ArchivoMolecular.objects.create(muestra=muestra, tipo_analisis=tipo, archivo=archivo)
+        archivo_mol = ArchivoMolecular.objects.create(
+            muestra=muestra,
+            tipo_analisis=tipo,
+            archivo=archivo
+        )
 
-        # Volcado con mapeo flexible para evitar "Unclassified" masivo
+        # Volcado con mapeo flexible
         bulk_data = []
         for item in resultado["data"]:
             bulk_data.append(ResultadoTaxonomico(
@@ -97,4 +116,8 @@ def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
             ))
         ResultadoTaxonomico.objects.bulk_create(bulk_data)
 
-    return {"total_registros": len(resultado["data"]), "muestra_id": muestra.id, "codigo": muestra.codigo}
+    return {
+        "total_registros": len(resultado["data"]),
+        "muestra_id": muestra.id,
+        "codigo": muestra.codigo
+    }

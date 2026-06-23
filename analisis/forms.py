@@ -2,23 +2,14 @@ from django import forms
 from analisis.models import MuestraSuelo, Cultivo, VariedadClon
 
 class SubirDatosForm(forms.Form):
+    TIPO_CHOICES = [("16S", "16S (Bacterias)"), ("ITS", "ITS (Hongos)")]
+
     nombre_producto = forms.CharField(
         max_length=100,
         label="Código de muestra",
         widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: CCN51-2024-01"}),
         required=True
     )
-    
-    TIPO_CHOICES  = [("16S", "16S (Bacterias)"), ("ITS", "ITS (Hongos)")]
-    NIVEL_CHOICES = [
-        ("genus",   "Género"),
-        ("family",  "Familia"),
-        ("order",   "Orden"),
-        ("class",   "Clase"),
-        ("phylum",  "Filo"),
-        ("species", "Especie"),
-    ]
-    TOP_N_CHOICES = [(5,"Top 5"),(10,"Top 10"),(25,"Top 25"),(50,"Top 50")]
 
     localidad = forms.CharField(
         max_length=100,
@@ -34,13 +25,13 @@ class SubirDatosForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-control", "id": "id_cultivo"}),
         required=True
     )
-    
-    variedad = forms.ModelChoiceField(
-        queryset=VariedadClon.objects.none(),  # Inicialmente vacío
+
+    variedad_clon = forms.ModelChoiceField(
+        queryset=VariedadClon.objects.none(),
         label="Variedad / clon",
         empty_label="Primero seleccione un cultivo...",
         widget=forms.Select(attrs={"class": "form-control", "id": "id_variedad"}),
-        required=True
+        required=False
     )
 
     tipo = forms.ChoiceField(
@@ -48,33 +39,29 @@ class SubirDatosForm(forms.Form):
         label="Marcador molecular",
         widget=forms.Select(attrs={"class": "form-control"}),
     )
-    nivel = forms.ChoiceField(
-        choices=NIVEL_CHOICES,
-        initial="genus",
-        label="Nivel taxonómico",
-        widget=forms.Select(attrs={"class": "form-control"}),
-    )
-    top_n = forms.ChoiceField(
-        choices=TOP_N_CHOICES,
-        initial=10,
-        label="Top N",
-        widget=forms.Select(attrs={"class": "form-control"}),
-    )
-    
+
     archivo = forms.FileField(
         label="Archivo CSV / Excel",
         widget=forms.FileInput(attrs={
-            "class": "form-control", 
+            "class": "form-control",
             "accept": ".csv,.tsv,.xlsx,.xls",
             "id": "file-upload"
         }),
+        required=True
     )
 
-    def clean_top_n(self):
-        return int(self.cleaned_data.get("top_n", 10))
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get('archivo')
+        if archivo:
+            ext = archivo.name.split('.')[-1].lower()
+            if ext not in ['csv', 'tsv', 'xlsx', 'xls']:
+                raise forms.ValidationError("Formato no permitido. Use CSV, TSV o Excel.")
+            if archivo.size > 10 * 1024 * 1024:
+                raise forms.ValidationError("El archivo no puede superar los 10 MB.")
+        return archivo
+
 
 class CompararForm(forms.Form):
-    """Formulario para la selección cruzada de muestras en el laboratorio."""
     MARCADOR_CHOICES = [("16S", "16S (Bacterias)"), ("ITS", "ITS (Hongos)")]
     NIVEL_CHOICES = [
         ("genus", "Género"),
@@ -85,23 +72,24 @@ class CompararForm(forms.Form):
         ("species", "Especie"),
     ]
 
-    muestra_1 = forms.ModelChoiceField(
+    muestras = forms.ModelMultipleChoiceField(
         queryset=MuestraSuelo.objects.all().order_by("-id"),
-        label="Muestra Base A",
-        empty_label="Seleccione la primera muestra...",
-        widget=forms.Select(attrs={"class": "form-control (select2)"})
+        label="Seleccione las muestras a comparar",
+        widget=forms.SelectMultiple(attrs={
+            "class": "form-control select2",
+            "multiple": "multiple",
+            "size": "6"
+        }),
+        required=True,
+        help_text="Mantenga presionada la tecla Ctrl (Windows) o Cmd (Mac) para seleccionar varias."
     )
-    muestra_2 = forms.ModelChoiceField(
-        queryset=MuestraSuelo.objects.all().order_by("-id"),
-        label="Muestra Objetivo B",
-        empty_label="Seleccione la segunda muestra...",
-        widget=forms.Select(attrs={"class": "form-control (select2)"})
-    )
+
     marcador = forms.ChoiceField(
         choices=MARCADOR_CHOICES,
         label="Filtro de Marcador",
         widget=forms.Select(attrs={"class": "form-control"})
     )
+
     nivel = forms.ChoiceField(
         choices=NIVEL_CHOICES,
         initial="genus",
@@ -111,11 +99,9 @@ class CompararForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        m1 = cleaned_data.get("muestra_1")
-        m2 = cleaned_data.get("muestra_2")
-
-        if m1 and m2 and m1 == m2:
-            raise forms.ValidationError("No se puede realizar un análisis comparativo sobre la misma muestra de suelo.")
+        muestras = cleaned_data.get("muestras")
+        if muestras and len(muestras) < 2:
+            raise forms.ValidationError("Seleccione al menos dos muestras para comparar.")
         return cleaned_data
 
 

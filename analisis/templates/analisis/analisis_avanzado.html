@@ -7,16 +7,17 @@
 {% block content %}
 <div class="page-header">
     <h1>Análisis Avanzado de Perfiles</h1>
-    <p>Evaluación profunda de diversidad alfa · Rankings de abundancia · Ecología diferencial diferencial</p>
+    <p>Evaluación profunda de diversidad alfa · Rankings de abundancia · Ecología diferencial</p>
 </div>
 
+<!-- FILTROS -->
 <div class="card card-sm" style="margin-bottom: 1.5rem;">
     <form method="get" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
         <div>
             <label class="form-label">Marcador</label>
             <select name="tipo" class="form-control" style="width: 110px;">
                 {% for m in marcadores_disponibles %}
-                <option value="{{ m }}" {% if tipo == m %}selected{% endif %}>{{ m }}</option>
+                <option value="{{ m }}" {% if tipo_actual == m %}selected{% endif %}>{{ m }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -24,7 +25,7 @@
             <label class="form-label">Nivel Taxonómico</label>
             <select name="nivel" class="form-control" style="width: 140px;">
                 {% for n in niveles_taxonomicos %}
-                <option value="{{ n|lower }}" {% if nivel == n|lower %}selected{% endif %}>{{ n }}</option>
+                <option value="{{ n|lower }}" {% if nivel_actual == n|lower %}selected{% endif %}>{{ n }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -32,13 +33,13 @@
             <label class="form-label">Profundidad (Top N)</label>
             <select name="top_n" class="form-control" style="width: 110px;">
                 {% for opt in opciones_top_n %}
-                <option value="{{ opt }}" {% if top_n == opt %}selected{% endif %}>Top {{ opt }}</option>
+                <option value="{{ opt }}" {% if top_n_actual == opt %}selected{% endif %}>Top {{ opt }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
             <label class="form-label">ID Muestra / Producto (Opcional)</label>
-            <input type="text" name="producto_id" value="{{ producto_id|default:'' }}" placeholder="Ej: MS-004" class="form-control" style="width: 150px;">
+            <input type="text" name="producto_id" value="{{ request.GET.producto_id|default:'' }}" placeholder="Ej: MS-004" class="form-control" style="width: 150px;">
         </div>
         <button type="submit" class="btn btn-primary" style="height: 38px;">
             <i class="ti ti-refresh" aria-hidden="true"></i> Actualizar
@@ -46,38 +47,48 @@
     </form>
 </div>
 
+<!-- DIVERSIDAD ALFA (métricas) -->
 {% if diversidad %}
-<div class="metrics-grid" style="margin-bottom: 1.5rem;">
+<div class="metrics-grid" style="margin-bottom: 0.5rem;">
     <div class="metric-card verde">
         <div class="metric-label">Riqueza Específica (S)</div>
-        <div class="metric-value td-mono">{{ diversidad.riqueza }}</div>
-        <div class="metric-sub">Taxa únicos identificados</div>
+        <div class="metric-value td-mono">{{ diversidad.riqueza|default:0 }}</div>
+        <div class="metric-sub">Taxa únicos por muestra</div>
     </div>
     <div class="metric-card">
         <div class="metric-label">Índice Shannon (H')</div>
-        <div class="metric-value td-mono">{{ diversidad.shannon }}</div>
+        <div class="metric-value td-mono">{{ diversidad.shannon|default:0 }}</div>
         <div class="metric-sub">Heterogeneidad de la comunidad</div>
     </div>
     <div class="metric-card">
         <div class="metric-label">Dominancia Simpson (D)</div>
-        <div class="metric-value td-mono">{{ diversidad.simpson }}</div>
+        <div class="metric-value td-mono">{{ diversidad.simpson|default:0 }}</div>
         <div class="metric-sub">Probabilidad de similitud</div>
     </div>
     <div class="metric-card">
         <div class="metric-label">Equitatividad Pielou (J')</div>
-        <div class="metric-value td-mono">{{ diversidad.equitatividad }}</div>
+        <div class="metric-value td-mono">{{ diversidad.equitatividad|default:0 }}</div>
         <div class="metric-sub">Regularidad de abundancias</div>
     </div>
 </div>
+{% if diversidad.n_muestras %}
+<p style="font-size: 12px; color: var(--text-hint); margin-bottom: 1.5rem;">
+    <i class="ti ti-info-circle"></i>
+    Promedio de <strong>{{ diversidad.n_muestras }}</strong> muestra{{ diversidad.n_muestras|pluralize:"s" }} · calculado sobre el perfil taxonómico completo (todos los taxones)
+</p>
+{% else %}
+<div style="margin-bottom: 1.5rem;"></div>
+{% endif %}
 {% endif %}
 
+<!-- TABLA TOP MICROORGANISMOS Y DONUT -->
 {% if top_microorganismos %}
 <div style="display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.5rem; align-items: start; margin-bottom: 1.5rem;">
 
     <div class="card" style="margin-bottom: 0;">
         <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>Estructura de la Comunidad — Top {{ top_n }} por {{ nivel|capfirst }}</span>
-            <span class="{% if tipo == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo }}</span>
+            <span>Top {{ top_n_actual }} por {{ nivel_actual|capfirst }} — Comunidad Microbiana</span>
+            <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual }}</span>
         </div>
         <div class="table-wrap" style="margin-top: 1rem;">
             <table>
@@ -93,14 +104,14 @@
                     {% for item in top_microorganismos %}
                     <tr>
                         <td class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
-                        <td><strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">{{ item.taxonomia }}</strong></td>
+                        <td><strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">{{ item.taxonomia|default:item.nombre_tax }}</strong></td>
                         <td>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                    <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.porcentaje_hits|floatformat:2 }}%;"></div>
+                                    <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.total_porcentaje|floatformat:2 }}%;"></div>
                                 </div>
                                 <span class="td-mono" style="min-width: 65px; text-align: right; font-weight: 500;">
-                                    {{ item.porcentaje_hits|floatformat:4 }}%
+                                    {{ item.total_porcentaje|floatformat:4 }}%
                                 </span>
                             </div>
                         </td>
@@ -127,6 +138,74 @@
         </div>
     </div>
 </div>
+
+<!-- ============================================================ -->
+<!-- GRÁFICAS AVANZADAS (Plotly) -->
+<!-- ============================================================ -->
+{% if graficos_avanzados %}
+<div class="card" style="margin-top: 2rem;">
+    <div class="card-title">Visualización Avanzada</div>
+    <div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
+        
+        <!-- 1. Barras apiladas -->
+        {% if graficos_avanzados.grafico_barras_apiladas %}
+        <div>
+            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.5rem;">
+                <i class="ti ti-chart-bar"></i> Composición por Muestra (Barras Apiladas)
+            </h4>
+            <div id="grafico-barras-apiladas" style="height: 450px; width: 100%;"></div>
+        </div>
+        {% endif %}
+
+        <!-- 2. Heatmap -->
+        {% if graficos_avanzados.grafico_heatmap %}
+        <div>
+            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.5rem;">
+                <i class="ti ti-grid-dots"></i> Mapa de Calor (Patrones de Abundancia)
+            </h4>
+            <div id="grafico-heatmap" style="height: 500px; width: 100%;"></div>
+        </div>
+        {% endif %}
+
+        <!-- 3. PCoA Bray-Curtis -->
+        {% if graficos_avanzados.grafico_pca %}
+        <div>
+            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.5rem;">
+                <i class="ti ti-radar"></i> PCoA – Beta Diversidad (Bray-Curtis)
+            </h4>
+            <p style="font-size: 12px; color: var(--text-hint); margin: 0 0 0.5rem;">
+                Ordenación sobre distancias de Bray-Curtis. Muestras próximas comparten composición microbiana similar. Requiere ≥ 3 muestras.
+            </p>
+            <div id="grafico-pca" style="height: 450px; width: 100%;"></div>
+        </div>
+        {% elif graficos_avanzados.error_pca %}
+        <div style="font-size: 13px; color: var(--text-muted); padding: 1rem; background: var(--bg-subtle, #f8f9fa); border-radius: var(--radius);">
+            <i class="ti ti-info-circle"></i> {{ graficos_avanzados.error_pca }}
+        </div>
+        {% endif %}
+
+        <!-- 4. Shannon por muestra (barras) -->
+        {% if graficos_avanzados.grafico_boxplot %}
+        <div>
+            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.5rem;">
+                <i class="ti ti-chart-bar"></i> Shannon H' por Muestra — todos los taxones
+            </h4>
+            <p style="font-size: 12px; color: var(--text-hint); margin: 0 0 0.5rem;">
+                Calculado sobre el perfil completo de cada muestra, sin truncamiento a Top N.
+            </p>
+            <div id="grafico-boxplot" style="height: 400px; width: 100%;"></div>
+        </div>
+        {% endif %}
+
+        <!-- Errores -->
+        {% if graficos_avanzados.error %}
+        <div class="alert alert-warning">{{ graficos_avanzados.error }}</div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+<!-- ============================================================ -->
+
 {% else %}
 <div class="empty-state">
     <i class="ti ti-chart-dots" aria-hidden="true"></i>
@@ -135,6 +214,7 @@
 </div>
 {% endif %}
 
+<!-- ANÁLISIS DIFERENCIAL (Beta Diversidad) -->
 {% if analisis_diferencial %}
 <div class="card">
     <div class="card-title"><i class="ti ti-microscope"></i> Análisis y Comparación Diferencial</div>
@@ -143,28 +223,28 @@
         <div>
             <div class="metric-label" style="margin-bottom: 4px;">Índice de Similitud Jaccard</div>
             <div class="td-mono" style="font-size: 26px; font-weight: 600; color: var(--verde-dark);">
-                {{ analisis_diferencial.beta.jaccard }}
+                {{ analisis_diferencial.beta.jaccard|default:0 }}
             </div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Grado de homología entre microbiomas</div>
         </div>
         <div>
             <div class="metric-label" style="margin-bottom: 4px;">Taxa Compartidos (Core)</div>
             <div class="td-mono" style="font-size: 26px; font-weight: 600; color: #185FA5;">
-                {{ analisis_diferencial.beta.compartidos|length }}
+                {{ analisis_diferencial.beta.compartidos|default:0 }}
             </div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Unidades taxonómicas operativas comunes</div>
         </div>
         <div>
             <div class="metric-label" style="margin-bottom: 4px;">Exclusivos Muestra A</div>
             <div class="td-mono" style="font-size: 26px; font-weight: 600; color: var(--amber);">
-                {{ analisis_diferencial.beta.exclusivos.exclusivos_a|length }}
+                {{ analisis_diferencial.beta.exclusivos.exclusivos_a|length|default:0 }}
             </div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Peculiares del primer set</div>
         </div>
         <div>
             <div class="metric-label" style="margin-bottom: 4px;">Exclusivos Muestra B</div>
             <div class="td-mono" style="font-size: 26px; font-weight: 600; color: #a32d2d;">
-                {{ analisis_diferencial.beta.exclusivos.exclusivos_b|length }}
+                {{ analisis_diferencial.beta.exclusivos.exclusivos_b|length|default:0 }}
             </div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Peculiares del segundo set</div>
         </div>
@@ -172,71 +252,101 @@
     {% endif %}
 </div>
 {% endif %}
+
 {% endblock %}
 
 {% block extra_js %}
+<!-- Chart.js para el donut -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
+<!-- Plotly para gráficas avanzadas -->
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+<!-- GRÁFICO DONUT -->
 {% if top_microorganismos %}
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // 1. Inyección y parseo seguro utilizando bloques aislados en Try-Catch
     try {
-        // Usamos el filtro |safe de Django pero controlamos la inicialización en JS
         const topData = {{ top_microorganismos|safe }};
-        
-        if (!Array.isArray(topData) || topData.length === 0) {
-            console.warn("La data de microorganismos está vacía o no tiene el formato correcto.");
-            return;
-        }
-
-        const labels = topData.map(r => r.taxonomia || 'Desconocido');
-        const values = topData.map(r => parseFloat(r.porcentaje_hits || 0));
-        
-        // Paleta de colores extendida y balanceada para microbiología BioSoil
-        const colores = ['#1D9E75','#0F6E56','#085041','#BA7517','#9E6515','#185FA5','#0C447C','#A32D2D','#5F5E5A','#888780'];
-
-        const ctx = document.getElementById('chart-donut');
-        if (ctx) {
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: values,
-                        backgroundColor: colores,
-                        borderWidth: 2,
-                        borderColor: '#ffffff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                boxWidth: 10,
-                                font: { family: 'Outfit, sans-serif', size: 11 },
-                                padding: 12
-                            }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(ctx) {
-                                    const val = typeof ctx.parsed === 'number' ? ctx.parsed.toFixed(4) : ctx.parsed;
-                                    return ` ${ctx.label}: ${val}%`;
+        if (Array.isArray(topData) && topData.length > 0) {
+            const labels = topData.map(r => r.taxonomia || r.nombre_tax || 'Desconocido');
+            const values = topData.map(r => parseFloat(r.total_porcentaje || 0));
+            const colores = ['#1D9E75','#0F6E56','#085041','#BA7517','#9E6515','#185FA5','#0C447C','#A32D2D','#5F5E5A','#888780'];
+            const ctx = document.getElementById('chart-donut');
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: colores,
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Outfit, sans-serif', size: 11 }, padding: 12 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(ctx) {
+                                        const val = typeof ctx.parsed === 'number' ? ctx.parsed.toFixed(4) : ctx.parsed;
+                                        return ` ${ctx.label}: ${val}%`;
+                                    }
                                 }
                             }
-                        }
-                    },
-                    cutout: '65%' // Donut estilizado de alta legibilidad
-                }
-            });
+                        },
+                        cutout: '65%'
+                    }
+                });
+            }
         }
     } catch (err) {
-        // Evitamos que un error matemático o de inyección de JSON tumbe la ejecución de otros scripts de la página
-        console.error("Error crítico controlado al renderizar el gráfico donut de biodiversidad:", err);
+        console.error("Error en donut:", err);
+    }
+});
+</script>
+{% endif %}
+
+<!-- RENDERIZADO DE GRÁFICAS AVANZADAS (Plotly) -->
+{% if graficos_avanzados %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var graficos = {{ graficos_avanzados|safe }};
+    
+    // Barras apiladas
+    if (graficos.grafico_barras_apiladas) {
+        Plotly.newPlot('grafico-barras-apiladas', 
+            graficos.grafico_barras_apiladas.data, 
+            graficos.grafico_barras_apiladas.layout
+        );
+    }
+    
+    // Heatmap
+    if (graficos.grafico_heatmap) {
+        Plotly.newPlot('grafico-heatmap', 
+            graficos.grafico_heatmap.data, 
+            graficos.grafico_heatmap.layout
+        );
+    }
+    
+    // PCoA Bray-Curtis
+    if (graficos.grafico_pca) {
+        Plotly.newPlot('grafico-pca',
+            graficos.grafico_pca.data,
+            graficos.grafico_pca.layout
+        );
+    }
+
+    // Shannon por muestra
+    if (graficos.grafico_boxplot) {
+        Plotly.newPlot('grafico-boxplot',
+            graficos.grafico_boxplot.data,
+            graficos.grafico_boxplot.layout
+        );
     }
 });
 </script>

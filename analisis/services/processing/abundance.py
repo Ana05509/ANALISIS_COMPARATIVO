@@ -95,8 +95,8 @@ def comparar_abundancias(df_a: pd.DataFrame, df_b: pd.DataFrame, nivel: str = "g
     df_a_limpio = df_a[~df_a[campo].astype(str).str.lower().isin(CATEGORIAS_CONTROL)]
     df_b_limpio = df_b[~df_b[campo].astype(str).str.lower().isin(CATEGORIAS_CONTROL)]
 
-    serie_a = df_a_limpio.groupby(campo)["%_hits"].mean()
-    serie_b = df_b_limpio.groupby(campo)["%_hits"].mean()
+    serie_a = df_a_limpio.groupby(campo)["%_hits"].sum()
+    serie_b = df_b_limpio.groupby(campo)["%_hits"].sum()
 
     # Pylance Fix: Convertimos a diccionarios nativos para evitar el choque de tipos en .map()
     mapa_a = serie_a.to_dict()

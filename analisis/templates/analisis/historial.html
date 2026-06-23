@@ -13,7 +13,7 @@
 <div class="card card-sm" style="margin-bottom:1.25rem;">
     <form method="get" style="display:flex; gap:10px; align-items:center;">
         <input type="hidden" name="tipo" value="{{ tipo_actual }}">
-        <input type="text" name="q" value="{{ busqueda|default:'' }}" placeholder="Buscar por nombre de producto..." class="form-control" style="max-width:360px;">
+        <input type="text" name="q" value="{{ busqueda|default:'' }}" placeholder="Buscar por código de muestra..." class="form-control" style="max-width:360px;">
         <button type="submit" class="btn btn-outline btn-sm">
             <i class="ti ti-search" aria-hidden="true"></i> Buscar
         </button>
@@ -22,30 +22,36 @@
             <i class="ti ti-x" aria-hidden="true"></i> Limpiar
         </a>
         {% endif %}
-        <span style="margin-left:auto; font-size:13px; color:var(--text-hint);">{{ total_productos|default:"0" }} producto(s)</span>
+        <span style="margin-left:auto; font-size:13px; color:var(--text-hint);">{{ muestras|length }} muestra(s)</span>
     </form>
 </div>
 
 <div class="card">
-    {% if productos %}
+    {% if muestras %}
     <div class="table-wrap">
         <table>
             <thead>
                 <tr>
-                    <th>Producto / cultivo</th>
-                    <th>Variedad / clon</th>
+                    <th>Código Muestra</th>
+                    <th>Cultivo / Variedad</th>
                     <th>Marcador</th>
                     <th>Análisis</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                {% for p in productos %}
+                {% for p in muestras %}
                 <tr>
-                    <td><strong>{{ p.nombre|default:"Sin nombre" }}</strong></td>
-                    <td style="color:var(--text-muted); font-size:13px;">{{ p.variedad|default:"—" }}</td>
+                    <td><strong>{{ p.codigo|default:"Sin código" }}</strong></td>
+                    <td style="color:var(--text-muted); font-size:13px;">
+                        {{ p.cultivo.nombre|default:"—" }} / {{ p.variedad_clon.nombre|default:"—" }}
+                    </td>
                     <td>
-                        <span class="{% if p.tipo == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ p.tipo|default:"N/A" }}</span>
+                        {% with primer_archivo=p.archivos_moleculares.first %}
+                        <span class="{% if primer_archivo.tipo_analisis == '16S' %}pill-16s{% else %}pill-its{% endif %}">
+                            {{ primer_archivo.tipo_analisis|default:"N/A" }}
+                        </span>
+                        {% endwith %}
                     </td>
                     <td class="td-mono">{{ p.total_analisis|default:"0" }}</td>
                     <td>
@@ -53,7 +59,7 @@
                             <a href="{% url 'analisis:ver_producto' p.id %}" class="btn btn-outline btn-sm">
                                 <i class="ti ti-eye" aria-hidden="true"></i> Ver
                             </a>
-                            <a href="{% url 'analisis:analisis_avanzado' %}?producto_id={{ p.id }}&tipo={{ p.tipo }}" class="btn btn-outline btn-sm">
+                            <a href="{% url 'analisis:analisis_avanzado' %}?producto_id={{ p.id }}&tipo={{ tipo_actual }}" class="btn btn-outline btn-sm">
                                 <i class="ti ti-chart-dots" aria-hidden="true"></i> Analizar
                             </a>
                         </div>

@@ -118,8 +118,8 @@ class ResultadoTaxonomico(models.Model):
         verbose_name = "Resultado Taxonómico"
         verbose_name_plural = "Resultados Taxonómicos"
         indexes = [
-            models.Index(fields=['archivo', 'porcentaje_hits']),
-            models.Index(fields=['genus', 'porcentaje_hits']),
+            models.Index(fields=['archivo', 'num_hits']),
+            models.Index(fields=['genus', 'num_hits']),
         ]
 
     def __str__(self):
@@ -136,6 +136,11 @@ class CatalogoMicroorganismo(models.Model):
         ("sin_clasificar", "Sin clasificar"),
     ]
 
+    MARCADOR_CHOICES = [
+        ("16S", "Bacteria"),
+        ("ITS", "Hongo"),
+    ]
+
     nombre = models.CharField(max_length=255, db_index=True, verbose_name="Nombre Científico",
                               help_text="Ej: Bacillus")
     nivel = models.CharField(max_length=50, db_index=True, verbose_name="Nivel Taxonómico",
@@ -146,6 +151,15 @@ class CatalogoMicroorganismo(models.Model):
     referencia = models.TextField(blank=True, verbose_name="Referencia Literaria",
                                   help_text="Literatura científica que respalda la clasificación")
 
+    # Nuevo campo solo con 16S e ITS
+    marcador = models.CharField(
+        max_length=10,
+        choices=MARCADOR_CHOICES,
+        default="16S",          # valor por defecto
+        verbose_name="Marcador Molecular",
+        help_text="Región genética usada para identificación (16S o ITS)"
+    )
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['nombre', 'nivel'], name='unique_nombre_nivel')
@@ -154,8 +168,7 @@ class CatalogoMicroorganismo(models.Model):
         verbose_name_plural = "Catálogo de Microorganismos"
 
     def __str__(self):
-        return f"{self.nombre} [{self.get_clasificacion_display()}]"
-
+        return f"{self.nombre} [{self.get_clasificacion_display()}] - {self.get_marcador_display()}"
 
 # ---------------------------------
 # Modelo de Usuario Personalizado
@@ -164,9 +177,8 @@ class CatalogoMicroorganismo(models.Model):
 class Usuario(AbstractUser):
     ROLES = (
         ('admin', 'Administrador'),
-        ('tecnico', 'Técnico / Analista Especialista'),
-        ('agricultor', 'Agricultor / Productor'),
-        ('estudiante', 'Estudiante de Agronomía'),
+        ('docente', 'Docente / Investigador'),
+        ('estudiante', 'Estudiante'),
     )
 
     rol = models.CharField(

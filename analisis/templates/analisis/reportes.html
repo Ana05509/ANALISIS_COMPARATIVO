@@ -8,9 +8,36 @@
 <a href="{% url 'analisis:historial' %}" class="btn btn-outline btn-sm">
     <i class="ti ti-arrow-left" aria-hidden="true"></i> Volver al Historial
 </a>
-<button onclick="window.print()" class="btn btn-primary btn-sm">
-    <i class="ti ti-printer" aria-hidden="true"></i> Imprimir / PDF
-</button>
+
+<div style="display:flex; align-items:center; gap:6px;">
+    <label for="top-n-selector" style="font-size:12px; color:var(--text-muted); white-space:nowrap; margin:0;">
+        Top N <span style="font-size:10px; opacity:.7;">(PDF · Excel ignora este límite)</span>
+    </label>
+    <select id="top-n-selector"
+            class="form-control"
+            style="width:90px; height:32px; font-size:13px; padding:0 6px;"
+            title="Número de taxones en el PDF. El Excel exporta el perfil completo sin truncar.">
+        {% for opt in opciones_top_n %}
+        <option value="{{ opt }}" {% if top_n_actual == opt %}selected{% endif %}>Top {{ opt }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<div style="display:flex; gap:4px;" role="group" aria-label="Formato de descarga">
+    <button id="btn-pdf"
+            onclick="descargar('pdf')"
+            class="btn btn-primary btn-sm"
+            title="Descarga el reporte visual (Top N taxones) en PDF">
+        <i class="ti ti-file-pdf" aria-hidden="true"></i> PDF
+    </button>
+    <button id="btn-excel"
+            onclick="descargar('excel')"
+            class="btn btn-sm"
+            style="background:var(--verde, #16a34a); color:#fff; border:none;"
+            title="Descarga el perfil completo (~1 600 taxa) en Excel sin truncar">
+        <i class="ti ti-table-export" aria-hidden="true"></i> Excel completo
+    </button>
+</div>
 {% endblock %}
 
 {% block content %}
@@ -46,7 +73,7 @@
 </div>
 
 <div class="card">
-    <div class="card-title">Desglose Ecológico — Top {{ top_actual|default:"10" }} ({{ nivel_actual|default:"-"|capfirst }})</div>
+    <div class="card-title">Desglose Ecológico ({{ nivel_actual|default:"-"|capfirst }})</div>
     
     <div class="table-wrap" style="margin-top: 1rem;">
         <table id="tabla-reporte" style="width: 100%;">
@@ -68,14 +95,14 @@
                             {{ item.taxonomia|default:"Desconocido" }}
                         </strong>
                     </td>
-                    <td class="td-mono" style="color: var(--text-primary);">{{ item.num_hits|default:"0" }}</td>
+                    <td class="td-mono" style="color: var(--text-primary);">{{ item.total_hits|default:"0" }}</td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div style="flex: 1; height: 8px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.porcentaje_hits|default:0|floatformat:2 }}%;"></div>
+                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.total_porcentaje|default:0|floatformat:2 }}%;"></div>
                             </div>
                             <span class="td-mono" style="font-weight: 500; min-width: 60px; text-align: right;">
-                                {{ item.porcentaje_hits|default:0|floatformat:2 }}%
+                                {{ item.total_porcentaje|default:0|floatformat:2 }}%
                             </span>
                         </div>
                     </td>
@@ -101,4 +128,68 @@
     <p>No existen datos bioinformáticos procesados para estructurar este reporte.</p>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function descargar(formato) {
+        const tipo  = '{{ tipo_actual|default:"16S" }}';
+        const nivel = '{{ nivel_actual|default:"genus" }}';
+        const topN  = document.getElementById('top-n-selector').value;
+
+        const btnPdf   = document.getElementById('btn-pdf');
+        const btnExcel = document.getElementById('btn-excel');
+
+        // Bloquea ambos botones mientras genera
+        if (btnPdf)   btnPdf.disabled   = true;
+        if (btnExcel) btnExcel.disabled = true;
+
+        const btn = formato === 'pdf' ? btnPdf : btnExcel;
+        if (btn) btn.textContent = 'Generando…';
+
+        fetch("{% url 'analisis:generar_reporte' %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({ tipo, nivel, top_n: topN, formato }),
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.error || `Error al generar ${formato.toUpperCase()}`);
+                });
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a   = document.createElement('a');
+            a.href    = url;
+            const ext = formato === 'excel' ? 'xlsx' : 'pdf';
+            a.download = formato === 'excel'
+                ? `reporte_${tipo}_${nivel}_completo.${ext}`
+                : `reporte_${tipo}_${nivel}_top${topN}.${ext}`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        })
+        .catch(error => {
+            alert('Error al descargar: ' + error.message);
+            console.error(error);
+        })
+        .finally(() => {
+            if (btnPdf) {
+                btnPdf.disabled  = false;
+                btnPdf.innerHTML = '<i class="ti ti-file-pdf" aria-hidden="true"></i> PDF';
+            }
+            if (btnExcel) {
+                btnExcel.disabled  = false;
+                btnExcel.innerHTML = '<i class="ti ti-table-export" aria-hidden="true"></i> Excel completo';
+            }
+        });
+    }
+</script>
 {% endblock %}

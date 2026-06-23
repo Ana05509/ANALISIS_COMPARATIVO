@@ -14,9 +14,36 @@
 <div class="page-header">
     <h1>Composición Taxonómica</h1>
     <p>
-        Muestra ID: <span class="td-mono" style="font-weight: 600; color: var(--text-primary);">#{{ muestra_id|default:"-" }}</span> — 
+        Muestra ID: <span class="td-mono" style="font-weight: 600; color: var(--text-primary);">#{{ muestra_id|default:"-" }}</span> —
         <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span>
     </p>
+</div>
+
+<div class="card card-sm" style="margin-bottom: 1.25rem;">
+    <form method="get" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+        <div>
+            <label class="form-label">Nivel taxonómico</label>
+            <select name="nivel" class="form-control" style="width:130px;">
+                {% for n in niveles_disponibles %}
+                <option value="{{ n }}" {% if nivel_actual == n %}selected{% endif %}>{{ n|capfirst }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">
+                Top N
+                <span style="font-size:10px; color:var(--text-hint); font-weight:400;">(solo visualización)</span>
+            </label>
+            <select name="top_n" class="form-control" style="width:100px;">
+                {% for opt in opciones_top_n %}
+                <option value="{{ opt }}" {% if top_actual == opt %}selected{% endif %}>Top {{ opt }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-outline btn-sm" style="height:38px;">
+            <i class="ti ti-refresh" aria-hidden="true"></i> Aplicar
+        </button>
+    </form>
 </div>
 
 {% if resumen %}
@@ -44,7 +71,10 @@
 </div>
 
 <div class="card">
-    <div class="card-title">Distribución de Abundancia — Top {{ top_actual|default:"10" }} por {{ nivel_actual|default:"-"|capfirst }}</div>
+    <div class="card-title">
+        Top {{ top_actual }} por {{ nivel_actual|default:"-"|capfirst }}
+        <span style="font-size:11px; font-weight:400; color:var(--text-hint); margin-left:6px;">(visualización — perfil completo en BD)</span>
+    </div>
     
     <div class="table-wrap" style="margin-top: 1rem;">
         <table id="tabla-resultados">
@@ -66,14 +96,14 @@
                             {{ item.taxonomia|default:"Desconocido" }}
                         </strong>
                     </td>
-                    <td class="td-mono" style="color: var(--text-primary);">{{ item.num_hits|default:"0" }}</td>
+                    <td class="td-mono" style="color: var(--text-primary);">{{ item.total_hits|default:"0" }}</td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.porcentaje_hits|default:0|floatformat:2 }}%;"></div>
+                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.total_porcentaje|default:0|floatformat:2 }}%;"></div>
                             </div>
                             <span class="td-mono" style="font-weight: 500; min-width: 75px; text-align: right;">
-                                {{ item.porcentaje_hits|default:0|floatformat:4 }}%
+                                {{ item.total_porcentaje|default:0|floatformat:4 }}%
                             </span>
                         </div>
                     </td>

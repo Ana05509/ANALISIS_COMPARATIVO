@@ -1,33 +1,37 @@
 import json
-import os
-from pathlib import Path
-import pandas as pd
-
+import plotly.express as px
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, F, Q, Sum
 from django.shortcuts import render
+import pandas as pd
+import numpy as np
 
 from ..models import CatalogoMicroorganismo, MuestraSuelo, ResultadoTaxonomico
-from ..services.business.statistics_service import StatisticsService
-from ..services.business.visualization_service import VisualizationService
-# Import necesario para el cálculo de diversidad
-from analisis.services.processing.diversity import DiversityService
+from ..services.business.analysis_service import obtener_diversidad
 
 MARCADORES_VALIDOS = ("16S", "ITS")
 
+def convertir_a_serializable(obj):
+    """Convierte objetos no serializables (ej. ndarray) a tipos Python nativos."""
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {k: convertir_a_serializable(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [convertir_a_serializable(item) for item in obj]
+    return obj
+
 @login_required
 def dashboard(request):
-    """
-    Vista principal del dashboard de análisis microbianos.
-    """
     tipo_raw = request.GET.get("tipo", "16S")
     tipo = tipo_raw if tipo_raw in MARCADORES_VALIDOS else "16S"
     
-    # Inicialización de contexto para estadísticas
     contexto_estadisticas = {}
+    graficos_json = {}
 
     try:
+        # Consultas base
         analisis = ResultadoTaxonomico.objects.filter(
             archivo__tipo_analisis=tipo
         ).select_related("archivo__muestra__variedad_clon").order_by("-id")
@@ -37,7 +41,7 @@ def dashboard(request):
         ).select_related("cultivo", "variedad_clon").distinct().order_by("-id")
 
         total_analisis = analisis.count()
-        total_muestras  = muestras.count()
+        total_muestras = muestras.count()
 
         muestras_por_variedad = list(
             muestras.values(nombre_variedad=F("variedad_clon__nombre"))
@@ -45,22 +49,25 @@ def dashboard(request):
             .order_by("-total")
         )
 
+        # Clasificación funcional
         conteos_funcionales = ResultadoTaxonomico.objects.filter(
             archivo__tipo_analisis=tipo
         ).values("genus").annotate(total_hits=Sum("num_hits"))
 
         genera_list = [c["genus"] for c in conteos_funcionales if c["genus"]]
-        catalogos = CatalogoMicroorganismo.objects.filter(nombre__in=genera_list).values("nombre", "clasificacion")
-        cat_dict = {c["nombre"]: c["clasificacion"] for c in catalogos}
+        catalogos = CatalogoMicroorganismo.objects.filter(
+            nombre__in=genera_list
+        ).values("nombre", "clasificacion")
+        cat_dict = {c["nombre"].lower(): c["clasificacion"] for c in catalogos}
 
         total_beneficos = 0
         total_fitopatogenos = 0
         total_sin_clasificacion = 0
 
         for c in conteos_funcionales:
-            genus = c["genus"]
+            genus = c["genus"] or ""
             hits = c["total_hits"] or 0
-            clasif = cat_dict.get(genus, "sin_clasificar")
+            clasif = cat_dict.get(genus.lower(), "sin_clasificar")
             if clasif == "benefico":
                 total_beneficos += hits
             elif clasif == "fitopatogeno":
@@ -72,65 +79,63 @@ def dashboard(request):
             archivo__tipo_analisis=tipo
         ).select_related("archivo__muestra").order_by("-id")[:5]
 
-        # --- GENERACIÓN DE GRÁFICOS Y ESTADÍSTICAS ---
-        graficos_json = {}
-        try:
-            raw_data = list(ResultadoTaxonomico.objects.filter(
-                archivo__tipo_analisis=tipo
-            ).values("genus", "porcentaje_hits"))
-            
-            if raw_data:
-                df_genera = pd.DataFrame(raw_data).groupby("genus", as_index=False).sum()
-                df_genera = df_genera.sort_values(by="porcentaje_hits", ascending=False).head(15)
-                df_genera.rename(columns={"porcentaje_hits": "total_porcentaje"}, inplace=True)
+        # Diversidad alfa — por muestra individual, sobre todos los taxa
+        contexto_estadisticas = obtener_diversidad(tipo=tipo) or {}
 
-                # Cálculo de Diversidad Alfa con DiversityService
-                df_div = df_genera.rename(columns={"genus": "taxonomia", "total_porcentaje": "%_hits"})
-                contexto_estadisticas = DiversityService.calcular_diversidad_alfa(df_div)
+        # Gráficos: Top 15 géneros — grand_total sobre TODOS los taxa, no solo los 15
+        todos_hits_qs = ResultadoTaxonomico.objects.filter(
+            archivo__tipo_analisis=tipo
+        ).aggregate(grand_total=Sum('num_hits'))
+        grand_total = todos_hits_qs['grand_total'] or 1
 
-                viz = VisualizationService()
-                
-                # Gráfico de barras
-                fig_barras = viz.crear_grafico_abundancia_barras(
-                    df_genera,
-                    x="genus",
-                    y="total_porcentaje",
-                    titulo=f"Top 15 Géneros más Abundantes - {tipo}"
-                )
-                if fig_barras is not None:
-                    graficos_json["grafico_barras"] = json.loads(str(fig_barras))
-                
-                # Gráfico de pastel
-                fig_pie = viz.crear_grafico_abundancia_pie(
-                    df_genera,
-                    nombres="genus",
-                    valores="total_porcentaje",
-                    titulo=f"Distribución de Abundancia - {tipo}"
-                )
-                if fig_pie is not None:
-                    graficos_json["grafico_pie"] = json.loads(str(fig_pie))
-        
-        except Exception as e:
-            print(f"Error generando gráficos o estadísticas: {e}")
-            messages.warning(request, "No se pudieron generar algunos gráficos o estadísticas.")
+        datos_top_qs = ResultadoTaxonomico.objects.filter(
+            archivo__tipo_analisis=tipo
+        ).exclude(
+            Q(genus__isnull=True) | Q(genus='') | Q(genus='Unclassified')
+        ).values('genus').annotate(
+            total_hits=Sum('num_hits')
+        ).order_by('-total_hits')[:15]
+
+        if datos_top_qs.exists():
+            df_genera = pd.DataFrame(list(datos_top_qs))
+            df_genera['porcentaje'] = (df_genera['total_hits'] / grand_total * 100).round(5)
+            df_genera.rename(columns={'genus': 'taxonomia'}, inplace=True)
+
+            fig_bar = px.bar(
+                df_genera, x='taxonomia', y='porcentaje',
+                title=f'Top 15 Géneros - {tipo}',
+                labels={'taxonomia': 'Género', 'porcentaje': 'Abundancia relativa (%)'},
+            )
+            fig_bar.update_layout(xaxis_tickangle=-45, height=400)
+
+            fig_pie = px.pie(
+                df_genera, names='taxonomia', values='porcentaje',
+                title=f'Distribución de Abundancia - {tipo}',
+            )
+            fig_pie.update_layout(height=400)
+
+            graficos_json['grafico_barras'] = convertir_a_serializable(fig_bar.to_dict())
+            graficos_json['grafico_pie']    = convertir_a_serializable(fig_pie.to_dict())
 
     except Exception as e:
-        messages.error(request, f"Error crítico al cargar el dashboard: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        messages.error(request, f"Error crítico: {str(e)}")
         return render(request, "analisis/dashboard.html", {"error_critico": True})
 
     return render(request, "analisis/dashboard.html", {
-        "analisis":              analisis,
-        "analisis_recientes":    analisis_recientes,
-        "productos":             muestras,
-        "total_analisis":        total_analisis,
-        "total_productos":       total_muestras,
-        "total_beneficos":       total_beneficos,
-        "total_fitopatogenos":   total_fitopatogenos,
+        "analisis": analisis,
+        "analisis_recientes": analisis_recientes,
+        "productos": muestras,
+        "total_analisis": total_analisis,
+        "total_productos": total_muestras,
+        "total_beneficos": total_beneficos,
+        "total_fitopatogenos": total_fitopatogenos,
         "total_sin_clasificacion": total_sin_clasificacion,
         "productos_por_variedad": muestras_por_variedad,
-        "tipo_actual":           tipo,
+        "tipo_actual": tipo,
         "marcadores_disponibles": MARCADORES_VALIDOS,
-        "graficos_json":         json.dumps(graficos_json),
-        "estadisticas":          contexto_estadisticas, # Se pasa al contexto
-        "es_estudiante":         request.user.rol == 'estudiante',
+        "graficos_json": json.dumps(graficos_json, default=str),  # default=str asegura serialización
+        "estadisticas": contexto_estadisticas,
+        "es_estudiante": request.user.rol == 'estudiante',
     })

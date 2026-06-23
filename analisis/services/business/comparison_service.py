@@ -147,15 +147,12 @@ def ejecutar_comparacion_clean(cleaned_data):
     if not analisis.exists():
         return vacio
 
-    # Identificamos cuáles son las N taxonomías más abundantes en sumatoria global
-    df_hits = pd.DataFrame(list(
-        analisis.values(tax=F(campo_db)).annotate(total=Sum("porcentaje_hits"))
-    ))
-    
-    taxa_top = (
-        df_hits.groupby("tax")["total"].sum()
-        .sort_values(ascending=False)
-        .head(top_n).index.tolist()
+    # Top N por suma de num_hits (conteos reales) entre todas las muestras seleccionadas
+    taxa_top = list(
+        analisis.values(tax=F(campo_db))
+        .annotate(total=Sum("num_hits"))
+        .order_by("-total")
+        .values_list("tax", flat=True)[:top_n]
     )
 
     # Enviamos la totalidad de los datos pero parametrizando el 'taxa_top' para consolidar la fila 'Otros'
@@ -198,7 +195,7 @@ def obtener_microorganismos_compartidos(tipo="16S", variedad_id=None):
     if len(ids) < 2:
         return []
 
-    sets = {mid: set(qs.filter(archivo__muestra_id=mid).values_list("genus", flat=True)) for mid in ids}
+    sets = {mid: set(qs.filter(archivo__muestra_id=mid).values_list("genus", flat=True).distinct()) for mid in ids}
     return sorted(set.intersection(*sets.values()))
 
 
@@ -220,7 +217,7 @@ def obtener_microorganismos_exclusivos(tipo="16S", variedad_id=None):
         archivo__muestra__cultivo_id=cultivo_id
     )
     
-    taxa_var   = set(qs_contexto.filter(archivo__muestra__variedad_clon_id=variedad_id).values_list("genus", flat=True))
-    taxa_otros = set(qs_contexto.exclude(archivo__muestra__variedad_clon_id=variedad_id).values_list("genus", flat=True))
+    taxa_var   = set(qs_contexto.filter(archivo__muestra__variedad_clon_id=variedad_id).values_list("genus", flat=True).distinct())
+    taxa_otros = set(qs_contexto.exclude(archivo__muestra__variedad_clon_id=variedad_id).values_list("genus", flat=True).distinct())
     
     return sorted(taxa_var - taxa_otros)

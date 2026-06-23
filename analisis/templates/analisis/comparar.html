@@ -12,22 +12,16 @@
 
 <div class="card" style="margin-bottom: 1.5rem;">
     <div class="card-title">Parámetros de comparación</div>
-    <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="tipo" value="{{ tipo_actual }}">
-        
-        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end;">
+    <form method="get">
+        <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 1rem; align-items: end;">
             <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Productos / Variedades</label>
-                <div class="django-select-custom">{{ form.productos }}</div>
+                <label class="form-label">Seleccione muestras</label>
+                {{ form.muestras }}
+                <small style="color: var(--text-hint); font-size: 12px;">Seleccione al menos dos muestras (Ctrl+clic)</small>
             </div>
             <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">Nivel Taxonómico</label>
                 {{ form.nivel }}
-            </div>
-            <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Top N</label>
-                {{ form.top_n }}
             </div>
             <button type="submit" class="btn btn-primary" style="height: 38px;">
                 <i class="ti ti-arrows-diff" aria-hidden="true"></i> Comparar
@@ -36,23 +30,23 @@
     </form>
 </div>
 
-{% if tabla %}
+{% if tabla_comparativa %}
 <div class="metrics-grid">
     <div class="metric-card">
         <div class="metric-label">Taxa comparados</div>
-        <div class="metric-value">{{ total_taxonomias }}</div>
+        <div class="metric-value td-mono">{{ total_taxonomias }}</div>
     </div>
     <div class="metric-card">
-        <div class="metric-label">Promedio %_hits</div>
-        <div class="metric-value td-mono">{{ promedio_hits }}</div>
+        <div class="metric-label">Taxa Compartidos</div>
+        <div class="metric-value td-mono">{{ pct_compartidos|floatformat:1 }}%</div>
     </div>
     <div class="metric-card verde">
         <div class="metric-label">Benéficos ✅</div>
-        <div class="metric-value">{{ total_beneficos }}</div>
+        <div class="metric-value td-mono">{{ conteo_clasificaciones.benefico }}</div>
     </div>
     <div class="metric-card amber">
         <div class="metric-label">Fitopatógenos ⚠️</div>
-        <div class="metric-value">{{ total_fitopatogenos }}</div>
+        <div class="metric-value td-mono">{{ conteo_clasificaciones.fitopatogeno }}</div>
     </div>
 </div>
 
@@ -101,9 +95,9 @@
 {% endif %}
 
 <div class="card">
-    <div class="card-title">Tabla comparativa — Top {{ top_actual }} por {{ nivel_actual }}</div>
+    <div class="card-title">Tabla comparativa por {{ nivel_actual|capfirst }}</div>
     <div style="margin-bottom: 0.75rem; font-size: 13px; color: var(--text-muted);">
-        Taxón más abundante en el set: <strong style="color: var(--verde-dark); font-family: 'DM Mono', monospace;">{{ top_taxonomia }}</strong>
+        Taxón más abundante en el set: <strong style="color: var(--verde-dark); font-family: 'DM Mono', monospace;">{{ top_taxonomia|default:"—" }}</strong>
     </div>
     
     <div class="table-wrap">
@@ -111,16 +105,18 @@
             <thead>
                 <tr>
                     <th>Taxonomía</th>
-                    {% for key in tabla.0.keys %}
-                        {% if key != 'taxonomia' and key != 'clasificacion' %}
-                        <th>{{ key }}</th>
-                        {% endif %}
-                    {% endfor %}
+                    {% if tabla_comparativa %}
+                        {% for key in tabla_comparativa.0.keys %}
+                            {% if key != 'taxonomia' and key != 'clasificacion' %}
+                            <th>{{ key }}</th>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
                     <th>Clasificación</th>
                 </tr>
             </thead>
             <tbody>
-                {% for fila in tabla %}
+                {% for fila in tabla_comparativa %}
                 <tr>
                     <td class="td-mono" style="font-weight: 500; color: var(--text-primary);">{{ fila.taxonomia }}</td>
                     {% for key, val in fila.items %}
@@ -165,18 +161,15 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // 1. Forzar de forma dinámica que los inputs de Django adopten los estilos de BioSoil
     const inputsForm = document.querySelectorAll('.card form select, .card form input[type="number"], .card form input[type="text"]');
     inputsForm.forEach(el => {
         el.classList.add('form-control');
     });
 
-    {% if tabla %}
-    // 2. Construcción segura del gráfico (Try-Catch y validación estricta)
+    {% if tabla_comparativa %}
     try {
         const tablaData = {{ tabla_json|safe }};
         
-        // Prevención de inyección vacía o malformada
         if (!Array.isArray(tablaData) || tablaData.length === 0) {
             console.warn("Datos comparativos insuficientes para renderizar el gráfico.");
             return;
@@ -185,7 +178,6 @@ document.addEventListener("DOMContentLoaded", function() {
         const labels = tablaData.map(r => r.taxonomia || 'Desconocido');
         const productos = Object.keys(tablaData[0] || {}).filter(k => k !== 'taxonomia' && k !== 'clasificacion');
         
-        // Colores corporativos extraídos de tu :root
         const vDark  = getComputedStyle(document.documentElement).getPropertyValue('--verde-dark').trim() || '#085041';
         const verde  = getComputedStyle(document.documentElement).getPropertyValue('--verde').trim() || '#1D9E75';
         const amber  = getComputedStyle(document.documentElement).getPropertyValue('--amber').trim() || '#BA7517';
@@ -196,7 +188,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const datasets = productos.map((p, i) => ({
             label: p,
             data: tablaData.map(r => parseFloat(r[p] || 0).toFixed(4)),
-            backgroundColor: colores[i % colores.length] + 'BB', // Agrega opacidad suave alpha
+            backgroundColor: colores[i % colores.length] + 'BB',
             borderColor: colores[i % colores.length],
             borderWidth: 1.5,
             borderRadius: 4

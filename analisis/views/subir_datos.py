@@ -11,17 +11,16 @@ MARCADORES_VALIDOS = ("16S", "ITS")
 
 @login_required
 def subir_datos(request):
-    if request.user.rol in ['estudiante', 'agricultor']:
-        messages.error(request, "Su nivel de cuenta no dispone de permisos para inyectar datos al pipeline molecular.")
+    if request.user.rol == 'estudiante':
+        messages.error(request, "Su nivel de cuenta no dispone de permisos para cargar datos moleculares.")
         return redirect("analisis:dashboard")
 
     if request.method == "POST":
-        # Obtener el cultivo seleccionado para filtrar variedades
         cultivo_id = request.POST.get('cultivo')
-        # Crear formulario con los datos recibidos
+        variedad_manual = request.POST.get('variedad_manual', '').strip()
         form = SubirDatosForm(request.POST, request.FILES)
-        
-        # Actualizar el queryset del campo variedad_clon según el cultivo seleccionado
+
+        # Actualizar queryset de variedad_clon según cultivo
         if cultivo_id:
             try:
                 cultivo = Cultivo.objects.get(id=cultivo_id)
@@ -31,25 +30,44 @@ def subir_datos(request):
         else:
             form.fields['variedad_clon'].queryset = VariedadClon.objects.none()
 
+        # Manejo de variedad manual
+        if variedad_manual and cultivo_id:
+            try:
+                cultivo = Cultivo.objects.get(id=cultivo_id)
+                variedad, created = VariedadClon.objects.get_or_create(
+                    nombre=variedad_manual,
+                    cultivo=cultivo,
+                    defaults={'descripcion': 'Creada manualmente desde la subida'}
+                )
+                if form.is_valid():
+                    form.cleaned_data['variedad_clon'] = variedad
+                else:
+                    form.data = form.data.copy()
+                    form.data['variedad_clon'] = variedad.id
+                if created:
+                    messages.info(request, f"Variedad '{variedad_manual}' creada automáticamente.")
+            except Cultivo.DoesNotExist:
+                messages.error(request, "El cultivo seleccionado no existe.")
+                return redirect("analisis:subir_datos")
+
         if form.is_valid():
             try:
                 localidad_limpia = form.cleaned_data.get("localidad")
                 resultado = procesar_upload(request)
                 messages.success(
                     request,
-                    f"Archivo de la localidad de {localidad_limpia} procesado correctamente. {resultado.get('total_registros', 0)} registros importados al sistema."
+                    f"Archivo de {localidad_limpia} procesado. {resultado.get('total_registros', 0)} registros importados."
                 )
                 return redirect("analisis:dashboard")
             except ValueError as e:
-                messages.error(request, f"Error de validación en la estructura de la data: {str(e)}")
+                messages.error(request, f"Error de validación: {str(e)}")
             except Exception as e:
-                messages.error(request, f"Error al procesar el archivo secuencial: {str(e)}")
+                messages.error(request, f"Error al procesar: {str(e)}")
         else:
             for field, errors in form.errors.items():
                 for error in errors:
                     messages.warning(request, f"Revisa el campo '{field}': {error}")
 
-        # En caso de error, volver a mostrar el formulario con los cultivos y marcadores
         cultivos = Cultivo.objects.all()
         return render(request, "analisis/subir_datos.html", {
             "form": form,
@@ -57,9 +75,8 @@ def subir_datos(request):
             "cultivos": cultivos,
         })
 
-    # Método GET
+    # GET
     form = SubirDatosForm()
-    # Inicializar el queryset de variedad_clon vacío (el JavaScript lo llenará)
     form.fields['variedad_clon'].queryset = VariedadClon.objects.none()
     cultivos = Cultivo.objects.all()
     return render(request, "analisis/subir_datos.html", {
@@ -68,6 +85,7 @@ def subir_datos(request):
         "cultivos": cultivos,
     })
 
+@login_required
 def cargar_variedades(request):
     cultivo_id = request.GET.get('cultivo_id')
     if cultivo_id:

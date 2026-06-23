@@ -31,8 +31,48 @@
 </div>
 {% endif %}
 
+<!-- Formulario de filtros -->
 <div class="card card-sm" style="margin-bottom: 1.5rem;">
-    </div>
+    <form method="get" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+        <div>
+            <label class="form-label">Buscar</label>
+            <input type="text" name="busqueda" value="{{ busqueda|default:'' }}" placeholder="Ej: Bacillus" class="form-control" style="width: 180px;">
+        </div>
+        <div>
+            <label class="form-label">Marcador</label>
+            <select name="filtro_marcador" class="form-control" style="width: 110px;">
+                <option value="">Todos</option>
+                {% for m in marcadores_disponibles %}
+                <option value="{{ m }}" {% if filtro_marcador == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Clasificación</label>
+            <select name="filtro_clasificacion" class="form-control" style="width: 140px;">
+                <option value="">Todas</option>
+                {% for clave, etiqueta in clasificaciones_disponibles %}
+                <option value="{{ clave }}" {% if filtro_clasificacion == clave %}selected{% endif %}>{{ etiqueta }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Nivel</label>
+            <select name="filtro_nivel" class="form-control" style="width: 110px;">
+                <option value="">Todos</option>
+                {% for n in niveles_taxonomicos %}
+                <option value="{{ n }}" {% if filtro_nivel == n %}selected{% endif %}>{{ n|capfirst }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary" style="height: 38px;">
+            <i class="ti ti-filter" aria-hidden="true"></i> Filtrar
+        </button>
+        <a href="{% url 'analisis:catalogo' %}" class="btn btn-outline" style="height: 38px;">
+            <i class="ti ti-x" aria-hidden="true"></i> Limpiar
+        </a>
+    </form>
+</div>
 
 <div class="card">
     {% if microorganismos %}
@@ -92,16 +132,59 @@
     <div class="empty-state">
         <i class="ti ti-search" aria-hidden="true"></i>
         <strong>Sin coincidencias en el catálogo</strong>
+        <p>No se encontraron microorganismos con los filtros seleccionados.</p>
     </div>
     {% endif %}
 </div>
 
 {% if request.user.is_staff %}
-<div id="modal-overlay" style="display: none; ...">
+<!-- Modal para reclasificar (simple) -->
+<div id="modal-overlay" style="display: none; position: fixed; inset:0; background: rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000;">
+    <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 400px; width: 100%;">
+        <h3 style="margin-bottom: 1rem;">Reclasificar</h3>
+        <p><strong>Taxón:</strong> <span id="modal-taxon"></span></p>
+        <form id="form-reclasificar" method="post" action="">
+            {% csrf_token %}
+            <div class="form-group">
+                <label class="form-label">Nueva clasificación</label>
+                <select name="clasificacion" class="form-control" required>
+                    <option value="benefico">Benéfico</option>
+                    <option value="fitopatogeno">Fitopatógeno</option>
+                    <option value="neutral">Neutral</option>
+                    <option value="sin_clasificar">Sin clasificar</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem;">
+                <button type="button" class="btn btn-outline" onclick="cerrarModal()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Guardar</button>
+            </div>
+        </form>
     </div>
+</div>
 
 <script>
-    // ... (Tu lógica JavaScript existente) ...
+    function abrirReclasificar(id, taxon, clasificacionActual) {
+        const overlay = document.getElementById('modal-overlay');
+        overlay.style.display = 'flex';
+        document.getElementById('modal-taxon').textContent = taxon;
+        const form = document.getElementById('form-reclasificar');
+        form.action = "{% url 'analisis:reclasificar' 0 %}".replace('0', id);
+        // Seleccionar la opción actual en el select
+        const select = form.querySelector('select[name="clasificacion"]');
+        for (let opt of select.options) {
+            if (opt.value === clasificacionActual) {
+                opt.selected = true;
+                break;
+            }
+        }
+    }
+    function cerrarModal() {
+        document.getElementById('modal-overlay').style.display = 'none';
+    }
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('modal-overlay').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModal();
+    });
 </script>
 {% endif %}
 {% endblock %}

@@ -1,9 +1,12 @@
 # analisis/views/catalogo.py
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo
 from analisis.services.business.catalog_service import CatalogService
+from analisis.forms import CatalogoImportarForm
 
+@login_required
 def catalogo_microorganismos(request):
     """
     Vista principal del catálogo con filtros persistentes y 
@@ -73,6 +76,7 @@ def detalle_microorganismo(request, pk):
     return render(request, "analisis/detalle_producto.html", context)
 
 
+@login_required
 def actualizar_clasificacion(request, pk):
     """
     Vista para reescribir o corregir manualmente un rol en el catálogo.
@@ -80,10 +84,47 @@ def actualizar_clasificacion(request, pk):
     if request.method == "POST":
         nueva_clasificacion = request.POST.get("clasificacion")
         microorganismo = get_object_or_404(CatalogoMicroorganismo, pk=pk)
-        
+
         if nueva_clasificacion in ['benefico', 'fitopatogeno', 'neutral', 'sin_clasificar']:
             microorganismo.clasificacion = nueva_clasificacion
             microorganismo.save()
             messages.success(request, "Clasificación actualizada correctamente.")
-            
-    return redirect('catalogo_microorganismos')
+
+    return redirect('analisis:catalogo')
+
+
+@login_required
+def importar_catalogo(request):
+    """
+    Procesa la importación masiva de microorganismos desde CSV/Excel.
+    Solo disponible para usuarios staff.
+    """
+    if not request.user.is_staff:
+        messages.error(request, "No tiene permisos para realizar esta acción.")
+        return redirect('analisis:catalogo')
+
+    if request.method == 'POST':
+        form = CatalogoImportarForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                creados, actualizados, errores = CatalogService.importar_desde_archivo(
+                    form.cleaned_data['archivo']
+                )
+                resumen = f"{creados} creados, {actualizados} actualizados"
+                if errores:
+                    messages.warning(
+                        request,
+                        f"Importación parcial: {resumen}. {errores} filas omitidas por datos inválidos."
+                    )
+                else:
+                    messages.success(request, f"Importación exitosa: {resumen}.")
+            except ValueError as e:
+                messages.error(request, str(e))
+            except Exception as e:
+                messages.error(request, f"Error al procesar el archivo: {e}")
+        else:
+            for field_errors in form.errors.values():
+                for error in field_errors:
+                    messages.error(request, error)
+
+    return redirect('analisis:catalogo')

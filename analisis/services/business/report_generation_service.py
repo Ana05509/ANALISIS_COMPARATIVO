@@ -28,16 +28,21 @@ class ReportGenerationService:
             qs = qs.filter(archivo__muestra__variedad_clon_id=variedad_id)
         if not qs.exists():
             return pd.DataFrame()
+
+        # grand_total desde TODOS los taxa antes del slice
+        grand_total = qs.aggregate(total=Sum("num_hits"))["total"] or 1
+
         data = list(
             qs.values(tax=F(campo_db))
-            .annotate(total_num_hits=Sum("num_hits"), total_porcentaje=Sum("porcentaje_hits"))
-            .order_by("-total_porcentaje")[:top_n]
+            .annotate(total_num_hits=Sum("num_hits"))
+            .order_by("-total_num_hits")[:top_n]
         )
         if not data:
             return pd.DataFrame()
         df = pd.DataFrame(data)
-        df.rename(columns={"total_num_hits": "num_hits", "total_porcentaje": "porcentaje_hits"}, inplace=True)
-        df["porcentaje_hits"] = df["porcentaje_hits"].round(5)
+        df.rename(columns={"total_num_hits": "num_hits"}, inplace=True)
+        # porcentaje_hits recalculado sobre grand_total real (no suma de porcentajes)
+        df["porcentaje_hits"] = (df["num_hits"] / grand_total * 100).round(5)
         lista_taxones = df["tax"].dropna().unique().tolist()
         catalogo_map = {
             obj["nombre"].lower(): obj["clasificacion"]

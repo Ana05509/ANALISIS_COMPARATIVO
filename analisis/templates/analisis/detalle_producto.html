@@ -1,6 +1,6 @@
 {% extends "analisis/base.html" %}
 
-{% block title %}{{ producto.nombre }}{% endblock %}
+{% block title %}Detalle de Muestra {{ producto.codigo }}{% endblock %}
 {% block nav_historial %}active{% endblock %}
 {% block topbar_title %}Detalle del Producto{% endblock %}
 
@@ -9,7 +9,7 @@
     <i class="ti ti-arrow-left" aria-hidden="true"></i> Historial
 </a>
 {% if request.user.is_staff %}
-<a href="{% url 'analisis:analisis_avanzado' %}?producto_id={{ producto.id }}&tipo={{ producto.tipo }}" class="btn btn-primary btn-sm">
+<a href="{% url 'analisis:analisis_avanzado' %}?producto_id={{ producto.id }}&tipo={{ tipo_actual }}" class="btn btn-primary btn-sm">
     <i class="ti ti-chart-dots" aria-hidden="true"></i> Analizar Perfil
 </a>
 {% endif %}
@@ -17,10 +17,10 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>{{ producto.nombre }}</h1>
+    <h1>{{ producto.codigo }}</h1>
     <p>
-        Marcador Secuenciado: <span class="{% if producto.tipo == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ producto.tipo }}</span>
-        {% if producto.variedad %} — <span style="color: var(--text-muted); font-weight: 500;">{{ producto.variedad }}</span>{% endif %}
+        Marcador Secuenciado: <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span>
+        {% if producto.variedad_clon %} — <span style="color: var(--text-muted); font-weight: 500;">{{ producto.variedad_clon.nombre }}</span>{% endif %}
     </p>
 </div>
 
@@ -44,7 +44,12 @@
 </div>
 
 <div class="card">
-    <div class="card-title">Composición y Microorganismos Identificados</div>
+    <div class="card-title">
+        Top {{ display_limit }} por Abundancia — Microorganismos Identificados
+        <span style="font-size:11px; font-weight:400; color:var(--text-hint); margin-left:6px;">
+            (visualización · {{ total_analisis }} taxa totales en BD)
+        </span>
+    </div>
 
     {% if analisis %}
     <div class="table-wrap" style="margin-top: 1rem;">
@@ -65,11 +70,14 @@
                     <td class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
                     <td>
                         <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
-                            {{ a.taxonomia|default:"Desconocido" }}
+                            {{ a.genus|default:"Desconocido" }}
                         </strong>
+                        {% if a.species and a.species != 'Unclassified' %}
+                        <span style="color: var(--text-muted); font-size: 13px; font-style: italic;">{{ a.species }}</span>
+                        {% endif %}
                     </td>
-                    <td style="font-size: 12px; color: var(--text-muted); text-transform: capitalize;">{{ a.nivel|default:"-" }}</td>
-                    <td class="td-mono" style="color: var(--text-primary); layout: fixed;">{{ a.num_hits|default:"0" }}</td>
+                    <td style="font-size: 12px; color: var(--text-muted); text-transform: capitalize;">Género</td>
+                    <td class="td-mono" style="color: var(--text-primary);">{{ a.num_hits|default:"0" }}</td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">

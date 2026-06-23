@@ -70,20 +70,9 @@
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div class="form-group">
-                    <label class="form-label">Marcador molecular</label>
-                    {{ form.tipo }}
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Nivel taxonómico</label>
-                    {{ form.nivel }}
-                </div>
-            </div>
-
             <div class="form-group">
-                <label class="form-label">Top N microorganismos</label>
-                {{ form.top_n }}
+                <label class="form-label">Marcador molecular</label>
+                {{ form.tipo }}
             </div>
 
             <div class="form-group">
@@ -107,9 +96,9 @@
 
     <div style="display: flex; flex-direction: column; gap: 1rem;">
         <div class="card card-sm">
-            <div class="card-title">Validaciones del pipeline</div>
+            <div class="card-title">Columnas requeridas en el archivo</div>
             <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 0.5rem;">
-                {% for col in "tax_level,kingdom,phylum,class,order,family,genus,species,num_hits,%_hits"|split:"," %}
+                {% for col in "kingdom,phylum,class,order,family,genus,species,num_hits,%_hits"|split:"," %}
                 <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
                     <i class="ti ti-check" style="color:var(--verde);"></i>
                     <code>{{ col }}</code>
@@ -117,11 +106,19 @@
                 {% endfor %}
             </div>
         </div>
+
+        <div class="card card-sm" style="border-left: 3px solid var(--verde);">
+            <div class="card-title" style="font-size: 13px;">Carga completa</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin: 0.25rem 0 0;">
+                Se guardan <strong>todos los taxones</strong> del archivo sin truncamiento.
+                El filtrado Top N se aplica únicamente en la visualización del análisis.
+            </p>
+        </div>
     </div>
 </div>
 
 <script>
-    // Mostrar nombre del archivo
+    // Mostrar nombre del archivo al cargar
     const fileInput = document.getElementById('archivo-input');
     const fileName = document.getElementById('file-name');
     fileInput.addEventListener('change', () => {
@@ -131,12 +128,11 @@
         }
     });
 
-    // Cargar variedades vía AJAX cuando se selecciona un cultivo
+    // Cargar variedades vía AJAX cuando se selecciona un cultivo existente
     document.getElementById('cultivo').addEventListener('change', function() {
         var cultivoId = this.value;
         var variedadSelect = document.getElementById('variedad_clon');
         
-        // Si no hay cultivo ID, reseteamos el select
         if (!cultivoId) {
             variedadSelect.innerHTML = '<option value="">Primero seleccione un cultivo</option>';
             return;
@@ -144,7 +140,7 @@
 
         variedadSelect.innerHTML = '<option value="">Cargando...</option>';
         
-        // RECUERDA: Ajustar la URL si usas un app_name en tu urls.py (ej. analisis:cargar_variedades)
+        // AJAX para traer las variedades dependientes
         fetch(`/cargar-variedades/?cultivo_id=${cultivoId}`)
             .then(response => response.json())
             .then(data => {
@@ -162,12 +158,11 @@
             });
     });
 
-    // Botón para alternar Cultivo Manual
+    // Botón para alternar Cultivo Manual / Lista
     document.getElementById('toggleCultivoBtn').addEventListener('click', function() {
         var selectCultivo = document.getElementById('cultivo');
         var inputManualCultivo = document.getElementById('cultivo_manual');
         
-        // Elementos de variedad
         var selectVariedad = document.getElementById('variedad_clon');
         var inputManualVariedad = document.getElementById('variedad_manual');
         var btnVariedad = document.getElementById('toggleVariedadBtn');
@@ -178,34 +173,39 @@
             inputManualCultivo.style.display = 'block';
             inputManualCultivo.required = true;
             selectCultivo.required = false;
-            selectCultivo.value = ""; // Limpiar el select
+            selectCultivo.value = ""; 
             this.textContent = 'Seleccionar de la lista';
 
-            // FORZAR Variedad a manual (ya que un cultivo nuevo no tiene variedades previas)
+            // Si el cultivo es NUEVO, la variedad OBLIGATORIAMENTE debe ser manual
             selectVariedad.style.display = 'none';
             inputManualVariedad.style.display = 'block';
             inputManualVariedad.required = true;
             selectVariedad.required = false;
             selectVariedad.value = "";
             btnVariedad.textContent = 'Seleccionar de la lista';
-            btnVariedad.style.display = 'none'; // Ocultamos el botón para evitar confusiones
+            btnVariedad.style.display = 'none'; // Ocultar para evitar errores lógicos
             
         } else {
-            // Regresar Cultivo a la lista
+            // Regresar Cultivo a la lista seleccionable
             selectCultivo.style.display = 'block';
             inputManualCultivo.style.display = 'none';
             inputManualCultivo.required = false;
             selectCultivo.required = true;
-            inputManualCultivo.value = ""; // Limpiar el input manual
+            inputManualCultivo.value = ""; 
             this.textContent = 'Ingresar manualmente';
 
-            // Restaurar el comportamiento de Variedad
+            // Restaurar el comportamiento estándar de Variedad
             btnVariedad.style.display = 'inline-block';
+            selectVariedad.style.display = 'block';
+            inputManualVariedad.style.display = 'none';
+            inputManualVariedad.required = false;
+            selectVariedad.required = true;
             selectVariedad.innerHTML = '<option value="">Primero seleccione un cultivo</option>';
+            btnVariedad.textContent = 'Ingresar manualmente';
         }
     });
     
-    // Botón para alternar Variedad Manual
+    // Botón para alternar Variedad Manual / Lista (Solo cuando el cultivo existe en la lista)
     document.getElementById('toggleVariedadBtn').addEventListener('click', function() {
         var selectVariedad = document.getElementById('variedad_clon');
         var inputManual = document.getElementById('variedad_manual');
