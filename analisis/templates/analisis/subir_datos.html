@@ -15,6 +15,7 @@
 
     <div class="card">
         <div class="card-title">Datos del archivo</div>
+
         {% if form.errors %}
         <div style="background: var(--rojo-light); color: var(--rojo); padding: 1rem; border-radius: var(--radius); margin-bottom: 1rem;">
             <strong>Error en la carga:</strong> Por favor, verifica los campos obligatorios.
@@ -29,7 +30,7 @@
                     <label class="form-label">Código de muestra</label>
                     {{ form.nombre_producto }}
                 </div>
-                
+
                 <div class="form-group">
                     <label class="form-label" for="cultivo">Cultivo principal</label>
                     <select name="cultivo" id="cultivo" class="form-control" required>
@@ -38,9 +39,7 @@
                             <option value="{{ cultivo.id }}">{{ cultivo.nombre }}</option>
                         {% endfor %}
                     </select>
-
-                    <input type="text" name="cultivo_manual" id="cultivo_manual" class="form-control mt-1" placeholder="Escriba un cultivo nuevo" style="display:none; margin-top: 0.5rem;">
-                    
+                    <input type="text" name="cultivo_manual" id="cultivo_manual" class="form-control" placeholder="Escriba un cultivo nuevo" style="display:none; margin-top: 0.5rem;">
                     <button type="button" id="toggleCultivoBtn" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 12px; margin-top: 0.5rem;">
                         Ingresar manualmente
                     </button>
@@ -55,15 +54,13 @@
                         <span style="font-size:12px; color:var(--rojo);">{{ form.localidad.errors.0 }}</span>
                     {% endif %}
                 </div>
-                
+
                 <div class="form-group">
                     <label class="form-label" for="variedad_clon">Variedad / clon</label>
                     <select name="variedad_clon" id="variedad_clon" class="form-control" required>
                         <option value="">Primero seleccione un cultivo</option>
                     </select>
-                    
-                    <input type="text" name="variedad_manual" id="variedad_manual" class="form-control mt-1" placeholder="Escriba una variedad nueva" style="display:none; margin-top: 0.5rem;">
-                    
+                    <input type="text" name="variedad_manual" id="variedad_manual" class="form-control" placeholder="Escriba una variedad nueva" style="display:none; margin-top: 0.5rem;">
                     <button type="button" id="toggleVariedadBtn" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 12px; margin-top: 0.5rem;">
                         Ingresar manualmente
                     </button>
@@ -75,20 +72,49 @@
                 {{ form.tipo }}
             </div>
 
+            <!-- ─── Zona de arrastre ─────────────────────────────────── -->
             <div class="form-group">
                 <label class="form-label">Archivo de resultados</label>
-                <div id="drop-zone" style="border: 2px dashed var(--gris-border); border-radius: var(--radius); padding: 2rem; text-align: center; cursor: pointer; position: relative;">
-                    <i class="ti ti-file-spreadsheet" style="font-size: 32px; color: var(--text-hint); display: block; margin-bottom: 0.5rem;" aria-hidden="true"></i>
-                    <p style="font-size: 14px; color: var(--text-muted);">Arrastre su archivo CSV o Excel aquí</p>
-                    <input type="file" name="archivo" id="archivo-input" accept=".csv,.tsv,.xlsx,.xls" style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;">
+
+                <div id="drop-zone" class="drop-zone" role="button" tabindex="0" aria-label="Zona de carga de archivos">
+                    <i class="ti ti-file-spreadsheet drop-zone__icon" id="dz-icon" aria-hidden="true"></i>
+                    <p class="drop-zone__title" id="dz-title">Arrastre su archivo aquí</p>
+                    <p class="drop-zone__sub">o <span class="drop-zone__link">haga clic para seleccionar</span></p>
+                    <p class="drop-zone__hint">CSV · TSV · XLSX — máx. 10 MB</p>
+                    <input type="file" name="archivo" id="archivo-input"
+                           accept=".csv,.tsv,.xlsx,.xls"
+                           style="position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;">
                 </div>
-                <div id="file-name" style="margin-top: 0.75rem; font-size: 13px; font-weight: 500; color: var(--verde); display: none;"></div>
+
+                <!-- Previsualización del archivo seleccionado -->
+                <div id="file-preview" class="file-preview" style="display:none;" aria-live="polite">
+                    <i class="ti ti-file-check file-preview__icon" aria-hidden="true"></i>
+                    <div class="file-preview__info">
+                        <span id="fp-name" class="file-preview__name"></span>
+                        <span id="fp-size" class="file-preview__size"></span>
+                    </div>
+                    <button type="button" id="remove-file" class="file-preview__remove" title="Quitar archivo" aria-label="Quitar archivo">
+                        <i class="ti ti-x" aria-hidden="true"></i>
+                    </button>
+                </div>
             </div>
 
-            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem;">
-                <a href="{% url 'analisis:dashboard' %}" class="btn btn-outline">Cancelar</a>
-                <button type="submit" class="btn btn-primary" id="submit-btn">
-                    Procesar archivo
+            <!-- ─── Barra de progreso ────────────────────────────────── -->
+            <div id="progress-section" style="display:none;" aria-live="polite" aria-label="Estado de carga">
+                <div class="progress-header">
+                    <span id="progress-label" class="progress-label">Subiendo archivo…</span>
+                    <span id="progress-pct" class="progress-pct">0%</span>
+                </div>
+                <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-track">
+                    <div id="progress-bar" class="progress-bar"></div>
+                </div>
+                <p id="progress-sub" class="progress-sub">Transfiriendo datos al servidor…</p>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1.25rem;">
+                <a href="{% url 'analisis:dashboard' %}" class="btn btn-outline" id="cancel-btn">Cancelar</a>
+                <button type="submit" class="btn btn-primary" id="submit-btn" disabled>
+                    <i class="ti ti-upload" aria-hidden="true"></i> Procesar archivo
                 </button>
             </div>
         </form>
@@ -100,7 +126,7 @@
             <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 0.5rem;">
                 {% for col in "kingdom,phylum,class,order,family,genus,species,num_hits,%_hits"|split:"," %}
                 <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
-                    <i class="ti ti-check" style="color:var(--verde);"></i>
+                    <i class="ti ti-check" style="color:var(--verde);" aria-hidden="true"></i>
                     <code>{{ col }}</code>
                 </div>
                 {% endfor %}
@@ -114,115 +140,530 @@
                 El filtrado Top N se aplica únicamente en la visualización del análisis.
             </p>
         </div>
+
+        <!-- Estado de la carga en tiempo real (lateral) -->
+        <div id="status-card" class="card card-sm status-card" style="display:none;">
+            <div class="status-card__dot" id="status-dot"></div>
+            <div>
+                <div id="status-title" class="status-card__title">Subiendo…</div>
+                <div id="status-detail" class="status-card__detail">Iniciando transferencia</div>
+            </div>
+        </div>
     </div>
 </div>
 
+<style>
+/* ── Drop zone ───────────────────────────────────────────── */
+.drop-zone {
+    border: 2px dashed var(--gris-border, #d1d5db);
+    border-radius: var(--radius, 8px);
+    padding: 2.25rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: border-color .2s, background .2s, transform .1s;
+    background: transparent;
+    outline: none;
+}
+.drop-zone:hover,
+.drop-zone:focus-visible {
+    border-color: var(--verde, #22c55e);
+    background: #f0fdf4;
+}
+.drop-zone.dz-over {
+    border-color: var(--verde, #22c55e);
+    border-style: solid;
+    background: #f0fdf4;
+    transform: scale(1.01);
+}
+.drop-zone.dz-error {
+    border-color: var(--rojo, #ef4444);
+    background: #fef2f2;
+}
+.drop-zone__icon {
+    font-size: 38px;
+    color: var(--text-hint, #9ca3af);
+    display: block;
+    margin-bottom: 0.6rem;
+    transition: color .2s, transform .2s;
+}
+.drop-zone.dz-over .drop-zone__icon {
+    color: var(--verde, #22c55e);
+    transform: translateY(-4px);
+}
+.drop-zone__title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+    margin: 0 0 2px;
+}
+.drop-zone__sub {
+    font-size: 13px;
+    color: var(--text-muted, #6b7280);
+    margin: 0 0 6px;
+}
+.drop-zone__link {
+    color: var(--verde, #22c55e);
+    font-weight: 600;
+    text-decoration: underline;
+}
+.drop-zone__hint {
+    font-size: 11px;
+    color: var(--text-hint, #9ca3af);
+    margin: 0;
+    letter-spacing: .3px;
+}
+
+/* ── File preview ────────────────────────────────────────── */
+.file-preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: var(--radius, 8px);
+}
+.file-preview__icon {
+    font-size: 22px;
+    color: var(--verde, #22c55e);
+    flex-shrink: 0;
+}
+.file-preview__info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.file-preview__name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
+}
+.file-preview__size {
+    font-size: 11px;
+    color: var(--text-muted, #6b7280);
+    margin-top: 1px;
+}
+.file-preview__remove {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-hint, #9ca3af);
+    padding: 4px;
+    border-radius: 4px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color .15s, background .15s;
+}
+.file-preview__remove:hover {
+    color: var(--rojo, #ef4444);
+    background: #fef2f2;
+}
+
+/* ── Barra de progreso ───────────────────────────────────── */
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.progress-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+}
+.progress-pct {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--verde, #22c55e);
+    min-width: 38px;
+    text-align: right;
+    font-family: 'DM Mono', monospace;
+    transition: color .3s;
+}
+.progress-track {
+    background: #e5e7eb;
+    border-radius: 99px;
+    height: 8px;
+    overflow: hidden;
+}
+.progress-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--verde, #22c55e), #16a34a);
+    transition: width .3s ease;
+}
+.progress-bar.pb-processing {
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+    animation: pb-pulse 1.5s ease-in-out infinite;
+}
+.progress-bar.pb-error {
+    background: var(--rojo, #ef4444);
+}
+@keyframes pb-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .7; }
+}
+.progress-sub {
+    font-size: 11px;
+    color: var(--text-muted, #6b7280);
+    margin: 5px 0 0;
+}
+.progress-pct.pct-error { color: var(--rojo, #ef4444); }
+
+/* ── Tarjeta lateral de estado ───────────────────────────── */
+.status-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.status-card__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    flex-shrink: 0;
+    transition: background .3s;
+}
+.status-card__dot.dot-uploading   { background: #3b82f6; animation: blink 1s infinite; }
+.status-card__dot.dot-processing  { background: #f59e0b; animation: blink 1s infinite; }
+.status-card__dot.dot-done        { background: var(--verde, #22c55e); animation: none; }
+.status-card__dot.dot-error       { background: var(--rojo, #ef4444);  animation: none; }
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .4; }
+}
+.status-card__title  { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.status-card__detail { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+
+/* Botón deshabilitado */
+#submit-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+</style>
+
 <script>
-    // Mostrar nombre del archivo al cargar
-    const fileInput = document.getElementById('archivo-input');
-    const fileName = document.getElementById('file-name');
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files.length > 0) {
-            fileName.textContent = fileInput.files[0].name;
-            fileName.style.display = 'block';
+(function () {
+    /* ── Referencias DOM ─────────────────────────────────── */
+    const form        = document.getElementById('upload-form');
+    const dropZone    = document.getElementById('drop-zone');
+    const fileInput   = document.getElementById('archivo-input');
+    const preview     = document.getElementById('file-preview');
+    const fpName      = document.getElementById('fp-name');
+    const fpSize      = document.getElementById('fp-size');
+    const removeBtn   = document.getElementById('remove-file');
+    const submitBtn   = document.getElementById('submit-btn');
+    const cancelBtn   = document.getElementById('cancel-btn');
+
+    const progressSection = document.getElementById('progress-section');
+    const progressBar     = document.getElementById('progress-bar');
+    const progressPct     = document.getElementById('progress-pct');
+    const progressLabel   = document.getElementById('progress-label');
+    const progressSub     = document.getElementById('progress-sub');
+    const progressTrack   = document.getElementById('progress-track');
+
+    const statusCard   = document.getElementById('status-card');
+    const statusDot    = document.getElementById('status-dot');
+    const statusTitle  = document.getElementById('status-title');
+    const statusDetail = document.getElementById('status-detail');
+
+    const dzIcon  = document.getElementById('dz-icon');
+    const dzTitle = document.getElementById('dz-title');
+
+    /* ── Utilidades ──────────────────────────────────────── */
+    const ALLOWED_EXT = ['csv', 'tsv', 'xlsx', 'xls'];
+    const MAX_BYTES   = 10 * 1024 * 1024;
+
+    function formatBytes(b) {
+        if (b < 1024)        return b + ' B';
+        if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+        return (b / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+
+    function extOf(name) {
+        return name.split('.').pop().toLowerCase();
+    }
+
+    function setProgress(pct, label, sub) {
+        const clamped = Math.min(100, Math.max(0, pct));
+        progressBar.style.width = clamped + '%';
+        progressPct.textContent = Math.round(clamped) + '%';
+        progressTrack.setAttribute('aria-valuenow', Math.round(clamped));
+        if (label !== undefined) progressLabel.textContent = label;
+        if (sub   !== undefined) progressSub.textContent   = sub;
+    }
+
+    function setStatus(state, title, detail) {
+        statusCard.style.display = 'flex';
+        statusDot.className = 'status-card__dot dot-' + state;
+        statusTitle.textContent  = title;
+        statusDetail.textContent = detail;
+    }
+
+    /* ── Selección / validación de archivo ───────────────── */
+    function applyFile(file) {
+        if (!file) return;
+
+        const ext = extOf(file.name);
+        if (!ALLOWED_EXT.includes(ext)) {
+            setDropError('Formato no permitido. Use CSV, TSV o Excel.');
+            return;
         }
+        if (file.size > MAX_BYTES) {
+            setDropError('El archivo supera el límite de 10 MB.');
+            return;
+        }
+
+        dropZone.classList.remove('dz-error');
+
+        fpName.textContent = file.name;
+        fpSize.textContent = formatBytes(file.size);
+        preview.style.display = 'flex';
+
+        dzIcon.className  = 'ti ti-file-check drop-zone__icon';
+        dzIcon.style.color = 'var(--verde, #22c55e)';
+        dzTitle.textContent = file.name;
+        dropZone.style.borderColor = 'var(--verde, #22c55e)';
+        dropZone.style.borderStyle = 'solid';
+        dropZone.style.background  = '#f0fdf4';
+
+        submitBtn.disabled = false;
+    }
+
+    function setDropError(msg) {
+        dropZone.classList.add('dz-error');
+        dzIcon.className  = 'ti ti-alert-circle drop-zone__icon';
+        dzIcon.style.color = 'var(--rojo, #ef4444)';
+        dzTitle.textContent = msg;
+        preview.style.display = 'none';
+        submitBtn.disabled = true;
+
+        // Reset después de un momento para permitir reintento
+        setTimeout(resetDropZone, 3000);
+    }
+
+    function resetDropZone() {
+        dropZone.classList.remove('dz-error', 'dz-over');
+        dzIcon.className  = 'ti ti-file-spreadsheet drop-zone__icon';
+        dzIcon.style.color = '';
+        dzTitle.textContent = 'Arrastre su archivo aquí';
+        dropZone.style.borderColor = '';
+        dropZone.style.borderStyle = '';
+        dropZone.style.background  = '';
+        preview.style.display = 'none';
+        submitBtn.disabled = true;
+    }
+
+    /* ── Eventos de drag & drop ──────────────────────────── */
+    let dragCounter = 0;  // evita falsos dragleave al pasar sobre hijos
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt =>
+        document.body.addEventListener(evt, e => e.preventDefault())
+    );
+
+    dropZone.addEventListener('dragenter', e => {
+        e.preventDefault();
+        dragCounter++;
+        dropZone.classList.add('dz-over');
     });
 
-    // Cargar variedades vía AJAX cuando se selecciona un cultivo existente
-    document.getElementById('cultivo').addEventListener('change', function() {
+    dropZone.addEventListener('dragleave', e => {
+        e.preventDefault();
+        dragCounter--;
+        if (dragCounter === 0) dropZone.classList.remove('dz-over');
+    });
+
+    dropZone.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dragCounter = 0;
+        dropZone.classList.remove('dz-over');
+
+        const files = e.dataTransfer.files;
+        if (!files.length) return;
+
+        // Inyectar archivo en el input nativo para que el formulario lo recoja
+        const dt = new DataTransfer();
+        dt.items.add(files[0]);
+        fileInput.files = dt.files;
+
+        applyFile(files[0]);
+    });
+
+    dropZone.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') fileInput.click();
+    });
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) applyFile(fileInput.files[0]);
+    });
+
+    removeBtn.addEventListener('click', () => {
+        fileInput.value = '';
+        resetDropZone();
+    });
+
+    /* ── Envío con XHR y progreso en tiempo real ─────────── */
+    let processingTimer = null;
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        if (!fileInput.files.length) {
+            setDropError('Seleccione un archivo antes de continuar.');
+            return;
+        }
+
+        const formData = new FormData(form);
+
+        // UI: bloquear controles
+        submitBtn.disabled = true;
+        cancelBtn.style.pointerEvents = 'none';
+        cancelBtn.style.opacity = '.5';
+        progressSection.style.display = 'block';
+        setProgress(0, 'Subiendo archivo…', 'Transfiriendo datos al servidor…');
+        setStatus('uploading', 'Subiendo…', 'Transferencia en curso');
+
+        const xhr = new XMLHttpRequest();
+
+        /* Progreso de subida (fase 1: 0 → 75%) */
+        xhr.upload.addEventListener('progress', function (e) {
+            if (!e.lengthComputable) return;
+            const pct = (e.loaded / e.total) * 75;
+            const sent = formatBytes(e.loaded);
+            const total = formatBytes(e.total);
+            setProgress(pct, 'Subiendo archivo…', sent + ' de ' + total + ' transferidos');
+            setStatus('uploading', 'Subiendo…', sent + ' / ' + total);
+        });
+
+        /* Subida completada → fase 2: 75 → 95% (procesamiento en servidor) */
+        xhr.upload.addEventListener('load', function () {
+            progressBar.classList.add('pb-processing');
+            setProgress(75, 'Procesando datos…', 'El servidor está analizando los taxones…');
+            setStatus('processing', 'Procesando…', 'Pipeline de análisis activo');
+
+            let current = 75;
+            processingTimer = setInterval(function () {
+                if (current < 93) {
+                    current += (93 - current) * 0.07;  // avance asintótico
+                    setProgress(current);
+                }
+            }, 400);
+        });
+
+        /* Respuesta del servidor → fase 3: 100% y redirigir */
+        xhr.addEventListener('load', function () {
+            clearInterval(processingTimer);
+            progressBar.classList.remove('pb-processing');
+            setProgress(100, '¡Completado!', 'Redirigiendo…');
+            setStatus('done', 'Listo', 'Archivo procesado correctamente');
+            progressPct.style.color = 'var(--verde)';
+
+            setTimeout(function () {
+                window.location.href = xhr.responseURL || '{{ request.path }}';
+            }, 600);
+        });
+
+        /* Error de red */
+        xhr.addEventListener('error', function () {
+            clearInterval(processingTimer);
+            progressBar.classList.add('pb-error');
+            progressPct.classList.add('pct-error');
+            setProgress(100, 'Error de conexión', 'No se pudo comunicar con el servidor. Intente de nuevo.');
+            setStatus('error', 'Error', 'Fallo en la red');
+            submitBtn.disabled = false;
+            cancelBtn.style.pointerEvents = '';
+            cancelBtn.style.opacity = '';
+        });
+
+        xhr.open('POST', form.action || window.location.pathname);
+        xhr.send(formData);
+    });
+
+    /* ── Carga de variedades vía AJAX ────────────────────── */
+    document.getElementById('cultivo').addEventListener('change', function () {
         var cultivoId = this.value;
         var variedadSelect = document.getElementById('variedad_clon');
-        
+
         if (!cultivoId) {
             variedadSelect.innerHTML = '<option value="">Primero seleccione un cultivo</option>';
             return;
         }
+        variedadSelect.innerHTML = '<option value="">Cargando…</option>';
 
-        variedadSelect.innerHTML = '<option value="">Cargando...</option>';
-        
-        // AJAX para traer las variedades dependientes
-        fetch(`/cargar-variedades/?cultivo_id=${cultivoId}`)
-            .then(response => response.json())
+        fetch('/cargar-variedades/?cultivo_id=' + cultivoId)
+            .then(r => r.json())
             .then(data => {
                 variedadSelect.innerHTML = '<option value="">Seleccione variedad</option>';
-                data.variedades.forEach(function(variedad) {
-                    var option = document.createElement('option');
-                    option.value = variedad.id;
-                    option.textContent = variedad.nombre;
-                    variedadSelect.appendChild(option);
+                data.variedades.forEach(function (v) {
+                    var opt = document.createElement('option');
+                    opt.value = v.id;
+                    opt.textContent = v.nombre;
+                    variedadSelect.appendChild(opt);
                 });
             })
-            .catch(error => {
-                console.error('Error:', error);
+            .catch(function () {
                 variedadSelect.innerHTML = '<option value="">Error al cargar variedades</option>';
             });
     });
 
-    // Botón para alternar Cultivo Manual / Lista
-    document.getElementById('toggleCultivoBtn').addEventListener('click', function() {
-        var selectCultivo = document.getElementById('cultivo');
-        var inputManualCultivo = document.getElementById('cultivo_manual');
-        
-        var selectVariedad = document.getElementById('variedad_clon');
-        var inputManualVariedad = document.getElementById('variedad_manual');
+    /* ── Toggle cultivo manual / lista ───────────────────── */
+    document.getElementById('toggleCultivoBtn').addEventListener('click', function () {
+        var selCultivo = document.getElementById('cultivo');
+        var inpCultivo = document.getElementById('cultivo_manual');
+        var selVariedad = document.getElementById('variedad_clon');
+        var inpVariedad = document.getElementById('variedad_manual');
         var btnVariedad = document.getElementById('toggleVariedadBtn');
 
-        if (inputManualCultivo.style.display === 'none') {
-            // Cambiar Cultivo a Manual
-            selectCultivo.style.display = 'none';
-            inputManualCultivo.style.display = 'block';
-            inputManualCultivo.required = true;
-            selectCultivo.required = false;
-            selectCultivo.value = ""; 
+        if (inpCultivo.style.display === 'none') {
+            selCultivo.style.display  = 'none';  inpCultivo.style.display  = 'block';
+            inpCultivo.required = true;  selCultivo.required = false;  selCultivo.value = '';
             this.textContent = 'Seleccionar de la lista';
 
-            // Si el cultivo es NUEVO, la variedad OBLIGATORIAMENTE debe ser manual
-            selectVariedad.style.display = 'none';
-            inputManualVariedad.style.display = 'block';
-            inputManualVariedad.required = true;
-            selectVariedad.required = false;
-            selectVariedad.value = "";
+            selVariedad.style.display = 'none';  inpVariedad.style.display = 'block';
+            inpVariedad.required = true;  selVariedad.required = false;  selVariedad.value = '';
             btnVariedad.textContent = 'Seleccionar de la lista';
-            btnVariedad.style.display = 'none'; // Ocultar para evitar errores lógicos
-            
+            btnVariedad.style.display = 'none';
         } else {
-            // Regresar Cultivo a la lista seleccionable
-            selectCultivo.style.display = 'block';
-            inputManualCultivo.style.display = 'none';
-            inputManualCultivo.required = false;
-            selectCultivo.required = true;
-            inputManualCultivo.value = ""; 
+            selCultivo.style.display  = 'block'; inpCultivo.style.display  = 'none';
+            inpCultivo.required = false; selCultivo.required = true;  inpCultivo.value = '';
             this.textContent = 'Ingresar manualmente';
 
-            // Restaurar el comportamiento estándar de Variedad
             btnVariedad.style.display = 'inline-block';
-            selectVariedad.style.display = 'block';
-            inputManualVariedad.style.display = 'none';
-            inputManualVariedad.required = false;
-            selectVariedad.required = true;
-            selectVariedad.innerHTML = '<option value="">Primero seleccione un cultivo</option>';
+            selVariedad.style.display = 'block';  inpVariedad.style.display = 'none';
+            inpVariedad.required = false; selVariedad.required = true;
+            selVariedad.innerHTML = '<option value="">Primero seleccione un cultivo</option>';
             btnVariedad.textContent = 'Ingresar manualmente';
         }
     });
-    
-    // Botón para alternar Variedad Manual / Lista (Solo cuando el cultivo existe en la lista)
-    document.getElementById('toggleVariedadBtn').addEventListener('click', function() {
-        var selectVariedad = document.getElementById('variedad_clon');
-        var inputManual = document.getElementById('variedad_manual');
-        
-        if (inputManual.style.display === 'none') {
-            selectVariedad.style.display = 'none';
-            inputManual.style.display = 'block';
-            inputManual.required = true;
-            selectVariedad.required = false;
+
+    /* ── Toggle variedad manual / lista ──────────────────── */
+    document.getElementById('toggleVariedadBtn').addEventListener('click', function () {
+        var selVariedad = document.getElementById('variedad_clon');
+        var inpVariedad = document.getElementById('variedad_manual');
+
+        if (inpVariedad.style.display === 'none') {
+            selVariedad.style.display = 'none';  inpVariedad.style.display = 'block';
+            inpVariedad.required = true;  selVariedad.required = false;
             this.textContent = 'Seleccionar de la lista';
         } else {
-            selectVariedad.style.display = 'block';
-            inputManual.style.display = 'none';
-            inputManual.required = false;
-            selectVariedad.required = true;
+            selVariedad.style.display = 'block'; inpVariedad.style.display = 'none';
+            inpVariedad.required = false; selVariedad.required = true;
             this.textContent = 'Ingresar manualmente';
         }
     });
+})();
 </script>
 {% endblock %}
