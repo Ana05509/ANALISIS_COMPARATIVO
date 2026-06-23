@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 from django.db.models import F, Sum
 from analisis.models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo, VariedadClon
@@ -83,7 +84,8 @@ def comparar_productos(analisis_filtrado, nivel="genus", taxa_top=None):
         columns=["__total_sort", "__is_otros"]
     )
 
-    return tabla_df.to_dict(orient="records")
+    # json.loads(to_json()) convierte numpy.float64 → Python float antes de devolver
+    return json.loads(tabla_df.to_json(orient="records"))
 
 
 def _calcular_diferencial(sets_por_muestra):

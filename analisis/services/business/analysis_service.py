@@ -38,9 +38,9 @@ def obtener_analisis_avanzado(tipo="16S", top_n=10, nivel="genus", variedad_id=N
     if not qs.exists():
         return {"resumen": [], "tipo_actual": tipo, "nivel_actual": nivel, "top_actual": top_n}
 
-    # Suma de hits por taxón (correcto para múltiples muestras)
+    # Suma de hits por taxón — clave 'taxonomia' uniforme para todos los templates
     todos_los_datos = list(
-        qs.values(nombre_tax=F(campo_db))
+        qs.values(taxonomia=F(campo_db))
         .annotate(total_hits=Sum("num_hits"))
         .order_by("-total_hits")
     )
@@ -61,20 +61,20 @@ def obtener_analisis_avanzado(tipo="16S", top_n=10, nivel="genus", variedad_id=N
     for item in datos_top:
         item["total_porcentaje"] = round(item["total_hits"] / grand_total * 100, 5)
         item["clasificacion"] = catalogo_lookup.get(
-            (item["nombre_tax"] or "").lower(), "sin_clasificar"
+            (item["taxonomia"] or "").lower(), "sin_clasificar"
         )
 
     if datos_resto:
         hits_resto = sum(x["total_hits"] for x in datos_resto)
         datos_top.append({
-            "nombre_tax":       "Otros microorganismos (< abundancia)",
+            "taxonomia":        "Otros microorganismos (< abundancia)",
             "total_hits":       hits_resto,
             "total_porcentaje": round(hits_resto / grand_total * 100, 5),
             "clasificacion":    "neutral",
         })
 
     return {
-        "resumen":     datos_top,
+        "resumen":      datos_top,
         "tipo_actual":  tipo,
         "nivel_actual": nivel,
         "top_actual":   top_n,
@@ -93,7 +93,7 @@ def obtener_top_n(tipo="16S", n=10, nivel="genus", variedad_id=None):
     grand_total = qs.aggregate(t=Sum("num_hits"))["t"] or 1
 
     data = list(
-        qs.values(nombre_tax=F(campo_db))
+        qs.values(taxonomia=F(campo_db))
         .annotate(total_hits=Sum("num_hits"))
         .order_by("-total_hits")[:n]
     )
@@ -106,12 +106,12 @@ def obtener_top_n(tipo="16S", n=10, nivel="genus", variedad_id=None):
     for item in data:
         item["total_porcentaje"] = round(item["total_hits"] / grand_total * 100, 5)
         item["clasificacion"] = catalogo_lookup.get(
-            (item["nombre_tax"] or "").lower(), "sin_clasificar"
+            (item["taxonomia"] or "").lower(), "sin_clasificar"
         )
 
     return data
 
-def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None):
+def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=None):
     """
     Calcula diversidad alfa por muestra individual y devuelve el promedio.
     Evita el error de calcular Shannon/Simpson sobre un perfil promediado.
@@ -119,7 +119,7 @@ def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None):
     if tipo not in MARCADORES_VALIDOS: tipo = "16S"
     campo_db = MAPA_NIVELES.get(nivel, "genus")
 
-    qs = _base_queryset(tipo, variedad_id)
+    qs = _base_queryset(tipo, variedad_id, muestra_id)
     if not qs.exists(): return None
 
     data = list(qs.values(

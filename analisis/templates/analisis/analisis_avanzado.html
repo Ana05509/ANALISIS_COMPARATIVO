@@ -104,7 +104,7 @@
                     {% for item in top_microorganismos %}
                     <tr>
                         <td class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
-                        <td><strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">{{ item.taxonomia|default:item.nombre_tax }}</strong></td>
+                        <td><strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">{{ item.taxonomia|default:"—" }}</strong></td>
                         <td>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
@@ -269,7 +269,7 @@ document.addEventListener("DOMContentLoaded", function() {
     try {
         const topData = {{ top_microorganismos_json|safe }};
         if (Array.isArray(topData) && topData.length > 0) {
-            const labels = topData.map(r => r.taxonomia || r.nombre_tax || 'Desconocido');
+            const labels = topData.map(r => r.taxonomia || 'Desconocido');
             const values = topData.map(r => parseFloat(r.total_porcentaje || 0));
             const colores = ['#1D9E75','#0F6E56','#085041','#BA7517','#9E6515','#185FA5','#0C447C','#A32D2D','#5F5E5A','#888780'];
             const ctx = document.getElementById('chart-donut');
@@ -317,36 +317,34 @@ document.addEventListener("DOMContentLoaded", function() {
 document.addEventListener('DOMContentLoaded', function() {
     var graficos = {{ graficos_avanzados_json|safe }};
     
+    var CFG = { responsive: true };
+
     // Barras apiladas
     if (graficos.grafico_barras_apiladas) {
-        Plotly.newPlot('grafico-barras-apiladas', 
-            graficos.grafico_barras_apiladas.data, 
-            graficos.grafico_barras_apiladas.layout
-        );
+        Plotly.newPlot('grafico-barras-apiladas',
+            graficos.grafico_barras_apiladas.data,
+            graficos.grafico_barras_apiladas.layout, CFG);
     }
-    
+
     // Heatmap
     if (graficos.grafico_heatmap) {
-        Plotly.newPlot('grafico-heatmap', 
-            graficos.grafico_heatmap.data, 
-            graficos.grafico_heatmap.layout
-        );
+        Plotly.newPlot('grafico-heatmap',
+            graficos.grafico_heatmap.data,
+            graficos.grafico_heatmap.layout, CFG);
     }
-    
+
     // PCoA Bray-Curtis
     if (graficos.grafico_pca) {
         Plotly.newPlot('grafico-pca',
             graficos.grafico_pca.data,
-            graficos.grafico_pca.layout
-        );
+            graficos.grafico_pca.layout, CFG);
     }
 
     // Shannon por muestra
     if (graficos.grafico_boxplot) {
         Plotly.newPlot('grafico-boxplot',
             graficos.grafico_boxplot.data,
-            graficos.grafico_boxplot.layout
-        );
+            graficos.grafico_boxplot.layout, CFG);
     }
 });
 </script>
