@@ -105,7 +105,7 @@ def comparar(request):
                             fig = px.bar(
                                 df_plot, x="taxonomia", y="Abundancia", color="Muestra",
                                 barmode="group",
-                                title=f"Comparación de Abundancias — {nivel.capitalize()} (Top {TOP_N_VISUALIZACION})",
+                                title=f"Comparación de Abundancias — {(nivel or '').capitalize()} (Top {TOP_N_VISUALIZACION})",
                                 template="plotly_white",
                             )
                             fig.update_layout(xaxis_tickangle=-45, height=420)

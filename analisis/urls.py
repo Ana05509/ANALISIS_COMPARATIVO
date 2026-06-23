@@ -40,6 +40,7 @@ urlpatterns = [
 
     # 4. CATÁLOGO
     path("catalogo/", views.catalogo_microorganismos, name="catalogo"),
+    path("catalogo/importar/", views.importar_catalogo, name="importar_catalogo"),
     path("catalogo/<int:pk>/", views.detalle_microorganismo, name="detalle_microorganismo"),
     path("catalogo/<int:pk>/reclasificar/", views.actualizar_clasificacion, name="reclasificar"),
 

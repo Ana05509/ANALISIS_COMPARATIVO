@@ -10,6 +10,20 @@
     <p>Base de datos referencial y curaduría biológica para marcadores 16S (Bacterias) e ITS (Hongos)</p>
 </div>
 
+{% if messages %}
+<div style="margin-bottom:1rem;">
+    {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags }}" style="
+        padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 8px;
+        background: {% if 'success' in msg.tags %}#f0fdf4{% elif 'error' in msg.tags %}#fef2f2{% else %}#fefce8{% endif %};
+        border: 1px solid {% if 'success' in msg.tags %}#bbf7d0{% elif 'error' in msg.tags %}#fecaca{% else %}#fde68a{% endif %};
+        color: {% if 'success' in msg.tags %}#065f46{% elif 'error' in msg.tags %}#991b1b{% else %}#92400e{% endif %};">
+        {{ msg }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 {% if estadisticas %}
 <div class="metrics-grid" style="margin-bottom: 1.5rem;">
     <div class="metric-card">
@@ -31,6 +45,17 @@
 </div>
 {% endif %}
 
+<!-- Acciones de staff: Agregar / Importar -->
+{% if request.user.is_staff %}
+<div style="display:flex;gap:10px;margin-bottom:1.25rem;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="abrirModalImportar()"
+            style="display:flex;align-items:center;gap:6px;">
+        <i class="ti ti-upload" aria-hidden="true"></i> Importar CSV / Excel
+    </button>
+    <a href="{% url 'analisis:reclasificar' 0 %}" style="display:none"></a><!-- preload URL pattern -->
+</div>
+{% endif %}
+
 <!-- Formulario de filtros -->
 <div class="card card-sm" style="margin-bottom: 1.5rem;">
     <form method="get" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
@@ -39,12 +64,11 @@
             <input type="text" name="busqueda" value="{{ busqueda|default:'' }}" placeholder="Ej: Bacillus" class="form-control" style="width: 180px;">
         </div>
         <div>
-            <label class="form-label">Marcador</label>
-            <select name="filtro_marcador" class="form-control" style="width: 110px;">
+            <label class="form-label">Tipo</label>
+            <select name="filtro_marcador" class="form-control" style="width: 130px;">
                 <option value="">Todos</option>
-                {% for m in marcadores_disponibles %}
-                <option value="{{ m }}" {% if filtro_marcador == m %}selected{% endif %}>{{ m }}</option>
-                {% endfor %}
+                <option value="16S" {% if filtro_marcador == '16S' %}selected{% endif %}>🦠 Bacteria (16S)</option>
+                <option value="ITS" {% if filtro_marcador == 'ITS' %}selected{% endif %}>🍄 Hongo (ITS)</option>
             </select>
         </div>
         <div>
@@ -82,8 +106,8 @@
                 <tr>
                     <th>Taxonomía</th>
                     <th>Nivel</th>
-                    <th>Producto / Muestra Origen</th>
-                    <th>Marcador</th>
+                    <th>Muestra Origen</th>
+                    <th>Tipo</th>
                     <th style="text-align: right;">% Abundancia Promedio</th>
                     <th style="padding-left: 2rem;">Clasificación Funcional</th>
                     {% if request.user.is_staff %}
@@ -98,9 +122,11 @@
                     <td style="font-size: 12px; color: var(--text-muted); text-transform: capitalize;">{{ m.nivel }}</td>
                     <td style="font-size: 13px; color: var(--text-primary);">{{ m.producto.nombre }}</td>
                     <td>
-                        <span class="{% if m.producto.tipo == '16S' %}pill-16s{% else %}pill-its{% endif %}">
-                            {{ m.producto.tipo }}
-                        </span>
+                        {% if m.producto.tipo == '16S' %}
+                        <span class="pill-16s" title="Bacteria — Marcador 16S">🦠 Bacteria</span>
+                        {% else %}
+                        <span class="pill-its" title="Hongo — Marcador ITS">🍄 Hongo</span>
+                        {% endif %}
                     </td>
                     <td class="td-mono" style="text-align: right; font-weight: 500; color: var(--text-primary);">
                         {{ m.porcentaje_hits|floatformat:4 }}%
@@ -138,7 +164,7 @@
 </div>
 
 {% if request.user.is_staff %}
-<!-- Modal para reclasificar (simple) -->
+<!-- Modal: Reclasificar taxón -->
 <div id="modal-overlay" style="display: none; position: fixed; inset:0; background: rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000;">
     <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 400px; width: 100%;">
         <h3 style="margin-bottom: 1rem;">Reclasificar</h3>
@@ -155,12 +181,62 @@
                 </select>
             </div>
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem;">
-                <button type="button" class="btn btn-outline" onclick="cerrarModal()">Cancelar</button>
+                <button type="button" class="btn btn-outline" onclick="cerrarModal('modal-overlay')">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Guardar</button>
             </div>
         </form>
     </div>
 </div>
+
+<!-- Modal: Importar CSV/Excel -->
+<div id="modal-importar" style="display: none; position: fixed; inset:0; background: rgba(0,0,0,0.55); justify-content:center; align-items:center; z-index:1000;">
+    <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 560px; width: 100%;">
+        <h3 style="margin-bottom: 0.5rem;">📥 Importar Catálogo</h3>
+        <p style="font-size:13px;color:#6b7280;margin-bottom:1.25rem;">
+            Suba un CSV o Excel con los microorganismos a registrar o actualizar.<br>
+            <strong>Columnas requeridas:</strong> nombre, nivel, marcador (16S/ITS), clasificacion.<br>
+            <strong>Opcionales:</strong> descripcion, referencia.
+        </p>
+
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px 14px;font-size:12px;margin-bottom:1.25rem;font-family:monospace;">
+            nombre,nivel,marcador,clasificacion,descripcion<br>
+            Bacillus,genus,16S,benefico,Promotor de crecimiento<br>
+            Fusarium,genus,ITS,fitopatogeno,Agente de marchitez
+        </div>
+
+        <form method="post" action="{% url 'analisis:importar_catalogo' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-group" style="margin-bottom:1.25rem;">
+                <label class="form-label">Archivo CSV / Excel</label>
+                <input type="file" name="archivo" accept=".csv,.tsv,.xlsx,.xls"
+                       class="form-control" required id="import-file-input">
+            </div>
+
+            <!-- Barra de progreso visual (solo decorativa) -->
+            <div id="import-progress" style="display:none;margin-bottom:1rem;">
+                <div style="background:#e5e7eb;border-radius:4px;height:6px;overflow:hidden;">
+                    <div style="background:#3b82f6;height:6px;width:60%;animation:progress-anim 1.2s infinite alternate;"></div>
+                </div>
+                <p style="font-size:12px;color:#6b7280;margin-top:4px;">Procesando archivo…</p>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn btn-outline" onclick="cerrarModal('modal-importar')">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="btn-importar"
+                        onclick="document.getElementById('import-progress').style.display='block'">
+                    <i class="ti ti-upload" aria-hidden="true"></i> Importar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+@keyframes progress-anim {
+    from { width: 20%; }
+    to   { width: 80%; }
+}
+</style>
 
 <script>
     function abrirReclasificar(id, taxon, clasificacionActual) {
@@ -169,21 +245,25 @@
         document.getElementById('modal-taxon').textContent = taxon;
         const form = document.getElementById('form-reclasificar');
         form.action = "{% url 'analisis:reclasificar' 0 %}".replace('0', id);
-        // Seleccionar la opción actual en el select
         const select = form.querySelector('select[name="clasificacion"]');
         for (let opt of select.options) {
-            if (opt.value === clasificacionActual) {
-                opt.selected = true;
-                break;
-            }
+            opt.selected = opt.value === clasificacionActual;
         }
     }
-    function cerrarModal() {
-        document.getElementById('modal-overlay').style.display = 'none';
+
+    function abrirModalImportar() {
+        document.getElementById('modal-importar').style.display = 'flex';
     }
-    // Cerrar modal al hacer clic fuera
-    document.getElementById('modal-overlay').addEventListener('click', function(e) {
-        if (e.target === this) cerrarModal();
+
+    function cerrarModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+
+    // Cerrar modales al clic fuera
+    ['modal-overlay', 'modal-importar'].forEach(function(id) {
+        document.getElementById(id).addEventListener('click', function(e) {
+            if (e.target === this) cerrarModal(id);
+        });
     });
 </script>
 {% endif %}

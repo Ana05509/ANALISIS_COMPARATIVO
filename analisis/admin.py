@@ -3,7 +3,10 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.db import transaction
 from django.contrib import messages
-from django import forms  
+from django.http import HttpResponseRedirect
+from django.urls import path
+from django.template.response import TemplateResponse
+from django import forms
 import pandas as pd
 import io
 
@@ -260,21 +263,106 @@ class ResultadoTaxonomicoAdmin(ModelAdmin):
 
 
 # =========================================================
+# FORMULARIO DE IMPORTACIÓN MASIVA PARA EL ADMIN
+# =========================================================
+class CatalogoImportAdminForm(forms.Form):
+    archivo = forms.FileField(
+        label="Archivo CSV / Excel",
+        widget=forms.FileInput(attrs={"accept": ".csv,.tsv,.xlsx,.xls"}),
+        help_text=(
+            "Columnas requeridas: nombre, nivel, marcador (16S o ITS), clasificacion. "
+            "Opcionales: descripcion, referencia."
+        )
+    )
+
+
+# =========================================================
 # CATÁLOGO MICROORGANISMOS
 # =========================================================
 @admin.register(CatalogoMicroorganismo)
 class CatalogoMicroorganismoAdmin(BotonEditarMixin, ModelAdmin):
-    list_display  = ("nombre", "nivel", "clasificacion_badge", "descripcion_corta", "acciones_columna")
+    change_list_template = "admin/analisis/catalogomicroorganismo/change_list.html"
+
+    list_display  = ("nombre", "nivel", "marcador_badge", "clasificacion_badge", "descripcion_corta", "acciones_columna")
     list_display_links = ("nombre",)
-    list_filter   = ("clasificacion", "nivel")
+    list_filter   = ("marcador", "clasificacion", "nivel")
     search_fields = ("nombre", "descripcion")
     ordering      = ("nombre",)
     list_per_page  = 20
 
     fieldsets = (
         ("Identificación Taxonómica", {"fields": ("nombre", "nivel")}),
+        ("Tipo de Organismo", {
+            "description": "Seleccione el marcador molecular que identifica si es Bacteria (16S) o Hongo (ITS).",
+            "fields": ("marcador",),
+        }),
         ("Clasificación Funcional", {"fields": ("clasificacion", "descripcion", "referencia")}),
     )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "importar/",
+                self.admin_site.admin_view(self.importar_view),
+                name="catalogo_importar",
+            ),
+        ]
+        return custom + urls
+
+    def importar_view(self, request):
+        """Vista de importación masiva desde CSV/Excel accesible en el admin."""
+        from analisis.services.business.catalog_service import CatalogService
+
+        if request.method == "POST":
+            form = CatalogoImportAdminForm(request.POST, request.FILES)
+            if form.is_valid():
+                try:
+                    creados, actualizados, errores = CatalogService.importar_desde_archivo(
+                        form.cleaned_data["archivo"]
+                    )
+                    resumen = f"{creados} creados, {actualizados} actualizados"
+                    if errores:
+                        self.message_user(
+                            request,
+                            f"Importación parcial: {resumen}. {errores} filas omitidas.",
+                            messages.WARNING,
+                        )
+                    else:
+                        self.message_user(request, f"Importación exitosa: {resumen}.", messages.SUCCESS)
+                except ValueError as exc:
+                    self.message_user(request, str(exc), messages.ERROR)
+                except Exception as exc:
+                    self.message_user(request, f"Error inesperado: {exc}", messages.ERROR)
+            else:
+                self.message_user(request, "Archivo no válido.", messages.ERROR)
+            return HttpResponseRedirect("../")
+
+        # GET → render formulario de importación
+        form = CatalogoImportAdminForm()
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Importar Catálogo de Microorganismos",
+            "form": form,
+            "opts": self.model._meta,
+        }
+        return TemplateResponse(
+            request,
+            "admin/analisis/catalogomicroorganismo/importar.html",
+            context,
+        )
+
+    @admin.display(description="Tipo")
+    def marcador_badge(self, obj):
+        if obj.marcador == "16S":
+            return format_html(
+                '<span style="background:#E1F5EE;color:#085041;padding:3px 10px;border-radius:20px;'
+                'font-size:12px;font-weight:500;">🦠 Bacteria</span>'
+            )
+        return format_html(
+            '<span style="background:#FAEEDA;color:#5a3a00;padding:3px 10px;border-radius:20px;'
+            'font-size:12px;font-weight:500;">🍄 Hongo</span>'
+        )
 
     @admin.display(description="Clasificación")
     def clasificacion_badge(self, obj):
@@ -331,8 +419,9 @@ class UsuarioAdmin(BaseUserAdmin, BotonEditarMixin, ModelAdmin):
     @admin.display(description="Rol")
     def rol_badge(self, obj):
         colores = {
-            "admin": ("#E1F5EE", "#085041"), "tecnico": ("#E6F1FB", "#0C447C"),
-            "agricultor": ("#FAEEDA", "#5a3a00"), "estudiante": ("#F1EFE8", "#5F5E5A"),
+            "admin":      ("#E1F5EE", "#085041"),
+            "docente":    ("#E6F1FB", "#0C447C"),
+            "estudiante": ("#F1EFE8", "#5F5E5A"),
         }
         bg, color = colores.get(obj.rol, ("#F1EFE8", "#5F5E5A"))
         return format_html(

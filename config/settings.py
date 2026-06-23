@@ -88,7 +88,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'MICROBIANA',
+        'NAME': 'Proyect',
         'USER': 'postgres',
         'PASSWORD': 'ABCDE',  
         'HOST': 'localhost',
@@ -154,6 +154,8 @@ LOGOUT_REDIRECT_URL = 'analisis:login'
 ACCOUNT_LOGOUT_REDIRECT_URL = 'analisis:login'
 ACCOUNT_AUTHENTICATED_LOGIN_REDIRECTS = True    # Redirige al login al salir
 ACCOUNT_SIGNUP_FORM_CLASS = 'analisis.signup_form.CustomSignupForm'
+ACCOUNT_ADAPTER = 'analisis.adapter.CustomAccountAdapter'
+ACCOUNT_PREVENT_ENUMERATION = False
 
 # Configuración del proveedor de Google OAuth2
 SOCIALACCOUNT_PROVIDERS = {

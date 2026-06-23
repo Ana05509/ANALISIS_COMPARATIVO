@@ -180,3 +180,7 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 .staticfiles
+.claudeignore 
+media/
+.vscode/
+vscode/

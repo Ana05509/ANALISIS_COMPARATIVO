@@ -13,11 +13,15 @@
 <div class="card" style="margin-bottom: 1.5rem;">
     <div class="card-title">Parámetros de comparación</div>
     <form method="get">
-        <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 1rem; align-items: end;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end;">
             <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">Seleccione muestras</label>
                 {{ form.muestras }}
                 <small style="color: var(--text-hint); font-size: 12px;">Seleccione al menos dos muestras (Ctrl+clic)</small>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Marcador Molecular</label>
+                {{ form.marcador }}
             </div>
             <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">Nivel Taxonómico</label>

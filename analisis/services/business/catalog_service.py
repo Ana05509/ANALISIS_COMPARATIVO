@@ -1,3 +1,5 @@
+import io
+import pandas as pd
 from django.db.models import Q, QuerySet
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo
 
@@ -91,6 +93,87 @@ class CatalogService:
             "total_sin_clas": stats["sin_clasificar"]
         }
         return resultados, estadisticas
+
+    @staticmethod
+    def importar_desde_archivo(archivo) -> tuple:
+        """
+        Lee un CSV/Excel y crea o actualiza registros en CatalogoMicroorganismo.
+        Columnas requeridas: nombre, nivel, marcador (16S/ITS), clasificacion.
+        Columnas opcionales: descripcion, referencia.
+        Retorna (creados, actualizados, errores).
+        """
+        nombre_archivo = archivo.name.lower()
+        if nombre_archivo.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(archivo)
+        else:
+            archivo.seek(0)
+            raw = archivo.read()
+            try:
+                df = pd.read_csv(io.BytesIO(raw))
+            except Exception:
+                df = pd.read_csv(io.BytesIO(raw), sep='\t')
+
+        df.columns = [str(c).strip().lower() for c in df.columns]
+
+        required = {'nombre', 'nivel', 'marcador', 'clasificacion'}
+        missing = required - set(df.columns)
+        if missing:
+            raise ValueError(
+                f"Columnas requeridas faltantes: {', '.join(sorted(missing))}. "
+                "El archivo debe tener: nombre, nivel, marcador, clasificacion "
+                "(opcionales: descripcion, referencia)"
+            )
+
+        MARCADORES = {'16S', 'ITS'}
+        CLASIFICACIONES = {'benefico', 'fitopatogeno', 'neutral', 'sin_clasificar'}
+        _nan = {'nan', 'none', ''}
+
+        creados = actualizados = errores = 0
+
+        for _, row in df.iterrows():
+            nombre = str(row.get('nombre', '')).strip()
+            nivel = str(row.get('nivel', '')).strip().lower()
+
+            if not nombre or nombre.lower() in _nan:
+                errores += 1
+                continue
+
+            marcador = str(row.get('marcador', '16S')).strip().upper()
+            if marcador not in MARCADORES:
+                marcador = '16S'
+
+            clasificacion = str(row.get('clasificacion', 'sin_clasificar')).strip().lower()
+            if clasificacion not in CLASIFICACIONES:
+                clasificacion = 'sin_clasificar'
+
+            def _clean(val):
+                s = str(val).strip()
+                return '' if s.lower() in _nan else s
+
+            descripcion = _clean(row.get('descripcion', '')) if 'descripcion' in df.columns else ''
+            referencia = _clean(row.get('referencia', '')) if 'referencia' in df.columns else ''
+
+            try:
+                _, created = CatalogoMicroorganismo.objects.update_or_create(
+                    nombre__iexact=nombre,
+                    nivel__iexact=nivel,
+                    defaults={
+                        'nombre': nombre,
+                        'nivel': nivel,
+                        'marcador': marcador,
+                        'clasificacion': clasificacion,
+                        'descripcion': descripcion,
+                        'referencia': referencia,
+                    }
+                )
+                if created:
+                    creados += 1
+                else:
+                    actualizados += 1
+            except Exception:
+                errores += 1
+
+        return creados, actualizados, errores
 
     @staticmethod
     def reclasificar_microorganismo(pk, nueva_clasificacion, descripcion):

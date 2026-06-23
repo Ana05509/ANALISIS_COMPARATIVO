@@ -105,6 +105,31 @@ class CompararForm(forms.Form):
         return cleaned_data
 
 
+class CatalogoImportarForm(forms.Form):
+    archivo = forms.FileField(
+        label="Archivo CSV / Excel",
+        widget=forms.FileInput(attrs={
+            "class": "form-control",
+            "accept": ".csv,.tsv,.xlsx,.xls",
+            "id": "import-catalogo-file"
+        }),
+        help_text=(
+            "Columnas requeridas: nombre, nivel, marcador (16S o ITS), clasificacion. "
+            "Opcionales: descripcion, referencia."
+        )
+    )
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get('archivo')
+        if archivo:
+            ext = archivo.name.rsplit('.', 1)[-1].lower()
+            if ext not in ('csv', 'tsv', 'xlsx', 'xls'):
+                raise forms.ValidationError("Formato no permitido. Use CSV, TSV o Excel.")
+            if archivo.size > 5 * 1024 * 1024:
+                raise forms.ValidationError("El archivo no puede superar los 5 MB.")
+        return archivo
+
+
 class CustomSignupForm(forms.Form):
     first_name = forms.CharField(
         max_length=30, 
