@@ -15,9 +15,12 @@
     <form method="get">
         <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end;">
             <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Seleccione muestras</label>
+                <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+                    Seleccione muestras
+                    <span id="sample-counter" style="font-size:12px; font-weight:600; color:var(--text-hint);"></span>
+                </label>
                 {{ form.muestras }}
-                <small style="color: var(--text-hint); font-size: 12px;">Seleccione al menos dos muestras (Ctrl+clic)</small>
+                <small style="color: var(--text-hint); font-size: 12px;">Ctrl+clic (Windows) o Cmd+clic (Mac) para selección múltiple</small>
             </div>
             <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">Marcador Molecular</label>
@@ -144,10 +147,34 @@
     </div>
 </div>
 
+<!-- Gráfico 1: Barras agrupadas (Plotly) -->
 <div class="card" style="margin-top: 1.5rem;">
-    <div class="card-title">Abundancia Relativa Comparada (%)</div>
-    <div style="position: relative; height: 340px; width: 100%;">
-        <canvas id="chart-comparativo"></canvas>
+    <div class="card-title">
+        <i class="ti ti-chart-bar" aria-hidden="true"></i>
+        Abundancia Relativa Comparada — Top {{ top_actual }} por {{ nivel_actual|capfirst }}
+    </div>
+    <div id="grafico-barras-comp" style="height: 420px; width: 100%;"></div>
+</div>
+
+<!-- Gráficos 2 y 3 en grid -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+
+    <div class="card" style="margin-bottom: 0;">
+        <div class="card-title">
+            <i class="ti ti-grid-dots" aria-hidden="true"></i>
+            Mapa de Calor Comparativo
+        </div>
+        <p style="font-size:12px; color:var(--text-hint); margin: 0 0 0.5rem;">Intensidad de color = abundancia relativa (%). Identifica patrones y taxa diferenciadores entre muestras.</p>
+        <div id="grafico-heatmap-comp" style="height: 380px; width: 100%;"></div>
+    </div>
+
+    <div class="card" style="margin-bottom: 0;">
+        <div class="card-title">
+            <i class="ti ti-chart-dots" aria-hidden="true"></i>
+            Diversidad Alfa por Muestra (Shannon H')
+        </div>
+        <p style="font-size:12px; color:var(--text-hint); margin: 0 0 0.5rem;">Calculado sobre el perfil completo de cada muestra, sin truncamiento a Top N.</p>
+        <div id="grafico-shannon-comp" style="height: 380px; width: 100%;"></div>
     </div>
 </div>
 
@@ -161,82 +188,140 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-    const inputsForm = document.querySelectorAll('.card form select, .card form input[type="number"], .card form input[type="text"]');
-    inputsForm.forEach(el => {
-        el.classList.add('form-control');
-    });
+(function () {
+    /* ── Contador interactivo de muestras seleccionadas ──── */
+    var selectMuestras = document.querySelector('[name="muestras"]');
+    var counter = document.getElementById('sample-counter');
+
+    function actualizarContador() {
+        if (!selectMuestras || !counter) return;
+        var n = selectMuestras.selectedOptions.length;
+        if (n === 0) {
+            counter.textContent = '';
+        } else if (n < 2) {
+            counter.textContent = n + ' seleccionada — mínimo 2';
+            counter.style.color = 'var(--rojo, #ef4444)';
+        } else {
+            counter.textContent = n + ' seleccionadas ✓';
+            counter.style.color = 'var(--verde, #22c55e)';
+        }
+    }
+
+    if (selectMuestras) {
+        selectMuestras.addEventListener('change', actualizarContador);
+        actualizarContador(); // estado inicial al cargar
+    }
 
     {% if tabla_comparativa %}
-    try {
-        const tablaData = {{ tabla_json|safe }};
-        
-        if (!Array.isArray(tablaData) || tablaData.length === 0) {
-            console.warn("Datos comparativos insuficientes para renderizar el gráfico.");
-            return;
+    document.addEventListener('DOMContentLoaded', function () {
+
+        var COLORES = ['#085041','#BA7517','#185FA5','#A32D2D','#0F6E56','#5a3a00','#0C447C','#5F5E5A'];
+
+        /* ── 1. Barras agrupadas (Plotly desde graficos_json) ── */
+        try {
+            var gBarras = {{ graficos_json|safe }};
+            if (gBarras && gBarras.data) {
+                // Aplicar paleta de colores consistente
+                gBarras.data.forEach(function(trace, i) {
+                    trace.marker = trace.marker || {};
+                    trace.marker.color = COLORES[i % COLORES.length];
+                });
+                gBarras.layout = Object.assign({}, gBarras.layout, {
+                    template: 'plotly_white',
+                    font: { family: 'Outfit, sans-serif' },
+                    legend: { orientation: 'h', y: -0.22 },
+                    height: 420,
+                    margin: { t: 50, b: 100, l: 60, r: 20 },
+                });
+                Plotly.newPlot('grafico-barras-comp', gBarras.data, gBarras.layout, { responsive: true });
+            }
+        } catch (e) {
+            console.error('Error al renderizar barras comparativas:', e);
         }
 
-        const labels = tablaData.map(r => r.taxonomia || 'Desconocido');
-        const productos = Object.keys(tablaData[0] || {}).filter(k => k !== 'taxonomia' && k !== 'clasificacion');
-        
-        const vDark  = getComputedStyle(document.documentElement).getPropertyValue('--verde-dark').trim() || '#085041';
-        const verde  = getComputedStyle(document.documentElement).getPropertyValue('--verde').trim() || '#1D9E75';
-        const amber  = getComputedStyle(document.documentElement).getPropertyValue('--amber').trim() || '#BA7517';
-        const rojo   = getComputedStyle(document.documentElement).getPropertyValue('--rojo').trim() || '#A32D2D';
-        const teal   = getComputedStyle(document.documentElement).getPropertyValue('--teal').trim() || '#0F6E56';
-        const colores = [vDark, amber, verde, rojo, teal];
+        /* ── 2. Heatmap comparativo (construido desde tabla_json) ── */
+        try {
+            var tablaData = {{ tabla_json|safe }};
+            if (Array.isArray(tablaData) && tablaData.length > 0) {
+                var muestrasHM = Object.keys(tablaData[0]).filter(function(k) {
+                    return k !== 'taxonomia' && k !== 'clasificacion';
+                });
+                var taxa = tablaData.map(function(r) { return r.taxonomia || '—'; });
+                var zValues = muestrasHM.map(function(m) {
+                    return tablaData.map(function(r) { return parseFloat(r[m] || 0); });
+                });
 
-        const datasets = productos.map((p, i) => ({
-            label: p,
-            data: tablaData.map(r => parseFloat(r[p] || 0).toFixed(4)),
-            backgroundColor: colores[i % colores.length] + 'BB',
-            borderColor: colores[i % colores.length],
-            borderWidth: 1.5,
-            borderRadius: 4
-        }));
+                Plotly.newPlot('grafico-heatmap-comp', [{
+                    type: 'heatmap',
+                    x: taxa,
+                    y: muestrasHM,
+                    z: zValues,
+                    colorscale: 'Viridis',
+                    hovertemplate: '<b>%{y}</b><br>%{x}<br>Abundancia: %{z:.4f}%<extra></extra>',
+                    colorbar: { title: { text: '%', side: 'right' } }
+                }], {
+                    template: 'plotly_white',
+                    font: { family: 'Outfit, sans-serif' },
+                    height: 380,
+                    margin: { t: 20, b: 90, l: 110, r: 30 },
+                    xaxis: { tickangle: -35, tickfont: { family: 'DM Mono, monospace', size: 10 } },
+                    yaxis: { tickfont: { family: 'DM Mono, monospace', size: 11 } },
+                }, { responsive: true });
+            }
+        } catch (e) {
+            console.error('Error al renderizar heatmap:', e);
+        }
 
-        const ctx = document.getElementById('chart-comparativo');
-        if (ctx) {
-            new Chart(ctx, {
-                type: 'bar',
-                data: { labels, datasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { 
-                            position: 'bottom',
-                            labels: { font: { family: 'Outfit, sans-serif', size: 13 } } 
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let val = context.parsed.y;
-                                    return ` ${context.dataset.label}: ${val.toFixed(4)}%`;
-                                }
-                            }
-                        }
+        /* ── 3. Diversidad alfa Shannon por muestra ─────────── */
+        try {
+            var shannonData = {{ shannon_json|safe }};
+            var muestrasS = Object.keys(shannonData);
+            if (muestrasS.length > 0) {
+                var valoresS = muestrasS.map(function(m) { return shannonData[m]; });
+                var maxS = Math.max.apply(null, valoresS);
+
+                Plotly.newPlot('grafico-shannon-comp', [{
+                    type: 'bar',
+                    x: muestrasS,
+                    y: valoresS,
+                    text: valoresS.map(function(v) { return v.toFixed(4); }),
+                    textposition: 'outside',
+                    marker: {
+                        color: valoresS.map(function(v) {
+                            var t = maxS > 0 ? v / maxS : 0;
+                            // Degradado verde oscuro → ámbar según valor relativo
+                            return t > 0.66 ? '#085041' : (t > 0.33 ? '#1D9E75' : '#BA7517');
+                        }),
+                        line: { width: 0 }
                     },
-                    scales: { 
-                        x: {
-                            ticks: { font: { family: 'DM Mono, monospace', size: 11 } }
-                        },
-                        y: { 
-                            beginAtZero: true, 
-                            title: { display: true, text: '% Abundancia Relativa', font: { family: 'Outfit, sans-serif' } },
-                            ticks: { font: { family: 'DM Mono, monospace' } }
-                        } 
-                    }
-                }
-            });
+                    hovertemplate: '<b>%{x}</b><br>Shannon H\': %{y:.4f}<extra></extra>',
+                }], {
+                    template: 'plotly_white',
+                    font: { family: 'Outfit, sans-serif' },
+                    yaxis: {
+                        title: { text: "Shannon H'", font: { family: 'Outfit, sans-serif' } },
+                        rangemode: 'tozero',
+                    },
+                    xaxis: {
+                        tickfont: { family: 'DM Mono, monospace', size: 11 },
+                        tickangle: muestrasS.length > 4 ? -30 : 0,
+                    },
+                    height: 380,
+                    margin: { t: 30, b: 70, l: 60, r: 20 },
+                }, { responsive: true });
+            } else {
+                document.getElementById('grafico-shannon-comp').innerHTML =
+                    '<p style="padding:2rem;text-align:center;color:var(--text-hint);font-size:13px;">No hay datos de diversidad disponibles para las muestras seleccionadas.</p>';
+            }
+        } catch (e) {
+            console.error('Error al renderizar Shannon:', e);
         }
-    } catch (err) {
-        console.error("Error crítico controlado al renderizar el gráfico comparativo:", err);
-    }
+
+    });
     {% endif %}
-});
+})();
 </script>
 {% endblock %}

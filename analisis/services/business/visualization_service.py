@@ -124,7 +124,7 @@ class VisualizationService:
                 height=520, legend_title=nivel.capitalize()
             )
             
-            paquete_graficos["grafico_barras_apiladas"] = fig_barras.to_dict()
+            paquete_graficos["grafico_barras_apiladas"] = json.loads(fig_barras.to_json())
             
         except Exception as e:
             paquete_graficos["error_barras"] = f"Error en barras apiladas: {str(e)}"

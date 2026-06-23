@@ -267,7 +267,7 @@
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     try {
-        const topData = {{ top_microorganismos|safe }};
+        const topData = {{ top_microorganismos_json|safe }};
         if (Array.isArray(topData) && topData.length > 0) {
             const labels = topData.map(r => r.taxonomia || r.nombre_tax || 'Desconocido');
             const values = topData.map(r => parseFloat(r.total_porcentaje || 0));
@@ -315,7 +315,7 @@ document.addEventListener("DOMContentLoaded", function() {
 {% if graficos_avanzados %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    var graficos = {{ graficos_avanzados|safe }};
+    var graficos = {{ graficos_avanzados_json|safe }};
     
     // Barras apiladas
     if (graficos.grafico_barras_apiladas) {

@@ -9,8 +9,9 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse, HttpResponseBase
 from django.views.decorators.http import require_POST
 
-from analisis.models import MuestraSuelo
+from analisis.models import MuestraSuelo, ResultadoTaxonomico
 from analisis.services.business.comparison_service import ejecutar_comparacion_clean
+from analisis.services.processing.diversity import DiversityService
 from analisis.services.business.analysis_service import obtener_analisis_avanzado
 from analisis.services.business.export_service import ExportService
 from analisis.services.business.report_generation_service import ReportGenerationService
@@ -49,6 +50,7 @@ def comparar(request):
         "top_actual": 10,
         "nivel_actual": "genus",
         "tabla_json": "[]",
+        "shannon_json": "{}",
     }
 
     TOP_N_VISUALIZACION = 25  # fijo; el usuario ya no lo selecciona
@@ -112,6 +114,22 @@ def comparar(request):
                             contexto["graficos_json"] = fig.to_json()
 
                     contexto["tabla_json"] = json.dumps(tabla)
+
+                    # Shannon H' individual por muestra (sobre todos los taxones)
+                    shannon_por_muestra = {}
+                    for muestra in muestras_seleccionadas:
+                        qs_m = ResultadoTaxonomico.objects.filter(
+                            archivo__tipo_analisis=marcador,
+                            archivo__muestra=muestra,
+                        )
+                        if qs_m.exists():
+                            hits = list(qs_m.values_list('porcentaje_hits', flat=True))
+                            df_m = pd.DataFrame({'%_hits': hits})
+                            df_m = df_m[df_m['%_hits'] > 0]
+                            if not df_m.empty:
+                                alfa = DiversityService.calcular_diversidad_alfa(df_m)
+                                shannon_por_muestra[muestra.codigo] = round(alfa.get('shannon', 0), 4)
+                    contexto["shannon_json"] = json.dumps(shannon_por_muestra)
 
                 else:
                     messages.info(request, "No se encontraron datos para las muestras seleccionadas.")

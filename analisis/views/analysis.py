@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+import json
 import pandas as pd
 import plotly.express as px
 
@@ -31,8 +32,10 @@ def analisis_avanzado(request):
 
     contexto = {
         "top_microorganismos": [],
+        "top_microorganismos_json": "[]",
         "diversidad": {},
         "graficos_avanzados": {},
+        "graficos_avanzados_json": "{}",
         "analisis_diferencial": None,
     }
 
@@ -44,6 +47,7 @@ def analisis_avanzado(request):
 
         if "resumen" in resultado and resultado["resumen"]:
             contexto["top_microorganismos"] = resultado["resumen"]
+            contexto["top_microorganismos_json"] = json.dumps(resultado["resumen"])
 
         # Diversidad alfa: calculada por muestra sobre datos COMPLETOS (no el resumen truncado)
         diversidad = obtener_diversidad(tipo=tipo, nivel=nivel, variedad_id=variedad_id)
@@ -115,9 +119,10 @@ def analisis_avanzado(request):
                     fig_box.update_layout(
                         yaxis_title='Shannon H\'', xaxis_title='Muestra', xaxis_tickangle=-30
                     )
-                    graficos_avanzados['grafico_boxplot'] = fig_box.to_dict()
+                    graficos_avanzados['grafico_boxplot'] = json.loads(fig_box.to_json())
 
                 contexto["graficos_avanzados"] = graficos_avanzados
+                contexto["graficos_avanzados_json"] = json.dumps(graficos_avanzados)
 
         # Análisis diferencial (si hay variedad seleccionada)
         if variedad_id:
