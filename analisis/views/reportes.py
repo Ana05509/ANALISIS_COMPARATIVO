@@ -10,6 +10,7 @@ from django.http import JsonResponse, HttpResponse, HttpResponseBase
 from django.views.decorators.http import require_POST
 
 from analisis.models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo
+from analisis.services.business.analysis_service import obtener_analisis_avanzado, obtener_diversidad
 from analisis.services.business.export_service import ExportService
 from analisis.services.business.report_generation_service import ReportGenerationService
 
@@ -39,15 +40,24 @@ def reportes(request):
     except (ValueError, TypeError):
         top_n = 25
 
+    variedad_id = request.GET.get("producto_id") or None
+
+    resumen   = []
+    diversidad = {}
+    muestras  = MuestraSuelo.objects.none()
+    historial = []
+
     try:
-        muestras = MuestraSuelo.objects.filter(
+        muestras  = MuestraSuelo.objects.filter(
             archivos_moleculares__tipo_analisis=tipo
         ).distinct().order_by("-id")
         historial = ReportGenerationService.obtener_historial_reportes(tipo)
+
+        resultado  = obtener_analisis_avanzado(tipo=tipo, top_n=top_n, nivel=nivel, variedad_id=variedad_id)
+        resumen    = resultado.get("resumen", [])
+        diversidad = obtener_diversidad(tipo=tipo, nivel=nivel, variedad_id=variedad_id) or {}
     except Exception as e:
         messages.error(request, f"Error al cargar los reportes: {str(e)}")
-        muestras = MuestraSuelo.objects.none()
-        historial = []
 
     return render(request, "analisis/reportes.html", {
         "productos":              muestras,
@@ -55,8 +65,12 @@ def reportes(request):
         "tipo_actual":            tipo,
         "nivel_actual":           nivel,
         "marcadores_disponibles": MARCADORES_VALIDOS,
+        "niveles_disponibles":    NIVELES_VALIDOS,
         "top_n_actual":           top_n,
         "opciones_top_n":         OPCIONES_TOP_N,
+        "resumen":                resumen,
+        "diversidad":             diversidad,
+        "variedad_id_actual":     variedad_id,
     })
 
 

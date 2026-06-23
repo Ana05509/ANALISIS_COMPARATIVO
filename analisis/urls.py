@@ -2,7 +2,7 @@ from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
 from .views.auth import CustomLoginView, CustomLogoutView
-from .views.analysis import exportar_analisis
+from .views.analysis import exportar_analisis, resultado_analisis
 
 app_name = "analisis"
 
@@ -37,6 +37,7 @@ urlpatterns = [
     path("analisis-avanzado/exportar/", exportar_analisis, name="exportar_analisis"),
     path("historial/", views.historial, name="historial"),
     path("producto/<int:id>/", views.ver_producto, name="ver_producto"),
+    path("muestra/<int:muestra_id>/resultados/", resultado_analisis, name="resultado_analisis"),
 
     # 4. CATÁLOGO
     path("catalogo/", views.catalogo_microorganismos, name="catalogo"),

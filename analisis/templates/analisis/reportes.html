@@ -41,13 +41,46 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-header" style="border-bottom: 2px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 2rem;">
+<div class="page-header" style="border-bottom: 2px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem;">
     <h1>Reporte de Salud del Suelo y Biodiversidad</h1>
     <p>
-        <strong>ID de Muestra Analizada:</strong> <span class="td-mono" style="font-weight: 600; color: var(--text-primary);">#{{ muestra_id|default:"-" }}</span> <br>
-        <strong>Marcador Molecular:</strong> <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span> <br>
-        <strong>Nivel de Resolución:</strong> <span style="text-transform: capitalize;">{{ nivel_actual|default:"-" }}</span>
+        Marcador: <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span> —
+        Nivel: <span style="text-transform: capitalize; font-weight: 500;">{{ nivel_actual|default:"-" }}</span> —
+        Alcance: <strong>{% if variedad_id_actual %}Muestra filtrada{% else %}Todas las muestras{% endif %}</strong>
     </p>
+</div>
+
+<div class="card card-sm" style="margin-bottom: 1.5rem;">
+    <form method="get" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+        <div>
+            <label class="form-label">Muestra <span style="font-size:10px; color:var(--text-hint);">(opcional)</span></label>
+            <select name="producto_id" class="form-control" style="width:210px;">
+                <option value="">— Todas las muestras —</option>
+                {% for p in productos %}
+                <option value="{{ p.id }}" {% if variedad_id_actual == p.id|stringformat:"d" %}selected{% endif %}>{{ p.codigo }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Marcador</label>
+            <select name="tipo" class="form-control" style="width:90px;">
+                {% for m in marcadores_disponibles %}
+                <option value="{{ m }}" {% if tipo_actual == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label">Nivel</label>
+            <select name="nivel" class="form-control" style="width:130px;">
+                {% for n in niveles_disponibles %}
+                <option value="{{ n }}" {% if nivel_actual == n %}selected{% endif %}>{{ n|capfirst }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-outline btn-sm" style="height:38px;">
+            <i class="ti ti-filter" aria-hidden="true"></i> Filtrar
+        </button>
+    </form>
 </div>
 
 {% if resumen %}
@@ -133,14 +166,14 @@
 {% block extra_js %}
 <script>
     function descargar(formato) {
-        const tipo  = '{{ tipo_actual|default:"16S" }}';
-        const nivel = '{{ nivel_actual|default:"genus" }}';
-        const topN  = document.getElementById('top-n-selector').value;
+        const tipo       = '{{ tipo_actual|default:"16S" }}';
+        const nivel      = '{{ nivel_actual|default:"genus" }}';
+        const topN       = document.getElementById('top-n-selector').value;
+        const productoId = document.querySelector('[name="producto_id"]').value;
 
         const btnPdf   = document.getElementById('btn-pdf');
         const btnExcel = document.getElementById('btn-excel');
 
-        // Bloquea ambos botones mientras genera
         if (btnPdf)   btnPdf.disabled   = true;
         if (btnExcel) btnExcel.disabled = true;
 
@@ -153,7 +186,7 @@
                 'X-CSRFToken': '{{ csrf_token }}',
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: new URLSearchParams({ tipo, nivel, top_n: topN, formato }),
+            body: new URLSearchParams({ tipo, nivel, top_n: topN, formato, producto_id: productoId }),
         })
         .then(response => {
             if (!response.ok) {

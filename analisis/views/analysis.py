@@ -154,6 +154,7 @@ NIVELES_VALIDOS = ["kingdom", "phylum", "class", "order", "family", "genus", "sp
 @login_required
 def resultado_analisis(request, muestra_id):
     try:
+        tipo  = request.GET.get("tipo", "16S")
         nivel = request.GET.get("nivel", "genus")
         if nivel not in NIVELES_VALIDOS:
             nivel = "genus"
@@ -166,13 +167,17 @@ def resultado_analisis(request, muestra_id):
             top_n = 10
 
         contexto = obtener_analisis_avanzado(
-            tipo=request.GET.get("tipo", "16S"),
+            tipo=tipo,
             top_n=top_n,
             nivel=nivel,
             muestra_id=muestra_id,
         )
-        contexto["muestra_id"]    = muestra_id
-        contexto["opciones_top_n"] = OPCIONES_TOP_N
+        diversidad = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_id=muestra_id)
+        if diversidad:
+            contexto["diversidad"] = diversidad
+
+        contexto["muestra_id"]          = muestra_id
+        contexto["opciones_top_n"]      = OPCIONES_TOP_N
         contexto["niveles_disponibles"] = NIVELES_VALIDOS
     except Exception as e:
         messages.error(request, f"No se pudo estructurar el reporte: {str(e)}")

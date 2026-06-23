@@ -8,7 +8,10 @@
 <a href="{% url 'analisis:historial' %}" class="btn btn-outline btn-sm">
     <i class="ti ti-arrow-left" aria-hidden="true"></i> Historial
 </a>
-{% if request.user.is_staff %}
+<a href="{% url 'analisis:resultado_analisis' producto.id %}?tipo={{ tipo_actual }}" class="btn btn-outline btn-sm">
+    <i class="ti ti-table-alias" aria-hidden="true"></i> Resultados Taxonómicos
+</a>
+{% if request.user.rol != 'estudiante' %}
 <a href="{% url 'analisis:analisis_avanzado' %}?producto_id={{ producto.id }}&tipo={{ tipo_actual }}" class="btn btn-primary btn-sm">
     <i class="ti ti-chart-dots" aria-hidden="true"></i> Analizar Perfil
 </a>
