@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from django.utils.html import format_html
+from django.utils.html import format_html, mark_safe
 from django.db import transaction
 from django.contrib import messages
 from django.http import HttpResponseRedirect
@@ -355,11 +355,11 @@ class CatalogoMicroorganismoAdmin(BotonEditarMixin, ModelAdmin):
     @admin.display(description="Tipo")
     def marcador_badge(self, obj):
         if obj.marcador == "16S":
-            return format_html(
+            return mark_safe(
                 '<span style="background:#E1F5EE;color:#085041;padding:3px 10px;border-radius:20px;'
                 'font-size:12px;font-weight:500;">🦠 Bacteria</span>'
             )
-        return format_html(
+        return mark_safe(
             '<span style="background:#FAEEDA;color:#5a3a00;padding:3px 10px;border-radius:20px;'
             'font-size:12px;font-weight:500;">🍄 Hongo</span>'
         )

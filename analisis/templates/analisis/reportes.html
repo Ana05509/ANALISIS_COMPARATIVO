@@ -1,151 +1,351 @@
 {% extends "analisis/base.html" %}
 
-{% block title %}Reporte Agronómico Consolidado{% endblock %}
+{% block title %}Reportes — TerraBioLab UTC{% endblock %}
 {% block nav_reportes %}active{% endblock %}
-{% block topbar_title %}Reporte Ejecutivo de Minería de Datos{% endblock %}
+{% block topbar_title %}Reporte de Salud del Suelo y Biodiversidad{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Barra de progreso del índice de salud ── */
+.indice-bar  { height:13px; border-radius:7px; background:#e2e8f0; overflow:hidden; margin-top:6px; }
+.indice-fill { height:100%; border-radius:7px; transition:width .5s ease; }
+
+/* ── Colores por nivel de salud ── */
+.c-optimo   { color:#14532d; } .bg-optimo   { background:#dcfce7; border-color:#14532d; }
+.c-favorable{ color:#16a34a; } .bg-favorable{ background:#f0fdf4; border-color:#16a34a; }
+.c-moderado { color:#ca8a04; } .bg-moderado { background:#fefce8; border-color:#ca8a04; }
+.c-riesgo   { color:#dc2626; } .bg-riesgo   { background:#fef2f2; border-color:#dc2626; }
+.c-critico  { color:#7f1d1d; } .bg-critico  { background:#fee2e2; border-color:#7f1d1d; }
+
+/* ── Tabla de taxones ── */
+#tabla-reporte th, #tabla-reporte td { padding: 6px 10px; font-size:13px; }
+#tabla-reporte thead th { background:var(--verde-oscuro,#1b4332); color:#fff; }
+#tabla-reporte tbody tr:nth-child(even) { background:var(--bg-light,#f8fafc); }
+</style>
+{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'analisis:historial' %}" class="btn btn-outline btn-sm">
-    <i class="ti ti-arrow-left" aria-hidden="true"></i> Volver al Historial
+    <i class="ti ti-arrow-left"></i> Historial
 </a>
 
-<div style="display:flex; align-items:center; gap:6px;">
-    <label for="top-n-selector" style="font-size:12px; color:var(--text-muted); white-space:nowrap; margin:0;">
-        Top N <span style="font-size:10px; opacity:.7;">(PDF · Excel ignora este límite)</span>
-    </label>
-    <select id="top-n-selector"
-            class="form-control"
-            style="width:90px; height:32px; font-size:13px; padding:0 6px;"
-            title="Número de taxones en el PDF. El Excel exporta el perfil completo sin truncar.">
+<span id="rpt-tipo-label"
+      style="font-size:12px; color:var(--text-hint); padding:0 4px; white-space:nowrap;">
+    Alcance: Global
+</span>
+
+<div style="display:flex; align-items:center; gap:5px;">
+    <label style="font-size:12px; color:var(--text-muted); margin:0; white-space:nowrap;">Top N</label>
+    <select id="top-n-selector" class="form-control"
+            style="width:88px; height:32px; font-size:13px; padding:0 6px;">
         {% for opt in opciones_top_n %}
         <option value="{{ opt }}" {% if top_n_actual == opt %}selected{% endif %}>Top {{ opt }}</option>
         {% endfor %}
     </select>
 </div>
 
-<div style="display:flex; gap:4px;" role="group" aria-label="Formato de descarga">
-    <button id="btn-pdf"
-            onclick="descargar('pdf')"
-            class="btn btn-primary btn-sm"
-            title="Descarga el reporte visual (Top N taxones) en PDF">
-        <i class="ti ti-file-pdf" aria-hidden="true"></i> PDF
+{% if muestra_ids_seleccionados %}
+<div style="display:flex; gap:4px;">
+    <button id="btn-pdf"   onclick="descargar('pdf')"
+            class="btn btn-primary btn-sm" title="PDF del reporte de la(s) muestra(s) seleccionada(s)">
+        <i class="ti ti-file-pdf"></i> PDF
     </button>
-    <button id="btn-excel"
-            onclick="descargar('excel')"
-            class="btn btn-sm"
-            style="background:var(--verde, #16a34a); color:#fff; border:none;"
-            title="Descarga el perfil completo (~1 600 taxa) en Excel sin truncar">
-        <i class="ti ti-table-export" aria-hidden="true"></i> Excel completo
+    <button id="btn-excel" onclick="descargar('excel')"
+            class="btn btn-sm" style="background:#16a34a; color:#fff; border:none;"
+            title="Excel completo (todos los taxones, multi-hoja)">
+        <i class="ti ti-table-export"></i> Excel
     </button>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="page-header" style="border-bottom: 2px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem;">
-    <h1>Reporte de Salud del Suelo y Biodiversidad</h1>
-    <p>
-        Marcador: <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span> —
-        Nivel: <span style="text-transform: capitalize; font-weight: 500;">{{ nivel_actual|default:"-" }}</span> —
-        Alcance: <strong>{% if variedad_id_actual %}Muestra filtrada{% else %}Todas las muestras{% endif %}</strong>
-    </p>
-</div>
 
-<div class="card card-sm" style="margin-bottom: 1.5rem;">
-    <form method="get" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-        <div>
-            <label class="form-label">Muestra <span style="font-size:10px; color:var(--text-hint);">(opcional)</span></label>
-            <select name="producto_id" class="form-control" style="width:210px;">
-                <option value="">— Todas las muestras —</option>
+<!-- ══════════════════════════════════════════════════════════════════════
+     PANEL DE FILTROS
+═══════════════════════════════════════════════════════════════════════ -->
+<div class="card card-sm" style="margin-bottom:1.5rem;">
+    <form method="get" id="rpt-filter-form"
+          style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+
+        <!-- Hidden multi-select sincronizado con los checkboxes -->
+        <select id="rpt-select-hidden" name="muestra_id" multiple style="display:none;">
+            {% for p in productos %}
+            <option value="{{ p.id }}"
+                    {% if p.id in muestra_ids_seleccionados %}selected{% endif %}>
+                {{ p.codigo }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <!-- Selector visual de muestras -->
+        <div style="flex:1; min-width:220px;">
+            <label class="form-label">
+                Muestras
+                <span style="font-size:10px; color:var(--text-hint);">(opcional — sin selección = global)</span>
+            </label>
+
+            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                <input id="rpt-search" type="text" placeholder="Buscar…"
+                       class="form-control"
+                       style="flex:1; height:30px; font-size:12px; padding:0 8px;"
+                       oninput="filtrarMuestras(this.value)">
+                <button type="button" onclick="selTodo(true)"
+                        style="padding:3px 9px; font-size:11px; font-weight:600;
+                               border:1px solid #16a34a; border-radius:5px;
+                               background:transparent; color:#16a34a; cursor:pointer;">
+                    ✓ Todo
+                </button>
+                <button type="button" onclick="selTodo(false)"
+                        style="padding:3px 9px; font-size:11px;
+                               border:1px solid var(--border-color,#e2e8f0); border-radius:5px;
+                               background:transparent; color:var(--text-muted); cursor:pointer;">
+                    ✕
+                </button>
+            </div>
+
+            <div id="rpt-checkbox-list"
+                 style="max-height:160px; overflow-y:auto;
+                        border:1px solid var(--border-color,#e2e8f0); border-radius:6px;
+                        padding:5px 10px; background:var(--bg-light,#f8fafc);">
                 {% for p in productos %}
-                <option value="{{ p.id }}" {% if variedad_id_actual == p.id|stringformat:"d" %}selected{% endif %}>{{ p.codigo }}</option>
+                <label style="display:flex; align-items:center; gap:7px;
+                               padding:3px 0; cursor:pointer; font-size:13px;"
+                       data-codigo="{{ p.codigo|lower }}">
+                    <input type="checkbox" class="rpt-chk" value="{{ p.id }}"
+                           {% if p.id in muestra_ids_seleccionados %}checked{% endif %}
+                           onchange="syncHidden()">
+                    <span>{{ p.codigo }}</span>
+                </label>
+                {% empty %}
+                <p style="font-size:12px; color:var(--text-muted); margin:4px 0;">
+                    Sin muestras disponibles.
+                </p>
                 {% endfor %}
-            </select>
+            </div>
+
+            <div style="font-size:11px; color:var(--text-hint); margin-top:3px;">
+                <span id="rpt-count">0</span> seleccionada(s)
+            </div>
         </div>
+
+        <!-- Marcador -->
         <div>
             <label class="form-label">Marcador</label>
-            <select name="tipo" class="form-control" style="width:90px;">
+            <select name="tipo" class="form-control" style="width:88px;">
                 {% for m in marcadores_disponibles %}
                 <option value="{{ m }}" {% if tipo_actual == m %}selected{% endif %}>{{ m }}</option>
                 {% endfor %}
             </select>
         </div>
+
+        <!-- Nivel taxonómico -->
         <div>
             <label class="form-label">Nivel</label>
-            <select name="nivel" class="form-control" style="width:130px;">
+            <select name="nivel" class="form-control" style="width:120px;">
                 {% for n in niveles_disponibles %}
-                <option value="{{ n }}" {% if nivel_actual == n %}selected{% endif %}>{{ n|capfirst }}</option>
+                <option value="{{ n }}" {% if nivel_actual == n %}selected{% endif %}>
+                    {{ n|capfirst }}
+                </option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="btn btn-outline btn-sm" style="height:38px;">
-            <i class="ti ti-filter" aria-hidden="true"></i> Filtrar
+
+        <button type="submit" class="btn btn-outline btn-sm" style="height:36px;">
+            <i class="ti ti-filter"></i> Filtrar
         </button>
     </form>
 </div>
 
 {% if resumen %}
-<div class="metrics-grid" style="margin-bottom: 2rem;">
-    <div class="metric-card">
-        <div class="metric-label">Total de Taxa</div>
-        <div class="metric-value">{{ resumen|length }}</div>
-        <div class="metric-sub">Microorganismos distintos</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     ÍNDICE DE SALUD DEL SUELO
+═══════════════════════════════════════════════════════════════════════ -->
+{% if indice_salud is not None %}
+{% with ns=nivel_salud|default:"" %}
+<div class="card card-sm" style="margin-bottom:1.5rem; border-left:4px solid
+    {% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
+    {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
+    {% else %}#7f1d1d{% endif %};">
+    <div style="display:flex; align-items:center; gap:1.5rem;">
+        <div style="font-size:2.8rem; font-weight:800; line-height:1;
+            color:{% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
+                  {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
+                  {% else %}#7f1d1d{% endif %};">
+            {{ indice_salud }}
+        </div>
+        <div style="flex:1;">
+            <div style="font-size:10px; text-transform:uppercase; letter-spacing:.06em;
+                        color:var(--text-muted); margin-bottom:2px;">
+                Índice de Salud del Suelo
+            </div>
+            <div style="font-size:1rem; font-weight:700; margin-bottom:5px;
+                color:{% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
+                      {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
+                      {% else %}#7f1d1d{% endif %};">
+                {{ ns }}
+            </div>
+            <div class="indice-bar">
+                <div class="indice-fill" style="width:{{ indice_salud }}%; background:
+                    {% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
+                    {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
+                    {% else %}#7f1d1d{% endif %};">
+                </div>
+            </div>
+        </div>
+        <div style="font-size:12px; color:var(--text-hint);">/ 100</div>
     </div>
-    
+</div>
+{% endwith %}
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     KPI — DIVERSIDAD Y CLASIFICACIÓN FUNCIONAL
+═══════════════════════════════════════════════════════════════════════ -->
+<div class="metrics-grid" style="margin-bottom:1rem; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">
+    <div class="metric-card">
+        <div class="metric-label">Taxa detectados</div>
+        <div class="metric-value">{{ resumen|length }}</div>
+        <div class="metric-sub">Top {{ top_n_actual }}</div>
+    </div>
     {% if diversidad %}
     <div class="metric-card">
-        <div class="metric-label">Índice Shannon (H')</div>
-        <div class="metric-value td-mono">{{ diversidad.shannon|default:"0.00" }}</div>
-        <div class="metric-sub">Diversidad Alfa</div>
+        <div class="metric-label">Shannon H'</div>
+        <div class="metric-value td-mono">{{ diversidad.shannon|floatformat:4|default:"—" }}</div>
+        <div class="metric-sub">Diversidad alfa</div>
     </div>
     <div class="metric-card">
-        <div class="metric-label">Dominancia Simpson</div>
-        <div class="metric-value td-mono">{{ diversidad.simpson|default:"0.00" }}</div>
-        <div class="metric-sub">Equitatividad comunitaria</div>
+        <div class="metric-label">Simpson D</div>
+        <div class="metric-value td-mono">{{ diversidad.simpson|floatformat:4|default:"—" }}</div>
+        <div class="metric-sub">Equitatividad</div>
+    </div>
+    {% endif %}
+    {% if totales_clasificacion %}
+    <div class="metric-card" style="border-top:3px solid #16a34a;">
+        <div class="metric-label">Benéficos</div>
+        <div class="metric-value" style="color:#16a34a;">{{ totales_clasificacion.benefico }}</div>
+        <div class="metric-sub">Aliados del cultivo</div>
+    </div>
+    <div class="metric-card" style="border-top:3px solid #dc2626;">
+        <div class="metric-label">Fitopatógenos</div>
+        <div class="metric-value" style="color:#dc2626;">{{ totales_clasificacion.fitopatogeno }}</div>
+        <div class="metric-sub">Potencial riesgo</div>
+    </div>
+    <div class="metric-card" style="border-top:3px solid #64748b;">
+        <div class="metric-label">Neutrales</div>
+        <div class="metric-value" style="color:#64748b;">{{ totales_clasificacion.neutral }}</div>
+        <div class="metric-sub">Sin impacto directo</div>
+    </div>
+    <div class="metric-card" style="border-top:3px solid #94a3b8;">
+        <div class="metric-label">Sin catalogar</div>
+        <div class="metric-value" style="color:#94a3b8;">{{ totales_clasificacion.sin_clasificar }}</div>
+        <div class="metric-sub">No en catálogo</div>
     </div>
     {% endif %}
 </div>
 
+<!-- ══════════════════════════════════════════════════════════════════════
+     GRÁFICA — perfil de abundancia (1 muestra) o tendencia (2+ muestras)
+═══════════════════════════════════════════════════════════════════════ -->
+{% if resumen %}
+<div class="card" style="margin-bottom:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem;">
+        <div>
+            <div class="card-title" style="margin-bottom:0.2rem;">
+                <i class="ti ti-chart-line"></i>
+                {% if muestra_ids_seleccionados|length == 1 %}
+                    Perfil de Abundancia — {{ nivel_actual|capfirst }}
+                {% else %}
+                    Tendencia por Muestra y Clasificación Funcional
+                {% endif %}
+            </div>
+            <p style="font-size:12px; color:var(--text-hint); margin:0;">
+                {% if muestra_ids_seleccionados|length == 1 %}
+                    Abundancia relativa (%) de cada taxón. El color indica la clasificación funcional.
+                    <strong>Cursor sobre un punto</strong> → detalle del microorganismo.
+                {% else %}
+                    N.° de taxones únicos (Benéficos, Fitopatógenos, Neutrales) en cada muestra.
+                    <strong>Cursor sobre un punto</strong> → lista de microorganismos de esa categoría.
+                {% endif %}
+            </p>
+        </div>
+        <button onclick="exportarGrafica('rpt-grafico-principal','perfil_abundancia')"
+                class="btn btn-outline btn-sm" style="flex-shrink:0; margin-left:1rem;">
+            <i class="ti ti-download"></i> PNG
+        </button>
+    </div>
+    <div id="rpt-grafico-principal" style="width:100%; min-height:420px;"></div>
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     TABLA TOP N TAXONES
+═══════════════════════════════════════════════════════════════════════ -->
 <div class="card">
-    <div class="card-title">Desglose Ecológico ({{ nivel_actual|default:"-"|capfirst }})</div>
-    
-    <div class="table-wrap" style="margin-top: 1rem;">
-        <table id="tabla-reporte" style="width: 100%;">
+    <div class="card-title">
+        Desglose Ecológico — Top {{ top_n_actual }} ({{ nivel_actual|capfirst }})
+        <span style="font-size:12px; font-weight:400; color:var(--text-hint); margin-left:8px;">
+            {% if muestra_ids_seleccionados %}
+                {{ muestra_ids_seleccionados|length }} muestra(s) seleccionada(s)
+            {% else %}
+                Todas las muestras
+            {% endif %}
+        </span>
+    </div>
+    <div class="table-wrap" style="margin-top:0.8rem;">
+        <table id="tabla-reporte" style="width:100%;">
             <thead>
                 <tr>
-                    <th style="width: 5%;">#</th>
-                    <th style="width: 30%;">Taxonomía Detectada</th>
-                    <th style="width: 15%;">Conteo (Hits)</th>
-                    <th style="width: 30%;">Abundancia Relativa</th>
-                    <th style="width: 20%;">Perfil Agronómico</th>
+                    <th style="width:4%;">#</th>
+                    <th style="width:32%;">Taxón detectado</th>
+                    <th style="width:13%;">Hits</th>
+                    <th style="width:31%;">Abundancia relativa</th>
+                    <th style="width:20%;">Clasificación funcional</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in resumen %}
                 <tr>
-                    <td class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
+                    <td class="td-mono" style="color:var(--text-muted); font-size:12px;">
+                        {{ forloop.counter }}
+                    </td>
                     <td>
-                        <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
+                        <strong style="font-family:'DM Mono',monospace; font-weight:500; font-size:13px;">
                             {{ item.taxonomia|default:"Desconocido" }}
                         </strong>
                     </td>
-                    <td class="td-mono" style="color: var(--text-primary);">{{ item.total_hits|default:"0" }}</td>
+                    <td class="td-mono" style="font-size:13px;">
+                        {{ item.total_hits|default:"0" }}
+                    </td>
                     <td>
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="flex: 1; height: 8px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.total_porcentaje|default:0|floatformat:2 }}%;"></div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div style="flex:1; height:7px; background:var(--border-color,#e2e8f0);
+                                        border-radius:4px; overflow:hidden;">
+                                <div style="height:100%; background:var(--verde,#16a34a);
+                                            border-radius:4px;
+                                            width:{{ item.total_porcentaje|default:0|floatformat:2 }}%;"></div>
                             </div>
-                            <span class="td-mono" style="font-weight: 500; min-width: 60px; text-align: right;">
+                            <span class="td-mono" style="font-size:12px; font-weight:500; min-width:56px; text-align:right;">
                                 {{ item.total_porcentaje|default:0|floatformat:2 }}%
                             </span>
                         </div>
                     </td>
                     <td>
                         {% if item.clasificacion == 'benefico' %}
-                            <span class="badge badge-benefico" style="font-weight: bold;"><i class="ti ti-shield-check"></i> Aliado Benéfico</span>
+                            <span class="badge badge-benefico">
+                                <i class="ti ti-shield-check"></i> Benéfico
+                            </span>
                         {% elif item.clasificacion == 'fitopatogeno' %}
-                            <span class="badge badge-fitopatogeno" style="font-weight: bold;"><i class="ti ti-alert-triangle"></i> Riesgo Patógeno</span>
+                            <span class="badge badge-fitopatogeno">
+                                <i class="ti ti-alert-triangle"></i> Fitopatógeno
+                            </span>
+                        {% elif item.clasificacion == 'neutral' %}
+                            <span class="badge" style="background:#f1f5f9; color:#475569;">
+                                Neutral
+                            </span>
                         {% else %}
-                            <span class="badge badge-sin-clas">Sin impacto documentado</span>
+                            <span class="badge badge-sin-clas">Sin catalogar</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -154,75 +354,287 @@
         </table>
     </div>
 </div>
+
 {% else %}
-<div class="empty-state">
-    <i class="ti ti-file-report" aria-hidden="true" style="font-size: 3rem; color: var(--text-muted);"></i>
-    <strong>Reporte no disponible</strong>
-    <p>No existen datos bioinformáticos procesados para estructurar este reporte.</p>
+<!-- Estado vacío — ninguna muestra seleccionada -->
+<div class="empty-state" style="margin-top:2rem;">
+    <i class="ti ti-flask" style="font-size:3.5rem; color:var(--verde,#16a34a); opacity:.7;"></i>
+    <strong style="font-size:1.1rem; margin-top:.5rem;">
+        Selecciona una muestra para generar el reporte
+    </strong>
+    <p style="max-width:420px; color:var(--text-muted); line-height:1.6; margin-top:.4rem;">
+        Marca una o varias muestras en el panel de arriba y haz clic en
+        <strong>Filtrar</strong>. Con <strong>1 muestra</strong> obtienes el
+        reporte individual; con <strong>2 o más</strong>, el comparativo.
+    </p>
+    {% if productos %}
+    <div style="margin-top:1.2rem; display:flex; flex-wrap:wrap; gap:8px; justify-content:center;">
+        {% for p in productos %}
+        <a href="?tipo={{ tipo_actual }}&nivel={{ nivel_actual }}&muestra_id={{ p.id }}"
+           class="btn btn-outline btn-sm">
+            <i class="ti ti-test-pipe"></i> {{ p.codigo }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
 {% endif %}
+
 {% endblock %}
 
+
 {% block extra_js %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
 <script>
-    function descargar(formato) {
-        const tipo       = '{{ tipo_actual|default:"16S" }}';
-        const nivel      = '{{ nivel_actual|default:"genus" }}';
-        const topN       = document.getElementById('top-n-selector').value;
-        const productoId = document.querySelector('[name="producto_id"]').value;
+var _MODO_MUESTRA = {{ muestra_ids_seleccionados|length }};
+var _RESUMEN_JSON  = {% if resumen_json %}{{ resumen_json|safe }}{% else %}[]{% endif %};
+var _CLAS_JSON     = {{ datos_clasificacion_json|safe }};
 
-        const btnPdf   = document.getElementById('btn-pdf');
-        const btnExcel = document.getElementById('btn-excel');
+var COLOR_CLAS = {
+    benefico:      '#16a34a',
+    fitopatogeno:  '#dc2626',
+    neutral:       '#475569',
+    sin_clasificar:'#94a3b8',
+};
+var LABEL_CLAS = {
+    benefico:      'Benéfico',
+    fitopatogeno:  'Potencial Fitopatógeno',
+    neutral:       'Neutral',
+    sin_clasificar:'Sin clasificación',
+};
 
-        if (btnPdf)   btnPdf.disabled   = true;
-        if (btnExcel) btnExcel.disabled = true;
+function exportarGrafica(divId, nombre) {
+    var el = document.getElementById(divId);
+    if (el) Plotly.downloadImage(el, { format:'png', filename:nombre, width:1600, height:650, scale:2 });
+}
 
-        const btn = formato === 'pdf' ? btnPdf : btnExcel;
-        if (btn) btn.textContent = 'Generando…';
+document.addEventListener('DOMContentLoaded', function () {
+    var div = document.getElementById('rpt-grafico-principal');
+    if (!div) return;
 
-        fetch("{% url 'analisis:generar_reporte' %}", {
+    // ── Modo 1 muestra: perfil de abundancia, una línea por categoría ──
+    if (_MODO_MUESTRA === 1 && _RESUMEN_JSON.length > 0) {
+        var nombres = _RESUMEN_JSON.map(function(d){ return d.nombre; });
+
+        // Categorías en el orden que aparecerán en la leyenda
+        var CATS = ['benefico', 'fitopatogeno', 'neutral', 'sin_clasificar'];
+
+        var traces = CATS.map(function(cat) {
+            // Cada traza solo tiene valor (%) donde el organismo pertenece a esa categoría
+            // En los demás posiciones → null (la línea no se conecta, queda separada)
+            var ys = _RESUMEN_JSON.map(function(d){
+                return d.clasificacion === cat ? d.porcentaje : null;
+            });
+
+            var hoverTexts = _RESUMEN_JSON.map(function(d, i){
+                if (d.clasificacion !== cat) return '';
+                return '<b>' + d.nombre + '</b><br>'
+                     + d.porcentaje.toFixed(2) + '% &nbsp;(' + d.hits + ' hits)<br>'
+                     + '<i>' + LABEL_CLAS[cat] + '</i>';
+            });
+
+            return {
+                type: 'scatter',
+                mode: 'lines+markers+text',
+                name: LABEL_CLAS[cat],
+                x: nombres,
+                y: ys,
+                // Valor % encima de cada punto que tiene dato
+                text: ys.map(function(p){
+                    return (p !== null && p > 0) ? p.toFixed(2) + '%' : '';
+                }),
+                textposition: 'top center',
+                textfont: { size: 10, color: COLOR_CLAS[cat], family: 'Arial, sans-serif' },
+                hovertext: hoverTexts,
+                hoverinfo: 'text',
+                connectgaps: false,          // NO conectar puntos de categorías distintas
+                line:   { color: COLOR_CLAS[cat], width: 2.5 },
+                marker: { color: COLOR_CLAS[cat], size: 10,
+                          line: { color: '#ffffff', width: 2 } },
+            };
+        });
+
+        Plotly.newPlot(div, traces, {
+            title: {
+                text: 'Perfil de Abundancia Relativa por {{ nivel_actual|capfirst }}',
+                font: { size: 14, color: '#1e293b', family: 'Arial, sans-serif' },
+                x: 0.5, xanchor: 'center',
+            },
+            xaxis: {
+                tickangle: nombres.length > 6 ? -40 : 0,
+                automargin: true, showgrid: false, zeroline: false,
+                tickfont: { size: nombres.length > 15 ? 9 : 11 },
+            },
+            yaxis: {
+                title: { text: 'Abundancia relativa (%)', standoff: 6 },
+                rangemode: 'tozero', showgrid: true,
+                gridcolor: '#e2e8f0', zeroline: true, zerolinecolor: '#cbd5e1',
+                tickfont: { size: 10 }, automargin: true,
+            },
+            legend: {
+                orientation: 'h', y: -0.22, xanchor: 'center', x: 0.5,
+                font: { size: 12 },
+            },
+            height: 470,
+            margin: { t: 60, r: 30, b: 110, l: 70 },
+            hovermode: 'x unified',
+            plot_bgcolor: '#ffffff', paper_bgcolor: '#ffffff',
+        }, { responsive: true, displayModeBar: false });
+
+    // ── Modo 2+ muestras: tendencia de taxones por categoría ───────────
+    } else if (_MODO_MUESTRA >= 2 && _CLAS_JSON.length > 0) {
+        var muestras = _CLAS_JSON.map(function(d){ return d.muestra; });
+        var CFG = [
+            { key:'benefico',     label:'Benéfico',               color:'#16a34a' },
+            { key:'fitopatogeno', label:'Potencial Fitopatógeno', color:'#dc2626' },
+            { key:'neutral',      label:'Neutral',                color:'#475569' },
+        ];
+        var traces = CFG.map(function(cfg) {
+            var counts = _CLAS_JSON.map(function(d){ return d[cfg.key] || 0; });
+            var hover  = _CLAS_JSON.map(function(d) {
+                var n     = d[cfg.key] || 0;
+                var names = d['nombres_' + cfg.key] || [];
+                if (n === 0) return '<b>' + cfg.label + ': 0 taxones</b>';
+                var lista = names.slice(0, 15).map(function(s){ return ' • ' + s; }).join('<br>');
+                var extra = names.length > 15 ? '<br><i>…y ' + (names.length-15) + ' más</i>' : '';
+                return '<b>' + cfg.label + ': ' + n + ' taxón(es)</b><br>' + lista + extra;
+            });
+            return {
+                type: 'scatter', mode: 'lines+markers+text',
+                name: cfg.label, x: muestras, y: counts,
+                text: counts.map(function(n){ return n > 0 ? String(n) : ''; }),
+                textposition: 'top center',
+                textfont: { size: 11, color: cfg.color },
+                hovertext: hover, hoverinfo: 'text',
+                line:   { color: cfg.color, width: 2.5 },
+                marker: { color: cfg.color, size: 11, line: { color:'#ffffff', width:2 } },
+                connectgaps: true,
+            };
+        });
+        Plotly.newPlot(div, traces, {
+            title: {
+                text: 'Taxones por Clasificación Funcional por Muestra',
+                font: { size: 14, color: '#1e293b' }, x: 0.5, xanchor: 'center',
+            },
+            xaxis: {
+                tickangle: muestras.length > 3 ? -35 : 0, automargin: true,
+                showgrid: false, zeroline: false, tickfont: { size: 11 },
+            },
+            yaxis: {
+                title: { text: 'N.° de taxones únicos', standoff: 8 },
+                rangemode: 'tozero', showgrid: true, gridcolor: '#e2e8f0',
+                zeroline: true, zerolinecolor: '#cbd5e1', tickfont: { size: 10 }, automargin: true,
+            },
+            legend: { orientation: 'h', y: -0.22, xanchor: 'center', x: 0.5, font: { size: 11 } },
+            height: 460,
+            margin: { t: 60, r: 30, b: 100, l: 70 },
+            hovermode: 'closest',
+            plot_bgcolor: '#ffffff', paper_bgcolor: '#ffffff',
+        }, { responsive: true, displayModeBar: false });
+    }
+});
+</script>
+
+<script>
+// ── Sincronización checkbox ↔ hidden select ──────────────────────────
+function syncHidden() {
+    var hidden = document.getElementById('rpt-select-hidden');
+    var chks   = document.querySelectorAll('.rpt-chk');
+    Array.from(hidden.options).forEach(function(o){ o.selected = false; });
+    var count  = 0;
+    chks.forEach(function(chk) {
+        if (chk.checked) {
+            count++;
+            var opt = hidden.querySelector('option[value="' + chk.value + '"]');
+            if (opt) opt.selected = true;
+        }
+    });
+    document.getElementById('rpt-count').textContent = count;
+    var lbl = document.getElementById('rpt-tipo-label');
+    if (lbl) {
+        lbl.textContent = count === 0 ? 'Alcance: Global'
+            : count === 1             ? 'Alcance: Individual (1 muestra)'
+            : 'Alcance: Comparativo (' + count + ' muestras)';
+    }
+}
+
+function selTodo(val) {
+    document.querySelectorAll('.rpt-chk').forEach(function(chk) {
+        var lbl = chk.closest('label');
+        if (!lbl || lbl.style.display !== 'none') chk.checked = val;
+    });
+    syncHidden();
+}
+
+function filtrarMuestras(q) {
+    var term = q.toLowerCase().trim();
+    document.querySelectorAll('#rpt-checkbox-list label').forEach(function(lbl) {
+        var codigo = lbl.getAttribute('data-codigo') || '';
+        lbl.style.display = (!term || codigo.includes(term)) ? '' : 'none';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', syncHidden);
+
+// ── Descarga PDF / Excel ─────────────────────────────────────────────
+async function descargar(formato) {
+    var tipo    = '{{ tipo_actual|default:"16S" }}';
+    var nivel   = '{{ nivel_actual|default:"genus" }}';
+    var topN    = document.getElementById('top-n-selector').value;
+    var ids     = Array.from(document.querySelectorAll('#rpt-select-hidden option:checked'))
+                       .map(function(o){ return o.value; });
+
+    var btnPdf   = document.getElementById('btn-pdf');
+    var btnExcel = document.getElementById('btn-excel');
+    var btn      = formato === 'pdf' ? btnPdf : btnExcel;
+
+    if (btnPdf)   btnPdf.disabled   = true;
+    if (btnExcel) btnExcel.disabled = true;
+    if (btn)      btn.textContent   = 'Generando…';
+
+    var body = new URLSearchParams({ tipo:tipo, nivel:nivel, top_n:topN, formato:formato });
+    ids.forEach(function(id){ body.append('muestra_id', id); });
+
+    try {
+        var resp = await fetch("{% url 'analisis:generar_reporte' %}", {
             method: 'POST',
             headers: {
                 'X-CSRFToken': '{{ csrf_token }}',
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: new URLSearchParams({ tipo, nivel, top_n: topN, formato, producto_id: productoId }),
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => {
-                    throw new Error(err.error || `Error al generar ${formato.toUpperCase()}`);
-                });
-            }
-            return response.blob();
-        })
-        .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-            const a   = document.createElement('a');
-            a.href    = url;
-            const ext = formato === 'excel' ? 'xlsx' : 'pdf';
-            a.download = formato === 'excel'
-                ? `reporte_${tipo}_${nivel}_completo.${ext}`
-                : `reporte_${tipo}_${nivel}_top${topN}.${ext}`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-        })
-        .catch(error => {
-            alert('Error al descargar: ' + error.message);
-            console.error(error);
-        })
-        .finally(() => {
-            if (btnPdf) {
-                btnPdf.disabled  = false;
-                btnPdf.innerHTML = '<i class="ti ti-file-pdf" aria-hidden="true"></i> PDF';
-            }
-            if (btnExcel) {
-                btnExcel.disabled  = false;
-                btnExcel.innerHTML = '<i class="ti ti-table-export" aria-hidden="true"></i> Excel completo';
-            }
+            body: body,
         });
+
+        if (!resp.ok) {
+            var err = await resp.json().catch(function(){ return { error: 'Error desconocido' }; });
+            throw new Error(err.error || ('Error ' + resp.status));
+        }
+
+        var blob = await resp.blob();
+        var url  = window.URL.createObjectURL(blob);
+        var a    = document.createElement('a');
+        a.href   = url;
+        var ext  = formato === 'excel' ? 'xlsx' : 'pdf';
+        a.download = 'reporte_' + tipo + '_' + nivel + '_' + (ids.length === 1 ? 'individual' : ids.length > 1 ? 'comparativo' : 'global') + '.' + ext;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+    } catch (err) {
+        alert('Error al descargar: ' + err.message);
+        console.error(err);
+    } finally {
+        if (btnPdf) {
+            btnPdf.disabled  = false;
+            btnPdf.innerHTML = '<i class="ti ti-file-pdf"></i> PDF';
+        }
+        if (btnExcel) {
+            btnExcel.disabled  = false;
+            btnExcel.innerHTML = '<i class="ti ti-table-export"></i> Excel';
+        }
     }
+}
 </script>
 {% endblock %}

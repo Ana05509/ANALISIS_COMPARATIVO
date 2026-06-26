@@ -112,10 +112,24 @@ class VisualizationService:
                 var_name="Muestra",
                 value_name="Abundancia"
             )
-            
+
+            # Paleta fija; "Otros" siempre en gris para no confundir con taxones reales
+            PALETA = ['#1D9E75','#0F6E56','#BA7517','#185FA5','#A32D2D','#9E6515',
+                      '#0C447C','#6B4E9E','#2E8B57','#c7a640','#5F5E5A','#085041']
+            taxa_ordenados = df_top[nivel].tolist()
+            color_map = {}
+            idx = 0
+            for taxon in taxa_ordenados:
+                if taxon and 'otros' in str(taxon).lower():
+                    color_map[taxon] = '#B0B8C1'   # gris neutro
+                else:
+                    color_map[taxon] = PALETA[idx % len(PALETA)]
+                    idx += 1
+
             fig_barras = px.bar(
                 df_formato_largo, x="Muestra", y="Abundancia", color=nivel,
-                title=f"Composición de la Comunidad Microbiana (Top {top_n} - Nivel: {nivel.capitalize()})",
+                color_discrete_map=color_map,
+                title=f"Composición de la Comunidad Microbiana (Top {top_n} — {nivel.capitalize()})",
                 template="plotly_white"
             )
             fig_barras.update_layout(
@@ -143,9 +157,18 @@ class VisualizationService:
                 hoverongaps=False
             ))
             fig_heatmap.update_layout(
-                title=f"Mapa de Calor - Patrones de Abundancia Core (Top {top_n})",
-                xaxis_title="Muestras de Suelo", yaxis_title=nivel.capitalize(),
-                height=400 + (top_n * 6)
+                title=f"Mapa de Calor — Abundancia Core (Top {top_n})",
+                xaxis_title="Muestras de Suelo",
+                yaxis_title=nivel.capitalize(),
+                height=max(420, top_n * 42 + 120),
+                margin=dict(l=220, r=30, t=60, b=60),
+                yaxis=dict(
+                    tickmode="linear",
+                    tick0=0,
+                    dtick=1,
+                    tickfont=dict(size=11),
+                    automargin=True,
+                ),
             )
             
             paquete_graficos["grafico_heatmap"] = json.loads(str(fig_heatmap.to_json()))

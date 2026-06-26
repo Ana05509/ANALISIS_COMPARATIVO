@@ -1,5 +1,7 @@
+from collections import defaultdict
 from io import BytesIO
 from datetime import datetime
+import json
 
 import pandas as pd
 from django.shortcuts import render, redirect
@@ -12,199 +14,309 @@ from django.views.decorators.http import require_POST
 from analisis.models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo
 from analisis.services.business.analysis_service import obtener_analisis_avanzado, obtener_diversidad
 from analisis.services.business.export_service import ExportService
-from analisis.services.business.report_generation_service import ReportGenerationService
 
 MARCADORES_VALIDOS = ("16S", "ITS")
-FORMATOS_VALIDOS   = ("pdf", "excel", "html", "json")
+FORMATOS_VALIDOS   = ("pdf", "excel")
 OPCIONES_TOP_N     = [5, 10, 25, 50]
 NIVELES_VALIDOS    = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
 MAPA_NIVELES = {
     "kingdom": "kingdom", "phylum": "phylum", "class": "tax_class",
-    "order": "order",     "family": "family",  "genus": "genus",
+    "order":   "order",   "family": "family",  "genus": "genus",
     "species": "species",
 }
 
 
+# ── Helpers de cálculo ────────────────────────────────────────────────────────
+
+def calcular_indice_salud(n_ben, n_fito, n_neu, n_sc, shannon=0):
+    """Índice de Salud del Suelo (0-100). Devuelve (indice, nivel)."""
+    total_func = n_ben + n_fito
+    ratio      = n_ben / total_func if total_func > 0 else 0.5
+    shan_norm  = min(float(shannon or 0) / 3.5, 1.0)
+    indice     = max(0, min(100, round((ratio * 0.70 + shan_norm * 0.30) * 100)))
+    if   indice >= 80: nivel = "ÓPTIMO"
+    elif indice >= 65: nivel = "FAVORABLE"
+    elif indice >= 50: nivel = "MODERADO"
+    elif indice >= 30: nivel = "EN RIESGO"
+    else:              nivel = "CRÍTICO"
+    return indice, nivel
+
+
+def _obtener_clasificacion_detalle(qs, nivel, campo_db):
+    """
+    Devuelve (detalle_dict, totales_dict) con info funcional de cada taxón.
+    detalle_dict[cat] = [{nombre, porcentaje, descripcion, referencia}, ...]
+    """
+    CATS = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
+    taxa_qs    = list(qs.values(taxon=F(campo_db)).annotate(hits=Sum("num_hits")).order_by("-hits"))
+    grand_total = sum(r["hits"] for r in taxa_qs) or 1
+    catalogo   = {obj.nombre.lower(): obj for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel)}
+
+    detalle = {c: [] for c in CATS}
+    totales = {c: 0  for c in CATS}
+    for row in taxa_qs:
+        nombre = row["taxon"] or "Desconocido"
+        cat_obj = catalogo.get(nombre.lower())
+        clas    = (cat_obj.clasificacion if cat_obj and cat_obj.clasificacion in CATS else "sin_clasificar")
+        detalle[clas].append({
+            "nombre":      nombre,
+            "porcentaje":  round(row["hits"] / grand_total * 100, 2),
+            "descripcion": cat_obj.descripcion or "" if cat_obj else "",
+            "referencia":  cat_obj.referencia  or "" if cat_obj else "",
+        })
+        totales[clas] += 1
+    return detalle, totales
+
+
+def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
+    """
+    Construye el dict completo de datos para PDF / Excel.
+    Retorna None si no hay datos.
+    """
+    campo_db = MAPA_NIVELES.get(nivel, "genus")
+    qs = ResultadoTaxonomico.objects.filter(archivo__tipo_analisis=tipo)
+    if muestra_ids:
+        qs = qs.filter(archivo__muestra_id__in=muestra_ids)
+    if not qs.exists():
+        return None
+
+    grand_total = qs.aggregate(total=Sum("num_hits"))["total"] or 1
+    todos_raw   = list(qs.values(taxonomia=F(campo_db)).annotate(total_hits=Sum("num_hits")).order_by("-total_hits"))
+
+    nombres_taxa = [r["taxonomia"] for r in todos_raw if r["taxonomia"]]
+    catalogo_map = {
+        obj["nombre"].lower(): obj["clasificacion"]
+        for obj in CatalogoMicroorganismo.objects.filter(
+            nombre__in=nombres_taxa, nivel__iexact=nivel
+        ).values("nombre", "clasificacion")
+    }
+    for r in todos_raw:
+        r["total_porcentaje"] = round(r["total_hits"] / grand_total * 100, 2)
+        r["clasificacion"]    = catalogo_map.get(str(r["taxonomia"] or "").lower(), "sin_clasificar")
+
+    diversidad  = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids) or {}
+    detalle_clas, totales_clas = _obtener_clasificacion_detalle(qs, nivel, campo_db)
+    shannon_val  = diversidad.get("shannon", 0) or 0
+    indice, nivel_salud = calcular_indice_salud(
+        totales_clas["benefico"], totales_clas["fitopatogeno"],
+        totales_clas["neutral"],  totales_clas["sin_clasificar"],
+        shannon=shannon_val,
+    )
+    return {
+        "top_taxa":     todos_raw[:top_n],
+        "todos_taxa":   todos_raw,
+        "diversidad":   diversidad,
+        "detalle_clas": detalle_clas,
+        "totales_clas": totales_clas,
+        "indice_salud": indice,
+        "nivel_salud":  nivel_salud,
+        "tipo": tipo, "nivel": nivel, "top_n": top_n,
+    }
+
+
+def _construir_datos_por_muestra(tipo, nivel, top_n, muestras_list):
+    """Para reportes comparativos: datos por cada muestra seleccionada."""
+    campo_db  = MAPA_NIVELES.get(nivel, "genus")
+    resultado = []
+    for muestra in muestras_list:
+        qs_m = ResultadoTaxonomico.objects.filter(
+            archivo__tipo_analisis=tipo, archivo__muestra_id=muestra.id
+        )
+        if not qs_m.exists():
+            continue
+        grand_total = qs_m.aggregate(total=Sum("num_hits"))["total"] or 1
+        top_raw = list(qs_m.values(taxonomia=F(campo_db)).annotate(total_hits=Sum("num_hits")).order_by("-total_hits")[:top_n])
+        for r in top_raw:
+            r["total_porcentaje"] = round(r["total_hits"] / grand_total * 100, 2)
+        div_m = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=[muestra.id]) or {}
+        _, totales_m = _obtener_clasificacion_detalle(qs_m, nivel, campo_db)
+        indice_m, nivel_m = calcular_indice_salud(
+            totales_m["benefico"], totales_m["fitopatogeno"],
+            totales_m["neutral"],  totales_m["sin_clasificar"],
+            shannon=div_m.get("shannon", 0) or 0,
+        )
+        resultado.append({
+            "muestra":      muestra,
+            "top_taxa":     top_raw,
+            "diversidad":   div_m,
+            "totales_clas": totales_m,
+            "indice_salud": indice_m,
+            "nivel_salud":  nivel_m,
+        })
+    return resultado
+
+
+def _clasificacion_por_muestra(tipo, nivel, muestra_ids=None):
+    """
+    Devuelve lista de dicts {muestra, benefico, fitopatogeno, neutral, sin_clasificar,
+    nombres_benefico, ...} filtrada por muestra_ids (o global si es None).
+    """
+    campo_db = MAPA_NIVELES.get(nivel, "genus")
+    qs = ResultadoTaxonomico.objects.filter(archivo__tipo_analisis=tipo)
+    if muestra_ids:
+        qs = qs.filter(archivo__muestra_id__in=muestra_ids)
+
+    data = list(qs.values(muestra=F("archivo__muestra__codigo"), taxon=F(campo_db)).annotate(hits=Sum("num_hits")))
+    if not data:
+        return []
+
+    catalog = {obj.nombre.lower(): obj.clasificacion for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel)}
+    CATS    = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
+    acc     = defaultdict(lambda: {c: [] for c in CATS})
+
+    for row in data:
+        m      = row["muestra"] or "Sin código"
+        nombre = row["taxon"]   or "Desconocido"
+        clas   = catalog.get(nombre.lower(), "sin_clasificar")
+        if nombre not in acc[m][clas]:
+            acc[m][clas].append(nombre)
+
+    return [
+        {"muestra": m, **{c: len(listas[c]) for c in CATS}, **{f"nombres_{c}": sorted(listas[c]) for c in CATS}}
+        for m, listas in sorted(acc.items())
+    ]
+
+
+# ── Vistas ────────────────────────────────────────────────────────────────────
+
 @login_required
 def reportes(request):
-    tipo_raw = request.GET.get("tipo", "16S")
-    tipo = tipo_raw if tipo_raw in MARCADORES_VALIDOS else "16S"
-
-    nivel_raw = request.GET.get("nivel", "genus")
-    nivel = nivel_raw if nivel_raw in NIVELES_VALIDOS else "genus"
-
+    tipo  = request.GET.get("tipo",  "16S")  if request.GET.get("tipo",  "16S")  in MARCADORES_VALIDOS else "16S"
+    nivel = request.GET.get("nivel", "genus") if request.GET.get("nivel", "genus") in NIVELES_VALIDOS    else "genus"
     try:
         top_n = int(request.GET.get("top_n", 25))
-        if top_n not in OPCIONES_TOP_N:
-            top_n = 25
+        top_n = top_n if top_n in OPCIONES_TOP_N else 25
     except (ValueError, TypeError):
         top_n = 25
 
-    variedad_id = request.GET.get("producto_id") or None
+    muestra_ids = [int(x) for x in request.GET.getlist("muestra_id") if x.isdigit()]
 
-    resumen   = []
-    diversidad = {}
-    muestras  = MuestraSuelo.objects.none()
-    historial = []
-
-    try:
-        muestras  = MuestraSuelo.objects.filter(
+    # Contexto base (defaults vacíos si falla algo)
+    ctx = {
+        "tipo_actual":             tipo,
+        "nivel_actual":            nivel,
+        "top_n_actual":            top_n,
+        "opciones_top_n":          OPCIONES_TOP_N,
+        "marcadores_disponibles":  MARCADORES_VALIDOS,
+        "niveles_disponibles":     NIVELES_VALIDOS,
+        "muestra_ids_seleccionados": muestra_ids,
+        "productos": MuestraSuelo.objects.filter(
             archivos_moleculares__tipo_analisis=tipo
-        ).distinct().order_by("-id")
-        historial = ReportGenerationService.obtener_historial_reportes(tipo)
+        ).distinct().order_by("codigo"),
+        "resumen":                 [],
+        "diversidad":              {},
+        "datos_clasificacion":     [],
+        "datos_clasificacion_json": "[]",
+        "totales_clasificacion":   {"benefico": 0, "fitopatogeno": 0, "neutral": 0, "sin_clasificar": 0},
+        "indice_salud":            None,
+        "nivel_salud":             None,
+    }
 
-        resultado  = obtener_analisis_avanzado(tipo=tipo, top_n=top_n, nivel=nivel, variedad_id=variedad_id)
-        resumen    = resultado.get("resumen", [])
-        diversidad = obtener_diversidad(tipo=tipo, nivel=nivel, variedad_id=variedad_id) or {}
-    except Exception as e:
-        messages.error(request, f"Error al cargar los reportes: {str(e)}")
+    # Solo cargar datos si el usuario seleccionó al menos una muestra
+    if muestra_ids:
+        try:
+            # ① Tabla Top N
+            resultado      = obtener_analisis_avanzado(tipo=tipo, top_n=top_n, nivel=nivel, muestra_ids=muestra_ids)
+            ctx["resumen"] = resultado.get("resumen", [])
+            # JSON para la gráfica de perfil de abundancia
+            ctx["resumen_json"] = json.dumps([
+                {
+                    "nombre":        str(r.get("taxonomia") or "Desconocido"),
+                    "porcentaje":    float(r.get("total_porcentaje") or 0),
+                    "hits":          int(r.get("total_hits") or 0),
+                    "clasificacion": str(r.get("clasificacion") or "sin_clasificar"),
+                }
+                for r in ctx["resumen"]
+            ])
 
-    return render(request, "analisis/reportes.html", {
-        "productos":              muestras,
-        "historial":              historial,
-        "tipo_actual":            tipo,
-        "nivel_actual":           nivel,
-        "marcadores_disponibles": MARCADORES_VALIDOS,
-        "niveles_disponibles":    NIVELES_VALIDOS,
-        "top_n_actual":           top_n,
-        "opciones_top_n":         OPCIONES_TOP_N,
-        "resumen":                resumen,
-        "diversidad":             diversidad,
-        "variedad_id_actual":     variedad_id,
-    })
+            # ② Métricas diversidad
+            ctx["diversidad"] = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids) or {}
+
+            # ③ Gráfica de tendencia
+            datos_clas                      = _clasificacion_por_muestra(tipo, nivel, muestra_ids=muestra_ids)
+            ctx["datos_clasificacion"]      = datos_clas
+            ctx["datos_clasificacion_json"] = json.dumps(datos_clas)
+
+            # ④ Índice de salud + totales funcionales
+            datos_rpt = _construir_datos_reporte(tipo, nivel, top_n, muestra_ids)
+            if datos_rpt:
+                ctx["indice_salud"]          = datos_rpt["indice_salud"]
+                ctx["nivel_salud"]           = datos_rpt["nivel_salud"]
+                ctx["totales_clasificacion"] = datos_rpt["totales_clas"]
+
+        except Exception as exc:
+            import traceback; traceback.print_exc()
+            messages.error(request, f"Error al cargar el reporte: {exc}")
+
+    return render(request, "analisis/reportes.html", ctx)
 
 
 @login_required
 @require_POST
 def generar_reporte(request) -> HttpResponseBase:
-    tipo = request.POST.get("tipo", "16S")
-    if tipo not in MARCADORES_VALIDOS:
-        tipo = "16S"
-
+    tipo  = request.POST.get("tipo",  "16S")
     nivel = request.POST.get("nivel", "genus")
-    if nivel not in NIVELES_VALIDOS:
-        nivel = "genus"
-    campo_db = MAPA_NIVELES[nivel]
+    if tipo  not in MARCADORES_VALIDOS: tipo  = "16S"
+    if nivel not in NIVELES_VALIDOS:    nivel = "genus"
 
     formato = request.POST.get("formato", "excel")
     if formato not in FORMATOS_VALIDOS:
         return JsonResponse({"ok": False, "error": "Formato no soportado."}, status=400)
 
-    variedad_id = request.POST.get("producto_id") or None
-
     try:
         top_n = int(request.POST.get("top_n", 25))
-        if top_n not in OPCIONES_TOP_N:
-            top_n = 25
+        top_n = top_n if top_n in OPCIONES_TOP_N else 25
     except (ValueError, TypeError):
         top_n = 25
 
-    try:
-        qs = ResultadoTaxonomico.objects.filter(archivo__tipo_analisis=tipo)
-        if variedad_id:
-            qs = qs.filter(archivo__muestra__variedad_clon_id=variedad_id)
+    muestra_ids = [int(x) for x in request.POST.getlist("muestra_id") if x.isdigit()]
+    ids_param   = muestra_ids if muestra_ids else None
 
-        if not qs.exists():
-            return JsonResponse({"ok": False, "error": "No hay datos para el reporte."}, status=404)
+    try:
+        datos_rpt = _construir_datos_reporte(tipo, nivel, top_n, ids_param)
+        if not datos_rpt:
+            return JsonResponse({"ok": False, "error": "No hay datos para el reporte seleccionado."}, status=404)
+
+        # Muestras correspondientes
+        muestras_qs = MuestraSuelo.objects.select_related("cultivo", "variedad_clon").filter(
+            archivos_moleculares__tipo_analisis=tipo
+        ).distinct()
+        if muestra_ids:
+            muestras_qs = muestras_qs.filter(id__in=muestra_ids)
+        muestras_list = list(muestras_qs.order_by("codigo"))
+
+        fecha = datetime.now().strftime("%Y%m%d_%H%M%S")
+        datos = {
+            **datos_rpt,
+            "muestras": muestras_list,
+            "muestra":  muestras_list[0] if len(muestras_list) == 1 else None,
+            "usuario":  request.user,
+        }
 
         if formato == "excel":
-            return _generar_excel_completo(qs, tipo, nivel, campo_db)
+            return ExportService.generar_excel_multisheet(datos)
 
-        # PDF / HTML / JSON — usa top_n para visualización
-        # grand_total desde TODOS los taxa antes del slice
-        grand_total = qs.aggregate(total=Sum("num_hits"))["total"] or 1
+        # PDF — individual si 0-1 muestras, comparativo si 2+
+        if len(muestras_list) > 1:
+            datos["datos_por_muestra"] = _construir_datos_por_muestra(tipo, nivel, top_n, muestras_list)
+            pdf_bytes = ExportService.generar_pdf_comparativo(datos)
+            nombre    = f"reporte_comparativo_{tipo}_{nivel}_{fecha}.pdf"
+        else:
+            pdf_bytes = ExportService.generar_pdf_individual(datos)
+            codigo    = muestras_list[0].codigo if muestras_list else "global"
+            nombre    = f"reporte_{tipo}_{nivel}_{codigo}_{fecha}.pdf"
 
-        data = list(
-            qs.values(taxonomia=F(campo_db))
-            .annotate(total_hits=Sum("num_hits"))
-            .order_by("-total_hits")[:top_n]
-        )
-        if not data:
-            return JsonResponse({"ok": False, "error": "No hay datos para el reporte."}, status=404)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        return response
 
-        for r in data:
-            r["porcentaje"] = round(r["total_hits"] / grand_total * 100, 5)
-
-        df_reporte = pd.DataFrame(data)
-        titulo = f"Reporte {tipo} — {nivel.capitalize()} Top {top_n}"
-
-        if formato == "pdf":
-            return ExportService.exportar_pdf_response(
-                titulo=titulo,
-                datos_analisis={},
-                df_datos=df_reporte,
-                usuario=request.user,
-                nombre_archivo=f"reporte_{tipo}_{nivel}_top{top_n}.pdf",
-            )
-
-        if formato == "html":
-            resultado = ExportService.generar_html_reporte(
-                titulo=titulo,
-                datos_analisis={},
-                df_datos=df_reporte,
-                usuario=request.user,
-                nombre_archivo=f"reporte_{tipo}_{nivel}.html",
-            )
-            if isinstance(resultado, str):
-                return HttpResponse(resultado, content_type="text/html")
-            return resultado
-
-        # json
-        return ExportService.exportar_json(
-            df_reporte.to_dict("records"),
-            f"reporte_{tipo}.json",
-        )
-
-    except Exception as e:
-        return JsonResponse({"ok": False, "error": str(e)}, status=500)
-
-
-def _generar_excel_completo(qs, tipo, nivel, campo_db) -> HttpResponse:
-    """
-    Genera Excel con TODOS los taxa (sin truncar).
-    Porcentajes recalculados desde grand_total real.
-    """
-    grand_total = qs.aggregate(total=Sum("num_hits"))["total"] or 1
-
-    data_all = list(
-        qs.values(taxonomia=F(campo_db))
-        .annotate(total_hits=Sum("num_hits"))
-        .order_by("-total_hits")
-    )
-    for r in data_all:
-        r["porcentaje"] = round(r["total_hits"] / grand_total * 100, 5)
-
-    nombres = [r["taxonomia"] for r in data_all if r["taxonomia"]]
-    catalogo_map = {
-        obj["nombre"].lower(): obj["clasificacion"]
-        for obj in CatalogoMicroorganismo.objects.filter(
-            nombre__in=nombres, nivel=nivel
-        ).values("nombre", "clasificacion")
-    }
-    for r in data_all:
-        r["clasificacion"] = catalogo_map.get(str(r["taxonomia"]).lower(), "sin_clasificar")
-
-    df_excel = pd.DataFrame(data_all)
-
-    buffer = BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df_excel.to_excel(writer, index=False, sheet_name=f"Analisis_{tipo}")
-    buffer.seek(0)
-
-    fecha = datetime.now().strftime("%Y%m%d_%H%M%S")
-    nombre = f"reporte_{tipo}_{nivel}_completo_{fecha}.xlsx"
-    response = HttpResponse(
-        buffer.read(),
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-    response["Content-Disposition"] = f'attachment; filename="{nombre}"'
-    return response
+    except Exception as exc:
+        import traceback; traceback.print_exc()
+        return JsonResponse({"ok": False, "error": str(exc)}, status=500)
 
 
 @login_required
 def detalle_reporte(request, reporte_id):
-    reporte = ReportGenerationService.obtener_reporte_por_id(reporte_id)
-    if reporte is None:
-        messages.error(request, "Reporte no encontrado.")
-        return redirect("analisis:reportes")
-    return render(request, "analisis/reportes.html", {"reporte": reporte})
+    """Placeholder — redirige al listado hasta que se implemente la vista de detalle."""
+    messages.info(request, "Vista de detalle pendiente de implementación.")
+    return redirect("analisis:reportes")

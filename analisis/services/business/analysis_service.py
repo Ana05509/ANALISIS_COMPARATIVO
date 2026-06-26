@@ -12,17 +12,19 @@ NIVELES_VALIDOS    = list(MAPA_NIVELES.keys())
 MARCADORES_VALIDOS = ("16S", "ITS")
 OPCIONES_TOP_N     = [5, 10, 25, 50]
 
-def _base_queryset(tipo, variedad_id=None, muestra_id=None):
+def _base_queryset(tipo, variedad_id=None, muestra_id=None, muestra_ids=None):
     qs = ResultadoTaxonomico.objects.filter(
         archivo__tipo_analisis=tipo
     ).select_related("archivo__muestra__variedad_clon")
     if variedad_id:
         qs = qs.filter(archivo__muestra__variedad_clon_id=variedad_id)
-    if muestra_id:
+    if muestra_ids:
+        qs = qs.filter(archivo__muestra_id__in=muestra_ids)
+    elif muestra_id:
         qs = qs.filter(archivo__muestra_id=muestra_id)
     return qs
 
-def obtener_analisis_avanzado(tipo="16S", top_n=10, nivel="genus", variedad_id=None, muestra_id=None):
+def obtener_analisis_avanzado(tipo="16S", top_n=10, nivel="genus", variedad_id=None, muestra_id=None, muestra_ids=None):
     """
     Perfil taxonómico agregado para visualización.
     Usa la suma de num_hits para calcular abundancia relativa real entre muestras agrupadas.
@@ -33,7 +35,7 @@ def obtener_analisis_avanzado(tipo="16S", top_n=10, nivel="genus", variedad_id=N
     if top_n not in OPCIONES_TOP_N:    top_n = 10
 
     campo_db = MAPA_NIVELES[nivel]
-    qs = _base_queryset(tipo, variedad_id, muestra_id)
+    qs = _base_queryset(tipo, variedad_id, muestra_id, muestra_ids)
 
     if not qs.exists():
         return {"resumen": [], "tipo_actual": tipo, "nivel_actual": nivel, "top_actual": top_n}
@@ -111,7 +113,7 @@ def obtener_top_n(tipo="16S", n=10, nivel="genus", variedad_id=None):
 
     return data
 
-def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=None):
+def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=None, muestra_ids=None):
     """
     Calcula diversidad alfa por muestra individual y devuelve el promedio.
     Evita el error de calcular Shannon/Simpson sobre un perfil promediado.
@@ -119,7 +121,7 @@ def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=N
     if tipo not in MARCADORES_VALIDOS: tipo = "16S"
     campo_db = MAPA_NIVELES.get(nivel, "genus")
 
-    qs = _base_queryset(tipo, variedad_id, muestra_id)
+    qs = _base_queryset(tipo, variedad_id, muestra_id, muestra_ids)
     if not qs.exists(): return None
 
     data = list(qs.values(

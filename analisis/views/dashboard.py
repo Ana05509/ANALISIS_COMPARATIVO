@@ -44,7 +44,8 @@ def dashboard(request):
         total_muestras = muestras.count()
 
         muestras_por_variedad = list(
-            muestras.values(nombre_variedad=F("variedad_clon__nombre"))
+            muestras.exclude(cultivo__isnull=True)
+            .values(nombre_variedad=F("cultivo__nombre"))
             .annotate(total=Count("id"))
             .order_by("-total")
         )

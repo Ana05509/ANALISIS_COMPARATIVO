@@ -184,3 +184,5 @@ cython_debug/
 media/
 .vscode/
 vscode/
+.claude/
+.gitignore

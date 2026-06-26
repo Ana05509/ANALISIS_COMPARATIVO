@@ -4,6 +4,29 @@
 {% block nav_comparar %}active{% endblock %}
 {% block topbar_title %}Análisis Comparativo Microbiano{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ── Panel de selección de muestras ── */
+.muestra-row {
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+.muestra-row:last-child { border-bottom: none; }
+.muestra-row label {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 12px; cursor: pointer; font-size: 13px;
+    transition: background 0.12s; user-select: none; width: 100%;
+    box-sizing: border-box;
+}
+.muestra-row label:hover { background: var(--bg-light, #f8fafc); }
+.muestra-row.activa label { background: #eff6ff; font-weight: 600; color: #1d4ed8; }
+.muestra-row input[type="checkbox"] {
+    accent-color: #3b82f6; width: 15px; height: 15px;
+    cursor: pointer; flex-shrink: 0;
+}
+.muestra-row.oculta { display: none; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <h1>Análisis Comparativo</h1>
@@ -19,8 +42,23 @@
                     Seleccione muestras
                     <span id="sample-counter" style="font-size:12px; font-weight:600; color:var(--text-hint);"></span>
                 </label>
+                <div style="display:flex; gap:6px; margin-bottom:6px; align-items:center;">
+                    <input id="muestra-search" type="text" placeholder="🔍 Buscar muestra..."
+                           autocomplete="off"
+                           style="flex:1; padding:5px 10px; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; font-size:12px; outline:none; background:var(--bg-surface,#fff);">
+                    <button type="button" id="btn-select-all"
+                            style="padding:4px 11px; font-size:11px; font-weight:600; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; background:var(--bg-light,#f8fafc); cursor:pointer; white-space:nowrap; color:var(--text-primary);">
+                        ✓ Todo
+                    </button>
+                    <button type="button" id="btn-clear-all"
+                            style="padding:4px 11px; font-size:11px; font-weight:600; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; background:var(--bg-light,#f8fafc); cursor:pointer; white-space:nowrap; color:var(--text-primary);">
+                        ✕ Limpiar
+                    </button>
+                </div>
+                <div id="muestra-list-wrap" style="border:1px solid var(--border-color,#e2e8f0); border-radius:6px; max-height:190px; overflow-y:auto;">
+                    <div id="muestra-checkbox-list"></div>
+                </div>
                 {{ form.muestras }}
-                <small style="color: var(--text-hint); font-size: 12px;">Ctrl+clic (Windows) o Cmd+clic (Mac) para selección múltiple</small>
             </div>
             <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">Marcador Molecular</label>
@@ -192,13 +230,17 @@
 
 <script>
 (function () {
-    /* ── Contador interactivo de muestras seleccionadas ──── */
-    var selectMuestras = document.querySelector('[name="muestras"]');
+    /* ── Panel de selección de muestras (construido desde el select oculto) ── */
+    var sel     = document.getElementById('id_muestras');
+    var listDiv = document.getElementById('muestra-checkbox-list');
     var counter = document.getElementById('sample-counter');
+    var search  = document.getElementById('muestra-search');
+    var btnAll  = document.getElementById('btn-select-all');
+    var btnClear= document.getElementById('btn-clear-all');
 
     function actualizarContador() {
-        if (!selectMuestras || !counter) return;
-        var n = selectMuestras.selectedOptions.length;
+        if (!counter) return;
+        var n = listDiv.querySelectorAll('input:checked').length;
         if (n === 0) {
             counter.textContent = '';
         } else if (n < 2) {
@@ -210,10 +252,66 @@
         }
     }
 
-    if (selectMuestras) {
-        selectMuestras.addEventListener('change', actualizarContador);
-        actualizarContador(); // estado inicial al cargar
+    /* Construir checkboxes desde las <option> del select oculto */
+    if (sel && listDiv) {
+        Array.from(sel.options).forEach(function(opt, i) {
+            var row = document.createElement('div');
+            row.className = 'muestra-row' + (opt.selected ? ' activa' : '');
+
+            var lbl = document.createElement('label');
+            lbl.htmlFor = 'mcb_' + i;
+
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.id   = 'mcb_' + i;
+            cb.checked = opt.selected;
+            cb.dataset.idx = i;
+
+            cb.addEventListener('change', function() {
+                sel.options[this.dataset.idx].selected = this.checked;
+                row.classList.toggle('activa', this.checked);
+                actualizarContador();
+            });
+
+            lbl.appendChild(cb);
+            lbl.appendChild(document.createTextNode(' ' + opt.textContent.trim()));
+            row.appendChild(lbl);
+            listDiv.appendChild(row);
+        });
     }
+
+    if (btnAll) {
+        btnAll.addEventListener('click', function() {
+            listDiv.querySelectorAll('.muestra-row:not(.oculta) input').forEach(function(cb) {
+                cb.checked = true;
+                sel.options[cb.dataset.idx].selected = true;
+                cb.closest('.muestra-row').classList.add('activa');
+            });
+            actualizarContador();
+        });
+    }
+
+    if (btnClear) {
+        btnClear.addEventListener('click', function() {
+            listDiv.querySelectorAll('input').forEach(function(cb) {
+                cb.checked = false;
+                sel.options[cb.dataset.idx].selected = false;
+                cb.closest('.muestra-row').classList.remove('activa');
+            });
+            actualizarContador();
+        });
+    }
+
+    if (search) {
+        search.addEventListener('input', function() {
+            var q = this.value.toLowerCase().trim();
+            listDiv.querySelectorAll('.muestra-row').forEach(function(row) {
+                row.classList.toggle('oculta', q !== '' && !row.textContent.toLowerCase().includes(q));
+            });
+        });
+    }
+
+    actualizarContador();
 
     {% if tabla_comparativa %}
     document.addEventListener('DOMContentLoaded', function () {

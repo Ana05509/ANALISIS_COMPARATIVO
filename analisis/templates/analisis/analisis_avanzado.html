@@ -4,6 +4,19 @@
 {% block nav_analisis %}active{% endblock %}
 {% block topbar_title %}Análisis Avanzado Microbiano{% endblock %}
 
+{% block extra_css %}
+<style>
+.av-row { border-bottom: 1px solid var(--border-color,#e2e8f0); }
+.av-row:last-child { border-bottom: none; }
+.av-row label { display:flex; align-items:center; gap:8px; padding:6px 10px; cursor:pointer; font-size:12px; transition:background .12s; user-select:none; width:100%; box-sizing:border-box; }
+.av-row label:hover { background:var(--bg-light,#f8fafc); }
+.av-row.activa label { background:#eff6ff; font-weight:600; color:#1d4ed8; }
+.av-row input[type=checkbox] { accent-color:#3b82f6; width:14px; height:14px; cursor:pointer; flex-shrink:0; }
+.av-row.oculta { display:none; }
+.chart-desc { font-size:12px; color:var(--text-hint); margin:0 0 0.5rem; line-height:1.5; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <h1>Análisis Avanzado de Perfiles</h1>
@@ -37,15 +50,44 @@
                 {% endfor %}
             </select>
         </div>
-        <div>
-            <label class="form-label">ID Muestra / Producto (Opcional)</label>
-            <input type="text" name="producto_id" value="{{ request.GET.producto_id|default:'' }}" placeholder="Ej: MS-004" class="form-control" style="width: 150px;">
+        <!-- Panel multi-selección de muestras -->
+        <div style="flex:1; min-width:260px;">
+            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+                Muestras a analizar
+                <span id="av-counter" style="font-size:11px; font-weight:600; color:var(--text-hint);"></span>
+            </label>
+            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                <input id="av-search" type="text" placeholder="🔍 Buscar..." autocomplete="off"
+                       style="flex:1; padding:4px 8px; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; font-size:12px; outline:none;">
+                <button type="button" id="av-btn-all" style="padding:3px 9px; font-size:11px; font-weight:600; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; background:var(--bg-light,#f8fafc); cursor:pointer;">✓ Todo</button>
+                <button type="button" id="av-btn-clear" style="padding:3px 9px; font-size:11px; font-weight:600; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; background:var(--bg-light,#f8fafc); cursor:pointer;">✕</button>
+            </div>
+            <div id="av-list-wrap" style="border:1px solid var(--border-color,#e2e8f0); border-radius:6px; max-height:160px; overflow-y:auto;">
+                <div id="av-checkbox-list"></div>
+            </div>
+            <!-- Select oculto — sincronizado por JS, enviado en el GET -->
+            <select name="muestra_id" id="av-select-hidden" multiple style="display:none;">
+                {% for m in muestras %}
+                <option value="{{ m.id }}"
+                    {% if m.id in muestra_ids_seleccionados %}selected{% endif %}>
+                    {{ m.codigo }}{% if m.cultivo %} · {{ m.cultivo.nombre }}{% endif %}{% if m.variedad_clon %} ({{ m.variedad_clon.nombre }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
         </div>
-        <button type="submit" class="btn btn-primary" style="height: 38px;">
-            <i class="ti ti-refresh" aria-hidden="true"></i> Actualizar
+        <button type="submit" class="btn btn-primary" style="height: 38px; align-self:flex-end;">
+            <i class="ti ti-refresh" aria-hidden="true"></i> Analizar
         </button>
     </form>
 </div>
+
+{% if sin_muestra %}
+<div class="empty-state">
+    <i class="ti ti-flask" aria-hidden="true"></i>
+    <strong>Seleccione una muestra para analizar</strong>
+    <p>Elija una muestra en el filtro superior para ver su perfil microbiano detallado.</p>
+</div>
+{% else %}
 
 <!-- DIVERSIDAD ALFA (métricas) -->
 {% if diversidad %}
@@ -150,9 +192,10 @@
         <!-- 1. Barras apiladas -->
         {% if graficos_avanzados.grafico_barras_apiladas %}
         <div>
-            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.5rem;">
-                <i class="ti ti-chart-bar"></i> Composición por Muestra (Barras Apiladas)
+            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.25rem;">
+                <i class="ti ti-chart-bar"></i> Composición de la Comunidad Microbiana (Barras Apiladas)
             </h4>
+            <p class="chart-desc">Muestra la proporción relativa de cada taxón en cada muestra. Las barras suman 100 %, permitiendo comparar la estructura de la comunidad entre muestras incluso cuando los volúmenes de secuenciación difieren. "Otros" agrupa todos los taxones fuera del Top N seleccionado.</p>
             <div id="grafico-barras-apiladas" style="height: 450px; width: 100%;"></div>
         </div>
         {% endif %}
@@ -160,39 +203,36 @@
         <!-- 2. Heatmap -->
         {% if graficos_avanzados.grafico_heatmap %}
         <div>
-            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.5rem;">
-                <i class="ti ti-grid-dots"></i> Mapa de Calor (Patrones de Abundancia)
+            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.25rem;">
+                <i class="ti ti-grid-dots"></i> Mapa de Calor — Patrones de Abundancia
             </h4>
-            <div id="grafico-heatmap" style="height: 500px; width: 100%;"></div>
+            <p class="chart-desc">Representación matricial donde cada celda indica la abundancia de un taxón (fila) en una muestra (columna). Los colores más intensos revelan mayor presencia. Útil para identificar taxones dominantes consistentes y patrones diferenciales entre muestras.</p>
+            <div id="grafico-heatmap" style="width: 100%; min-height: 420px;"></div>
         </div>
         {% endif %}
 
         <!-- 3. PCoA Bray-Curtis -->
         {% if graficos_avanzados.grafico_pca %}
         <div>
-            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.5rem;">
-                <i class="ti ti-radar"></i> PCoA – Beta Diversidad (Bray-Curtis)
+            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.25rem;">
+                <i class="ti ti-radar"></i> PCoA — Beta Diversidad (Bray-Curtis)
             </h4>
-            <p style="font-size: 12px; color: var(--text-hint); margin: 0 0 0.5rem;">
-                Ordenación sobre distancias de Bray-Curtis. Muestras próximas comparten composición microbiana similar. Requiere ≥ 3 muestras.
-            </p>
+            <p class="chart-desc">Ordenación multivariante basada en distancias de Bray-Curtis, la métrica estándar de disimilitud microbiana. Muestras cercanas en el plano comparten una composición microbiana similar; las distantes tienen comunidades distintas. Requiere ≥ 3 muestras para calcular la matriz de distancias.</p>
             <div id="grafico-pca" style="height: 450px; width: 100%;"></div>
         </div>
         {% elif graficos_avanzados.error_pca %}
-        <div style="font-size: 13px; color: var(--text-muted); padding: 1rem; background: var(--bg-subtle, #f8f9fa); border-radius: var(--radius);">
-            <i class="ti ti-info-circle"></i> {{ graficos_avanzados.error_pca }}
+        <div style="font-size: 13px; color: var(--text-muted); padding: 0.75rem 1rem; background: var(--bg-subtle,#f8f9fa); border-radius: var(--radius); border-left: 3px solid var(--border-color,#e2e8f0);">
+            <i class="ti ti-info-circle"></i> <strong>PCoA:</strong> {{ graficos_avanzados.error_pca }}
         </div>
         {% endif %}
 
-        <!-- 4. Shannon por muestra (barras) -->
+        <!-- 4. Shannon por muestra -->
         {% if graficos_avanzados.grafico_boxplot %}
         <div>
-            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.5rem;">
-                <i class="ti ti-chart-bar"></i> Shannon H' por Muestra — todos los taxones
+            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.25rem;">
+                <i class="ti ti-chart-bar"></i> Índice de Diversidad Shannon H' por Muestra
             </h4>
-            <p style="font-size: 12px; color: var(--text-hint); margin: 0 0 0.5rem;">
-                Calculado sobre el perfil completo de cada muestra, sin truncamiento a Top N.
-            </p>
+            <p class="chart-desc">Cuantifica la diversidad alfa de cada muestra de forma individual, calculado sobre el perfil taxonómico completo (sin truncar al Top N). Valores altos indican comunidades más diversas y equilibradas; valores bajos sugieren dominancia de pocos taxones.</p>
             <div id="grafico-boxplot" style="height: 400px; width: 100%;"></div>
         </div>
         {% endif %}
@@ -206,12 +246,6 @@
 {% endif %}
 <!-- ============================================================ -->
 
-{% else %}
-<div class="empty-state">
-    <i class="ti ti-chart-dots" aria-hidden="true"></i>
-    <strong>No se hallaron registros bioinformáticos</strong>
-    <p>Ajuste los criterios de filtrado, verifique el ID del producto o procese muestras válidas en el pipeline.</p>
-</div>
 {% endif %}
 
 <!-- ANÁLISIS DIFERENCIAL (Beta Diversidad) -->
@@ -253,6 +287,8 @@
 </div>
 {% endif %}
 
+{% endif %}{# /sin_muestra #}
+
 {% endblock %}
 
 {% block extra_js %}
@@ -262,51 +298,108 @@
 <!-- Plotly para gráficas avanzadas -->
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 
+<!-- PANEL MULTI-SELECCIÓN DE MUESTRAS -->
+<script>
+(function () {
+    var sel     = document.getElementById('av-select-hidden');
+    var listDiv = document.getElementById('av-checkbox-list');
+    var counter = document.getElementById('av-counter');
+    var search  = document.getElementById('av-search');
+    var btnAll  = document.getElementById('av-btn-all');
+    var btnClr  = document.getElementById('av-btn-clear');
+    if (!sel || !listDiv) return;
+
+    function contarSeleccionados() {
+        return listDiv.querySelectorAll('input:checked').length;
+    }
+    function actualizarContador() {
+        if (!counter) return;
+        var n = contarSeleccionados();
+        counter.textContent = n === 0 ? '' : n + ' seleccionada' + (n > 1 ? 's' : '') + (n >= 3 ? ' ✓ (PCoA disponible)' : n >= 1 ? ' ✓' : '');
+        counter.style.color = n === 0 ? 'var(--text-hint)' : n >= 3 ? 'var(--verde,#22c55e)' : '#3b82f6';
+    }
+
+    Array.from(sel.options).forEach(function (opt, i) {
+        var row = document.createElement('div');
+        row.className = 'av-row' + (opt.selected ? ' activa' : '');
+        var lbl = document.createElement('label');
+        lbl.htmlFor = 'avcb_' + i;
+        var cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.id = 'avcb_' + i;
+        cb.checked = opt.selected; cb.dataset.idx = i;
+        cb.addEventListener('change', function () {
+            sel.options[this.dataset.idx].selected = this.checked;
+            row.classList.toggle('activa', this.checked);
+            actualizarContador();
+        });
+        lbl.appendChild(cb);
+        lbl.appendChild(document.createTextNode(' ' + opt.textContent.trim()));
+        row.appendChild(lbl);
+        listDiv.appendChild(row);
+    });
+
+    if (btnAll) btnAll.addEventListener('click', function () {
+        listDiv.querySelectorAll('.av-row:not(.oculta) input').forEach(function (cb) {
+            cb.checked = true; sel.options[cb.dataset.idx].selected = true;
+            cb.closest('.av-row').classList.add('activa');
+        });
+        actualizarContador();
+    });
+    if (btnClr) btnClr.addEventListener('click', function () {
+        listDiv.querySelectorAll('input').forEach(function (cb) {
+            cb.checked = false; sel.options[cb.dataset.idx].selected = false;
+            cb.closest('.av-row').classList.remove('activa');
+        });
+        actualizarContador();
+    });
+    if (search) search.addEventListener('input', function () {
+        var q = this.value.toLowerCase().trim();
+        listDiv.querySelectorAll('.av-row').forEach(function (row) {
+            row.classList.toggle('oculta', q !== '' && !row.textContent.toLowerCase().includes(q));
+        });
+    });
+    actualizarContador();
+}());
+</script>
+
 <!-- GRÁFICO DONUT -->
 {% if top_microorganismos %}
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     try {
+        const PALETA = ['#1D9E75','#0F6E56','#085041','#BA7517','#9E6515','#185FA5','#0C447C','#A32D2D','#6B4E9E','#2E8B57','#c7a640','#5F5E5A'];
+        const OTROS_COLOR = '#B0B8C1';
         const topData = {{ top_microorganismos_json|safe }};
         if (Array.isArray(topData) && topData.length > 0) {
             const labels = topData.map(r => r.taxonomia || 'Desconocido');
             const values = topData.map(r => parseFloat(r.total_porcentaje || 0));
-            const colores = ['#1D9E75','#0F6E56','#085041','#BA7517','#9E6515','#185FA5','#0C447C','#A32D2D','#5F5E5A','#888780'];
+            let idx = 0;
+            const bgColors = labels.map(l =>
+                l.toLowerCase().includes('otros') ? OTROS_COLOR : PALETA[idx++ % PALETA.length]
+            );
             const ctx = document.getElementById('chart-donut');
             if (ctx) {
                 new Chart(ctx, {
                     type: 'doughnut',
                     data: {
                         labels: labels,
-                        datasets: [{
-                            data: values,
-                            backgroundColor: colores,
-                            borderWidth: 2,
-                            borderColor: '#ffffff'
-                        }]
+                        datasets: [{ data: values, backgroundColor: bgColors, borderWidth: 2, borderColor: '#ffffff' }]
                     },
                     options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
+                        responsive: true, maintainAspectRatio: false,
                         plugins: {
                             legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Outfit, sans-serif', size: 11 }, padding: 12 } },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(ctx) {
-                                        const val = typeof ctx.parsed === 'number' ? ctx.parsed.toFixed(4) : ctx.parsed;
-                                        return ` ${ctx.label}: ${val}%`;
-                                    }
-                                }
-                            }
+                            tooltip: { callbacks: { label: function(ctx) {
+                                const val = typeof ctx.parsed === 'number' ? ctx.parsed.toFixed(4) : ctx.parsed;
+                                return ` ${ctx.label}: ${val}%`;
+                            }}}
                         },
                         cutout: '65%'
                     }
                 });
             }
         }
-    } catch (err) {
-        console.error("Error en donut:", err);
-    }
+    } catch (err) { console.error("Error en donut:", err); }
 });
 </script>
 {% endif %}
@@ -326,11 +419,17 @@ document.addEventListener('DOMContentLoaded', function() {
             graficos.grafico_barras_apiladas.layout, CFG);
     }
 
-    // Heatmap
+    // Heatmap — responsive:false para respetar la altura dinámica calculada en Python
     if (graficos.grafico_heatmap) {
         Plotly.newPlot('grafico-heatmap',
             graficos.grafico_heatmap.data,
-            graficos.grafico_heatmap.layout, CFG);
+            graficos.grafico_heatmap.layout,
+            { responsive: false });
+        // Ajustar el contenedor a la altura real del gráfico
+        var hmDiv = document.getElementById('grafico-heatmap');
+        if (hmDiv && graficos.grafico_heatmap.layout && graficos.grafico_heatmap.layout.height) {
+            hmDiv.style.height = graficos.grafico_heatmap.layout.height + 'px';
+        }
     }
 
     // PCoA Bray-Curtis

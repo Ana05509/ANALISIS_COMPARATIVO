@@ -61,6 +61,18 @@ class SubirDatosForm(forms.Form):
         return archivo
 
 
+class _MuestraMultipleField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, obj):
+        parts = [obj.codigo]
+        if obj.cultivo_id:
+            parts.append(obj.cultivo.nombre)
+        if obj.variedad_clon_id:
+            parts.append(obj.variedad_clon.nombre)
+        if obj.localidad:
+            parts.append(obj.localidad)
+        return " — ".join(parts)
+
+
 class CompararForm(forms.Form):
     MARCADOR_CHOICES = [("16S", "16S (Bacterias)"), ("ITS", "ITS (Hongos)")]
     NIVEL_CHOICES = [
@@ -72,16 +84,15 @@ class CompararForm(forms.Form):
         ("species", "Especie"),
     ]
 
-    muestras = forms.ModelMultipleChoiceField(
-        queryset=MuestraSuelo.objects.all().order_by("-id"),
+    muestras = _MuestraMultipleField(
+        queryset=MuestraSuelo.objects.select_related("cultivo", "variedad_clon").order_by("-id"),
         label="Seleccione las muestras a comparar",
         widget=forms.SelectMultiple(attrs={
-            "class": "form-control select2",
+            "id": "id_muestras",
             "multiple": "multiple",
-            "size": "6"
+            "style": "display:none;",
         }),
         required=True,
-        help_text="Mantenga presionada la tecla Ctrl (Windows) o Cmd (Mac) para seleccionar varias."
     )
 
     marcador = forms.ChoiceField(

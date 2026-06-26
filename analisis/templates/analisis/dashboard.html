@@ -127,11 +127,11 @@
 
 {% if productos_por_variedad %}
 <div class="card" style="margin-top: 1.5rem;">
-    <div class="card-title">Muestras Totales por Variedad o Clon</div>
+    <div class="card-title">Muestras Totales por Cultivo</div>
     <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 0.75rem;">
         {% for v in productos_por_variedad %}
         <div style="background: var(--bg-light, #f8fafc); border: 1px solid var(--border-color, #e2e8f0); border-radius: 6px; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 13px; font-weight: 500; color: var(--text-primary);">{{ v.variedad_clon__nombre|default:"Sin Variedad Clasificada" }}</span>
+            <span style="font-size: 13px; font-weight: 500; color: var(--text-primary);">{{ v.nombre_variedad }}</span>
             <span class="td-mono" style="font-size: 11px; background: var(--border-color, #e2e8f0); padding: 1px 6px; border-radius: 4px; color: var(--text-muted); font-weight: 600;">
                 {{ v.total }}
             </span>

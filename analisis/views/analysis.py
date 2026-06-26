@@ -13,7 +13,7 @@ from ..services.business.analysis_service import (
     obtener_diversidad,
 )
 from ..services.business.visualization_service import VisualizationService
-from ..models import ResultadoTaxonomico
+from ..models import ResultadoTaxonomico, MuestraSuelo
 from analisis.services.processing.diversity import DiversityService
 
 @login_required
@@ -21,14 +21,25 @@ def analisis_avanzado(request):
     tipo = request.GET.get("tipo", "16S")
     top_n_raw = request.GET.get("top_n", "10")
     nivel = request.GET.get("nivel", "genus")
-    variedad_id = request.GET.get("producto_id", None)
-    muestra_id = request.GET.get("muestra_id", None)
+
+    # Acepta lista de muestra_id (multi-select) o producto_id (link desde detalle_producto)
+    ids_raw = request.GET.getlist("muestra_id") or ([request.GET.get("producto_id")] if request.GET.get("producto_id") else [])
+    muestra_ids = []
+    for raw in ids_raw:
+        try:
+            muestra_ids.append(int(raw))
+        except (ValueError, TypeError):
+            pass
 
     opciones_top_n = [5, 10, 25, 50]
     try:
         top_n = int(top_n_raw) if int(top_n_raw) in opciones_top_n else 10
     except ValueError:
         top_n = 10
+
+    muestras = MuestraSuelo.objects.select_related(
+        "cultivo", "variedad_clon"
+    ).order_by("cultivo__nombre", "codigo")
 
     contexto = {
         "top_microorganismos": [],
@@ -37,29 +48,42 @@ def analisis_avanzado(request):
         "graficos_avanzados": {},
         "graficos_avanzados_json": "{}",
         "analisis_diferencial": None,
+        "muestras": muestras,
+        "muestra_ids_seleccionados": muestra_ids,
+        "sin_muestra": len(muestra_ids) == 0,
     }
+
+    if not muestra_ids:
+        contexto.update({
+            "tipo_actual": tipo,
+            "top_n_actual": top_n,
+            "nivel_actual": nivel,
+            "opciones_top_n": opciones_top_n,
+            "niveles_taxonomicos": ["kingdom", "phylum", "class", "order", "family", "genus", "species"],
+            "marcadores_disponibles": ("16S", "ITS"),
+        })
+        return render(request, "analisis/analisis_avanzado.html", contexto)
 
     try:
         # Obtener el análisis avanzado básico (tabla de Top N para visualización)
         resultado = obtener_analisis_avanzado(
-            tipo=tipo, top_n=top_n, nivel=nivel, variedad_id=variedad_id, muestra_id=muestra_id
+            tipo=tipo, top_n=top_n, nivel=nivel, muestra_ids=muestra_ids
         )
 
         if "resumen" in resultado and resultado["resumen"]:
             contexto["top_microorganismos"] = resultado["resumen"]
             contexto["top_microorganismos_json"] = json.dumps(resultado["resumen"])
 
-        # Diversidad alfa: calculada por muestra sobre datos COMPLETOS (no el resumen truncado)
-        diversidad = obtener_diversidad(tipo=tipo, nivel=nivel, variedad_id=variedad_id)
+        # Diversidad alfa promedio sobre las muestras seleccionadas
+        diversidad = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids)
         if diversidad:
             contexto["diversidad"] = diversidad
 
         # --- GRÁFICAS AVANZADAS ---
-        qs = ResultadoTaxonomico.objects.filter(archivo__tipo_analisis=tipo)
-        if variedad_id:
-            qs = qs.filter(archivo__muestra__variedad_clon_id=variedad_id)
-        if muestra_id:
-            qs = qs.filter(archivo__muestra_id=muestra_id)
+        qs = ResultadoTaxonomico.objects.filter(
+            archivo__tipo_analisis=tipo,
+            archivo__muestra_id__in=muestra_ids,
+        )
 
         if qs.exists():
             mapa_campo = {
@@ -124,9 +148,9 @@ def analisis_avanzado(request):
                 contexto["graficos_avanzados"] = graficos_avanzados
                 contexto["graficos_avanzados_json"] = json.dumps(graficos_avanzados)
 
-        # Análisis diferencial (si hay variedad seleccionada)
-        if variedad_id:
-            diff = obtener_analisis_diferencial(tipo=tipo, nivel=nivel, variedad_id=variedad_id)
+        # Análisis diferencial (solo cuando hay exactamente 1 muestra seleccionada)
+        if len(muestra_ids) == 1:
+            diff = obtener_analisis_diferencial(tipo=tipo, nivel=nivel, muestra_id=muestra_ids[0])
             if diff:
                 contexto["analisis_diferencial"] = diff
 
