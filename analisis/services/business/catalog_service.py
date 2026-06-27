@@ -1,4 +1,5 @@
 import io
+import unicodedata
 import pandas as pd
 from django.db.models import Q, QuerySet
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo
@@ -95,6 +96,49 @@ class CatalogService:
         return resultados, estadisticas
 
     @staticmethod
+    def _quitar_tildes(texto: str) -> str:
+        """Convierte 'Benéfico' → 'benefico', 'Fitopatógeno' → 'fitopatogeno'."""
+        nfkd = unicodedata.normalize('NFD', texto)
+        return ''.join(c for c in nfkd if unicodedata.category(c) != 'Mn')
+
+    @classmethod
+    def _normalizar_clasificacion(cls, valor: str) -> str:
+        """
+        Acepta cualquier variante legible del Excel y la mapea al código interno.
+        Maneja acentos, mayúsculas, sinónimos en español e inglés.
+        """
+        v = cls._quitar_tildes(str(valor).strip().lower())
+        MAPA = {
+            # benéfico
+            'benefico':            'benefico',
+            'beneficioso':         'benefico',
+            'beneficial':          'benefico',
+            'promotor':            'benefico',
+            'aliado':              'benefico',
+            # fitopatógeno
+            'fitopatogeno':        'fitopatogeno',
+            'potencial fitopatogeno': 'fitopatogeno',
+            'patogeno':            'fitopatogeno',
+            'patogeno potencial':  'fitopatogeno',
+            'pathogen':            'fitopatogeno',
+            'riesgo':              'fitopatogeno',
+            # neutral
+            'neutral':             'neutral',
+            'neutro':              'neutral',
+            # sin clasificar
+            'sin_clasificar':      'sin_clasificar',
+            'sin clasificar':      'sin_clasificar',
+            'desconocido':         'sin_clasificar',
+            'unknown':             'sin_clasificar',
+            'nd':                  'sin_clasificar',
+            'n/d':                 'sin_clasificar',
+            '':                    'sin_clasificar',
+            'nan':                 'sin_clasificar',
+            'none':                'sin_clasificar',
+        }
+        return MAPA.get(v, 'sin_clasificar')
+
+    @staticmethod
     def importar_desde_archivo(archivo) -> tuple:
         """
         Lee un CSV/Excel y crea o actualiza registros en CatalogoMicroorganismo.
@@ -125,14 +169,13 @@ class CatalogService:
             )
 
         MARCADORES = {'16S', 'ITS'}
-        CLASIFICACIONES = {'benefico', 'fitopatogeno', 'neutral', 'sin_clasificar'}
         _nan = {'nan', 'none', ''}
 
         creados = actualizados = errores = 0
 
         for _, row in df.iterrows():
             nombre = str(row.get('nombre', '')).strip()
-            nivel = str(row.get('nivel', '')).strip().lower()
+            nivel  = str(row.get('nivel', '')).strip().lower()
 
             if not nombre or nombre.lower() in _nan:
                 errores += 1
@@ -142,34 +185,45 @@ class CatalogService:
             if marcador not in MARCADORES:
                 marcador = '16S'
 
-            clasificacion = str(row.get('clasificacion', 'sin_clasificar')).strip().lower()
-            if clasificacion not in CLASIFICACIONES:
-                clasificacion = 'sin_clasificar'
+            # Normalización robusta: acepta tildes y sinónimos del Excel
+            clasificacion = CatalogService._normalizar_clasificacion(
+                row.get('clasificacion', 'sin_clasificar')
+            )
 
+            _nan_set = _nan
             def _clean(val):
                 s = str(val).strip()
-                return '' if s.lower() in _nan else s
+                return '' if s.lower() in _nan_set else s
 
             descripcion = _clean(row.get('descripcion', '')) if 'descripcion' in df.columns else ''
-            referencia = _clean(row.get('referencia', '')) if 'referencia' in df.columns else ''
+            referencia  = _clean(row.get('referencia',  '')) if 'referencia'  in df.columns else ''
 
             try:
-                _, created = CatalogoMicroorganismo.objects.update_or_create(
+                # Django 5.x: update_or_create no acepta __iexact en kwargs no-defaults.
+                # Usamos filter().first() para la búsqueda case-insensitive y luego
+                # create/save explícito para la escritura.
+                obj = CatalogoMicroorganismo.objects.filter(
                     nombre__iexact=nombre,
                     nivel__iexact=nivel,
-                    defaults={
-                        'nombre': nombre,
-                        'nivel': nivel,
-                        'marcador': marcador,
-                        'clasificacion': clasificacion,
-                        'descripcion': descripcion,
-                        'referencia': referencia,
-                    }
-                )
-                if created:
-                    creados += 1
-                else:
+                ).first()
+
+                if obj:
+                    obj.marcador      = marcador
+                    obj.clasificacion = clasificacion
+                    obj.descripcion   = descripcion or obj.descripcion
+                    obj.referencia    = referencia  or obj.referencia
+                    obj.save()
                     actualizados += 1
+                else:
+                    CatalogoMicroorganismo.objects.create(
+                        nombre=nombre,
+                        nivel=nivel,
+                        marcador=marcador,
+                        clasificacion=clasificacion,
+                        descripcion=descripcion,
+                        referencia=referencia,
+                    )
+                    creados += 1
             except Exception:
                 errores += 1
 
