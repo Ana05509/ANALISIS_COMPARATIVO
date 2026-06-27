@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from django.templatetags.static import static
+from django.urls import reverse_lazy
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -37,7 +38,8 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',  # Proveedor específico de Google
     'analisis',
-    
+    'bioquimica',
+
 ]
 
 # ---------------------------
@@ -67,6 +69,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
             BASE_DIR / 'analisis' / 'templates',
+            BASE_DIR / 'bioquimica' / 'templates',
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -113,6 +116,7 @@ LANGUAGE_CODE = 'es'
 TIME_ZONE = 'America/Guayaquil'
 USE_I18N = True
 USE_TZ = True
+LANGUAGES = [('es', 'Español')]   # Solo español: ignora Accept-Language del navegador
 LOCALE_PATHS = [
     BASE_DIR / 'locale',
 ]
@@ -135,6 +139,10 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # ---------------------------
 AUTH_USER_MODEL = 'analisis.Usuario'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Catálogos grandes en el admin superan el límite por defecto (1000 campos).
+# 10 000 cubre hasta ~5 000 filas con checkboxes; ajustar si crece más.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10_000
 
 # ---------------------------
 # CONFIGURACIÓN DE AUTENTICACIÓN (Allauth + Django)
@@ -186,30 +194,104 @@ UNFOLD = {
     "SITE_SYMBOL": "biotech",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
+    "DASHBOARD_CALLBACK": "analisis.admin.dashboard_callback",
     
     "STYLES": [
         lambda request: static("admin_personalizado.css"),
     ],
 
-"COLORS": {
+    "COLORS": {
         "primary": {
-            "50": "239 246 255",
-            "100": "219 234 254",
-            "200": "191 219 254",
-            "300": "147 197 253",
-            "400": "96 165 250",
-            "500": "59 130 246",  # Azul principal
-            "600": "37 99 235",
-            "700": "29 78 216",
-            "800": "30 64 175",
-            "900": "30 58 138",
+            "50":  "oklch(97% 0.020 165)",
+            "100": "oklch(94% 0.042 165)",
+            "200": "oklch(90% 0.072 165)",
+            "300": "oklch(84% 0.104 165)",
+            "400": "oklch(74% 0.124 165)",
+            "500": "oklch(62% 0.136 165)",  # #1D9E75 verde principal
+            "600": "oklch(54% 0.130 165)",
+            "700": "oklch(46% 0.120 165)",
+            "800": "oklch(37% 0.100 165)",
+            "900": "oklch(28% 0.080 165)",
+            "950": "oklch(20% 0.060 165)",
         },
     },
+
     "SIDEBAR": {
         "show_search": True,
-        "show_all_applications": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": "Secuenciación Molecular",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Catálogo de Microorganismos",
+                        "icon": "menu_book",
+                        "link": reverse_lazy("admin:analisis_catalogomicroorganismo_changelist"),
+                    },
+                    {
+                        "title": "Archivos Moleculares",
+                        "icon": "upload_file",
+                        "link": reverse_lazy("admin:analisis_archivomolecular_changelist"),
+                    },
+                    {
+                        "title": "Resultados Taxonómicos",
+                        "icon": "science",
+                        "link": reverse_lazy("admin:analisis_resultadotaxonomico_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Muestras de Campo",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Muestras de Suelo",
+                        "icon": "landscape",
+                        "link": reverse_lazy("admin:analisis_muestrasuelo_changelist"),
+                    },
+                    {
+                        "title": "Cultivos",
+                        "icon": "agriculture",
+                        "link": reverse_lazy("admin:analisis_cultivo_changelist"),
+                    },
+                    {
+                        "title": "Variedades / Clones",
+                        "icon": "eco",
+                        "link": reverse_lazy("admin:analisis_variedadclon_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Microbiología Clásica",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Ensayos (Recuento / Aislamiento)",
+                        "icon": "science",
+                        "link": reverse_lazy("admin:bioquimica_ensayomicrobiologico_changelist"),
+                    },
+                    {
+                        "title": "Microorganismos Aislados",
+                        "icon": "biotech",
+                        "link": reverse_lazy("admin:bioquimica_microorganismoaislado_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Gestión",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Usuarios",
+                        "icon": "group",
+                        "link": reverse_lazy("admin:analisis_usuario_changelist"),
+                    },
+                ],
+            },
+        ],
     },
-    
+
     # ─── TRADUCCIONES INTERNAS DE UNFOLD ──────────────────────────────────
     "LIST_EMPTY_TITLE": "No se encontraron resultados",
     "LIST_EMPTY_DESCRIPTION": "Esta sección no contiene registros aún. Crea un nuevo elemento o restablece los filtros.",
