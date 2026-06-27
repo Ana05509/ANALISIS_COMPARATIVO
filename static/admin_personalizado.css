@@ -1,0 +1,253 @@
+
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,500&family=Outfit:wght@300;400;500;600&display=swap');
+
+/* ─── ESCALA DE FUENTE GLOBAL (texto más legible al 100% zoom) ─── */
+html {
+    font-size: 106.25% !important; /* 17px base: text-sm → ~15px, text-xs → ~13px */
+}
+
+body {
+    line-height: 1.6 !important;
+}
+
+/* ─── TOKENS SEMÁNTICOS PROPIOS ─── */
+:root {
+    --tb-verde:        #1D9E75;
+    --tb-verde-light:  #E1F5EE;
+    --tb-verde-dark:   #085041;
+    --tb-amber:        #BA7517;
+    --tb-amber-light:  #FAEEDA;
+    --tb-rojo:         #A32D2D;
+    --tb-rojo-light:   #FCEBEB;
+    --tb-bg:           #F7F6F2;
+    --tb-surface:      #FFFFFF;
+    --tb-border:       #D3D1C7;
+    --tb-text:         #1a1a18;
+    --tb-muted:        #5F5E5A;
+    --tb-hint:         #888780;
+    --tb-gris-light:   #F1EFE8;
+}
+
+/* ─── TIPOGRAFÍA ─── */
+html, body,
+button, input, select, textarea,
+[class*="font-sans"] {
+    font-family: 'Outfit', sans-serif !important;
+}
+
+h1, h2, h3,
+#site-name a,
+.site-name,
+[class*="text-2xl"],
+[class*="text-xl"][class*="font-semibold"] {
+    font-family: 'Fraunces', serif !important;
+    letter-spacing: -0.3px !important;
+    font-weight: 500 !important;
+}
+
+code, pre, kbd, samp,
+[class*="font-mono"],
+[class*="tabular-nums"] {
+    font-family: 'DM Mono', monospace !important;
+}
+
+/* ─── FONDO CÁLIDO ─── */
+body {
+    background-color: var(--tb-bg) !important;
+}
+
+/* ─── ENCABEZADOS DE TABLA ─── */
+thead th,
+th {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.6px !important;
+    color: var(--tb-hint) !important;
+    background-color: var(--tb-gris-light) !important;
+}
+
+/* ─── FILAS CON HOVER ACENTO IZQUIERDO ─── */
+/* box-shadow inset no altera el layout de la tabla (a diferencia de border-left) */
+tbody tr {
+    transition: background-color 0.12s !important;
+}
+
+tbody tr:hover td:first-child {
+    box-shadow: inset 3px 0 0 var(--tb-verde) !important;
+}
+
+tbody tr:hover {
+    background-color: var(--tb-verde-light) !important;
+}
+
+/* ─── INPUTS Y FORMULARIOS ─── */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="url"],
+input[type="search"],
+textarea,
+select {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 14px !important;
+    border-color: var(--tb-border) !important;
+    border-radius: 8px !important;
+    color: var(--tb-text) !important;
+    background-color: var(--tb-surface) !important;
+    transition: border-color 0.15s, box-shadow 0.15s !important;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="search"]:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--tb-verde) !important;
+    box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.12) !important;
+    outline: none !important;
+}
+
+/* ─── FIELDSETS COMO TARJETAS ─── */
+fieldset.module,
+.module.aligned {
+    background: var(--tb-surface) !important;
+    border: 1px solid var(--tb-border) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+    overflow: hidden !important;
+    margin-bottom: 18px !important;
+}
+
+fieldset.module h2,
+.module h2 {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.9px !important;
+    color: var(--tb-muted) !important;
+    background-color: var(--tb-gris-light) !important;
+    border-bottom: 1px solid var(--tb-border) !important;
+    padding: 10px 16px !important;
+    margin: 0 !important;
+}
+
+/* ─── FILTROS LATERALES ─── */
+#changelist-filter h2,
+#changelist-filter h3 {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    color: var(--tb-hint) !important;
+    font-weight: 500 !important;
+}
+
+/* ─── BREADCRUMBS ─── */
+#breadcrumbs,
+[class*="breadcrumb"] {
+    font-size: 12px !important;
+    color: var(--tb-muted) !important;
+}
+
+/* ─── MENSAJES (success / error / warning) ─── */
+.messagelist .success,
+li.success {
+    background: var(--tb-verde-light) !important;
+    color: var(--tb-verde-dark) !important;
+    border-left: 3px solid var(--tb-verde) !important;
+}
+
+.messagelist .error,
+li.error,
+.errornote {
+    background: var(--tb-rojo-light) !important;
+    color: var(--tb-rojo) !important;
+    border-left: 3px solid var(--tb-rojo) !important;
+}
+
+.messagelist .warning,
+li.warning {
+    background: var(--tb-amber-light) !important;
+    color: #5a3a00 !important;
+    border-left: 3px solid var(--tb-amber) !important;
+}
+
+/* ─── PAGINACIÓN ─── */
+.paginator a,
+[class*="paginator"] a {
+    font-family: 'DM Mono', monospace !important;
+    font-size: 13px !important;
+    border-radius: 6px !important;
+}
+
+/* ─── BOTÓN DE IMPORTAR CSV ─── */
+a[href*="importar"] {
+    background-color: var(--tb-verde) !important;
+    border-color: var(--tb-verde) !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 500 !important;
+    border-radius: 8px !important;
+    transition: background-color 0.15s !important;
+}
+
+a[href*="importar"]:hover {
+    background-color: var(--tb-verde-dark) !important;
+    border-color: var(--tb-verde-dark) !important;
+}
+
+/* ─── DARK MODE ─── */
+.dark body {
+    background-color: #111110 !important;
+}
+
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="number"],
+.dark input[type="search"],
+.dark textarea,
+.dark select {
+    background-color: #1e1e1c !important;
+    border-color: #333330 !important;
+    color: #e5e5e0 !important;
+}
+
+.dark input[type="text"]:focus,
+.dark textarea:focus,
+.dark select:focus {
+    border-color: var(--tb-verde) !important;
+    box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.15) !important;
+}
+
+.dark thead th {
+    background-color: #1a1a18 !important;
+    color: #666663 !important;
+}
+
+.dark tbody tr:hover {
+    background-color: rgba(29, 158, 117, 0.08) !important;
+}
+
+.dark tbody tr:hover td:first-child {
+    box-shadow: inset 3px 0 0 var(--tb-verde) !important;
+}
+
+.dark fieldset.module,
+.dark .module.aligned {
+    background-color: #1a1a18 !important;
+    border-color: #333330 !important;
+}
+
+.dark fieldset.module h2,
+.dark .module h2 {
+    background-color: #111110 !important;
+    border-bottom-color: #333330 !important;
+    color: #666663 !important;
+}

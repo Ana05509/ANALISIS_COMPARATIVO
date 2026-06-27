@@ -39,7 +39,7 @@ class BotonEditarMixin:
     def acciones_columna(self, obj):
         url = f"./{obj.pk}/change/"
         return format_html(
-            '<a href="{}" style="background-color: #3b82f6; color: white; padding: 5px 14px; '
+            '<a href="{}" style="background-color: #1D9E75; color: white; padding: 5px 14px; '
             'border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; '
             'display: inline-block; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">✏️ Editar</a>',
             url
@@ -56,6 +56,7 @@ class CultivoAdmin(BotonEditarMixin, ModelAdmin):
     search_fields = ("nombre", "descripcion")
     ordering      = ("nombre",)
     list_per_page = 15
+    list_fullwidth = True
 
     fieldsets = (
         ("Información del Cultivo", {
@@ -83,6 +84,7 @@ class VariedadClonAdmin(BotonEditarMixin, ModelAdmin):
     search_fields = ("nombre", "cultivo__nombre")
     ordering      = ("cultivo__nombre", "nombre")
     list_per_page = 20
+    list_fullwidth = True
 
     fieldsets = (
         ("Clasificación Taxonómica Agrícola", {
@@ -123,6 +125,7 @@ class MuestraSueloAdmin(BotonEditarMixin, ModelAdmin):
     ordering      = ("-fecha_registro",)
     date_hierarchy = "fecha_registro"
     list_per_page  = 20
+    list_fullwidth = True
     readonly_fields = ("fecha_registro",)
 
     fieldsets = (
@@ -179,7 +182,7 @@ def _leer_archivo_molecular(archivo_field):
 def _disparar_pipeline(archivo_mol, request):
     ResultadoTaxonomico.objects.filter(archivo=archivo_mol).delete()
     df_raw = _leer_archivo_molecular(archivo_mol.archivo)
-    resultado = PipelineProcesamiento.procesar_archivo_df(df_raw, nivel="genus")
+    resultado = PipelineProcesamiento.procesar_archivo_df(df_raw)
     
     if not resultado or not resultado.get("data"):
         raise ValueError("El archivo no contiene datos taxonómicos válidos.")
@@ -207,6 +210,7 @@ class ArchivoMolecularAdmin(BotonEditarMixin, ModelAdmin):
     ordering      = ("-fecha_carga",)
     date_hierarchy = "fecha_carga"
     list_per_page  = 20
+    list_fullwidth = True
     readonly_fields = ("fecha_carga",)
 
     fieldsets = (
@@ -254,6 +258,7 @@ class ResultadoTaxonomicoAdmin(ModelAdmin):
     search_fields = ("genus", "species", "phylum", "archivo__muestra__codigo")
     ordering      = ("-porcentaje_hits",)
     list_per_page  = 30
+    list_fullwidth = True
 
     fieldsets = (
         ("Contexto", {"fields": ("archivo",)}),
@@ -289,6 +294,7 @@ class CatalogoMicroorganismoAdmin(BotonEditarMixin, ModelAdmin):
     search_fields = ("nombre", "descripcion")
     ordering      = ("nombre",)
     list_per_page  = 20
+    list_fullwidth = True
 
     fieldsets = (
         ("Identificación Taxonómica", {"fields": ("nombre", "nivel")}),
@@ -405,11 +411,12 @@ class UsuarioAdmin(BaseUserAdmin, BotonEditarMixin, ModelAdmin):
     change_password_form = AdminPasswordChangeForm
 
     list_display  = ("username", "email", "nombre_completo", "rol_badge", "is_active", "is_staff", "date_joined", "acciones_columna")
-    list_display_links = ("username", "email")
+    list_display_links = ("username",)
     list_filter   = ("rol", "is_staff", "is_active")
     search_fields = ("username", "email", "first_name", "last_name")
     ordering      = ("username",)
     list_per_page  = 20
+    list_fullwidth = True
 
     @admin.display(description="Nombre")
     def nombre_completo(self, obj):
@@ -436,3 +443,102 @@ class UsuarioAdmin(BaseUserAdmin, BotonEditarMixin, ModelAdmin):
             {"fields": ("rol",), "description": "Asigne el rol para determinar los permisos de visualización."}
         ))
         return fieldsets
+
+
+# =========================================================
+# BADGES PARA LA BARRA LATERAL
+# =========================================================
+def badge_archivos_sin_procesar(request):
+    archivos_con = ResultadoTaxonomico.objects.values("archivo_id").distinct()
+    n = ArchivoMolecular.objects.exclude(id__in=archivos_con).count()
+    return n if n > 0 else None
+
+
+def badge_usuarios_nuevos(request):
+    from django.utils import timezone
+    from datetime import timedelta
+    n = Usuario.objects.filter(
+        date_joined__gte=timezone.now() - timedelta(days=7)
+    ).count()
+    return n if n > 0 else None
+
+
+# =========================================================
+# CALLBACK DEL DASHBOARD
+# =========================================================
+def dashboard_callback(request, context):
+    import shutil
+    from django.conf import settings as django_settings
+    from django.utils import timezone
+    from datetime import timedelta
+
+    # Almacenamiento del servidor
+    try:
+        uso = shutil.disk_usage(django_settings.BASE_DIR)
+        total_gb = round(uso.total / 1024 ** 3, 1)
+        usado_gb = round(uso.used  / 1024 ** 3, 1)
+        libre_gb = round(uso.free  / 1024 ** 3, 1)
+        pct      = round(uso.used / uso.total * 100, 1)
+    except Exception:
+        total_gb = usado_gb = libre_gb = pct = 0
+
+    context["storage"] = {
+        "total": total_gb,
+        "usado": usado_gb,
+        "libre": libre_gb,
+        "pct":   pct,
+    }
+
+    # Estadísticas rápidas
+    archivos_con = ResultadoTaxonomico.objects.values("archivo_id").distinct()
+    sin_procesar = ArchivoMolecular.objects.exclude(id__in=archivos_con).count()
+
+    context["stats"] = {
+        "muestras":     MuestraSuelo.objects.count(),
+        "archivos":     ArchivoMolecular.objects.count(),
+        "catalogo":     CatalogoMicroorganismo.objects.count(),
+        "usuarios":     Usuario.objects.count(),
+        "sin_procesar": sin_procesar,
+    }
+
+    # Notificaciones automáticas
+    notifs = []
+    if sin_procesar > 0:
+        notifs.append({
+            "tipo": "warning",
+            "icono": "alert-triangle",
+            "msg": f"{sin_procesar} archivo(s) molecular(es) pendiente(s) de procesar",
+        })
+
+    nuevos = Usuario.objects.filter(
+        date_joined__gte=timezone.now() - timedelta(days=7)
+    ).count()
+    if nuevos > 0:
+        notifs.append({
+            "tipo": "info",
+            "icono": "user-plus",
+            "msg": f"{nuevos} usuario(s) registrado(s) en los últimos 7 días",
+        })
+
+    if pct >= 85:
+        notifs.append({
+            "tipo": "error",
+            "icono": "server-2",
+            "msg": f"Almacenamiento crítico: {pct}% utilizado",
+        })
+    elif pct >= 70:
+        notifs.append({
+            "tipo": "warning",
+            "icono": "server-2",
+            "msg": f"Almacenamiento alto: {pct}% utilizado",
+        })
+
+    if not notifs:
+        notifs.append({
+            "tipo": "success",
+            "icono": "circle-check",
+            "msg": "Sistema funcionando con normalidad",
+        })
+
+    context["notifications"] = notifs
+    return context

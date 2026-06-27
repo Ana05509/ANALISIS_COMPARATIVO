@@ -1,0 +1,451 @@
+{% extends 'admin/base.html' %}
+{% load i18n %}
+
+{% block extrahead %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+    /* ════════════════════════════════════════
+       DASHBOARD ADMIN — TerraBioLab UTC
+       Fuentes: Outfit, Fraunces, DM Mono
+       (cargadas desde admin_personalizado.css)
+       ════════════════════════════════════════ */
+
+    .tb-dash {
+        max-width: 1360px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 16px;
+        color: #111111;
+    }
+
+    /* ── ENCABEZADO DEL DASHBOARD ── */
+    .tb-dash-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.6rem;
+        flex-wrap: wrap;
+    }
+    .tb-dash-title {
+        font-family: 'Fraunces', serif;
+        font-size: 1.6rem;
+        font-weight: 600;
+        color: #0A0A0A;
+        letter-spacing: -0.3px;
+        line-height: 1.2;
+    }
+    .tb-dash-subtitle {
+        font-size: 0.85rem;
+        color: #5F5E5A;
+        margin-top: 2px;
+        font-family: 'DM Mono', monospace;
+    }
+    .tb-dash-date {
+        font-family: 'DM Mono', monospace;
+        font-size: 0.75rem;
+        color: #888780;
+        text-align: right;
+    }
+
+    /* ── GRID DE ESTADÍSTICAS ── */
+    .tb-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    /* Tarjeta de estadística */
+    .tb-stat-card {
+        background: #ffffff;
+        border: 1px solid #E5E4DE;
+        border-radius: 16px;
+        padding: 20px 22px;
+        text-decoration: none;
+        display: block;
+        color: inherit;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        position: relative;
+        overflow: hidden;
+    }
+    .tb-stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 28px rgba(0,0,0,0.10);
+        text-decoration: none;
+        color: inherit;
+    }
+    /* Acento superior de color */
+    .tb-stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 4px;
+        border-radius: 16px 16px 0 0;
+        background: var(--acento);
+    }
+
+    .tb-stat-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        gap: 8px;
+    }
+    .tb-stat-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: #5F5E5A;
+        line-height: 1.3;
+    }
+    .tb-stat-desc {
+        font-size: 0.75rem;
+        color: #888780;
+        margin-top: 3px;
+        font-weight: 400;
+    }
+    .tb-stat-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--icon-bg);
+        flex-shrink: 0;
+    }
+    .tb-stat-icon i {
+        font-size: 22px;
+        color: var(--acento);
+    }
+    .tb-stat-value {
+        font-family: 'Fraunces', serif;
+        font-size: 2.8rem;
+        font-weight: 600;
+        color: #0A0A0A;
+        line-height: 1;
+        margin-bottom: 14px;
+    }
+    .tb-stat-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 10px;
+        border-top: 1px solid #F1EFE8;
+    }
+    .tb-stat-foot-label {
+        font-size: 0.72rem;
+        color: #888780;
+    }
+    .tb-stat-foot-link {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--acento);
+    }
+
+    /* Variantes de color por tarjeta */
+    .card-verde   { --acento: #1D9E75; --icon-bg: #E1F5EE; }
+    .card-azul    { --acento: #1565C0; --icon-bg: #E3F2FD; }
+    .card-amber   { --acento: #C56A00; --icon-bg: #FFF3E0; }
+    .card-morado  { --acento: #6A1B9A; --icon-bg: #F3E5F5; }
+
+    /* ── BARRA DE ALMACENAMIENTO ── */
+    .tb-storage-card {
+        background: #ffffff;
+        border: 1px solid #E5E4DE;
+        border-radius: 16px;
+        padding: 22px 26px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .tb-storage-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .tb-storage-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #1a1a18;
+    }
+    .tb-storage-title i {
+        font-size: 20px;
+        color: #1D9E75;
+    }
+    .tb-storage-nums {
+        font-family: 'DM Mono', monospace;
+        font-size: 0.75rem;
+        color: #5F5E5A;
+    }
+    .tb-progress-track {
+        background: #F1EFE8;
+        border-radius: 99px;
+        height: 10px;
+        overflow: hidden;
+        margin-bottom: 6px;
+    }
+    .tb-progress-bar {
+        height: 100%;
+        border-radius: 99px;
+        transition: width 0.6s ease;
+    }
+    .bar-ok      { background: linear-gradient(90deg, #1D9E75, #25c490); }
+    .bar-warning { background: linear-gradient(90deg, #C56A00, #e07a00); }
+    .bar-danger  { background: linear-gradient(90deg, #A32D2D, #c44040); }
+    .tb-progress-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.72rem;
+        color: #888780;
+    }
+    .tb-progress-pct {
+        font-weight: 700;
+    }
+    .pct-ok      { color: #1D9E75; }
+    .pct-warning { color: #C56A00; }
+    .pct-danger  { color: #A32D2D; }
+
+    /* ── NOTIFICACIONES ── */
+    .tb-notif-card {
+        background: #ffffff;
+        border: 1px solid #E5E4DE;
+        border-radius: 16px;
+        padding: 22px 26px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .tb-notif-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #1a1a18;
+        margin-bottom: 16px;
+    }
+    .tb-notif-title i {
+        font-size: 20px;
+        color: #1D9E75;
+    }
+    .tb-notif-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .tb-notif-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 11px 14px;
+        border-radius: 10px;
+        border-left: 4px solid transparent;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        font-weight: 500;
+    }
+    .tb-notif-item i {
+        font-size: 18px;
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+    .notif-success { background: #E1F5EE; border-color: #1D9E75; color: #085041; }
+    .notif-success i { color: #1D9E75; }
+    .notif-info    { background: #E3F2FD; border-color: #1565C0; color: #0D3E8C; }
+    .notif-info i  { color: #1565C0; }
+    .notif-warning { background: #FFF3E0; border-color: #C56A00; color: #5a3000; }
+    .notif-warning i { color: #C56A00; }
+    .notif-error   { background: #FFEBEE; border-color: #A32D2D; color: #6b1212; }
+    .notif-error i { color: #A32D2D; }
+
+    .tb-notif-empty {
+        text-align: center;
+        padding: 24px 0;
+        color: #888780;
+        font-size: 0.85rem;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1100px) {
+        .tb-stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+        .tb-stats-grid { grid-template-columns: 1fr; }
+        .tb-stat-value { font-size: 2.2rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tb-dash">
+
+    <!-- ── Encabezado ── -->
+    <div class="tb-dash-header">
+        <div>
+            <div class="tb-dash-title">Panel de Control Microbiológico</div>
+            <div class="tb-dash-subtitle">TerraBioLab UTC · Análisis 16S &amp; ITS</div>
+        </div>
+        <div class="tb-dash-date">
+            <i class="ti ti-calendar"></i>
+            {% now "l, d \d\e F \d\e Y" %}
+        </div>
+    </div>
+
+    <!-- ── Fila 1: Tarjetas de estadísticas ── -->
+    <div class="tb-stats-grid">
+
+        <!-- Muestras de suelo -->
+        <a class="tb-stat-card card-verde"
+           href="{% url 'admin:analisis_muestrasuelo_changelist' %}">
+            <div class="tb-stat-top">
+                <div>
+                    <div class="tb-stat-label">Muestras de Suelo</div>
+                    <div class="tb-stat-desc">Registradas en el sistema</div>
+                </div>
+                <div class="tb-stat-icon">
+                    <i class="ti ti-plant"></i>
+                </div>
+            </div>
+            <div class="tb-stat-value">{{ stats.muestras|default:"—" }}</div>
+            <div class="tb-stat-footer">
+                <span class="tb-stat-foot-label">Total de registros</span>
+                <span class="tb-stat-foot-link">Ver muestras →</span>
+            </div>
+        </a>
+
+        <!-- Archivos moleculares -->
+        <a class="tb-stat-card card-azul"
+           href="{% url 'admin:analisis_archivomolecular_changelist' %}">
+            <div class="tb-stat-top">
+                <div>
+                    <div class="tb-stat-label">Archivos Moleculares</div>
+                    <div class="tb-stat-desc">
+                        {% if stats.sin_procesar %}
+                            <span style="color:#C56A00;font-weight:700;">
+                                {{ stats.sin_procesar }} sin procesar
+                            </span>
+                        {% else %}
+                            Todos procesados
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="tb-stat-icon">
+                    <i class="ti ti-dna-2"></i>
+                </div>
+            </div>
+            <div class="tb-stat-value">{{ stats.archivos|default:"—" }}</div>
+            <div class="tb-stat-footer">
+                <span class="tb-stat-foot-label">Secuencias 16S / ITS</span>
+                <span class="tb-stat-foot-link">Ver archivos →</span>
+            </div>
+        </a>
+
+        <!-- Catálogo maestro -->
+        <a class="tb-stat-card card-amber"
+           href="{% url 'admin:analisis_catalogomicroorganismo_changelist' %}">
+            <div class="tb-stat-top">
+                <div>
+                    <div class="tb-stat-label">Catálogo Maestro</div>
+                    <div class="tb-stat-desc">Microorganismos clasificados</div>
+                </div>
+                <div class="tb-stat-icon">
+                    <i class="ti ti-book-2"></i>
+                </div>
+            </div>
+            <div class="tb-stat-value">{{ stats.catalogo|default:"—" }}</div>
+            <div class="tb-stat-footer">
+                <span class="tb-stat-foot-label">Especies catalogadas</span>
+                <span class="tb-stat-foot-link">Ver catálogo →</span>
+            </div>
+        </a>
+
+        <!-- Usuarios -->
+        <a class="tb-stat-card card-morado"
+           href="{% url 'admin:analisis_usuario_changelist' %}">
+            <div class="tb-stat-top">
+                <div>
+                    <div class="tb-stat-label">Usuarios</div>
+                    <div class="tb-stat-desc">Cuentas activas</div>
+                </div>
+                <div class="tb-stat-icon">
+                    <i class="ti ti-users"></i>
+                </div>
+            </div>
+            <div class="tb-stat-value">{{ stats.usuarios|default:"—" }}</div>
+            <div class="tb-stat-footer">
+                <span class="tb-stat-foot-label">Docentes y estudiantes</span>
+                <span class="tb-stat-foot-link">Gestionar →</span>
+            </div>
+        </a>
+
+    </div>
+
+    <!-- ── Fila 2: Almacenamiento del servidor ── -->
+    <div class="tb-storage-card">
+        <div class="tb-storage-header">
+            <div class="tb-storage-title">
+                <i class="ti ti-server-2"></i>
+                Almacenamiento del Servidor
+            </div>
+            <span class="tb-storage-nums">
+                {{ storage.usado|default:"—" }} GB usados
+                &nbsp;/&nbsp;
+                {{ storage.total|default:"—" }} GB totales
+                &nbsp;·&nbsp;
+                <strong>{{ storage.libre|default:"—" }} GB libres</strong>
+            </span>
+        </div>
+
+        <div class="tb-progress-track">
+            {% if storage.pct >= 85 %}
+                <div class="tb-progress-bar bar-danger" style="width:{{ storage.pct }}%;"></div>
+            {% elif storage.pct >= 70 %}
+                <div class="tb-progress-bar bar-warning" style="width:{{ storage.pct }}%;"></div>
+            {% else %}
+                <div class="tb-progress-bar bar-ok" style="width:{{ storage.pct }}%;"></div>
+            {% endif %}
+        </div>
+
+        <div class="tb-progress-labels">
+            <span>0 GB</span>
+            <span class="tb-progress-pct
+                {% if storage.pct >= 85 %}pct-danger
+                {% elif storage.pct >= 70 %}pct-warning
+                {% else %}pct-ok{% endif %}">
+                {{ storage.pct|default:"0" }}% utilizado
+            </span>
+            <span>{{ storage.total|default:"—" }} GB</span>
+        </div>
+    </div>
+
+    <!-- ── Fila 3: Notificaciones ── -->
+    <div class="tb-notif-card">
+        <div class="tb-notif-title">
+            <i class="ti ti-bell-ringing"></i>
+            Notificaciones del Sistema
+        </div>
+
+        <div class="tb-notif-list">
+            {% for n in notifications %}
+                <div class="tb-notif-item notif-{{ n.tipo }}">
+                    <i class="ti ti-{{ n.icono }}"></i>
+                    <span>{{ n.msg }}</span>
+                </div>
+            {% empty %}
+                <div class="tb-notif-empty">
+                    <i class="ti ti-circle-check" style="font-size:24px;color:#1D9E75;"></i><br>
+                    Sin notificaciones pendientes
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

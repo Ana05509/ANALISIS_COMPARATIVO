@@ -232,7 +232,9 @@ class CatalogService:
     @staticmethod
     def reclasificar_microorganismo(pk, nueva_clasificacion, descripcion):
         try:
-            res = ResultadoTaxonomico.objects.get(pk=pk)
+            res = ResultadoTaxonomico.objects.select_related('archivo').get(pk=pk)
+            marcador = res.archivo.tipo_analisis  # "16S" o "ITS"
+
             genus_limpio = CatalogService._limpiar(res.genus)
             species_limpio = CatalogService._limpiar(res.species)
 
@@ -246,6 +248,7 @@ class CatalogService:
             obj = CatalogoMicroorganismo.objects.filter(
                 nombre__iexact=nombre,
                 nivel__iexact=nivel,
+                marcador=marcador,
             ).first()
             if obj:
                 obj.clasificacion = nueva_clasificacion
@@ -255,6 +258,7 @@ class CatalogService:
                 CatalogoMicroorganismo.objects.create(
                     nombre=nombre,
                     nivel=nivel,
+                    marcador=marcador,
                     clasificacion=nueva_clasificacion,
                     descripcion=descripcion,
                 )

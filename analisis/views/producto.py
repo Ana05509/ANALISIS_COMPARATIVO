@@ -13,7 +13,10 @@ def ver_producto(request, id):
     archivo = muestra.archivos_moleculares.order_by("-id").first()
     tipo_actual = archivo.tipo_analisis if archivo else "16S"
 
-    qs = ResultadoTaxonomico.objects.filter(archivo__muestra=muestra)
+    qs = ResultadoTaxonomico.objects.filter(
+        archivo__muestra=muestra,
+        archivo__tipo_analisis=tipo_actual,
+    )
 
     total_analisis = qs.count()
 
@@ -21,7 +24,7 @@ def ver_producto(request, id):
 
     catalogo = {
         obj.nombre.lower(): obj.clasificacion
-        for obj in CatalogoMicroorganismo.objects.filter(nivel='genus', marcador=tipo_actual)
+        for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo_actual)
     }
 
     for reg in analisis_top:

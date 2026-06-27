@@ -422,6 +422,68 @@
         
         .messages-container { margin-bottom: 1rem; }
 
+        /* ── BOTÓN HAMBURGUESA (solo visible en móvil) ── */
+        .sidebar-toggle-btn {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 6px 8px;
+            border-radius: var(--radius);
+            color: var(--text-muted);
+            font-size: 20px;
+            line-height: 1;
+            transition: background 0.15s;
+            margin-right: 8px;
+        }
+        .sidebar-toggle-btn:hover { background: var(--gris-light); }
+
+        /* ── OVERLAY para cerrar sidebar en móvil ── */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.35);
+            z-index: 99;
+            backdrop-filter: blur(1px);
+        }
+
+        /* ── RESPONSIVE: tablet y móvil ── */
+        @media (max-width: 900px) {
+            .bs-app-sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.25s ease;
+                z-index: 200;
+                box-shadow: none;
+            }
+            .bs-app-sidebar.sidebar-visible {
+                transform: translateX(0);
+                box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+            }
+            .bs-app-main-panel {
+                margin-left: 0 !important;
+            }
+            .sidebar-toggle-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .sidebar-overlay.overlay-visible {
+                display: block;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .page-content { padding: 1.25rem 1rem; }
+            .topbar { padding: 0 1rem; }
+            .metrics-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .topbar-title { font-size: 14px; }
+        }
+
+        @media (max-width: 400px) {
+            .metrics-grid { grid-template-columns: 1fr; }
+        }
+
         {% block extra_css %}{% endblock %}
     </style>
 </head>

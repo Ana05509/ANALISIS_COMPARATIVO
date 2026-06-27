@@ -39,6 +39,14 @@
             <a href="{% url 'analisis:reportes' %}" class="nav-link {% block nav_reportes %}{% endblock %}">
                 <i class="ti ti-report" aria-hidden="true"></i> Reportes
             </a>
+
+            <div class="nav-section-label">Microbiología Clásica</div>
+            <a href="{% url 'bioquimica:lista' %}" class="nav-link {% block nav_ensayos %}{% endblock %}">
+                <i class="ti ti-flask" aria-hidden="true"></i> Bioquímica
+            </a>
+            <a href="{% url 'bioquimica:subir_pdf' %}" class="nav-link {% block nav_subir_pdf %}{% endblock %}">
+                <i class="ti ti-file-upload" aria-hidden="true"></i> Subir PDF
+            </a>
         </nav>
 
         <div class="marker-tabs">
@@ -65,9 +73,17 @@
         </div>
     </aside>
 
+    <!-- Overlay para cerrar sidebar en móvil -->
+    <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
+
     <main class="bs-app-main-panel">
         <div class="topbar">
-            <span class="topbar-title">{% block topbar_title %}{% endblock %}</span>
+            <div style="display:flex;align-items:center;gap:4px;min-width:0;">
+                <button class="sidebar-toggle-btn" id="sidebarToggle" aria-label="Abrir menú" aria-expanded="false">
+                    <i class="ti ti-menu-2" aria-hidden="true"></i>
+                </button>
+                <span class="topbar-title">{% block topbar_title %}{% endblock %}</span>
+            </div>
             <div class="topbar-actions">
                 {% block topbar_actions %}{% endblock %}
             </div>
@@ -90,4 +106,33 @@
     </main>
 
 </div>
+
+<script>
+(function () {
+    var btn     = document.getElementById('sidebarToggle');
+    var sidebar = document.querySelector('.bs-app-sidebar');
+    var overlay = document.getElementById('sidebarOverlay');
+    if (!btn || !sidebar || !overlay) return;
+
+    function openSidebar() {
+        sidebar.classList.add('sidebar-visible');
+        overlay.classList.add('overlay-visible');
+        btn.setAttribute('aria-expanded', 'true');
+    }
+    function closeSidebar() {
+        sidebar.classList.remove('sidebar-visible');
+        overlay.classList.remove('overlay-visible');
+        btn.setAttribute('aria-expanded', 'false');
+    }
+
+    btn.addEventListener('click', function () {
+        sidebar.classList.contains('sidebar-visible') ? closeSidebar() : openSidebar();
+    });
+    overlay.addEventListener('click', closeSidebar);
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeSidebar();
+    });
+})();
+</script>
+
 {% endblock %}

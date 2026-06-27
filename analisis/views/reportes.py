@@ -50,7 +50,7 @@ def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S"):
     CATS = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
     taxa_qs    = list(qs.values(taxon=F(campo_db)).annotate(hits=Sum("num_hits")).order_by("-hits"))
     grand_total = sum(r["hits"] for r in taxa_qs) or 1
-    catalogo   = {obj.nombre.lower(): obj for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel, marcador=tipo)}
+    catalogo   = {obj.nombre.lower(): obj for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo)}
 
     detalle = {c: [] for c in CATS}
     totales = {c: 0  for c in CATS}

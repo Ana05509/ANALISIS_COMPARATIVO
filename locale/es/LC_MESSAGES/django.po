@@ -1,0 +1,345 @@
+# Traducciones del proyecto TerraBioLab UTC
+# Cubre cadenas de Unfold que no están en el catálogo de Django Admin
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: es\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# --- Acciones generales ---
+msgid "Action"
+msgstr "Acción"
+
+msgid "Action:"
+msgstr "Acción:"
+
+msgid "Add"
+msgstr "Agregar"
+
+msgid "Change"
+msgstr "Editar"
+
+msgid "Delete"
+msgstr "Eliminar"
+
+msgid "View"
+msgstr "Ver"
+
+msgid "Save"
+msgstr "Guardar"
+
+msgid "Save and continue editing"
+msgstr "Guardar y continuar editando"
+
+msgid "Save and add another"
+msgstr "Guardar y agregar otro"
+
+msgid "Save as new"
+msgstr "Guardar como nuevo"
+
+msgid "Save and view"
+msgstr "Guardar y ver"
+
+msgid "Submit"
+msgstr "Enviar"
+
+msgid "Run"
+msgstr "Ejecutar"
+
+msgid "Run the selected action"
+msgstr "Ejecutar la acción seleccionada"
+
+msgid "More actions"
+msgstr "Más acciones"
+
+msgid "Search"
+msgstr "Buscar"
+
+msgid "Go"
+msgstr "Ir"
+
+msgid "Go back"
+msgstr "Volver"
+
+msgid "Show all"
+msgstr "Mostrar todo"
+
+msgid "Select all"
+msgstr "Seleccionar todo"
+
+msgid "Select all rows"
+msgstr "Seleccionar todas las filas"
+
+msgid "Clear selection"
+msgstr "Limpiar selección"
+
+msgid "Objects"
+msgstr "Objetos"
+
+msgid "Summary"
+msgstr "Resumen"
+
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgid "Close"
+msgstr "Cerrar"
+
+msgid "Remove"
+msgstr "Quitar"
+
+msgid "Next"
+msgstr "Siguiente"
+
+msgid "Previous"
+msgstr "Anterior"
+
+msgid "Add row"
+msgstr "Agregar fila"
+
+msgid "Expand row"
+msgstr "Expandir fila"
+
+msgid "No, take me back"
+msgstr "No, volver atrás"
+
+msgid "This item will be deleted."
+msgstr "Este elemento será eliminado."
+
+# --- Búsqueda ---
+msgid "Type to search"
+msgstr "Escriba para buscar"
+
+msgid "Search apps and models..."
+msgstr "Buscar aplicaciones y modelos..."
+
+msgid "Filter navigation items"
+msgstr "Filtrar elementos de navegación"
+
+msgid "Recent searches"
+msgstr "Búsquedas recientes"
+
+msgid "No recent searches"
+msgstr "Sin búsquedas recientes"
+
+msgid "No results found"
+msgstr "Sin resultados"
+
+msgid "No results matching your query"
+msgstr "Sin resultados para su búsqueda"
+
+msgid "Loading more results..."
+msgstr "Cargando más resultados..."
+
+msgid "All applications"
+msgstr "Todas las aplicaciones"
+
+# --- Filtros ---
+msgid "Filters"
+msgstr "Filtros"
+
+msgid "Apply Filters"
+msgstr "Aplicar filtros"
+
+msgid "Clear all filters"
+msgstr "Limpiar todos los filtros"
+
+msgid "Reset filters"
+msgstr "Restablecer filtros"
+
+msgid " By %(filter_title)s "
+msgstr " Por %(filter_title)s "
+
+msgid "Hide counts"
+msgstr "Ocultar conteos"
+
+msgid "Show counts"
+msgstr "Mostrar conteos"
+
+# --- Tabla / listado ---
+msgid "Toggle sorting"
+msgstr "Alternar orden"
+
+msgid "Remove from sorting"
+msgstr "Quitar del orden"
+
+msgid "Sorting priority: %(priority_number)s"
+msgstr "Prioridad de orden: %(priority_number)s"
+
+msgid "No data"
+msgstr "Sin datos"
+
+msgid "This page yielded into no results. Create a new item or reset your filters."
+msgstr "Esta página no tiene resultados. Cree un nuevo elemento o restablezca los filtros."
+
+msgid "%(counter)s result"
+msgid_plural "%(counter)s results"
+msgstr[0] "%(counter)s resultado"
+msgstr[1] "%(counter)s resultados"
+
+msgid "%(counter)s result in %(time)s second"
+msgid_plural "%(counter)s results in %(time)s seconds"
+msgstr[0] "%(counter)s resultado en %(time)s segundo"
+msgstr[1] "%(counter)s resultados en %(time)s segundos"
+
+msgid "%(full_result_count)s total"
+msgstr "%(full_result_count)s en total"
+
+msgid "%(counter)s entry"
+msgid_plural "%(counter)s entries"
+msgstr[0] "%(counter)s entrada"
+msgstr[1] "%(counter)s entradas"
+
+# --- Acciones en bloque ---
+msgid "Select all %(total_count)s %(module_name)s"
+msgstr "Seleccionar todos: %(total_count)s %(module_name)s"
+
+msgid "Click here to select the objects across all pages"
+msgstr "Clic aquí para seleccionar los objetos de todas las páginas"
+
+# --- Tema (claro/oscuro) ---
+msgid "Light"
+msgstr "Claro"
+
+msgid "Dark"
+msgstr "Oscuro"
+
+msgid "System"
+msgstr "Sistema"
+
+# --- Navegación y encabezado ---
+msgid "Home"
+msgstr "Inicio"
+
+msgid "History"
+msgstr "Historial"
+
+msgid "Return to site"
+msgstr "Volver al sitio"
+
+msgid "View on site"
+msgstr "Ver en el sitio"
+
+msgid "General"
+msgstr "General"
+
+# --- Contraseña y autenticación ---
+msgid "Log in"
+msgstr "Iniciar sesión"
+
+msgid "Log out"
+msgstr "Cerrar sesión"
+
+msgid "Log in again"
+msgstr "Iniciar sesión de nuevo"
+
+msgid "Change password"
+msgstr "Cambiar contraseña"
+
+msgid "Toggle password visibility"
+msgstr "Mostrar/ocultar contraseña"
+
+msgid "Forgotten your password or username?"
+msgstr "¿Olvidó su contraseña o nombre de usuario?"
+
+msgid "Your password was changed."
+msgstr "Su contraseña fue cambiada."
+
+msgid "Please enter your old password, for security's sake, and then enter your new password twice so we can verify you typed it in correctly."
+msgstr "Por seguridad, ingrese su contraseña actual y luego la nueva contraseña dos veces para verificar que la escribió correctamente."
+
+msgid "Enter a new password for the user <strong>%(username)s</strong>."
+msgstr "Ingrese una nueva contraseña para el usuario <strong>%(username)s</strong>."
+
+msgid "Thanks for spending some quality time with the web site today."
+msgstr "Gracias por usar el sistema."
+
+# --- Archivos y multimedia ---
+msgid "Choose file to upload"
+msgstr "Seleccionar archivo para subir"
+
+msgid "Record picture"
+msgstr "Tomar fotografía"
+
+msgid "Image preview"
+msgstr "Vista previa de imagen"
+
+msgid "Click to cancel"
+msgstr "Clic para cancelar"
+
+msgid "Click to download"
+msgstr "Clic para descargar"
+
+# --- Historial y relaciones ---
+msgid "Recent actions"
+msgstr "Acciones recientes"
+
+msgid "Unknown content"
+msgstr "Contenido desconocido"
+
+msgid "Unknown"
+msgstr "Desconocido"
+
+msgid "User"
+msgstr "Usuario"
+
+msgid "Date/time"
+msgstr "Fecha/hora"
+
+msgid "Change selected %(model)s"
+msgstr "Editar %(model)s seleccionado"
+
+msgid "Add another %(model)s"
+msgstr "Agregar otro %(model)s"
+
+msgid "View selected %(model)s"
+msgstr "Ver %(model)s seleccionado"
+
+msgid "Delete selected %(model)s"
+msgstr "Eliminar %(model)s seleccionado"
+
+msgid "Models in the %(name)s application"
+msgstr "Modelos de la aplicación %(name)s"
+
+msgid "Add %(name)s"
+msgstr "Agregar %(name)s"
+
+# --- Valores booleanos ---
+msgid "True"
+msgstr "Verdadero"
+
+msgid "False"
+msgstr "Falso"
+
+# --- Eliminación ---
+msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
+msgstr "¿Está seguro de que desea eliminar el %(object_name)s \"%(escaped_object)s\"? También se eliminarán los siguientes elementos relacionados:"
+
+msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgstr "Eliminar el %(object_name)s '%(escaped_object)s' implicaría eliminar objetos relacionados, pero su cuenta no tiene permiso para eliminar los siguientes tipos de objetos:"
+
+msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
+msgstr "Eliminar el %(object_name)s '%(escaped_object)s' requeriría eliminar los siguientes objetos protegidos relacionados:"
+
+msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgstr "Eliminar los %(objects_name)s seleccionados implicaría eliminar objetos relacionados, pero su cuenta no tiene permiso para eliminar los siguientes tipos de objetos:"
+
+msgid "Deleting the selected %(objects_name)s would require deleting the following protected related objects:"
+msgstr "Eliminar los %(objects_name)s seleccionados requeriría eliminar los siguientes objetos protegidos relacionados:"
+
+msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
+msgstr "¿Está seguro de que desea eliminar los %(objects_name)s seleccionados? Se eliminarán todos los objetos y sus elementos relacionados:"
+
+# --- Errores de formulario ---
+msgid "Please correct the error below."
+msgid_plural "Please correct the errors below."
+msgstr[0] "Por favor corrija el error a continuación."
+msgstr[1] "Por favor corrija los errores a continuación."
+
+# --- Formulario de contraseña ---
+msgid "Password"
+msgstr "Contraseña"
+
+msgid "Username"
+msgstr "Nombre de usuario"

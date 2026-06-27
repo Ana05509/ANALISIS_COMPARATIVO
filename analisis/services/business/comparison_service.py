@@ -13,13 +13,13 @@ MAPA_NIVELES = {
 
 def _obtener_mapa_catalogo(nivel, tipo="16S"):
     """
-    PRECARGA OPTIMIZADA: Obtiene todo el catálogo del nivel en una sola consulta
-    para evitar el problema de rendimiento N+1 en los bucles.
-    Filtra por marcador (16S=Bacteria / ITS=Hongo) para no mezclar clasificaciones.
+    PRECARGA OPTIMIZADA: Obtiene todo el catálogo del marcador en una sola consulta.
+    No filtra por nivel porque el nombre del taxón es único por marcador;
+    filtrar por nivel rompe entradas con nivel guardado en español u otro formato.
     """
     return {
         obj.nombre.lower(): obj.clasificacion
-        for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel, marcador=tipo)
+        for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo)
     }
 
 

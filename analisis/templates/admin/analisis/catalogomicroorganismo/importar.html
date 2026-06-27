@@ -4,68 +4,291 @@
 {% block title %}Importar Catálogo de Microorganismos{% endblock %}
 
 {% block content %}
-<div style="max-width:660px;margin:2rem auto;">
-    <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;">
+
+<div style="max-width:900px;margin:30px auto;">
+
+    <h1 style="font-size:30px;font-weight:bold;margin-bottom:10px;">
         📥 Importar Catálogo de Microorganismos
     </h1>
-    <p style="color:#6b7280;margin-bottom:1.5rem;">
-        Cargue un archivo CSV o Excel para registrar o actualizar microorganismos en masa.
-        Si un registro ya existe (mismo nombre + nivel), se actualizará con los nuevos valores.
+
+    <p style="font-size:15px;color:#555;line-height:1.6;">
+        Importe un archivo <strong>CSV</strong> o <strong>Excel (.xlsx)</strong> con la información del catálogo
+        maestro de microorganismos. El sistema verificará cada registro automáticamente.
     </p>
 
-    <!-- Formato esperado -->
-    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-        <p style="font-weight:600;margin:0 0 0.5rem;">Formato de columnas:</p>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <thead>
-                <tr style="background:#dcfce7;">
-                    <th style="padding:6px 10px;text-align:left;border-radius:4px 0 0 4px;">Columna</th>
-                    <th style="padding:6px 10px;text-align:left;">Obligatoria</th>
-                    <th style="padding:6px 10px;text-align:left;border-radius:0 4px 4px 0;">Valores aceptados</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;"><code>nombre</code></td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">✅</td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">Nombre científico (Ej: Bacillus)</td></tr>
-                <tr><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;"><code>nivel</code></td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">✅</td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">genus, species, family, etc.</td></tr>
-                <tr><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;"><code>marcador</code></td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">✅</td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;"><strong>16S</strong> (Bacteria) o <strong>ITS</strong> (Hongo)</td></tr>
-                <tr><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;"><code>clasificacion</code></td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">✅</td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">benefico, fitopatogeno, neutral, sin_clasificar</td></tr>
-                <tr><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;"><code>descripcion</code></td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">—</td><td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">Texto libre</td></tr>
-                <tr><td style="padding:5px 10px;"><code>referencia</code></td><td style="padding:5px 10px;">—</td><td style="padding:5px 10px;">Literatura científica</td></tr>
-            </tbody>
-        </table>
+    <!-- Información general -->
+    <div style="
+        margin-top:25px;
+        background:#E1F5EE;
+        border:1px solid #A7E3CC;
+        padding:18px;
+        border-radius:8px;">
+
+        <h3 style="margin-top:0;color:#085041;">
+            ℹ ¿Qué realiza la importación?
+        </h3>
+
+        <ul style="line-height:1.8;margin-bottom:0;">
+            <li>✔ Valida que el archivo tenga el formato correcto.</li>
+            <li>✔ Comprueba que existan todas las columnas requeridas.</li>
+            <li>✔ Crea microorganismos nuevos.</li>
+            <li>✔ Actualiza microorganismos existentes (mismo nombre + nivel taxonómico).</li>
+            <li>✔ Conserva la integridad del catálogo maestro.</li>
+            <li>✔ Al finalizar mostrará un resumen de la importación.</li>
+        </ul>
+
     </div>
 
-    <!-- Formulario de carga -->
-    <form method="post" enctype="multipart/form-data"
-          style="background:white;border:1px solid #e5e7eb;border-radius:10px;padding:1.5rem;">
+    <!-- Advertencias -->
+
+    <div style="
+        margin-top:20px;
+        background:#FEF9C3;
+        border:1px solid #FACC15;
+        padding:18px;
+        border-radius:8px;">
+
+        <h3 style="margin-top:0;color:#92400E;">
+            ⚠ Recomendaciones importantes
+        </h3>
+
+        <ul style="line-height:1.8;margin-bottom:0;">
+            <li>No modifique el nombre de las columnas.</li>
+            <li>No elimine columnas obligatorias.</li>
+            <li>Utilice únicamente los valores permitidos.</li>
+            <li>Revise que los nombres científicos estén correctamente escritos.</li>
+            <li>Los registros duplicados serán actualizados automáticamente.</li>
+        </ul>
+
+    </div>
+
+    <!-- Formato -->
+
+    <div style="
+        margin-top:25px;
+        background:white;
+        border:1px solid #DDD;
+        border-radius:8px;
+        overflow:hidden;">
+
+        <div style="
+            background:#1D9E75;
+            color:white;
+            padding:12px 20px;
+            font-weight:bold;">
+
+            📋 Formato esperado del archivo
+        </div>
+
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+
+            <thead style="background:#F9FAFB;">
+
+            <tr>
+
+                <th style="padding:12px;border-bottom:1px solid #E5E7EB;">Columna</th>
+
+                <th style="padding:12px;border-bottom:1px solid #E5E7EB;">Obligatoria</th>
+
+                <th style="padding:12px;border-bottom:1px solid #E5E7EB;">Ejemplo</th>
+
+                <th style="padding:12px;border-bottom:1px solid #E5E7EB;">Descripción</th>
+
+            </tr>
+
+            </thead>
+
+            <tbody>
+
+            <tr>
+                <td style="padding:10px;"><code>nombre</code></td>
+                <td>✅</td>
+                <td><i>Bacillus</i></td>
+                <td>Nombre científico del microorganismo.</td>
+            </tr>
+
+            <tr>
+                <td style="padding:10px;"><code>nivel</code></td>
+                <td>✅</td>
+                <td>genus</td>
+                <td>Nivel taxonómico.</td>
+            </tr>
+
+            <tr>
+                <td style="padding:10px;"><code>marcador</code></td>
+                <td>✅</td>
+                <td>16S</td>
+                <td>16S (Bacterias) o ITS (Hongos).</td>
+            </tr>
+
+            <tr>
+                <td style="padding:10px;"><code>clasificacion</code></td>
+                <td>✅</td>
+                <td>benefico</td>
+                <td>
+                    benefico<br>
+                    fitopatogeno<br>
+                    neutral<br>
+                    sin_clasificar
+                </td>
+            </tr>
+
+            <tr>
+
+                <td style="padding:10px;"><code>descripcion</code></td>
+
+                <td>No</td>
+
+                <td>Bacteria promotora del crecimiento vegetal.</td>
+
+                <td>Descripción general.</td>
+
+            </tr>
+
+            <tr>
+
+                <td style="padding:10px;"><code>referencia</code></td>
+
+                <td>No</td>
+
+                <td>Artículo científico, DOI, libro.</td>
+
+                <td>Fuente bibliográfica.</td>
+
+            </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <!-- Ejemplo -->
+
+    <div style="
+        margin-top:25px;
+        background:#F9FAFB;
+        border:1px solid #DDD;
+        border-radius:8px;
+        padding:20px;">
+
+        <h3 style="margin-top:0;">
+            🧬 Ejemplo de registros
+        </h3>
+
+<pre style="
+background:white;
+padding:15px;
+border-radius:6px;
+border:1px solid #DDD;
+overflow:auto;">
+nombre,nivel,marcador,clasificacion,descripcion,referencia
+Bacillus,genus,16S,benefico,Bacteria promotora del crecimiento,DOI:10.xxx
+Fusarium oxysporum,species,ITS,fitopatogeno,Hongo causante de marchitez,Libro XXX
+</pre>
+
+    </div>
+
+    <!-- Formulario -->
+
+    <form method="post"
+          enctype="multipart/form-data"
+          id="form-importar"
+          style="
+            margin-top:30px;
+            background:white;
+            border:1px solid #DDD;
+            border-radius:8px;
+            padding:25px;">
+
         {% csrf_token %}
 
-        <div style="margin-bottom:1.25rem;">
-            <label style="display:block;font-weight:600;margin-bottom:0.5rem;font-size:14px;">
-                Archivo CSV / Excel
+        <div style="margin-bottom:20px;">
+
+            <label style="
+                font-weight:bold;
+                display:block;
+                margin-bottom:10px;">
+
+                📁 Seleccione un archivo
+
             </label>
+
             {{ form.archivo }}
-            {% if form.archivo.help_text %}
-            <p style="color:#6b7280;font-size:12px;margin-top:0.4rem;">{{ form.archivo.help_text }}</p>
-            {% endif %}
+
+            <p style="
+                margin-top:8px;
+                color:#6B7280;
+                font-size:13px;">
+
+                Formatos permitidos:
+                <strong>.csv</strong>,
+                <strong>.xlsx</strong>,
+                <strong>.xls</strong>
+
+            </p>
+
             {% if form.archivo.errors %}
-            <p style="color:#dc2626;font-size:13px;margin-top:0.4rem;">{{ form.archivo.errors|join:", " }}</p>
+                <div style="
+                    color:#DC2626;
+                    margin-top:10px;
+                    font-weight:bold;">
+                    {{ form.archivo.errors }}
+                </div>
             {% endif %}
+
         </div>
 
-        <div style="display:flex;gap:10px;">
-            <button type="submit"
-                    style="background:#3b82f6;color:white;padding:9px 20px;border:none;
-                           border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">
-                📥 Importar Registros
+        <div style="display:flex;gap:15px;">
+
+            <button
+                id="btn-importar"
+                type="submit"
+                style="
+                background:#1D9E75;
+                color:white;
+                border:none;
+                padding:12px 25px;
+                border-radius:6px;
+                cursor:pointer;
+                font-size:15px;
+                font-weight:bold;">
+
+                📥 Importar Catálogo
+
             </button>
+
             <a href="../"
-               style="background:white;border:1px solid #d1d5db;color:#374151;padding:9px 20px;
-                      border-radius:6px;font-size:14px;font-weight:500;text-decoration:none;
-                      display:inline-block;">
+               style="
+               padding:12px 25px;
+               border:1px solid #CCC;
+               border-radius:6px;
+               text-decoration:none;
+               color:#374151;
+               background:white;">
+
                 Cancelar
+
             </a>
+
         </div>
+
     </form>
+
 </div>
+
+<script>
+
+document.getElementById("form-importar").addEventListener("submit", function(){
+
+    const boton=document.getElementById("btn-importar");
+
+    boton.disabled=true;
+
+    boton.innerHTML="⏳ Importando registros...";
+
+});
+
+</script>
+
 {% endblock %}

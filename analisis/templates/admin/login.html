@@ -4,315 +4,620 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consola de Administración — TerraBioLab</title>
+    <title>Consola de Administración — TerraBioLab UTC</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-    
+
     <style>
+        /* ══════════════════════════════════════════════════
+           PALETA — Verdes de planta, texto negro, alto contraste
+           ══════════════════════════════════════════════════ */
         :root {
-            --primary: #2a4538;
-            --primary-light: #3b604e;
-            --admin-gold: #b45309; 
-            --bg-base: #f0f4f1; 
-            /* Fondo de tarjeta ultra claro y sutil para dar la máxima visibilidad al video trasero */
-            --surface-glass-light: rgba(255, 255, 255, 0.45); 
-            --text-dark: #111827; 
-            --text-muted: #4b5563;
-            --border-light: rgba(255, 255, 255, 0.6);
-            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            /* Verdes inspirados en vegetación real */
+            --verde-raiz:    #1B5E20; /* Verde profundo: raíz / corteza */
+            --verde-hoja:    #2E7D32; /* Verde hoja madura */
+            --verde-tallo:   #388E3C; /* Verde tallo activo */
+            --verde-brote:   #4CAF50; /* Verde brote nuevo */
+            --verde-palido:  #E8F5E9; /* Verde pálido: nuevo crecimiento */
+            --verde-menta:   #A5D6A7; /* Menta suave para acentos */
+
+            /* Texto — siempre negro o casi negro */
+            --negro:         #0A0A0A;
+            --gris-oscuro:   #1F1F1F;
+            --gris-texto:    #2D2D2D;
+            --gris-apoyo:    #4A4A4A;
+
+            /* Errores */
+            --rojo:          #B71C1C;
+            --rojo-fondo:    #FFEBEE;
+
+            /* Panel formulario: blanco limpio */
+            --panel-fondo:   #f9fdf9; /* ligerísimo tinte verde/blanco */
+
+            /* Overlay del video: 30 % opacidad → video visible al 70 % */
+            --overlay:       rgba(215, 242, 218, 0.30);
+
+            --ease: cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        body { 
-            font-family: 'Outfit', sans-serif; 
-            min-height: 100vh; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            background-color: var(--bg-base);
-            overflow: hidden;
-            position: relative;
-            padding: 1.5rem;
-        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* CAPA DEL VIDEO DE FONDO - Máxima claridad y nitidez */
-        .system-bg-video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-            overflow: hidden;
-        }
-        .system-bg-video video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            opacity: 0.65; /* Incrementado notablemente para que sea muy visible */
-        }
-        .system-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, rgba(240, 244, 241, 0.2) 0%, rgba(218, 227, 221, 0.4) 100%);
-            z-index: 2;
-        }
+        /* Base 18 px: mínimo recomendado para accesibilidad visual */
+        html { font-size: 18px; }
 
-        /* CONSOLA CENTRAL FLOTANTE CON ALTA TRANSPARENCIA */
-        .admin-box {
-            position: relative;
-            z-index: 3;
-            width: 100%;
-            max-width: 530px; /* Ancho máximo amplio */
-            background: var(--surface-glass-light);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border: 1px solid var(--border-light);
-            border-radius: 24px;
-            padding: 45px 40px; 
-            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Encabezado */
-        .box-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        .sys-identity {
-            display: inline-flex;
+        body {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            line-height: 1.65;
+            color: var(--negro);
+            min-height: 100vh;
+            display: flex;
             align-items: center;
-            gap: 14px;
-            margin-bottom: 1.25rem;
-        }
-        .sys-identity i { color: var(--primary); font-size: 32px; } /* Icono grande */
-        .sys-identity span { color: var(--text-dark); font-size: 28px; font-weight: 800; letter-spacing: 0.5px; } /* Título imponente */
-
-        .sys-subtitle {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            color: var(--text-dark);
-            background: rgba(255, 255, 255, 0.6);
-            border-left: 3px solid var(--primary);
-            padding: 12px 14px;
-            line-height: 1.4;
-            border-radius: 0 6px 6px 0;
-            text-align: left;
+            justify-content: center;
+            background: #0b2e0d;
+            overflow: hidden;
+            padding: 1.25rem;
         }
 
-        /* Alertas de Error Nativas de Django Admin */
-        .errornote {
-            background: rgba(254, 226, 226, 0.9);
-            border: 1px solid #fca5a5;
-            color: #991b1b;
-            padding: 12px 14px;
-            border-radius: 10px;
-            font-size: 13px;
-            margin-bottom: 1.25rem;
-            list-style: none;
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 500;
+        /* ── VIDEO + OVERLAY ILUMINADO ── */
+        .bg-wrap {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
         }
-        .errorlist { color: #ef4444; font-size: 12px; margin-top: 4px; list-style: none; font-family: 'JetBrains Mono', monospace; }
+        .bg-wrap video {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            /* Visible como textura natural bajo la capa clara */
+        }
+        /* Capa blanco-verde muy opaca → fondo claro e iluminado */
+        .bg-wrap::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--overlay);
+        }
 
-        /* Estructura de Campos */
-        .form-row {
-            margin-bottom: 1.25rem;
+        /* ── TARJETA PRINCIPAL ── */
+        .login-card {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 980px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border-radius: 22px;
+            overflow: hidden;
+            box-shadow:
+                0 0 0 2px rgba(90, 173, 79, 0.63),
+                0 20px 50px -8px rgba(0, 0, 0, 0.20);
+            animation: cardIn 0.4s var(--ease) both;
+        }
+
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(18px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ══════════════════════════════════════════
+           PANEL IZQUIERDO — Branding (verde planta)
+           Texto BLANCO sobre verde oscuro = alto contraste
+           ══════════════════════════════════════════ */
+        .brand-panel {
+            /* Naturaleza: prado soleado → hoja madura → sombra de bosque */
+            background: linear-gradient(155deg, #5EA83A 0%, #3D8228 50%, #235218 100%);
+            padding: 3.2rem 2.6rem;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            justify-content: space-between;
+            gap: 2rem;
             position: relative;
-        }
-        .form-row label {
-            font-size: 13.5px;
-            font-weight: 600;
-            color: var(--text-dark);
-        }
-        
-        /* Contenedor relativo especial para el input de password y el ojo */
-        .password-wrapper {
-            position: relative;
-            width: 100%;
+            overflow: hidden;
         }
 
-        /* Inputs limpios e integrados */
-        .form-row input {
+        /* Círculos decorativos: luz solar filtrándose entre hojas */
+        .brand-panel::before {
+            content: '';
+            position: absolute;
+            top: -70px; right: -70px;
+            width: 250px; height: 250px;
+            border-radius: 50%;
+            background: rgba(255, 200, 80, 0.10); /* luz cálida sol */
+            pointer-events: none;
+        }
+        .brand-panel::after {
+            content: '';
+            position: absolute;
+            bottom: -55px; left: -55px;
+            width: 210px; height: 210px;
+            border-radius: 50%;
+            background: rgba(120, 190, 90, 0.12); /* verde brote suave */
+            pointer-events: none;
+        }
+
+        .brand-top    { position: relative; z-index: 1; }
+        .brand-bottom { position: relative; z-index: 1; }
+
+        .brand-icon-wrap {
+            width: 68px; height: 68px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 2px solid rgba(165, 214, 167, 0.38);
+            border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 1.6rem;
+        }
+        .brand-icon-wrap i {
+            color: #CCFF90; /* lima vivo — brote joven */
+            font-size: 34px;
+        }
+
+        .brand-name {
+            font-family: 'Fraunces', serif;
+            font-size: 2.2rem;   /* ~40 px */
+            font-weight: 600;
+            color: #ffffff;
+            line-height: 1.1;
+            letter-spacing: -0.5px;
+            margin-bottom: 0.3rem;
+        }
+        .brand-name span { color: #CCFF90; } /* lima vivo */
+
+        .brand-institution {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.92); /* más opaco → más oscuro/legible */
+            letter-spacing: 2.2px;
+            text-transform: uppercase;
+            margin-bottom: 1.6rem;
+        }
+
+        .brand-desc {
+            font-size: 1rem;
+            color: #ffffff; /* blanco puro */
+            line-height: 1.7;
+        }
+
+        /* Lista de capacidades */
+        .brand-features {
+            margin-top: 1.6rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            font-size: 0.94rem;
+            font-weight: 600;    /* negrita para mayor legibilidad */
+            color: #ffffff;      /* blanco puro */
+        }
+        .feature-item i {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+        /* Cada ícono del panel izquierdo con color vivo distinto */
+        .ti-chart-dots-3  { color: #FFD740; } /* amarillo sol         */
+        .ti-plant-2        { color: #69FF87; } /* verde lima brillante */
+        .ti-report-analytics { color: #40C4FF; } /* azul cielo         */
+        .ti-flask          { color: #FF9100; } /* naranja mineral      */
+
+        /* Badge sistema en línea */
+        .security-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1.5px solid rgba(165, 214, 167, 0.30);
+            border-radius: 100px;
+            padding: 0.45rem 1rem;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.67rem;
+            color: #ffffff; /* badge legible en blanco puro */
+            letter-spacing: 0.5px;
+            width: fit-content;
+        }
+        .security-badge .dot {
+            width: 9px; height: 9px;
+            background: #69f0ae;
+            border-radius: 50%;
+            animation: pulse 2.2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1;    transform: scale(1);    }
+            50%       { opacity: 0.4; transform: scale(0.72); }
+        }
+
+        /* ══════════════════════════════════════════
+           PANEL DERECHO — Formulario
+           FONDO MUY CLARO, texto NEGRO puro
+           ══════════════════════════════════════════ */
+        .form-panel {
+            background: var(--panel-fondo);
+            padding: 3.2rem 2.8rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .form-header { margin-bottom: 2rem; }
+
+        .form-title {
+            font-family: 'Fraunces', serif;
+            font-size: 1.75rem;  /* ~32 px */
+            font-weight: 600;
+            color: var(--negro);
+            letter-spacing: -0.3px;
+            line-height: 1.2;
+            margin-bottom: 0.4rem;
+        }
+
+        .form-subtitle {
+            font-size: 1rem;     /* 18 px */
+            color: var(--gris-apoyo);
+            font-weight: 500;
+        }
+
+        /* ── BANNER DE ERROR — rojo oscuro, texto negro ── */
+        .error-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.65rem;
+            background: var(--rojo-fondo);
+            border: 2px solid #ef9a9a;
+            border-left: 5px solid var(--rojo);
+            color: var(--rojo);
+            padding: 0.9rem 1rem;
+            border-radius: 10px;
+            font-size: 0.95rem;  /* ~17 px */
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+        .error-banner i { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+
+        /* Ocultar los errores de campo individuales de Django (usamos el banner global) */
+        .errorlist { display: none !important; }
+        .errornote  { display: none !important; }
+
+        /* ── ETIQUETAS Y CAMPOS ── */
+        .field-group { margin-bottom: 1.3rem; }
+
+        .field-label {
+            display: block;
+            font-size: 1rem;     /* 18 px */
+            font-weight: 700;
+            color: var(--negro);
+            margin-bottom: 0.45rem;
+        }
+
+        .field-wrap { position: relative; }
+
+        /* Íconos de campo: base */
+        .field-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.25rem;
+            pointer-events: none;
+            transition: color 0.2s, transform 0.2s;
+        }
+
+        /* Ícono usuario — azul cielo (agua, vida) */
+        .ti-user.field-icon  { color: #1565C0; }
+        /* Ícono candado — naranja tierra (otoño, semilla) */
+        .ti-lock.field-icon  { color: #E65100; }
+        /* Ícono ojo (toggle contraseña) — violeta flor silvestre */
+        .toggle-pw           { color: #6A1B9A; }
+        .toggle-pw:hover     { color: #4A148C; background: #F3E5F5; }
+
+        /* Django renderiza el <input> con {{ form.field }} */
+        .field-wrap input {
             width: 100%;
-            padding: 12px 14px;
-            background: rgba(255, 255, 255, 0.8);
-            border: 1px solid rgba(0, 0, 0, 0.15);
+            padding: 0.85rem 3rem 0.85rem 2.9rem;
+            background: #ffffff;
+            border: 2px solid #C8E6C9;   /* borde verde pálido visible */
             border-radius: 10px;
             font-family: 'Outfit', sans-serif;
-            font-size: 14.5px;
-            color: var(--text-dark);
-            transition: var(--transition);
-        }
-        .form-row input:focus {
-            border-color: var(--primary);
-            background: #ffffff;
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(42, 69, 56, 0.1);
+            font-size: 1rem;             /* 18 px */
+            font-weight: 500;
+            color: var(--negro);
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
-        /* Estilos específicos para el botón del Ojo de contraseña */
-        .toggle-password-btn {
+        .field-wrap input::placeholder {
+            color: #9E9E9E;
+            font-weight: 400;
+        }
+
+        .field-wrap input:focus {
+            border-color: var(--verde-hoja);
+            box-shadow: 0 0 0 4px rgba(46, 125, 50, 0.18);
+            outline: none;
+        }
+
+        .field-wrap:focus-within .field-icon {
+            color: #5C4B1A; /* tierra oscura al enfocar */
+        }
+
+        .field-wrap.has-error input {
+            border-color: var(--rojo);
+            box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.14);
+        }
+
+        /* Botón ojo contraseña */
+        .toggle-pw {
             position: absolute;
-            right: 14px;
+            right: 12px;
             top: 50%;
             transform: translateY(-50%);
             background: none;
             border: none;
-            color: var(--text-muted);
             cursor: pointer;
+            font-size: 1.2rem;
+            padding: 5px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            padding: 4px;
-            transition: var(--transition);
-            z-index: 10;
+            border-radius: 7px;
+            transition: color 0.2s, background 0.2s;
         }
-        .toggle-password-btn:hover {
-            color: var(--primary);
-        }
-        
-        /* Ajuste para que el texto de la contraseña no choque con el ojo */
-        .form-row .password-wrapper input {
-            padding-right: 44px;
+        .toggle-pw:focus-visible {
+            outline: 3px solid var(--verde-brote);
+            outline-offset: 2px;
         }
 
-        /* Botón de Envío */
-        .btn-submit-core {
+        /* ── BOTÓN INGRESAR ── */
+        .btn-login {
             width: 100%;
-            padding: 13px;
-            background: var(--primary); 
+            padding: 1rem;
+            background: var(--verde-hoja);
             color: #ffffff;
             border: none;
             border-radius: 10px;
             font-family: 'Outfit', sans-serif;
-            font-size: 15px;
-            font-weight: 600;
+            font-size: 1.05rem;  /* ~19 px */
+            font-weight: 700;
+            letter-spacing: 0.3px;
             cursor: pointer;
-            transition: var(--transition);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            margin-top: 1.5rem;
+            gap: 0.6rem;
+            margin-top: 1.8rem;
+            transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
         }
-        .btn-submit-core:hover {
-            background: #1c3027;
-            box-shadow: 0 8px 16px -6px rgba(42, 69, 56, 0.3);
+        .btn-login:hover {
+            background: var(--verde-raiz);
+            box-shadow: 0 8px 24px -6px rgba(27, 94, 32, 0.45);
+        }
+        .btn-login:active { transform: scale(0.985); }
+        .btn-login:disabled {
+            background: var(--verde-menta);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .btn-login:focus-visible {
+            outline: 3px solid var(--verde-brote);
+            outline-offset: 3px;
         }
 
+        /* Spinner de carga */
+        .btn-spinner {
+            display: none;
+            width: 18px; height: 18px;
+            border: 2.5px solid rgba(255, 255, 255, 0.35);
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            flex-shrink: 0;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── LINK VOLVER ── */
         .back-link {
-            display: inline-flex;
+            display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
-            margin-top: 1.5rem;
-            color: var(--text-muted);
+            gap: 0.4rem;
+            margin-top: 1.3rem;
+            color: var(--gris-apoyo);
+            font-size: 0.95rem;  /* ~17 px */
+            font-weight: 600;
             text-decoration: none;
-            font-size: 13px;
-            font-weight: 500;
-            transition: var(--transition);
-            width: 100%;
+            border-radius: 8px;
+            padding: 4px 8px;
+            transition: color 0.2s;
         }
-        .back-link:hover { color: var(--primary); }
+        .back-link:hover { color: var(--verde-raiz); }
+        .back-link:focus-visible {
+            outline: 3px solid var(--verde-brote);
+            outline-offset: 2px;
+        }
 
-        @media (max-width: 480px) {
-            .admin-box { padding: 25px 20px; border: none; background: #ffffff; box-shadow: none; border-radius: 0; }
+        /* ══════════════════════════════════════════
+           RESPONSIVE
+           ══════════════════════════════════════════ */
+        @media (max-width: 740px) {
+            html { font-size: 17px; }
+            .login-card {
+                grid-template-columns: 1fr;
+                max-width: 460px;
+                border-radius: 18px;
+            }
+            .brand-panel { padding: 2rem 2rem 1.75rem; }
+            .brand-features { display: none; }
+            .brand-desc { display: none; }
+            .brand-name { font-size: 1.8rem; }
+            .form-panel { padding: 2rem 2rem; }
+        }
+
+        @media (max-width: 450px) {
+            html { font-size: 16px; }
+            body { padding: 0; }
+            .login-card { border-radius: 0; box-shadow: none; max-width: 100%; }
+            .brand-panel { padding: 1.6rem 1.5rem 1.4rem; }
+            .form-panel  { padding: 1.6rem 1.5rem; }
         }
     </style>
 </head>
 <body>
 
-    <div class="system-bg-video">
+    <!-- Video de naturaleza visible bajo el overlay claro -->
+    <div class="bg-wrap" aria-hidden="true">
         <video autoplay loop muted playsinline>
             <source src="{% static 'videos/mi_video.mp4' %}" type="video/mp4">
         </video>
-        <div class="system-overlay"></div>
     </div>
 
-    <div class="admin-box">
-        
-        <div class="box-header">
-            <div class="sys-identity">
-                <i class="ti ti-shield-cog"></i>
-                <span>ADMINISTRADOR</span>
+    <main class="login-card" role="main">
+
+        <!-- ══ Panel izquierdo: identidad del sistema ══ -->
+        <div class="brand-panel" aria-hidden="true">
+            <div class="brand-top">
+                <div class="brand-icon-wrap">
+                    <i class="ti ti-leaf"></i>
+                </div>
+                <div class="brand-name">Terra<span>BioLab</span></div>
+                <div class="brand-institution">Universidad Técnica de Cotopaxi</div>
+                <p class="brand-desc">
+                    Plataforma de análisis microbiológico de suelos agrícolas
+                    mediante secuenciación 16S (Bacterias) e ITS (Hongos).
+                </p>
+                <div class="brand-features">
+                    <div class="feature-item">
+                        <i class="ti ti-chart-dots-3"></i>
+                        Análisis taxonómico avanzado
+                    </div>
+                    <div class="feature-item">
+                        <i class="ti ti-plant-2"></i>
+                        Clasificación funcional del suelo
+                    </div>
+                    <div class="feature-item">
+                        <i class="ti ti-report-analytics"></i>
+                        Reportes PDF y exportación Excel
+                    </div>
+                    <div class="feature-item">
+                        <i class="ti ti-flask"></i>
+                        Ensayos bioquímicos clásicos
+                    </div>
+                </div>
             </div>
-            
-            <div class="sys-subtitle">
-                Introduzca credenciales autorizadas de soporte o administración.
+
+            <div class="brand-bottom">
+                <div class="security-badge">
+                    <span class="dot"></span>
+                    Sistema en línea · Acceso restringido
+                </div>
             </div>
         </div>
 
-        {% if form.errors and not form.non_field_errors %}
-            <p class="errornote">Error: Compruebe las credenciales introducidas en el formulario.</p>
-        {% endif %}
-        
-        {% if form.non_field_errors %}
-            {% for error in form.non_field_errors %}
-                <p class="errornote">{{ error }}</p>
-            {% endfor %}
-        {% endif %}
-
-        <form action="{{ app_path }}" method="post" id="login-form">
-            {% csrf_token %}
-            
-            <div class="form-row {% if form.username.errors %}errors{% endif %}">
-                <label for="{{ form.username.id_for_label }}">Usuario Administrador:</label>
-                {{ form.username }}
-                {{ form.username.errors }}
+        <!-- ══ Panel derecho: formulario de acceso ══ -->
+        <div class="form-panel">
+            <div class="form-header">
+                <h1 class="form-title">Consola de Administración</h1>
+                <p class="form-subtitle">Ingrese sus credenciales autorizadas</p>
             </div>
-            
-            <div class="form-row {% if form.password.errors %}errors{% endif %}">
-                <label for="{{ form.password.id_for_label }}">Contraseña:</label>
-                <div class="password-wrapper">
-                    {{ form.password }}
-                    <button type="button" class="toggle-password-btn" id="togglePassword" title="Mostrar/ocultar contraseña">
-                        <i class="ti ti-eye" id="eyeIcon"></i>
-                    </button>
+
+            {% if form.errors %}
+            <div class="error-banner" role="alert" aria-live="assertive">
+                <i class="ti ti-alert-circle" aria-hidden="true"></i>
+                <span>
+                    {% if form.non_field_errors %}
+                        {{ form.non_field_errors|first }}
+                    {% else %}
+                        Credenciales incorrectas. Verifique su usuario y contraseña.
+                    {% endif %}
+                </span>
+            </div>
+            {% endif %}
+
+            <form action="{{ app_path }}" method="post" id="login-form" novalidate>
+                {% csrf_token %}
+                {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+                <!-- Campo: Usuario -->
+                <div class="field-group">
+                    <label class="field-label" for="{{ form.username.id_for_label }}">
+                        Usuario
+                    </label>
+                    <div class="field-wrap {% if form.username.errors %}has-error{% endif %}">
+                        {{ form.username }}
+                        <i class="ti ti-user field-icon" aria-hidden="true"></i>
+                    </div>
                 </div>
-                {{ form.password.errors }}
-            </div>
 
-            <button class="btn-submit-core" type="submit">
-                <i class="ti ti-terminal"></i> Iniciar Sesión Técnica
-            </button>
-        </form>
+                <!-- Campo: Contraseña -->
+                <div class="field-group">
+                    <label class="field-label" for="{{ form.password.id_for_label }}">
+                        Contraseña
+                    </label>
+                    <div class="field-wrap {% if form.password.errors %}has-error{% endif %}">
+                        {{ form.password }}
+                        <i class="ti ti-lock field-icon" aria-hidden="true"></i>
+                        <button type="button"
+                                class="toggle-pw"
+                                id="togglePw"
+                                aria-label="Mostrar contraseña"
+                                aria-pressed="false">
+                            <i class="ti ti-eye" id="eyeIcon" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
 
-        <a href="/" class="back-link">
-            <i class="ti ti-arrow-left"></i> Volver a la plataforma pública
-        </a>
-    </div>
+                <button class="btn-login" type="submit" id="submitBtn">
+                    <span class="btn-spinner" id="spinner" aria-hidden="true"></span>
+                    <i class="ti ti-shield-check" id="btnIcon" aria-hidden="true"></i>
+                    <span id="btnText">Ingresar al sistema</span>
+                </button>
+            </form>
+
+            <a href="/" class="back-link">
+                <i class="ti ti-arrow-left" aria-hidden="true"></i>
+                Volver a la plataforma
+            </a>
+        </div>
+
+    </main>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const togglePasswordButton = document.getElementById('togglePassword');
-            const passwordInput = document.querySelector('.password-wrapper input');
-            const eyeIcon = document.getElementById('eyeIcon');
+    (function () {
+        // Auto-foco en el campo usuario al cargar
+        var userInput = document.querySelector('#login-form input[name="username"]');
+        if (userInput) { userInput.focus(); }
 
-            if (togglePasswordButton && passwordInput) {
-                togglePasswordButton.addEventListener('click', function() {
-                    const isPassword = passwordInput.getAttribute('type') === 'password';
-                    passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
-                    
-                    if (isPassword) {
-                        eyeIcon.classList.remove('ti-eye');
-                        eyeIcon.classList.add('ti-eye-off');
-                    } else {
-                        eyeIcon.classList.remove('ti-eye-off');
-                        eyeIcon.classList.add('ti-eye');
-                    }
-                });
-            }
-        });
+        // Toggle mostrar / ocultar contraseña
+        var toggleBtn = document.getElementById('togglePw');
+        var eyeIcon   = document.getElementById('eyeIcon');
+        var pwInput   = document.querySelector('#login-form input[name="password"]');
+
+        if (toggleBtn && pwInput) {
+            toggleBtn.addEventListener('click', function () {
+                var show = pwInput.type === 'password';
+                pwInput.type = show ? 'text' : 'password';
+                eyeIcon.className = show ? 'ti ti-eye-off' : 'ti ti-eye';
+                toggleBtn.setAttribute('aria-label',   show ? 'Ocultar contraseña'  : 'Mostrar contraseña');
+                toggleBtn.setAttribute('aria-pressed', show ? 'true'                : 'false');
+            });
+        }
+
+        // Estado de carga al enviar el formulario
+        var form      = document.getElementById('login-form');
+        var submitBtn = document.getElementById('submitBtn');
+        var spinner   = document.getElementById('spinner');
+        var btnIcon   = document.getElementById('btnIcon');
+        var btnText   = document.getElementById('btnText');
+
+        if (form) {
+            form.addEventListener('submit', function () {
+                submitBtn.disabled = true;
+                spinner.style.display = 'block';
+                btnIcon.style.display = 'none';
+                btnText.textContent   = 'Verificando credenciales…';
+                submitBtn.setAttribute('aria-busy', 'true');
+            });
+        }
+    })();
     </script>
 
 </body>
