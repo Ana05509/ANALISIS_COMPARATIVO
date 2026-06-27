@@ -243,16 +243,21 @@ class CatalogService:
                 nombre = genus_limpio
                 nivel = "genus"
 
-            CatalogoMicroorganismo.objects.update_or_create(
-                nombre__iexact=nombre, 
+            obj = CatalogoMicroorganismo.objects.filter(
+                nombre__iexact=nombre,
                 nivel__iexact=nivel,
-                defaults={
-                    "nombre": nombre, 
-                    "nivel": nivel, 
-                    "clasificacion": nueva_clasificacion, 
-                    "descripcion": descripcion
-                }
-            )
+            ).first()
+            if obj:
+                obj.clasificacion = nueva_clasificacion
+                obj.descripcion   = descripcion or obj.descripcion
+                obj.save()
+            else:
+                CatalogoMicroorganismo.objects.create(
+                    nombre=nombre,
+                    nivel=nivel,
+                    clasificacion=nueva_clasificacion,
+                    descripcion=descripcion,
+                )
             return True
-        except: 
+        except:
             return False

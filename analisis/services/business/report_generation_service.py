@@ -43,11 +43,10 @@ class ReportGenerationService:
         df.rename(columns={"total_num_hits": "num_hits"}, inplace=True)
         # porcentaje_hits recalculado sobre grand_total real (no suma de porcentajes)
         df["porcentaje_hits"] = (df["num_hits"] / grand_total * 100).round(5)
-        lista_taxones = df["tax"].dropna().unique().tolist()
         catalogo_map = {
             obj["nombre"].lower(): obj["clasificacion"]
             for obj in CatalogoMicroorganismo.objects.filter(
-                nombre__in=lista_taxones, nivel=nivel
+                nivel=nivel, marcador=tipo
             ).values("nombre", "clasificacion")
         }
         df["clasificacion"] = df["tax"].apply(

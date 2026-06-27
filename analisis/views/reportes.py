@@ -42,7 +42,7 @@ def calcular_indice_salud(n_ben, n_fito, n_neu, n_sc, shannon=0):
     return indice, nivel
 
 
-def _obtener_clasificacion_detalle(qs, nivel, campo_db):
+def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S"):
     """
     Devuelve (detalle_dict, totales_dict) con info funcional de cada taxón.
     detalle_dict[cat] = [{nombre, porcentaje, descripcion, referencia}, ...]
@@ -50,7 +50,7 @@ def _obtener_clasificacion_detalle(qs, nivel, campo_db):
     CATS = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
     taxa_qs    = list(qs.values(taxon=F(campo_db)).annotate(hits=Sum("num_hits")).order_by("-hits"))
     grand_total = sum(r["hits"] for r in taxa_qs) or 1
-    catalogo   = {obj.nombre.lower(): obj for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel)}
+    catalogo   = {obj.nombre.lower(): obj for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel, marcador=tipo)}
 
     detalle = {c: [] for c in CATS}
     totales = {c: 0  for c in CATS}
@@ -83,11 +83,10 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
     grand_total = qs.aggregate(total=Sum("num_hits"))["total"] or 1
     todos_raw   = list(qs.values(taxonomia=F(campo_db)).annotate(total_hits=Sum("num_hits")).order_by("-total_hits"))
 
-    nombres_taxa = [r["taxonomia"] for r in todos_raw if r["taxonomia"]]
     catalogo_map = {
         obj["nombre"].lower(): obj["clasificacion"]
         for obj in CatalogoMicroorganismo.objects.filter(
-            nombre__in=nombres_taxa, nivel__iexact=nivel
+            nivel__iexact=nivel, marcador=tipo
         ).values("nombre", "clasificacion")
     }
     for r in todos_raw:
@@ -95,7 +94,7 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
         r["clasificacion"]    = catalogo_map.get(str(r["taxonomia"] or "").lower(), "sin_clasificar")
 
     diversidad  = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids) or {}
-    detalle_clas, totales_clas = _obtener_clasificacion_detalle(qs, nivel, campo_db)
+    detalle_clas, totales_clas = _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo)
     shannon_val  = diversidad.get("shannon", 0) or 0
     indice, nivel_salud = calcular_indice_salud(
         totales_clas["benefico"], totales_clas["fitopatogeno"],

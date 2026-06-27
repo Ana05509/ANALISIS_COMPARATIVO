@@ -57,7 +57,7 @@ def obtener_analisis_avanzado(tipo="16S", top_n=10, nivel="genus", variedad_id=N
 
     catalogo_lookup = {
         obj.nombre.lower(): obj.clasificacion
-        for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel)
+        for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel, marcador=tipo)
     }
 
     for item in datos_top:
@@ -102,7 +102,7 @@ def obtener_top_n(tipo="16S", n=10, nivel="genus", variedad_id=None):
 
     catalogo_lookup = {
         obj.nombre.lower(): obj.clasificacion
-        for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel)
+        for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel, marcador=tipo)
     }
 
     for item in data:

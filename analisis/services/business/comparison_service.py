@@ -11,18 +11,19 @@ MAPA_NIVELES = {
 }
 
 
-def _obtener_mapa_catalogo(nivel):
+def _obtener_mapa_catalogo(nivel, tipo="16S"):
     """
     PRECARGA OPTIMIZADA: Obtiene todo el catálogo del nivel en una sola consulta
     para evitar el problema de rendimiento N+1 en los bucles.
+    Filtra por marcador (16S=Bacteria / ITS=Hongo) para no mezclar clasificaciones.
     """
     return {
-        obj.nombre.lower(): obj.clasificacion 
-        for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel)
+        obj.nombre.lower(): obj.clasificacion
+        for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel, marcador=tipo)
     }
 
 
-def comparar_productos(analisis_filtrado, nivel="genus", taxa_top=None):
+def comparar_productos(analisis_filtrado, nivel="genus", taxa_top=None, tipo="16S"):
     """
     Convierte el queryset en tabla dinámica pivoteada por muestra.
     Agrupa dinámicamente todo el residuo biológico fuera del Top N en la fila 'Otros'.
@@ -31,7 +32,7 @@ def comparar_productos(analisis_filtrado, nivel="genus", taxa_top=None):
         return []
 
     campo_db = MAPA_NIVELES.get(nivel, "genus")
-    mapa_clasificacion = _obtener_mapa_catalogo(nivel)
+    mapa_clasificacion = _obtener_mapa_catalogo(nivel, tipo)
 
     data = []
     muestras_vistas = set()
@@ -158,7 +159,7 @@ def ejecutar_comparacion_clean(cleaned_data):
     )
 
     # Enviamos la totalidad de los datos pero parametrizando el 'taxa_top' para consolidar la fila 'Otros'
-    tabla = comparar_productos(analisis, nivel, taxa_top=taxa_top)
+    tabla = comparar_productos(analisis, nivel, taxa_top=taxa_top, tipo=tipo)
 
     sets = {
         mid: set(analisis.filter(archivo__muestra_id=mid).values_list(campo_db, flat=True))

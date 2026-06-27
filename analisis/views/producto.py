@@ -19,11 +19,9 @@ def ver_producto(request, id):
 
     analisis_top = list(qs.order_by("-num_hits")[:DISPLAY_LIMIT])
 
-    nombres_genus = [r.genus for r in analisis_top if r.genus]
-
     catalogo = {
         obj.nombre.lower(): obj.clasificacion
-        for obj in CatalogoMicroorganismo.objects.filter(nombre__in=nombres_genus)
+        for obj in CatalogoMicroorganismo.objects.filter(nivel='genus', marcador=tipo_actual)
     }
 
     for reg in analisis_top:
