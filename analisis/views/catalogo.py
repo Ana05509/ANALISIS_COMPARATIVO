@@ -9,56 +9,68 @@ from analisis.forms import CatalogoImportarForm
 @login_required
 def catalogo_microorganismos(request):
     """
-    Vista principal del catálogo con filtros persistentes y 
-    matching taxonómico jerárquico.
+    Muestra directamente las entradas de CatalogoMicroorganismo con sus
+    clasificaciones guardadas (equivalente a lo que ve el admin).
     """
-    # 1. Captura de parámetros desde el formulario HTML
-    busqueda = request.GET.get('busqueda', '').strip()
-    filtro_marcador = request.GET.get('filtro_marcador', '')
+    from django.db.models import Count
+
+    busqueda             = request.GET.get('busqueda', '').strip()
+    filtro_marcador      = request.GET.get('filtro_marcador', '')
     filtro_clasificacion = request.GET.get('filtro_clasificacion', '')
-    filtro_nivel = request.GET.get('filtro_nivel', '')
+    filtro_nivel         = request.GET.get('filtro_nivel', '')
 
-    # 2. QuerySet Base optimizado
-    resultados_qs = ResultadoTaxonomico.objects.select_related('archivo__muestra').all()
-    
-    # 3. Aplicación de filtros dinámicos independientes
+    qs = CatalogoMicroorganismo.objects.all()
+
     if busqueda:
-        resultados_qs = resultados_qs.filter(genus__icontains=busqueda)
+        qs = qs.filter(nombre__icontains=busqueda)
     if filtro_marcador:
-        resultados_qs = resultados_qs.filter(archivo__tipo_analisis=filtro_marcador)
+        qs = qs.filter(marcador=filtro_marcador)
+    if filtro_clasificacion:
+        qs = qs.filter(clasificacion=filtro_clasificacion)
+    if filtro_nivel:
+        qs = qs.filter(nivel__iexact=filtro_nivel)
 
-    # 4. Consumo del nuevo servicio con Matching Jerárquico pasándole los filtros requeridos
-    # Esto elimina el error 'reportArgumentType' de Pylance al coincidir con la firma del Service
-    microorganismos, estadisticas = CatalogService.obtener_catalogo_procesado(
-        resultados_qs,
-        clasificacion=filtro_clasificacion,
-        nivel=filtro_nivel
-    )
+    qs = qs.order_by('nombre')
 
-    # 5. Listas estáticas para los selectores del formulario HTML
-    marcadores_disponibles = ["16S", "ITS"]
-    clasificaciones_disponibles = [
-        ("benefico", "Benéfico"),
-        ("fitopatogeno", "Fitopatógeno"),
-        ("neutral", "Neutral"),
-        ("sin_clasificar", "Sin Clasificar")
-    ]
-    niveles_taxonomicos = ["genus", "species"]
-
-    # 6. Contexto completo para asegurar la persistencia visual en la UI
-    context = {
-        "microorganismos": microorganismos,
-        "estadisticas": estadisticas,
-        "busqueda": busqueda,
-        "filtro_marcador": filtro_marcador,
-        "filtro_clasificacion": filtro_clasificacion,
-        "filtro_nivel": filtro_nivel,
-        "marcadores_disponibles": marcadores_disponibles,
-        "clasificaciones_disponibles": clasificaciones_disponibles,
-        "niveles_taxonomicos": niveles_taxonomicos,
+    # Estadísticas sobre el catálogo completo (no sobre el queryset filtrado)
+    conteos = {
+        row['clasificacion']: row['total']
+        for row in CatalogoMicroorganismo.objects.values('clasificacion').annotate(total=Count('id'))
+    }
+    estadisticas = {
+        "total":             CatalogoMicroorganismo.objects.count(),
+        "total_beneficos":   conteos.get('benefico', 0),
+        "total_fitopatogenos": conteos.get('fitopatogeno', 0),
+        "total_neutrales":   conteos.get('neutral', 0),
+        "total_sin_clas":    conteos.get('sin_clasificar', 0),
     }
 
-    return render(request, "analisis/catalogo_microorganismos.html", context)
+    # Niveles distintos presentes en el catálogo (dinámico)
+    niveles_taxonomicos = (
+        CatalogoMicroorganismo.objects
+        .values_list('nivel', flat=True)
+        .distinct()
+        .order_by('nivel')
+    )
+
+    clasificaciones_disponibles = [
+        ("benefico",      "Benéfico"),
+        ("fitopatogeno",  "Fitopatógeno"),
+        ("neutral",       "Neutral"),
+        ("sin_clasificar","Sin Clasificar"),
+    ]
+
+    return render(request, "analisis/catalogo_microorganismos.html", {
+        "microorganismos":         qs,
+        "estadisticas":            estadisticas,
+        "busqueda":                busqueda,
+        "filtro_marcador":         filtro_marcador,
+        "filtro_clasificacion":    filtro_clasificacion,
+        "filtro_nivel":            filtro_nivel,
+        "marcadores_disponibles":  ["16S", "ITS"],
+        "clasificaciones_disponibles": clasificaciones_disponibles,
+        "niveles_taxonomicos":     niveles_taxonomicos,
+    })
 
 
 # =========================================================================
@@ -125,6 +137,6 @@ def importar_catalogo(request):
         else:
             for field_errors in form.errors.values():
                 for error in field_errors:
-                    messages.error(request, error)
+                    messages.error(request, str(error))
 
     return redirect('analisis:catalogo')
