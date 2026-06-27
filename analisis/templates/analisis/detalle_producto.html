@@ -28,22 +28,67 @@
 </div>
 
 <div class="metrics-grid">
+
     <div class="metric-card">
-        <div class="metric-label">Total Análisis Organizados</div>
+        <div class="metric-label">Total Taxa en Base de Datos</div>
         <div class="metric-value td-mono">{{ total_analisis|default:"0" }}</div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
+            mostrando Top {{ display_limit }}
+        </div>
     </div>
+
     <div class="metric-card verde">
-        <div class="metric-label">Benéficos Detectados ✅</div>
+        <div class="metric-label">Benéficos Detectados</div>
         <div class="metric-value td-mono">{{ total_beneficos|default:"0" }}</div>
+        <div style="margin-top:8px;">
+            <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
+                <div style="height:100%; width:{{ pct_beneficos }}%; background:#1D9E75; border-radius:4px;"></div>
+            </div>
+            <div style="font-size:12px; font-weight:600; color:#1D9E75; margin-top:4px;">
+                {{ pct_beneficos }}% del Top {{ display_limit }}
+            </div>
+        </div>
     </div>
+
     <div class="metric-card amber">
-        <div class="metric-label">Fitopatógenos Identificados ⚠️</div>
+        <div class="metric-label">Fitopatógenos Identificados</div>
         <div class="metric-value td-mono">{{ total_fitopatogenos|default:"0" }}</div>
+        <div style="margin-top:8px;">
+            <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
+                <div style="height:100%; width:{{ pct_fitopatogenos }}%; background:#BA7517; border-radius:4px;"></div>
+            </div>
+            <div style="font-size:12px; font-weight:600; color:#BA7517; margin-top:4px;">
+                {{ pct_fitopatogenos }}% del Top {{ display_limit }}
+            </div>
+        </div>
     </div>
+
     <div class="metric-card">
-        <div class="metric-label">Sin Clasificación Biológica</div>
-        <div class="metric-value td-mono">{{ total_sin_clasificacion|default:"0" }}</div>
+        <div class="metric-label">Neutrales</div>
+        <div class="metric-value td-mono">{{ total_neutral|default:"0" }}</div>
+        <div style="margin-top:8px;">
+            <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
+                <div style="height:100%; width:{{ pct_neutral }}%; background:#185FA5; border-radius:4px;"></div>
+            </div>
+            <div style="font-size:12px; font-weight:600; color:#185FA5; margin-top:4px;">
+                {{ pct_neutral }}% del Top {{ display_limit }}
+            </div>
+        </div>
     </div>
+
+    <div class="metric-card">
+        <div class="metric-label">Sin Clasificación</div>
+        <div class="metric-value td-mono">{{ total_sin_clasificacion|default:"0" }}</div>
+        <div style="margin-top:8px;">
+            <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
+                <div style="height:100%; width:{{ pct_sin_clasificacion }}%; background:#5F5E5A; border-radius:4px;"></div>
+            </div>
+            <div style="font-size:12px; font-weight:600; color:#5F5E5A; margin-top:4px;">
+                {{ pct_sin_clasificacion }}% del Top {{ display_limit }}
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <div class="card">
@@ -96,6 +141,8 @@
                             <span class="badge badge-benefico"><i class="ti ti-shield-check"></i> Benéfico</span>
                         {% elif a.clasificacion == 'fitopatogeno' %}
                             <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle"></i> Fitopatógeno</span>
+                        {% elif a.clasificacion == 'neutral' %}
+                            <span class="badge" style="background:#E8F0FA;color:#185FA5;border:1px solid #b3cce8;"><i class="ti ti-minus"></i> Neutral</span>
                         {% else %}
                             <span class="badge badge-sin-clas">Sin clasificación</span>
                         {% endif %}
