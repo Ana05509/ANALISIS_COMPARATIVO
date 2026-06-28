@@ -100,7 +100,7 @@
                     <td>
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.total_porcentaje|default:0|floatformat:2 }}%;"></div>
+                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.total_porcentaje|default:0|floatformat:2 }}%; max-width: 100%;"></div>
                             </div>
                             <span class="td-mono" style="font-weight: 500; min-width: 75px; text-align: right;">
                                 {{ item.total_porcentaje|default:0|floatformat:4 }}%

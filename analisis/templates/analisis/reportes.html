@@ -8,7 +8,7 @@
 <style>
 /* ── Barra de progreso del índice de salud ── */
 .indice-bar  { height:13px; border-radius:7px; background:#e2e8f0; overflow:hidden; margin-top:6px; }
-.indice-fill { height:100%; border-radius:7px; transition:width .5s ease; }
+.indice-fill { height:100%; border-radius:7px; transition:width .5s ease; max-width:100%; }
 
 /* ── Colores por nivel de salud ── */
 .c-optimo   { color:#14532d; } .bg-optimo   { background:#dcfce7; border-color:#14532d; }
@@ -16,6 +16,16 @@
 .c-moderado { color:#ca8a04; } .bg-moderado { background:#fefce8; border-color:#ca8a04; }
 .c-riesgo   { color:#dc2626; } .bg-riesgo   { background:#fef2f2; border-color:#dc2626; }
 .c-critico  { color:#7f1d1d; } .bg-critico  { background:#fee2e2; border-color:#7f1d1d; }
+
+/* ── Metric cards con acento superior por clasificación ── */
+.metric-card.mt-verde .metric-value { color: #16a34a; border-top: none; }
+.metric-card.mt-verde { border-top: 3px solid #16a34a; }
+.metric-card.mt-rojo  { border-top: 3px solid #dc2626; }
+.metric-card.mt-rojo  .metric-value { color: #dc2626; }
+.metric-card.mt-gris  { border-top: 3px solid #64748b; }
+.metric-card.mt-gris  .metric-value { color: #64748b; }
+.metric-card.mt-slate { border-top: 3px solid #94a3b8; }
+.metric-card.mt-slate .metric-value { color: #94a3b8; }
 
 /* ── Tabla de taxones ── */
 #tabla-reporte th, #tabla-reporte td { padding: 6px 10px; font-size:13px; }
@@ -46,12 +56,12 @@
 
 {% if muestra_ids_seleccionados %}
 <div style="display:flex; gap:4px;">
-    <button id="btn-pdf"   onclick="descargar('pdf')"
+    <button id="btn-pdf"
             class="btn btn-primary btn-sm" title="PDF del reporte de la(s) muestra(s) seleccionada(s)">
         <i class="ti ti-file-pdf"></i> PDF
     </button>
-    <button id="btn-excel" onclick="descargar('excel')"
-            class="btn btn-sm" style="background:#16a34a; color:#fff; border:none;"
+    <button id="btn-excel"
+            class="btn btn-green btn-sm"
             title="Excel completo (todos los taxones, multi-hoja)">
         <i class="ti ti-table-export"></i> Excel
     </button>
@@ -87,19 +97,13 @@
 
             <div style="display:flex; gap:5px; margin-bottom:5px;">
                 <input id="rpt-search" type="text" placeholder="Buscar…"
+                       aria-label="Filtrar muestras por código"
                        class="form-control"
-                       style="flex:1; height:30px; font-size:12px; padding:0 8px;"
-                       oninput="filtrarMuestras(this.value)">
-                <button type="button" onclick="selTodo(true)"
-                        style="padding:3px 9px; font-size:11px; font-weight:600;
-                               border:1px solid #16a34a; border-radius:5px;
-                               background:transparent; color:#16a34a; cursor:pointer;">
+                       style="flex:1; height:30px; font-size:12px; padding:0 8px;">
+                <button type="button" id="btn-sel-todo" class="btn btn-ghost-verde btn-sm">
                     ✓ Todo
                 </button>
-                <button type="button" onclick="selTodo(false)"
-                        style="padding:3px 9px; font-size:11px;
-                               border:1px solid var(--border-color,#e2e8f0); border-radius:5px;
-                               background:transparent; color:var(--text-muted); cursor:pointer;">
+                <button type="button" id="btn-sel-ninguno" class="btn btn-outline btn-sm">
                     ✕
                 </button>
             </div>
@@ -114,7 +118,7 @@
                        data-codigo="{{ p.codigo|lower }}">
                     <input type="checkbox" class="rpt-chk" value="{{ p.id }}"
                            {% if p.id in muestra_ids_seleccionados %}checked{% endif %}
-                           onchange="syncHidden()">
+                           >
                     <span>{{ p.codigo }}</span>
                 </label>
                 {% empty %}
@@ -151,7 +155,7 @@
             </select>
         </div>
 
-        <button type="submit" class="btn btn-outline btn-sm" style="height:36px;">
+        <button type="submit" id="btn-filtrar" class="btn btn-outline btn-sm" style="height:36px;">
             <i class="ti ti-filter"></i> Filtrar
         </button>
     </form>
@@ -164,34 +168,44 @@
 ═══════════════════════════════════════════════════════════════════════ -->
 {% if indice_salud is not None %}
 {% with ns=nivel_salud|default:"" %}
-<div class="card card-sm" style="margin-bottom:1.5rem; border-left:4px solid
-    {% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
-    {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
-    {% else %}#7f1d1d{% endif %};">
+<div class="card card-sm
+    {% if ns == 'ÓPTIMO' %}card-optimo
+    {% elif ns == 'FAVORABLE' %}card-favorable
+    {% elif ns == 'MODERADO' %}card-moderado
+    {% elif ns == 'EN RIESGO' %}card-riesgo
+    {% else %}card-critico{% endif %}"
+     style="margin-bottom:1.5rem;">
     <div style="display:flex; align-items:center; gap:1.5rem;">
-        <div style="font-size:2.8rem; font-weight:800; line-height:1;
-            color:{% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
-                  {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
-                  {% else %}#7f1d1d{% endif %};">
+        <div class="
+            {% if ns == 'ÓPTIMO' %}text-optimo
+            {% elif ns == 'FAVORABLE' %}text-favorable
+            {% elif ns == 'MODERADO' %}text-moderado
+            {% elif ns == 'EN RIESGO' %}text-riesgo
+            {% else %}text-critico{% endif %}"
+             style="font-size:2.8rem; font-weight:800; line-height:1;">
             {{ indice_salud }}
         </div>
         <div style="flex:1;">
-            <div style="font-size:10px; text-transform:uppercase; letter-spacing:.06em;
-                        color:var(--text-muted); margin-bottom:2px;">
+            <div class="metric-label" style="font-size:10px; letter-spacing:.06em; margin-bottom:2px;">
                 Índice de Salud del Suelo
             </div>
-            <div style="font-size:1rem; font-weight:700; margin-bottom:5px;
-                color:{% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
-                      {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
-                      {% else %}#7f1d1d{% endif %};">
+            <div class="
+                {% if ns == 'ÓPTIMO' %}text-optimo
+                {% elif ns == 'FAVORABLE' %}text-favorable
+                {% elif ns == 'MODERADO' %}text-moderado
+                {% elif ns == 'EN RIESGO' %}text-riesgo
+                {% else %}text-critico{% endif %}"
+                 style="font-size:1rem; font-weight:700; margin-bottom:5px;">
                 {{ ns }}
             </div>
             <div class="indice-bar">
-                <div class="indice-fill" style="width:{{ indice_salud }}%; background:
-                    {% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
-                    {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
-                    {% else %}#7f1d1d{% endif %};">
-                </div>
+                <div class="indice-fill
+                    {% if ns == 'ÓPTIMO' %}fill-optimo
+                    {% elif ns == 'FAVORABLE' %}fill-favorable
+                    {% elif ns == 'MODERADO' %}fill-moderado
+                    {% elif ns == 'EN RIESGO' %}fill-riesgo
+                    {% else %}fill-critico{% endif %}"
+                     style="width:{{ indice_salud }}%;"></div>
             </div>
         </div>
         <div style="font-size:12px; color:var(--text-hint);">/ 100</div>
@@ -222,24 +236,24 @@
     </div>
     {% endif %}
     {% if totales_clasificacion %}
-    <div class="metric-card" style="border-top:3px solid #16a34a;">
+    <div class="metric-card mt-verde">
         <div class="metric-label">Benéficos</div>
-        <div class="metric-value" style="color:#16a34a;">{{ totales_clasificacion.benefico }}</div>
+        <div class="metric-value">{{ totales_clasificacion.benefico }}</div>
         <div class="metric-sub">Aliados del cultivo</div>
     </div>
-    <div class="metric-card" style="border-top:3px solid #dc2626;">
+    <div class="metric-card mt-rojo">
         <div class="metric-label">Fitopatógenos</div>
-        <div class="metric-value" style="color:#dc2626;">{{ totales_clasificacion.fitopatogeno }}</div>
+        <div class="metric-value">{{ totales_clasificacion.fitopatogeno }}</div>
         <div class="metric-sub">Potencial riesgo</div>
     </div>
-    <div class="metric-card" style="border-top:3px solid #64748b;">
+    <div class="metric-card mt-gris">
         <div class="metric-label">Neutrales</div>
-        <div class="metric-value" style="color:#64748b;">{{ totales_clasificacion.neutral }}</div>
+        <div class="metric-value">{{ totales_clasificacion.neutral }}</div>
         <div class="metric-sub">Sin impacto directo</div>
     </div>
-    <div class="metric-card" style="border-top:3px solid #94a3b8;">
+    <div class="metric-card mt-slate">
         <div class="metric-label">Sin catalogar</div>
-        <div class="metric-value" style="color:#94a3b8;">{{ totales_clasificacion.sin_clasificar }}</div>
+        <div class="metric-value">{{ totales_clasificacion.sin_clasificar }}</div>
         <div class="metric-sub">No en catálogo</div>
     </div>
     {% endif %}
@@ -270,7 +284,7 @@
                 {% endif %}
             </p>
         </div>
-        <button onclick="exportarGrafica('rpt-grafico-principal','perfil_abundancia')"
+        <button id="btn-exportar-grafica"
                 class="btn btn-outline btn-sm" style="flex-shrink:0; margin-left:1rem;">
             <i class="ti ti-download"></i> PNG
         </button>
@@ -341,9 +355,7 @@
                                 <i class="ti ti-alert-triangle"></i> Fitopatógeno
                             </span>
                         {% elif item.clasificacion == 'neutral' %}
-                            <span class="badge" style="background:#f1f5f9; color:#475569;">
-                                Neutral
-                            </span>
+                            <span class="badge badge-neutral">Neutral</span>
                         {% else %}
                             <span class="badge badge-sin-clas">Sin catalogar</span>
                         {% endif %}
@@ -575,7 +587,53 @@ function filtrarMuestras(q) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', syncHidden);
+document.addEventListener('DOMContentLoaded', function () {
+    syncHidden();
+
+    // Búsqueda en tiempo real
+    var searchInput = document.getElementById('rpt-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', function () { filtrarMuestras(this.value); });
+    }
+
+    // Botones Seleccionar todo / Ninguno
+    var btnTodo    = document.getElementById('btn-sel-todo');
+    var btnNinguno = document.getElementById('btn-sel-ninguno');
+    if (btnTodo)    btnTodo.addEventListener('click',    function () { selTodo(true); });
+    if (btnNinguno) btnNinguno.addEventListener('click', function () { selTodo(false); });
+
+    // Event delegation para checkboxes de muestras
+    var lista = document.getElementById('rpt-checkbox-list');
+    if (lista) {
+        lista.addEventListener('change', function (e) {
+            if (e.target && e.target.classList.contains('rpt-chk')) syncHidden();
+        });
+    }
+
+    // Botón exportar gráfica
+    var btnExportGraf = document.getElementById('btn-exportar-grafica');
+    if (btnExportGraf) {
+        btnExportGraf.addEventListener('click', function () {
+            exportarGrafica('rpt-grafico-principal', 'perfil_abundancia');
+        });
+    }
+
+    // Descarga PDF / Excel
+    var btnPdf   = document.getElementById('btn-pdf');
+    var btnExcel = document.getElementById('btn-excel');
+    if (btnPdf)   btnPdf.addEventListener('click',   function () { descargar('pdf'); });
+    if (btnExcel) btnExcel.addEventListener('click', function () { descargar('excel'); });
+
+    // Loading state en el formulario de filtro
+    var filterForm = document.getElementById('rpt-filter-form');
+    var btnFiltrar = document.getElementById('btn-filtrar');
+    if (filterForm && btnFiltrar) {
+        filterForm.addEventListener('submit', function () {
+            btnFiltrar.disabled = true;
+            btnFiltrar.innerHTML = '<span class="spinner-inline"></span> Cargando…';
+        });
+    }
+});
 
 // ── Descarga PDF / Excel ─────────────────────────────────────────────
 async function descargar(formato) {

@@ -338,9 +338,75 @@
             font-weight: 500;
         }
 
-        .badge-benefico { background: var(--verde-light); color: var(--verde-dark); }
-        .badge-fitopatogeno { background: var(--amber-light); color: #5a3a00; }
-        .badge-sin-clas { background: var(--gris-light); color: var(--gris); }
+        .badge-benefico    { background: var(--verde-light); color: var(--verde-dark); }
+        .badge-fitopatogeno{ background: var(--amber-light);  color: #5a3a00; }
+        .badge-neutral     { background: #f1f5f9; color: #475569; }
+        .badge-sin-clas    { background: var(--gris-light);  color: var(--gris); }
+        .badge-positivo    { background: var(--verde-light); color: var(--verde-dark); font-weight: 700; }
+        .badge-negativo    { background: var(--amber-light);  color: #5a3a00; font-weight: 700; }
+
+        /* Tipo de organismo (bioquímica) */
+        .tipo-bacteria { background: var(--verde-light); color: var(--verde-dark); }
+        .tipo-hongo    { background: var(--amber-light);  color: #5a3a00; }
+
+        /* Metric card — variantes de color adicionales */
+        .metric-card.azul  { border-left: 3px solid #1565C0; }
+        .metric-card.azul  .metric-value { color: #1565C0; }
+        .metric-card.gris  { border-left: 3px solid #64748b; }
+        .metric-card.gris  .metric-value { color: #64748b; }
+        .metric-card.slate { border-left: 3px solid #94a3b8; }
+        .metric-card.slate .metric-value { color: #94a3b8; }
+
+        /* Botón verde (Excel, acciones secundarias) */
+        .btn-green       { background: #16a34a; color: #fff; border-color: #16a34a; }
+        .btn-green:hover { background: #14532d; border-color: #14532d; color: #fff; }
+        .btn-ghost-verde { background: transparent; color: var(--verde); border: 1px solid var(--verde); }
+        .btn-ghost-verde:hover { background: var(--verde-light); }
+
+        /* Spinner inline para estados de carga en botones */
+        .spinner-inline {
+            display: inline-block; width: 13px; height: 13px;
+            border: 2px solid currentColor; border-top-color: transparent;
+            border-radius: 50%; animation: spinBtn 0.7s linear infinite;
+            vertical-align: middle;
+        }
+        @keyframes spinBtn { to { transform: rotate(360deg); } }
+
+        /* Tabla interna (sin bordes externos, para usar dentro de .card) */
+        .table-inner { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .table-inner thead tr { border-bottom: 2px solid var(--gris-border); }
+        .table-inner thead th { background: var(--gris-light); font-size: 11px; font-weight: 600;
+                                 text-transform: uppercase; letter-spacing: .5px;
+                                 color: var(--text-hint); padding: 7px 10px; text-align: left; }
+        .table-inner tbody tr { border-bottom: 1px solid var(--gris-light); }
+        .table-inner tbody tr:last-child { border-bottom: none; }
+        .table-inner tbody td { padding: 7px 10px; color: var(--text-primary); }
+        .table-inner tfoot td { padding: 8px 10px; font-size: 12px;
+                                 background: var(--gris-light); border-top: 2px solid var(--gris-border); }
+
+        /* Utilidades de alineación */
+        .td-right  { text-align: right !important; }
+        .td-center { text-align: center !important; }
+
+        /* Índice de salud — borde izquierdo por nivel */
+        .card-optimo    { border-left: 4px solid #14532d !important; }
+        .card-favorable { border-left: 4px solid #16a34a !important; }
+        .card-moderado  { border-left: 4px solid #ca8a04 !important; }
+        .card-riesgo    { border-left: 4px solid #dc2626 !important; }
+        .card-critico   { border-left: 4px solid #7f1d1d !important; }
+        .text-optimo    { color: #14532d; }
+        .text-favorable { color: #16a34a; }
+        .text-moderado  { color: #ca8a04; }
+        .text-riesgo    { color: #dc2626; }
+        .text-critico   { color: #7f1d1d; }
+        .fill-optimo    { background: #14532d; }
+        .fill-favorable { background: #16a34a; }
+        .fill-moderado  { background: #ca8a04; }
+        .fill-riesgo    { background: #dc2626; }
+        .fill-critico   { background: #7f1d1d; }
+
+        /* Barras de progreso — cap implícito */
+        .progress-bar-inner { max-width: 100%; }
 
         .btn {
             display: inline-flex;
@@ -419,8 +485,145 @@
 
         .pill-16s { display: inline-block; background: var(--verde-light); color: var(--verde-dark); font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; }
         .pill-its { display: inline-block; background: var(--amber-light); color: #5a3a00; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; }
-        
-        .messages-container { margin-bottom: 1rem; }
+
+        /* ════════════════════════════════════════
+           1. SISTEMA DE TOASTS FLOTANTES
+           ════════════════════════════════════════ */
+        .toast-container {
+            position: fixed;
+            top: 1.25rem;
+            right: 1.25rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+            width: 340px;
+            max-width: calc(100vw - 2.5rem);
+        }
+        .toast {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 13px 15px;
+            border-radius: 12px;
+            border-left: 4px solid transparent;
+            font-size: 14px;
+            font-weight: 500;
+            line-height: 1.45;
+            pointer-events: all;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.05);
+            animation: toastIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+            position: relative;
+            overflow: hidden;
+        }
+        .toast.toast-exit {
+            animation: toastOut 0.25s ease-in both;
+        }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(56px) scale(0.95); }
+            to   { opacity: 1; transform: translateX(0)    scale(1);    }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateX(0); max-height: 200px; }
+            to   { opacity: 0; transform: translateX(56px); max-height: 0; padding: 0; margin: 0; border: 0; }
+        }
+        .toast-progress {
+            position: absolute;
+            bottom: 0; left: 0;
+            height: 3px;
+            width: 100%;
+            transform-origin: left;
+            border-radius: 0 0 0 8px;
+        }
+        .toast-icon    { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+        .toast-body    { flex: 1; min-width: 0; }
+        .toast-close   {
+            background: none; border: none; cursor: pointer;
+            font-size: 17px; opacity: 0.45; padding: 0; line-height: 1;
+            flex-shrink: 0; color: inherit; transition: opacity 0.15s;
+        }
+        .toast-close:hover { opacity: 1; }
+
+        .toast-success { background: #E1F5EE; border-color: var(--verde); color: #063b28; }
+        .toast-success .toast-icon    { color: var(--verde); }
+        .toast-success .toast-progress{ background: var(--verde); }
+
+        .toast-error   { background: #FFEBEE; border-color: var(--rojo); color: #5c1212; }
+        .toast-error   .toast-icon    { color: var(--rojo); }
+        .toast-error   .toast-progress{ background: var(--rojo); }
+
+        .toast-warning { background: #FFF8EC; border-color: var(--amber); color: #4a2800; }
+        .toast-warning .toast-icon    { color: var(--amber); }
+        .toast-warning .toast-progress{ background: var(--amber); }
+
+        .toast-info    { background: #E8F4FF; border-color: #1565C0; color: #0a2e6e; }
+        .toast-info    .toast-icon    { color: #1565C0; }
+        .toast-info    .toast-progress{ background: #1565C0; }
+
+        /* ════════════════════════════════════════
+           2. TABLAS ORDENABLES (SORTING)
+           ════════════════════════════════════════ */
+        .table-wrap table thead th {
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            transition: background 0.12s, color 0.12s;
+        }
+        .table-wrap table thead th:hover {
+            background: #e8e6df;
+            color: var(--text-primary);
+        }
+        .table-wrap table thead th[data-no-sort] {
+            cursor: default;
+        }
+        .table-wrap table thead th[data-no-sort]:hover {
+            background: var(--gris-light);
+            color: var(--text-hint);
+        }
+        .th-sort-icon {
+            display: inline-block;
+            margin-left: 5px;
+            font-size: 12px;
+            opacity: 0.35;
+            transition: opacity 0.15s;
+            vertical-align: middle;
+        }
+        th[data-sort-dir] .th-sort-icon { opacity: 1; color: var(--verde-dark); }
+        th[data-sort-dir] { color: var(--verde-dark) !important; }
+
+        /* ════════════════════════════════════════
+           3. VALIDACIÓN EN TIEMPO REAL
+           ════════════════════════════════════════ */
+        .form-control.field-valid {
+            border-color: var(--verde) !important;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231D9E75' stroke-width='2.5'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 16px;
+            padding-right: 2.2rem;
+        }
+        .form-control.field-invalid {
+            border-color: var(--rojo) !important;
+            box-shadow: 0 0 0 3px rgba(163,45,45,0.10);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23A32D2D' stroke-width='2.5'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M15 9l-6 6M9 9l6 6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 16px;
+            padding-right: 2.2rem;
+        }
+        .field-hint {
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+            align-items: center;
+            gap: 4px;
+        }
+        .field-hint.visible { display: flex; }
+        .field-hint.hint-error   { color: var(--rojo); }
+        .field-hint.hint-success  { color: var(--verde-dark); }
+
+        .messages-container { display: none; } /* reemplazado por toasts */
 
         /* ── BOTÓN HAMBURGUESA (solo visible en móvil) ── */
         .sidebar-toggle-btn {
@@ -494,5 +697,211 @@
     {% endblock %}
 
     {% block extra_js %}{% endblock %}
+
+    <!-- ── Contenedor de toasts (siempre presente) ── -->
+    <div class="toast-container" id="toastContainer"
+         role="region" aria-label="Notificaciones" aria-live="polite"></div>
+
+    <script>
+    /* ════════════════════════════════════════════════
+       SISTEMA DE INTERACTIVIDAD GLOBAL — TerraBioLab
+       1. Toast Manager
+       2. Table Sorter
+       3. Form Validator
+       ════════════════════════════════════════════════ */
+
+    /* ── 1. TOAST MANAGER ── */
+    var Toast = (function () {
+        var container = null;
+        var ICONS = {
+            success: 'ti-circle-check',
+            error:   'ti-alert-circle',
+            warning: 'ti-alert-triangle',
+            info:    'ti-info-circle'
+        };
+
+        function getContainer() {
+            if (!container) container = document.getElementById('toastContainer');
+            return container;
+        }
+
+        function dismiss(el) {
+            el.classList.add('toast-exit');
+            el.addEventListener('animationend', function () { el.remove(); }, { once: true });
+        }
+
+        function show(type, message, duration) {
+            var c = getContainer();
+            if (!c) return;
+
+            /* Duración: errores no se cierran solos */
+            if (duration === undefined) duration = (type === 'error') ? 0 : 5000;
+
+            var el = document.createElement('div');
+            el.className   = 'toast toast-' + type;
+            el.setAttribute('role', 'alert');
+
+            var progressHtml = duration
+                ? '<div class="toast-progress" style="animation: toastProg ' + duration + 'ms linear forwards;"></div>'
+                : '';
+
+            el.innerHTML =
+                '<i class="ti ' + (ICONS[type] || ICONS.info) + ' toast-icon" aria-hidden="true"></i>' +
+                '<span class="toast-body">' + message + '</span>' +
+                '<button class="toast-close" aria-label="Cerrar notificación">&#10005;</button>' +
+                progressHtml;
+
+            el.querySelector('.toast-close').addEventListener('click', function () { dismiss(el); });
+            c.appendChild(el);
+
+            if (duration) { setTimeout(function () { dismiss(el); }, duration); }
+            return el;
+        }
+
+        return { show: show, dismiss: dismiss };
+    })();
+
+    /* Animación de barra de progreso (se inyecta dinámicamente) */
+    (function () {
+        var s = document.createElement('style');
+        s.textContent = '@keyframes toastProg { from { width:100% } to { width:0% } }';
+        document.head.appendChild(s);
+    })();
+
+    /* ── 2. TABLE SORTER ── */
+    function initSortableTables() {
+        document.querySelectorAll('.table-wrap table').forEach(function (table) {
+            var headers = table.querySelectorAll('thead th');
+            headers.forEach(function (th, colIdx) {
+                if (th.hasAttribute('data-no-sort')) return;
+
+                /* Ícono de ordenamiento */
+                var icon = document.createElement('span');
+                icon.className   = 'th-sort-icon';
+                icon.textContent = '↕';
+                icon.setAttribute('aria-hidden', 'true');
+                th.appendChild(icon);
+
+                th.setAttribute('tabindex', '0');
+                th.setAttribute('title', 'Ordenar columna');
+
+                function sort() {
+                    var asc = th.dataset.sortDir !== 'asc';
+                    /* Reset todos */
+                    headers.forEach(function (h) {
+                        delete h.dataset.sortDir;
+                        var ic = h.querySelector('.th-sort-icon');
+                        if (ic) ic.textContent = '↕';
+                    });
+                    th.dataset.sortDir   = asc ? 'asc' : 'desc';
+                    icon.textContent     = asc ? '↑' : '↓';
+
+                    var tbody = table.querySelector('tbody');
+                    if (!tbody) return;
+                    var rows = Array.from(tbody.querySelectorAll('tr'));
+
+                    rows.sort(function (a, b) {
+                        var av = (a.cells[colIdx] || {}).textContent.trim() || '';
+                        var bv = (b.cells[colIdx] || {}).textContent.trim() || '';
+                        var an = parseFloat(av.replace(/[^\d.-]/g, ''));
+                        var bn = parseFloat(bv.replace(/[^\d.-]/g, ''));
+                        if (!isNaN(an) && !isNaN(bn)) return asc ? an - bn : bn - an;
+                        return asc
+                            ? av.localeCompare(bv, 'es', { sensitivity: 'base' })
+                            : bv.localeCompare(av, 'es', { sensitivity: 'base' });
+                    });
+                    rows.forEach(function (r) { tbody.appendChild(r); });
+                }
+
+                th.addEventListener('click', sort);
+                th.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sort(); }
+                });
+            });
+        });
+    }
+
+    /* ── 3. VALIDACIÓN EN TIEMPO REAL ── */
+    function initFormValidation() {
+        var MSGS = {
+            valueMissing:   'Este campo es obligatorio.',
+            tooShort:       'Mínimo {min} caracteres.',
+            tooLong:        'Máximo {max} caracteres.',
+            typeMismatch:   'Formato inválido.',
+            patternMismatch:'El valor no tiene el formato correcto.',
+            rangeUnderflow: 'El valor mínimo es {min}.',
+            rangeOverflow:  'El valor máximo es {max}.',
+        };
+
+        function getMsg(input) {
+            var v = input.validity;
+            if (v.valueMissing)    return MSGS.valueMissing;
+            if (v.tooShort)        return MSGS.tooShort.replace('{min}', input.minLength);
+            if (v.tooLong)         return MSGS.tooLong.replace('{max}', input.maxLength);
+            if (v.rangeUnderflow)  return MSGS.rangeUnderflow.replace('{min}', input.min);
+            if (v.rangeOverflow)   return MSGS.rangeOverflow.replace('{max}', input.max);
+            if (v.typeMismatch)    return MSGS.typeMismatch;
+            if (v.patternMismatch) return MSGS.patternMismatch;
+            return input.validationMessage || 'Valor inválido.';
+        }
+
+        function getHint(input) {
+            var id = input.id + '-hint';
+            var hint = document.getElementById(id);
+            if (!hint) {
+                hint = document.createElement('span');
+                hint.id = id;
+                hint.className = 'field-hint';
+                hint.setAttribute('aria-live', 'polite');
+                input.insertAdjacentElement('afterend', hint);
+            }
+            return hint;
+        }
+
+        function validate(input) {
+            if (!input.value && !input.required) {
+                input.classList.remove('field-valid', 'field-invalid');
+                var h = document.getElementById(input.id + '-hint');
+                if (h) { h.className = 'field-hint'; h.textContent = ''; }
+                return;
+            }
+            var ok   = input.checkValidity();
+            var hint = getHint(input);
+            input.classList.toggle('field-valid',   ok);
+            input.classList.toggle('field-invalid', !ok);
+            if (!ok && input.value) {
+                hint.textContent = getMsg(input);
+                hint.className   = 'field-hint visible hint-error';
+            } else if (ok && input.value) {
+                hint.textContent = '';
+                hint.className   = 'field-hint';
+            }
+        }
+
+        document.querySelectorAll('.form-control').forEach(function (input) {
+            if (input.type === 'file' || input.type === 'hidden') return;
+            input.addEventListener('blur',  function () { validate(input); });
+            input.addEventListener('input', function () {
+                /* Solo feedback positivo mientras escribe; negativo al perder foco */
+                if (input.checkValidity() && input.value) {
+                    input.classList.add('field-valid');
+                    input.classList.remove('field-invalid');
+                    var h = document.getElementById(input.id + '-hint');
+                    if (h) h.className = 'field-hint';
+                } else {
+                    input.classList.remove('field-valid');
+                }
+            });
+        });
+    }
+
+    /* ── INICIALIZACIÓN ── */
+    document.addEventListener('DOMContentLoaded', function () {
+        initSortableTables();
+        initFormValidation();
+    });
+    </script>
+
+    {% block toast_messages %}{% endblock %}
 </body>
 </html>

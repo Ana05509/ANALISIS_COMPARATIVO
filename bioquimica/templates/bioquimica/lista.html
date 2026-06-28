@@ -1,7 +1,8 @@
 {% extends "analisis/base.html" %}
 
-{% block topbar_title %}Microbiología Bioquímica{% endblock %}
+{% block title %}Bioquímica — TerraBioLab{% endblock %}
 {% block nav_ensayos %}active{% endblock %}
+{% block topbar_title %}Microbiología Bioquímica{% endblock %}
 
 {% block topbar_actions %}
     <a href="{% url 'bioquimica:subir_pdf' %}" class="btn btn-primary btn-sm">
@@ -15,7 +16,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="metrics-grid" style="margin-bottom: 24px;">
+<div class="metrics-grid" style="margin-bottom: 1.5rem;">
     <a href="?tipo=" class="metric-card {% if not tipo_filtro %}verde{% endif %}" style="text-decoration:none;">
         <div class="metric-label">Todos los Ensayos</div>
         <div class="metric-value">{{ total_recuento|add:total_aislamiento }}</div>
@@ -34,57 +35,65 @@
 </div>
 
 {% if ensayos %}
-<div class="card" style="padding: 0; overflow: hidden;">
-    <table class="data-table" style="width:100%; border-collapse: collapse;">
-        <thead>
-            <tr style="background:#F8F7F4; border-bottom: 2px solid #E8E5DC;">
-                <th style="padding:12px 16px; text-align:left; font-size:13px; color:#5F5E5A; font-weight:600;">Código</th>
-                <th style="padding:12px 16px; text-align:left; font-size:13px; color:#5F5E5A; font-weight:600;">Tipo</th>
-                <th style="padding:12px 16px; text-align:left; font-size:13px; color:#5F5E5A; font-weight:600;">Muestra</th>
-                <th style="padding:12px 16px; text-align:left; font-size:13px; color:#5F5E5A; font-weight:600;">Fecha Reporte</th>
-                <th style="padding:12px 16px; text-align:left; font-size:13px; color:#5F5E5A; font-weight:600;">Registros</th>
-                <th style="padding:12px 16px; text-align:center; font-size:13px; color:#5F5E5A; font-weight:600;">Acción</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for ensayo in ensayos %}
-            <tr style="border-bottom: 1px solid #F1EFE8; transition: background 0.15s;" onmouseover="this.style.background='#F8F7F4'" onmouseout="this.style.background='white'">
-                <td style="padding:12px 16px; font-family:monospace; font-size:13px; font-weight:600; color:#085041;">{{ ensayo.codigo }}</td>
-                <td style="padding:12px 16px;">
-                    {% if ensayo.tipo == 'recuento' %}
-                    <span style="background:#E6F1FB;color:#0C447C;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;">📊 Recuento</span>
-                    {% else %}
-                    <span style="background:#F1EFE8;color:#5F5E5A;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;">🔬 Aislamiento</span>
-                    {% endif %}
-                </td>
-                <td style="padding:12px 16px; font-size:13px;">{{ ensayo.nombre_muestra }}</td>
-                <td style="padding:12px 16px; font-size:13px; color:#5F5E5A;">{{ ensayo.fecha_reporte|date:"d/m/Y" }}</td>
-                <td style="padding:12px 16px; font-size:13px; color:#085041; font-weight:600;">{{ ensayo.total_organismos }}</td>
-                <td style="padding:12px 16px; text-align:center;">
-                    <a href="{% url 'bioquimica:detalle' ensayo.pk %}"
-                       style="background:#1D9E75;color:white;padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">
-                        Ver
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="card" style="padding:0; overflow:hidden;">
+    <div class="table-wrap">
+        <table class="table-inner" style="margin:0;">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Tipo</th>
+                    <th>Muestra</th>
+                    <th>Fecha reporte</th>
+                    <th>Organismos</th>
+                    <th class="td-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ensayo in ensayos %}
+                <tr>
+                    <td class="td-mono" style="color:var(--verde-dark); font-weight:600;">{{ ensayo.codigo }}</td>
+                    <td>
+                        {% if ensayo.tipo == 'recuento' %}
+                        <span class="badge" style="background:#E6F1FB; color:#0C447C;">📊 Recuento</span>
+                        {% else %}
+                        <span class="badge badge-sin-clas">🔬 Aislamiento</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:13px;">{{ ensayo.nombre_muestra }}</td>
+                    <td class="td-mono" style="font-size:13px; color:var(--text-muted);">{{ ensayo.fecha_reporte|date:"d/m/Y" }}</td>
+                    <td class="td-mono" style="color:var(--verde-dark); font-weight:600;">{{ ensayo.total_organismos }}</td>
+                    <td class="td-center">
+                        <a href="{% url 'bioquimica:detalle' ensayo.pk %}" class="btn btn-primary btn-sm">
+                            <i class="ti ti-eye"></i> Ver
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
+
 {% else %}
-<div class="empty-state" style="text-align:center; padding: 60px 20px;">
-    <i class="ti ti-flask-off" style="font-size:48px; color:#C8C5BC;"></i>
-    <p style="color:#888780; margin-top:16px; font-size:15px;">
+<div class="empty-state">
+    <i class="ti ti-flask-off" aria-hidden="true"></i>
+    <strong>
         {% if tipo_filtro %}
-            No hay ensayos de tipo <strong>{{ tipo_filtro }}</strong> registrados.
+            Sin ensayos de tipo "{{ tipo_filtro }}"
         {% else %}
-            No hay ensayos registrados aún.
+            Sin ensayos registrados
+        {% endif %}
+    </strong>
+    <p>
+        {% if tipo_filtro %}
+            No hay ensayos de este tipo. <a href="?tipo=">Ver todos los tipos</a>
+        {% else %}
+            Aún no hay ensayos bioquímicos en el sistema.
         {% endif %}
     </p>
     {% if request.user.is_staff or request.user.rol == 'docente' %}
-    <a href="/admin/bioquimica/ensayomicrobiologico/add/"
-       style="display:inline-block; margin-top:16px; background:#1D9E75; color:white; padding:8px 20px; border-radius:8px; text-decoration:none; font-weight:600;">
-        + Registrar primer ensayo
+    <a href="/admin/bioquimica/ensayomicrobiologico/add/" class="btn btn-primary btn-sm" style="margin-top:0.75rem;">
+        <i class="ti ti-plus"></i> Registrar primer ensayo
     </a>
     {% endif %}
 </div>

@@ -90,17 +90,6 @@
         </div>
 
         <div class="page-content">
-            {% if messages %}
-            <div class="messages-container">
-                {% for message in messages %}
-                <div class="alert alert-{% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}success{% endif %}">
-                    <i class="ti ti-{% if message.tags == 'error' %}alert-circle{% elif message.tags == 'warning' %}alert-triangle{% else %}circle-check{% endif %}" aria-hidden="true"></i>
-                    {{ message }}
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
             {% block content %}{% endblock %}
         </div>
     </main>
@@ -135,4 +124,22 @@
 })();
 </script>
 
+{% endblock %}
+
+{% block toast_messages %}
+{% if messages %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var msgs = [
+        {% for message in messages %}
+        {
+            type: "{% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% elif message.tags == 'info' %}info{% else %}success{% endif %}",
+            text: "{{ message|escapejs }}"
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    msgs.forEach(function (m) { Toast.show(m.type, m.text); });
+});
+</script>
+{% endif %}
 {% endblock %}

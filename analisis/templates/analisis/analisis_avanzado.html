@@ -58,9 +58,10 @@
             </label>
             <div style="display:flex; gap:5px; margin-bottom:5px;">
                 <input id="av-search" type="text" placeholder="🔍 Buscar..." autocomplete="off"
+                       aria-label="Filtrar muestras por nombre"
                        style="flex:1; padding:4px 8px; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; font-size:12px; outline:none;">
-                <button type="button" id="av-btn-all" style="padding:3px 9px; font-size:11px; font-weight:600; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; background:var(--bg-light,#f8fafc); cursor:pointer;">✓ Todo</button>
-                <button type="button" id="av-btn-clear" style="padding:3px 9px; font-size:11px; font-weight:600; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; background:var(--bg-light,#f8fafc); cursor:pointer;">✕</button>
+                <button type="button" id="av-btn-all"   class="btn btn-ghost-verde btn-sm">✓ Todo</button>
+                <button type="button" id="av-btn-clear" class="btn btn-outline btn-sm">✕</button>
             </div>
             <div id="av-list-wrap" style="border:1px solid var(--border-color,#e2e8f0); border-radius:6px; max-height:160px; overflow-y:auto;">
                 <div id="av-checkbox-list"></div>
@@ -75,7 +76,7 @@
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="btn btn-primary" style="height: 38px; align-self:flex-end;">
+        <button type="submit" id="btn-analizar" class="btn btn-primary" style="height: 38px; align-self:flex-end;">
             <i class="ti ti-refresh" aria-hidden="true"></i> Analizar
         </button>
     </form>
@@ -150,7 +151,7 @@
                         <td>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                    <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.total_porcentaje|floatformat:2 }}%;"></div>
+                                    <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.total_porcentaje|floatformat:2 }}%; max-width: 100%;"></div>
                                 </div>
                                 <span class="td-mono" style="min-width: 65px; text-align: right; font-weight: 500;">
                                     {{ item.total_porcentaje|floatformat:4 }}%
@@ -448,4 +449,17 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endif %}
+
+<script>
+(function () {
+    var form = document.querySelector('form[method="get"]');
+    var btn  = document.getElementById('btn-analizar');
+    if (form && btn) {
+        form.addEventListener('submit', function () {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-inline"></span> Analizando…';
+        });
+    }
+})();
+</script>
 {% endblock %}

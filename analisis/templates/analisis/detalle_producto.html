@@ -42,7 +42,7 @@
         <div class="metric-value td-mono">{{ total_beneficos|default:"0" }}</div>
         <div style="margin-top:8px;">
             <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
-                <div style="height:100%; width:{{ pct_beneficos }}%; background:#1D9E75; border-radius:4px;"></div>
+                <div style="height:100%; width:{{ pct_beneficos }}%; max-width:100%; background:#1D9E75; border-radius:4px;"></div>
             </div>
             <div style="font-size:12px; font-weight:600; color:#1D9E75; margin-top:4px;">
                 {{ pct_beneficos }}% del Top {{ display_limit }}
@@ -55,7 +55,7 @@
         <div class="metric-value td-mono">{{ total_fitopatogenos|default:"0" }}</div>
         <div style="margin-top:8px;">
             <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
-                <div style="height:100%; width:{{ pct_fitopatogenos }}%; background:#BA7517; border-radius:4px;"></div>
+                <div style="height:100%; width:{{ pct_fitopatogenos }}%; max-width:100%; background:#BA7517; border-radius:4px;"></div>
             </div>
             <div style="font-size:12px; font-weight:600; color:#BA7517; margin-top:4px;">
                 {{ pct_fitopatogenos }}% del Top {{ display_limit }}
@@ -68,7 +68,7 @@
         <div class="metric-value td-mono">{{ total_neutral|default:"0" }}</div>
         <div style="margin-top:8px;">
             <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
-                <div style="height:100%; width:{{ pct_neutral }}%; background:#185FA5; border-radius:4px;"></div>
+                <div style="height:100%; width:{{ pct_neutral }}%; max-width:100%; background:#185FA5; border-radius:4px;"></div>
             </div>
             <div style="font-size:12px; font-weight:600; color:#185FA5; margin-top:4px;">
                 {{ pct_neutral }}% del Top {{ display_limit }}
@@ -81,7 +81,7 @@
         <div class="metric-value td-mono">{{ total_sin_clasificacion|default:"0" }}</div>
         <div style="margin-top:8px;">
             <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
-                <div style="height:100%; width:{{ pct_sin_clasificacion }}%; background:#5F5E5A; border-radius:4px;"></div>
+                <div style="height:100%; width:{{ pct_sin_clasificacion }}%; max-width:100%; background:#5F5E5A; border-radius:4px;"></div>
             </div>
             <div style="font-size:12px; font-weight:600; color:#5F5E5A; margin-top:4px;">
                 {{ pct_sin_clasificacion }}% del Top {{ display_limit }}
@@ -129,7 +129,7 @@
                     <td>
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ a.porcentaje_hits|default:0|floatformat:2 }}%;"></div>
+                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ a.porcentaje_hits|default:0|floatformat:2 }}%; max-width: 100%;"></div>
                             </div>
                             <span class="td-mono" style="font-weight: 500; min-width: 75px; text-align: right;">
                                 {{ a.porcentaje_hits|default:0|floatformat:4 }}%

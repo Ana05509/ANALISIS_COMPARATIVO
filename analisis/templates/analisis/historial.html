@@ -13,7 +13,9 @@
 <div class="card card-sm" style="margin-bottom:1.25rem;">
     <form method="get" style="display:flex; gap:10px; align-items:center;">
         <input type="hidden" name="tipo" value="{{ tipo_actual }}">
-        <input type="text" name="q" value="{{ busqueda|default:'' }}" placeholder="Buscar por código de muestra..." class="form-control" style="max-width:360px;">
+        <input type="text" name="q" value="{{ busqueda|default:'' }}" placeholder="Buscar por código de muestra..."
+               aria-label="Buscar muestra por código"
+               class="form-control" style="max-width:360px;">
         <button type="submit" class="btn btn-outline btn-sm">
             <i class="ti ti-search" aria-hidden="true"></i> Buscar
         </button>

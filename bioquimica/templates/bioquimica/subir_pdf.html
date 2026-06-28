@@ -3,8 +3,8 @@
 {% block topbar_title %}Subir Reporte PDF{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'bioquimica:lista' %}" style="background:#F1EFE8;color:#5F5E5A;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">
-    ← Volver
+<a href="{% url 'bioquimica:lista' %}" class="btn btn-outline btn-sm">
+    <i class="ti ti-arrow-left"></i> Volver
 </a>
 {% endblock %}
 
@@ -48,7 +48,7 @@
                     </p>
                     <p style="font-size:12px; color:#888780; margin-top:4px;">Solo archivos .pdf — MAg-XXX-XXXX</p>
                     <input type="file" name="archivo" id="archivo-input" accept=".pdf" style="display:none;"
-                           onchange="mostrarArchivo(this)">
+                           aria-label="Seleccionar archivo PDF">
                 </div>
             </div>
 
@@ -109,7 +109,11 @@ function handleDrop(e) {
 document.getElementById('upload-form').addEventListener('submit', function() {
     const btn = document.getElementById('btn-procesar');
     btn.disabled = true;
-    btn.innerHTML = '<i class="ti ti-loader-2 ti-spin"></i> Procesando...';
+    btn.innerHTML = '<span class="spinner-inline"></span> Procesando…';
+});
+
+document.getElementById('archivo-input').addEventListener('change', function () {
+    mostrarArchivo(this);
 });
 </script>
 {% endblock extra_js %}

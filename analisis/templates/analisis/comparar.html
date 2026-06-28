@@ -44,16 +44,11 @@
                 </label>
                 <div style="display:flex; gap:6px; margin-bottom:6px; align-items:center;">
                     <input id="muestra-search" type="text" placeholder="🔍 Buscar muestra..."
+                           aria-label="Filtrar muestras por nombre"
                            autocomplete="off"
                            style="flex:1; padding:5px 10px; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; font-size:12px; outline:none; background:var(--bg-surface,#fff);">
-                    <button type="button" id="btn-select-all"
-                            style="padding:4px 11px; font-size:11px; font-weight:600; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; background:var(--bg-light,#f8fafc); cursor:pointer; white-space:nowrap; color:var(--text-primary);">
-                        ✓ Todo
-                    </button>
-                    <button type="button" id="btn-clear-all"
-                            style="padding:4px 11px; font-size:11px; font-weight:600; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; background:var(--bg-light,#f8fafc); cursor:pointer; white-space:nowrap; color:var(--text-primary);">
-                        ✕ Limpiar
-                    </button>
+                    <button type="button" id="btn-select-all" class="btn btn-ghost-verde btn-sm">✓ Todo</button>
+                    <button type="button" id="btn-clear-all"  class="btn btn-outline btn-sm">✕ Limpiar</button>
                 </div>
                 <div id="muestra-list-wrap" style="border:1px solid var(--border-color,#e2e8f0); border-radius:6px; max-height:190px; overflow-y:auto;">
                     <div id="muestra-checkbox-list"></div>
@@ -68,7 +63,7 @@
                 <label class="form-label">Nivel Taxonómico</label>
                 {{ form.nivel }}
             </div>
-            <button type="submit" class="btn btn-primary" style="height: 38px;">
+            <button type="submit" id="btn-comparar" class="btn btn-primary" style="height: 38px;">
                 <i class="ti ti-arrows-diff" aria-hidden="true"></i> Comparar
             </button>
         </div>
@@ -420,6 +415,19 @@
 
     });
     {% endif %}
+})();
+</script>
+
+<script>
+(function () {
+    var form = document.querySelector('form[method="get"]');
+    var btn  = document.getElementById('btn-comparar');
+    if (form && btn) {
+        form.addEventListener('submit', function () {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-inline"></span> Procesando…';
+        });
+    }
 })();
 </script>
 {% endblock %}
