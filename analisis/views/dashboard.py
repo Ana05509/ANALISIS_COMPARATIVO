@@ -9,8 +9,7 @@ import numpy as np
 
 from ..models import CatalogoMicroorganismo, MuestraSuelo, ResultadoTaxonomico
 from ..services.business.analysis_service import obtener_diversidad
-
-MARCADORES_VALIDOS = ("16S", "ITS")
+from analisis.constants import MARCADORES_VALIDOS
 
 def convertir_a_serializable(obj):
     """Convierte objetos no serializables (ej. ndarray) a tipos Python nativos."""

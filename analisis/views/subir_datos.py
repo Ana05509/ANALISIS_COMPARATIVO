@@ -6,8 +6,7 @@ from django.http import JsonResponse
 from analisis.services.business.upload_service import procesar_upload
 from analisis.forms import SubirDatosForm
 from analisis.models import MuestraSuelo, VariedadClon, Cultivo
-
-MARCADORES_VALIDOS = ("16S", "ITS")
+from analisis.constants import MARCADORES_VALIDOS
 
 @login_required
 def subir_datos(request):

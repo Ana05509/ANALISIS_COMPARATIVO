@@ -1,16 +1,18 @@
 import pandas as pd
 from django.db.models import F, Sum, Avg
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo, VariedadClon
-from analisis.services.processing.diversity import DiversityService # CORRECCIÓN IMPORT
+from analisis.services.processing.diversity import DiversityService
 from analisis.services.processing.abundance import comparar_abundancias
+from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, MAPA_NIVELES, OPCIONES_TOP_N
 
-MAPA_NIVELES = {
-    "kingdom": "kingdom", "phylum": "phylum", "class": "tax_class",
-    "order": "order", "family": "family", "genus": "genus", "species": "species"
-}
-NIVELES_VALIDOS    = list(MAPA_NIVELES.keys())
-MARCADORES_VALIDOS = ("16S", "ITS")
-OPCIONES_TOP_N     = [5, 10, 25, 50]
+
+def obtener_lookup_catalogo(tipo):
+    """Dict {nombre.lower(): clasificacion} para todos los microorganismos del marcador."""
+    return {
+        obj.nombre.lower(): obj.clasificacion
+        for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo)
+    }
+
 
 def _base_queryset(tipo, variedad_id=None, muestra_id=None, muestra_ids=None):
     qs = ResultadoTaxonomico.objects.filter(
@@ -55,10 +57,7 @@ def obtener_analisis_avanzado(tipo="16S", top_n=10, nivel="genus", variedad_id=N
     datos_top = todos_los_datos[:top_n]
     datos_resto = todos_los_datos[top_n:]
 
-    catalogo_lookup = {
-        obj.nombre.lower(): obj.clasificacion
-        for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo)
-    }
+    catalogo_lookup = obtener_lookup_catalogo(tipo)
 
     for item in datos_top:
         item["total_porcentaje"] = round(item["total_hits"] / grand_total * 100, 5)
@@ -100,10 +99,7 @@ def obtener_top_n(tipo="16S", n=10, nivel="genus", variedad_id=None):
         .order_by("-total_hits")[:n]
     )
 
-    catalogo_lookup = {
-        obj.nombre.lower(): obj.clasificacion
-        for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo)
-    }
+    catalogo_lookup = obtener_lookup_catalogo(tipo)
 
     for item in data:
         item["total_porcentaje"] = round(item["total_hits"] / grand_total * 100, 5)

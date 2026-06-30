@@ -150,8 +150,8 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10_000
 SITE_ID = 1
 
 AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',             # Autenticación tradicional
-    'allauth.account.auth_backends.AuthenticationBackend',   # Autenticación vía Google/Social
+    'analisis.backends.EmailOrUsernameBackend',              # username o email → funciona para admin y usuarios nuevos
+    'allauth.account.auth_backends.AuthenticationBackend',   # Google / Social
 ]
 
 # URLs de redirección unificadas utilizando nombres de rutas mutuas con namespace
@@ -160,10 +160,12 @@ LOGIN_REDIRECT_URL = 'analisis:dashboard'  # Redirige al dashboard de tu app tra
 LOGOUT_REDIRECT_URL = 'analisis:login'
 
 ACCOUNT_LOGOUT_REDIRECT_URL = 'analisis:login'
-ACCOUNT_AUTHENTICATED_LOGIN_REDIRECTS = True    # Redirige al login al salir
+ACCOUNT_AUTHENTICATED_LOGIN_REDIRECTS = True
 ACCOUNT_SIGNUP_FORM_CLASS = 'analisis.signup_form.CustomSignupForm'
 ACCOUNT_ADAPTER = 'analisis.adapter.CustomAccountAdapter'
 ACCOUNT_PREVENT_ENUMERATION = False
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']  # sin username; email=username
+ACCOUNT_UNIQUE_EMAIL = True         # un correo = una cuenta
 
 # Configuración del proveedor de Google OAuth2
 SOCIALACCOUNT_PROVIDERS = {

@@ -391,9 +391,18 @@ class CatalogoMicroorganismoAdmin(BotonEditarMixin, ModelAdmin):
 # FORMULARIOS PARA LA CREACIÓN DE USUARIO
 # =========================================================
 class CustomUserCreationForm(UserCreationForm):
+    """Formulario de creación de usuario en admin: pide email y genera username automáticamente."""
     class Meta:
         model = Usuario
-        fields = ("username",)
+        fields = ("email",)
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        # username = email (mismo criterio que el adapter de allauth)
+        user.username = (user.email or "")[:150]
+        if commit:
+            user.save()
+        return user
 
 class CustomUserChangeForm(UserChangeForm):
     class Meta:
@@ -410,11 +419,11 @@ class UsuarioAdmin(BaseUserAdmin, BotonEditarMixin, ModelAdmin):
     add_form = CustomUserCreationForm
     change_password_form = AdminPasswordChangeForm
 
-    list_display  = ("username", "email", "nombre_completo", "rol_badge", "is_active", "is_staff", "date_joined", "acciones_columna")
-    list_display_links = ("username",)
+    list_display  = ("email", "nombre_completo", "rol_badge", "is_active", "is_staff", "date_joined", "acciones_columna")
+    list_display_links = ("email",)
     list_filter   = ("rol", "is_staff", "is_active")
     search_fields = ("username", "email", "first_name", "last_name")
-    ordering      = ("username",)
+    ordering      = ("email",)
     list_per_page  = 20
     list_fullwidth = True
 

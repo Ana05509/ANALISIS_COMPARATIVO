@@ -23,7 +23,7 @@
     <h1>{{ producto.codigo }}</h1>
     <p>
         Marcador Secuenciado: <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span>
-        {% if producto.variedad_clon %} — <span style="color: var(--text-muted); font-weight: 500;">{{ producto.variedad_clon.nombre }}</span>{% endif %}
+        {% if producto.variedad_clon %} — <span class="td-muted fw-500">{{ producto.variedad_clon.nombre }}</span>{% endif %}
     </p>
 </div>
 
@@ -32,61 +32,43 @@
     <div class="metric-card">
         <div class="metric-label">Total Taxa en Base de Datos</div>
         <div class="metric-value td-mono">{{ total_analisis|default:"0" }}</div>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
-            mostrando Top {{ display_limit }}
-        </div>
+        <div class="metric-sub">mostrando Top {{ display_limit }}</div>
     </div>
 
     <div class="metric-card verde">
         <div class="metric-label">Benéficos Detectados</div>
         <div class="metric-value td-mono">{{ total_beneficos|default:"0" }}</div>
-        <div style="margin-top:8px;">
-            <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
-                <div style="height:100%; width:{{ pct_beneficos }}%; max-width:100%; background:#1D9E75; border-radius:4px;"></div>
-            </div>
-            <div style="font-size:12px; font-weight:600; color:#1D9E75; margin-top:4px;">
-                {{ pct_beneficos }}% del Top {{ display_limit }}
-            </div>
+        <div class="mini-bar-track">
+            <div class="mini-bar-fill bg-benefico" style="width:{{ pct_beneficos|stringformat:'g' }}%;"></div>
         </div>
+        <div class="mini-bar-pct text-benefico">{{ pct_beneficos }}% del Top {{ display_limit }}</div>
     </div>
 
     <div class="metric-card amber">
         <div class="metric-label">Fitopatógenos Identificados</div>
         <div class="metric-value td-mono">{{ total_fitopatogenos|default:"0" }}</div>
-        <div style="margin-top:8px;">
-            <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
-                <div style="height:100%; width:{{ pct_fitopatogenos }}%; max-width:100%; background:#BA7517; border-radius:4px;"></div>
-            </div>
-            <div style="font-size:12px; font-weight:600; color:#BA7517; margin-top:4px;">
-                {{ pct_fitopatogenos }}% del Top {{ display_limit }}
-            </div>
+        <div class="mini-bar-track">
+            <div class="mini-bar-fill bg-fitopatogeno" style="width:{{ pct_fitopatogenos|stringformat:'g' }}%;"></div>
         </div>
+        <div class="mini-bar-pct text-fitopatogeno">{{ pct_fitopatogenos }}% del Top {{ display_limit }}</div>
     </div>
 
     <div class="metric-card">
         <div class="metric-label">Neutrales</div>
         <div class="metric-value td-mono">{{ total_neutral|default:"0" }}</div>
-        <div style="margin-top:8px;">
-            <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
-                <div style="height:100%; width:{{ pct_neutral }}%; max-width:100%; background:#185FA5; border-radius:4px;"></div>
-            </div>
-            <div style="font-size:12px; font-weight:600; color:#185FA5; margin-top:4px;">
-                {{ pct_neutral }}% del Top {{ display_limit }}
-            </div>
+        <div class="mini-bar-track">
+            <div class="mini-bar-fill bg-neutral-azul" style="width:{{ pct_neutral|stringformat:'g' }}%;"></div>
         </div>
+        <div class="mini-bar-pct text-neutral-azul">{{ pct_neutral }}% del Top {{ display_limit }}</div>
     </div>
 
     <div class="metric-card">
         <div class="metric-label">Sin Clasificación</div>
         <div class="metric-value td-mono">{{ total_sin_clasificacion|default:"0" }}</div>
-        <div style="margin-top:8px;">
-            <div style="height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden;">
-                <div style="height:100%; width:{{ pct_sin_clasificacion }}%; max-width:100%; background:#5F5E5A; border-radius:4px;"></div>
-            </div>
-            <div style="font-size:12px; font-weight:600; color:#5F5E5A; margin-top:4px;">
-                {{ pct_sin_clasificacion }}% del Top {{ display_limit }}
-            </div>
+        <div class="mini-bar-track">
+            <div class="mini-bar-fill bg-sin-clas-bar" style="width:{{ pct_sin_clasificacion|stringformat:'g' }}%;"></div>
         </div>
+        <div class="mini-bar-pct text-sin-clas">{{ pct_sin_clasificacion }}% del Top {{ display_limit }}</div>
     </div>
 
 </div>
@@ -94,14 +76,12 @@
 <div class="card">
     <div class="card-title">
         Top {{ display_limit }} por Abundancia — Microorganismos Identificados
-        <span style="font-size:11px; font-weight:400; color:var(--text-hint); margin-left:6px;">
-            (visualización · {{ total_analisis }} taxa totales en BD)
-        </span>
+        <span class="card-title-note">(visualización · {{ total_analisis }} taxa totales en BD)</span>
     </div>
 
     {% if analisis %}
     <div class="table-wrap" style="margin-top: 1rem;">
-        <table>
+        <table class="table-inner">
             <thead>
                 <tr>
                     <th style="width: 60px;">#</th>
@@ -115,25 +95,21 @@
             <tbody>
                 {% for a in analisis %}
                 <tr>
-                    <td class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
+                    <td class="td-mono td-muted">{{ forloop.counter }}</td>
                     <td>
-                        <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
-                            {{ a.genus|default:"Desconocido" }}
-                        </strong>
+                        <strong class="td-taxonomy">{{ a.genus|default:"Desconocido" }}</strong>
                         {% if a.species and a.species != 'Unclassified' %}
-                        <span style="color: var(--text-muted); font-size: 13px; font-style: italic;">{{ a.species }}</span>
+                        <span class="td-italic">{{ a.species }}</span>
                         {% endif %}
                     </td>
-                    <td style="font-size: 12px; color: var(--text-muted); text-transform: capitalize;">Género</td>
-                    <td class="td-mono" style="color: var(--text-primary);">{{ a.num_hits|default:"0" }}</td>
+                    <td class="td-muted td-capitalize">Género</td>
+                    <td class="td-mono">{{ a.num_hits|default:"0" }}</td>
                     <td>
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ a.porcentaje_hits|default:0|floatformat:2 }}%; max-width: 100%;"></div>
+                        <div class="pct-bar-wrap">
+                            <div class="pct-bar-track">
+                                <div class="pct-bar-fill" style="width:{{ a.porcentaje_hits|default:0|stringformat:'.2f' }}%;"></div>
                             </div>
-                            <span class="td-mono" style="font-weight: 500; min-width: 75px; text-align: right;">
-                                {{ a.porcentaje_hits|default:0|floatformat:4 }}%
-                            </span>
+                            <span class="pct-bar-label">{{ a.porcentaje_hits|default:0|floatformat:4 }}%</span>
                         </div>
                     </td>
                     <td>
@@ -142,7 +118,7 @@
                         {% elif a.clasificacion == 'fitopatogeno' %}
                             <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle"></i> Fitopatógeno</span>
                         {% elif a.clasificacion == 'neutral' %}
-                            <span class="badge" style="background:#E8F0FA;color:#185FA5;border:1px solid #b3cce8;"><i class="ti ti-minus"></i> Neutral</span>
+                            <span class="badge badge-neutral-azul"><i class="ti ti-minus"></i> Neutral</span>
                         {% else %}
                             <span class="badge badge-sin-clas">Sin clasificación</span>
                         {% endif %}

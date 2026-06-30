@@ -14,16 +14,9 @@ from django.views.decorators.http import require_POST
 from analisis.models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo
 from analisis.services.business.analysis_service import obtener_analisis_avanzado, obtener_diversidad
 from analisis.services.business.export_service import ExportService
+from analisis.constants import MARCADORES_VALIDOS, OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES
 
-MARCADORES_VALIDOS = ("16S", "ITS")
-FORMATOS_VALIDOS   = ("pdf", "excel")
-OPCIONES_TOP_N     = [5, 10, 25, 50]
-NIVELES_VALIDOS    = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
-MAPA_NIVELES = {
-    "kingdom": "kingdom", "phylum": "phylum", "class": "tax_class",
-    "order":   "order",   "family": "family",  "genus": "genus",
-    "species": "species",
-}
+FORMATOS_VALIDOS = ("pdf", "excel")
 
 
 # ── Helpers de cálculo ────────────────────────────────────────────────────────

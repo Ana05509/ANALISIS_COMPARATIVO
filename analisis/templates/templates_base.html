@@ -408,6 +408,45 @@
         /* Barras de progreso — cap implícito */
         .progress-bar-inner { max-width: 100%; }
 
+        /* ── Barras mini en metric-card ─────────────────────────── */
+        .mini-bar-track { height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden; margin-top:8px; }
+        .mini-bar-fill  { height:100%; border-radius:4px; max-width:100%; }
+        .mini-bar-pct   { font-size:12px; font-weight:600; margin-top:4px; }
+
+        /* ── Barras de abundancia en tabla ──────────────────────── */
+        .pct-bar-wrap  { display:flex; align-items:center; gap:12px; }
+        .pct-bar-track { flex:1; height:6px; background:#e2e8f0; border-radius:4px; overflow:hidden; }
+        .pct-bar-fill  { height:100%; border-radius:4px; max-width:100%; background:var(--verde); }
+        .pct-bar-label { font-size:13px; font-weight:500; min-width:75px; text-align:right; font-family:'DM Mono',monospace; }
+
+        /* ── Colores de clasificación de organismos ──────────────── */
+        .bg-benefico     { background: #1D9E75; }
+        .bg-fitopatogeno { background: #BA7517; }
+        .bg-neutral-azul { background: #185FA5; }
+        .bg-sin-clas-bar { background: #5F5E5A; }
+        .text-benefico     { color: #1D9E75; }
+        .text-fitopatogeno { color: #BA7517; }
+        .text-neutral-azul { color: #185FA5; }
+        .text-sin-clas     { color: #5F5E5A; }
+
+        /* ── Helpers de celdas de tabla ─────────────────────────── */
+        .td-muted     { color:var(--text-muted) !important; font-size:13px !important; }
+        .td-taxonomy  { font-family:'DM Mono',monospace; font-weight:500; color:var(--text-primary); }
+        .td-italic    { color:var(--text-muted); font-size:13px; font-style:italic; }
+        .td-capitalize{ text-transform:capitalize; }
+
+        /* ── Utilidades menores ──────────────────────────────────── */
+        .fw-500          { font-weight:500; }
+        .fw-600          { font-weight:600; }
+        .card-title-note { font-size:11px; font-weight:400; color:var(--text-hint); margin-left:6px; }
+
+        /* ── Badges adicionales ──────────────────────────────────── */
+        .badge-neutral-azul { background:#E8F0FA; color:#185FA5; border:1px solid #b3cce8; }
+        .badge-recuento     { background:#E6F1FB; color:#0C447C; }
+
+        /* ── Layout de formularios de filtro ─────────────────────── */
+        .form-row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+
         .btn {
             display: inline-flex;
             align-items: center;

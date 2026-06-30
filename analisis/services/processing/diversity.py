@@ -1,8 +1,9 @@
 import math
-import numpy as np # Importación necesaria
+import numpy as np
 import pandas as pd
 
-NIVELES_VALIDOS = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
+from analisis.constants import NIVELES_VALIDOS
+
 FILTROS_EXCLUSION = {"others", "unclassified", "unknown", "nan", "", "others sp"}
 
 class DiversityService:

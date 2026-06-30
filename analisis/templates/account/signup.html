@@ -86,8 +86,14 @@
                 <h1 class="hero-text">Únete al futuro<br>del <em>análisis de suelos</em></h1>
             </div>
             <div class="feature-grid">
-                <div class="feature-card"><i class="ti ti-microscope"></i> Pipeline bioinformático automatizado</div>
-                <div class="feature-card"><i class="ti ti-leaf"></i> Clasificación funcional de microorganismos</div>
+                <div class="feature-card">
+                    <i class="ti ti-microscope" style="color:#00e5ff; filter:drop-shadow(0 0 8px rgba(0,229,255,.6));"></i>
+                    Pipeline bioinformático automatizado
+                </div>
+                <div class="feature-card">
+                    <i class="ti ti-leaf" style="color:#69f542; filter:drop-shadow(0 0 8px rgba(105,245,66,.6));"></i>
+                    Clasificación funcional de microorganismos
+                </div>
             </div>
         </div>
 
@@ -128,22 +134,19 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="{{ form.email.id_for_label }}">Correo electrónico</label>
+                        <label class="form-label" for="{{ form.email.id_for_label }}">Correo electrónico institucional</label>
                         <div class="input-wrapper">
                             <i class="ti ti-mail icon-left"></i>
                             {{ form.email }}
                         </div>
-                        {% if form.email.errors %}<div class="error-msg">{{ form.email.errors }}</div>{% endif %}
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.username.id_for_label }}">Nombre de usuario</label>
-                        <div class="input-wrapper">
-                            <i class="ti ti-user icon-left"></i>
-                            {{ form.username }}
-                        </div>
-                        {% if form.username.errors %}<div class="error-msg">{{ form.username.errors }}</div>{% endif %}
-                        {% if form.username.help_text %}<div class="help-msg">{{ form.username.help_text }}</div>{% endif %}
+                        {% if form.email.errors %}
+                            <div class="error-msg">{{ form.email.errors }}</div>
+                        {% else %}
+                            <div class="help-msg" style="display:flex; align-items:center; gap:4px;">
+                                <i class="ti ti-info-circle" style="font-size:12px;"></i>
+                                Usarás este correo para iniciar sesión. Un correo = una cuenta.
+                            </div>
+                        {% endif %}
                     </div>
 
                     {% for field in form %}

@@ -1,26 +1,9 @@
 import json
 import pandas as pd
 from django.db.models import F, Sum
-from analisis.models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo, VariedadClon
-
-NIVELES_VALIDOS    = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
-MARCADORES_VALIDOS = ("16S", "ITS")
-MAPA_NIVELES = {
-    "kingdom": "kingdom", "phylum": "phylum", "class": "tax_class",
-    "order": "order", "family": "family", "genus": "genus", "species": "species"
-}
-
-
-def _obtener_mapa_catalogo(nivel, tipo="16S"):
-    """
-    PRECARGA OPTIMIZADA: Obtiene todo el catálogo del marcador en una sola consulta.
-    No filtra por nivel porque el nombre del taxón es único por marcador;
-    filtrar por nivel rompe entradas con nivel guardado en español u otro formato.
-    """
-    return {
-        obj.nombre.lower(): obj.clasificacion
-        for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo)
-    }
+from analisis.models import MuestraSuelo, ResultadoTaxonomico, VariedadClon
+from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, MAPA_NIVELES, OPCIONES_TOP_N
+from analisis.services.business.analysis_service import obtener_lookup_catalogo
 
 
 def comparar_productos(analisis_filtrado, nivel="genus", taxa_top=None, tipo="16S"):
@@ -32,7 +15,7 @@ def comparar_productos(analisis_filtrado, nivel="genus", taxa_top=None, tipo="16
         return []
 
     campo_db = MAPA_NIVELES.get(nivel, "genus")
-    mapa_clasificacion = _obtener_mapa_catalogo(nivel, tipo)
+    mapa_clasificacion = obtener_lookup_catalogo(tipo)
 
     data = []
     muestras_vistas = set()
@@ -124,7 +107,7 @@ def ejecutar_comparacion_clean(cleaned_data):
 
     if tipo not in MARCADORES_VALIDOS: tipo = "16S"
     if nivel not in NIVELES_VALIDOS:   nivel = "genus"
-    if top_n not in [5, 10, 25, 50]:   top_n = 10
+    if top_n not in OPCIONES_TOP_N:    top_n = 10
 
     campo_db = MAPA_NIVELES.get(nivel, "genus")
     ids = [m.id for m in muestras_sel] if muestras_sel else []

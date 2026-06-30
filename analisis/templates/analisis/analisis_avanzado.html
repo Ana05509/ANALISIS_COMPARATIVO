@@ -8,11 +8,12 @@
 <style>
 .av-row { border-bottom: 1px solid var(--border-color,#e2e8f0); }
 .av-row:last-child { border-bottom: none; }
-.av-row label { display:flex; align-items:center; gap:8px; padding:6px 10px; cursor:pointer; font-size:12px; transition:background .12s; user-select:none; width:100%; box-sizing:border-box; }
+.av-row label { display:flex; align-items:center; gap:0; padding:6px 10px; cursor:pointer; font-size:12px; transition:background .12s; user-select:none; width:100%; box-sizing:border-box; }
 .av-row label:hover { background:var(--bg-light,#f8fafc); }
 .av-row.activa label { background:#eff6ff; font-weight:600; color:#1d4ed8; }
-.av-row input[type=checkbox] { accent-color:#3b82f6; width:14px; height:14px; cursor:pointer; flex-shrink:0; }
+.av-row input[type=checkbox] { accent-color:#3b82f6; width:14px; height:14px; cursor:pointer; flex-shrink:0; margin-right:8px; }
 .av-row.oculta { display:none; }
+.av-row.marcador-oculta { display:none; }
 .chart-desc { font-size:12px; color:var(--text-hint); margin:0 0 0.5rem; line-height:1.5; }
 </style>
 {% endblock %}
@@ -25,60 +26,64 @@
 
 <!-- FILTROS -->
 <div class="card card-sm" style="margin-bottom: 1.5rem;">
-    <form method="get" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
-        <div>
-            <label class="form-label">Marcador</label>
-            <select name="tipo" class="form-control" style="width: 110px;">
-                {% for m in marcadores_disponibles %}
-                <option value="{{ m }}" {% if tipo_actual == m %}selected{% endif %}>{{ m }}</option>
-                {% endfor %}
-            </select>
+    <form method="get">
+        <!-- Fila 1: controles compactos + botón -->
+        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:10px;">
+            <div>
+                <label class="form-label">Marcador</label>
+                <select name="tipo" id="av-tipo-select" class="form-control" style="width:110px;">
+                    {% for m in marcadores_disponibles %}
+                    <option value="{{ m }}" {% if tipo_actual == m %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Nivel Taxonómico</label>
+                <select name="nivel" class="form-control" style="width:140px;">
+                    {% for n in niveles_taxonomicos %}
+                    <option value="{{ n|lower }}" {% if nivel_actual == n|lower %}selected{% endif %}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Profundidad (Top N)</label>
+                <select name="top_n" class="form-control" style="width:110px;">
+                    {% for opt in opciones_top_n %}
+                    <option value="{{ opt }}" {% if top_n_actual == opt %}selected{% endif %}>Top {{ opt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" id="btn-analizar" class="btn btn-primary" style="height:38px;">
+                <i class="ti ti-refresh" aria-hidden="true"></i> Analizar
+            </button>
         </div>
+        <!-- Fila 2: panel multi-selección de muestras (fila propia, sin mezclar alturas) -->
         <div>
-            <label class="form-label">Nivel Taxonómico</label>
-            <select name="nivel" class="form-control" style="width: 140px;">
-                {% for n in niveles_taxonomicos %}
-                <option value="{{ n|lower }}" {% if nivel_actual == n|lower %}selected{% endif %}>{{ n }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label class="form-label">Profundidad (Top N)</label>
-            <select name="top_n" class="form-control" style="width: 110px;">
-                {% for opt in opciones_top_n %}
-                <option value="{{ opt }}" {% if top_n_actual == opt %}selected{% endif %}>Top {{ opt }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <!-- Panel multi-selección de muestras -->
-        <div style="flex:1; min-width:260px;">
-            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
-                Muestras a analizar
+            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <span>Muestras a analizar</span>
                 <span id="av-counter" style="font-size:11px; font-weight:600; color:var(--text-hint);"></span>
             </label>
             <div style="display:flex; gap:5px; margin-bottom:5px;">
-                <input id="av-search" type="text" placeholder="🔍 Buscar..." autocomplete="off"
+                <input id="av-search" type="text" placeholder="🔍 Buscar muestra..." autocomplete="off"
                        aria-label="Filtrar muestras por nombre"
                        style="flex:1; padding:4px 8px; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; font-size:12px; outline:none;">
                 <button type="button" id="av-btn-all"   class="btn btn-ghost-verde btn-sm">✓ Todo</button>
                 <button type="button" id="av-btn-clear" class="btn btn-outline btn-sm">✕</button>
             </div>
-            <div id="av-list-wrap" style="border:1px solid var(--border-color,#e2e8f0); border-radius:6px; max-height:160px; overflow-y:auto;">
+            <div id="av-list-wrap" style="border:1px solid var(--border-color,#e2e8f0); border-radius:6px; max-height:180px; overflow-y:auto;">
                 <div id="av-checkbox-list"></div>
             </div>
             <!-- Select oculto — sincronizado por JS, enviado en el GET -->
             <select name="muestra_id" id="av-select-hidden" multiple style="display:none;">
                 {% for m in muestras %}
                 <option value="{{ m.id }}"
+                    data-tipo="{% with arch=m.archivos_moleculares.first %}{{ arch.tipo_analisis|default:'' }}{% endwith %}"
                     {% if m.id in muestra_ids_seleccionados %}selected{% endif %}>
                     {{ m.codigo }}{% if m.cultivo %} · {{ m.cultivo.nombre }}{% endif %}{% if m.variedad_clon %} ({{ m.variedad_clon.nombre }}){% endif %}
                 </option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" id="btn-analizar" class="btn btn-primary" style="height: 38px; align-self:flex-end;">
-            <i class="ti ti-refresh" aria-hidden="true"></i> Analizar
-        </button>
     </form>
 </div>
 
@@ -308,23 +313,25 @@
     var search  = document.getElementById('av-search');
     var btnAll  = document.getElementById('av-btn-all');
     var btnClr  = document.getElementById('av-btn-clear');
+    var tipoSel = document.getElementById('av-tipo-select');
     if (!sel || !listDiv) return;
 
-    function contarSeleccionados() {
-        return listDiv.querySelectorAll('input:checked').length;
-    }
     function actualizarContador() {
         if (!counter) return;
-        var n = contarSeleccionados();
-        counter.textContent = n === 0 ? '' : n + ' seleccionada' + (n > 1 ? 's' : '') + (n >= 3 ? ' ✓ (PCoA disponible)' : n >= 1 ? ' ✓' : '');
+        var n = listDiv.querySelectorAll('.av-row:not(.oculta):not(.marcador-oculta) input:checked').length;
+        counter.textContent = n === 0 ? '' : n + ' seleccionada' + (n > 1 ? 's' : '') + (n >= 3 ? ' ✓ (PCoA disponible)' : ' ✓');
         counter.style.color = n === 0 ? 'var(--text-hint)' : n >= 3 ? 'var(--verde,#22c55e)' : '#3b82f6';
     }
 
     Array.from(sel.options).forEach(function (opt, i) {
+        var tipo = opt.dataset.tipo || '';
         var row = document.createElement('div');
         row.className = 'av-row' + (opt.selected ? ' activa' : '');
+        row.dataset.tipo = tipo;
+
         var lbl = document.createElement('label');
         lbl.htmlFor = 'avcb_' + i;
+
         var cb = document.createElement('input');
         cb.type = 'checkbox'; cb.id = 'avcb_' + i;
         cb.checked = opt.selected; cb.dataset.idx = i;
@@ -333,14 +340,50 @@
             row.classList.toggle('activa', this.checked);
             actualizarContador();
         });
+
+        var txt = document.createElement('span');
+        txt.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        txt.textContent = opt.textContent.trim();
+
         lbl.appendChild(cb);
-        lbl.appendChild(document.createTextNode(' ' + opt.textContent.trim()));
+        lbl.appendChild(txt);
+
+        if (tipo) {
+            var pill = document.createElement('span');
+            pill.className = tipo === '16S' ? 'pill-16s' : 'pill-its';
+            pill.style.cssText = 'font-size:10px;padding:1px 6px;margin-left:8px;flex-shrink:0;white-space:nowrap;';
+            pill.textContent = tipo === '16S' ? '16S · Bacteria' : 'ITS · Hongo';
+            lbl.appendChild(pill);
+        }
+
         row.appendChild(lbl);
         listDiv.appendChild(row);
     });
 
+    function filtrarPorMarcador(marcador) {
+        listDiv.querySelectorAll('.av-row').forEach(function (row) {
+            var rowTipo = row.dataset.tipo;
+            var visible = !rowTipo || rowTipo === marcador;
+            row.classList.toggle('marcador-oculta', !visible);
+            if (!visible) {
+                var cb = row.querySelector('input');
+                if (cb && cb.checked) {
+                    cb.checked = false;
+                    sel.options[cb.dataset.idx].selected = false;
+                    row.classList.remove('activa');
+                }
+            }
+        });
+        actualizarContador();
+    }
+
+    if (tipoSel) {
+        tipoSel.addEventListener('change', function () { filtrarPorMarcador(this.value); });
+        filtrarPorMarcador(tipoSel.value);
+    }
+
     if (btnAll) btnAll.addEventListener('click', function () {
-        listDiv.querySelectorAll('.av-row:not(.oculta) input').forEach(function (cb) {
+        listDiv.querySelectorAll('.av-row:not(.oculta):not(.marcador-oculta) input').forEach(function (cb) {
             cb.checked = true; sel.options[cb.dataset.idx].selected = true;
             cb.closest('.av-row').classList.add('activa');
         });

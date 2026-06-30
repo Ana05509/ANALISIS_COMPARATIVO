@@ -14,6 +14,7 @@ from analisis.models import (
     MuestraSuelo, ResultadoTaxonomico,
     CatalogoMicroorganismo, ArchivoMolecular,
 )
+from analisis.services.business.analysis_service import obtener_lookup_catalogo
 
 
 def _error(msg, status=400):
@@ -96,10 +97,7 @@ def api_muestra_detalle(request, pk):
         archivo__tipo_analisis=tipo,
     )
 
-    catalogo = {
-        obj.nombre.lower(): obj.clasificacion
-        for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo)
-    }
+    catalogo = obtener_lookup_catalogo(tipo)
 
     taxa = list(
         qs.values(taxonomia=F("genus"))

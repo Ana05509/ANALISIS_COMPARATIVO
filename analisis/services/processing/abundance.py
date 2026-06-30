@@ -4,7 +4,8 @@
 import pandas as pd
 from typing import List
 
-NIVELES_VALIDOS = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
+from analisis.constants import NIVELES_VALIDOS
+
 CATEGORIAS_CONTROL = {"others", "unclassified", "unknown", "others sp"}
 
 

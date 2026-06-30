@@ -1,11 +1,11 @@
 import pandas as pd
 
+from analisis.constants import NIVELES_VALIDOS
+
 COLUMNAS_REQUERIDAS = [
     "kingdom", "phylum", "class", "order",
     "family", "genus", "species", "num_hits", "%_hits"
 ]
-
-NIVELES_VALIDOS = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
 
 
 class PipelineProcesamiento:

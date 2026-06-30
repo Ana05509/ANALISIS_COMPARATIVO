@@ -4,8 +4,7 @@ from django.contrib import messages
 from django.db.models import Count
 
 from ..models import MuestraSuelo, ArchivoMolecular
-
-MARCADORES_VALIDOS = ("16S", "ITS")
+from analisis.constants import MARCADORES_VALIDOS
 
 @login_required
 def historial(request):

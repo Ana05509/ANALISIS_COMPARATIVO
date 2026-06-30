@@ -1,7 +1,8 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 
-from ..models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo
+from ..models import MuestraSuelo, ResultadoTaxonomico
+from ..services.business.analysis_service import obtener_lookup_catalogo
 
 DISPLAY_LIMIT = 50  # filas mostradas en la tabla; todos los taxa siguen en BD
 
@@ -22,10 +23,7 @@ def ver_producto(request, id):
 
     analisis_top = list(qs.order_by("-num_hits")[:DISPLAY_LIMIT])
 
-    catalogo = {
-        obj.nombre.lower(): obj.clasificacion
-        for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo_actual)
-    }
+    catalogo = obtener_lookup_catalogo(tipo_actual)
 
     for reg in analisis_top:
         reg.clasificacion = catalogo.get((reg.genus or "").lower(), "sin_clasificar")

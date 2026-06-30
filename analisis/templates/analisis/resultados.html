@@ -14,13 +14,13 @@
 <div class="page-header">
     <h1>Composición Taxonómica</h1>
     <p>
-        Muestra ID: <span class="td-mono" style="font-weight: 600; color: var(--text-primary);">#{{ muestra_id|default:"-" }}</span> —
+        Muestra ID: <span class="td-mono fw-600">#{{ muestra_id|default:"-" }}</span> —
         <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span>
     </p>
 </div>
 
 <div class="card card-sm" style="margin-bottom: 1.25rem;">
-    <form method="get" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+    <form method="get" class="form-row">
         <div>
             <label class="form-label">Nivel taxonómico</label>
             <select name="nivel" class="form-control" style="width:130px;">
@@ -73,11 +73,11 @@
 <div class="card">
     <div class="card-title">
         Top {{ top_actual }} por {{ nivel_actual|default:"-"|capfirst }}
-        <span style="font-size:11px; font-weight:400; color:var(--text-hint); margin-left:6px;">(visualización — perfil completo en BD)</span>
+        <span class="card-title-note">(visualización — perfil completo en BD)</span>
     </div>
-    
+
     <div class="table-wrap" style="margin-top: 1rem;">
-        <table id="tabla-resultados">
+        <table id="tabla-resultados" class="table-inner">
             <thead>
                 <tr>
                     <th style="width: 60px;">#</th>
@@ -90,21 +90,17 @@
             <tbody>
                 {% for item in resumen %}
                 <tr>
-                    <td class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
+                    <td class="td-mono td-muted">{{ forloop.counter }}</td>
                     <td>
-                        <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
-                            {{ item.taxonomia|default:"Desconocido" }}
-                        </strong>
+                        <strong class="td-taxonomy">{{ item.taxonomia|default:"Desconocido" }}</strong>
                     </td>
-                    <td class="td-mono" style="color: var(--text-primary);">{{ item.total_hits|default:"0" }}</td>
+                    <td class="td-mono">{{ item.total_hits|default:"0" }}</td>
                     <td>
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ item.total_porcentaje|default:0|floatformat:2 }}%; max-width: 100%;"></div>
+                        <div class="pct-bar-wrap">
+                            <div class="pct-bar-track">
+                                <div class="pct-bar-fill" style="width:{{ item.total_porcentaje|default:0|stringformat:'.2f' }}%;"></div>
                             </div>
-                            <span class="td-mono" style="font-weight: 500; min-width: 75px; text-align: right;">
-                                {{ item.total_porcentaje|default:0|floatformat:4 }}%
-                            </span>
+                            <span class="pct-bar-label">{{ item.total_porcentaje|default:0|floatformat:4 }}%</span>
                         </div>
                     </td>
                     <td>

@@ -6,371 +6,518 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acceso — BioSoil Analytics</title>
-    
-    <!-- Tipografías Premium -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-    
     <style>
+        /* ── Variables ─────────────────────────────── */
         :root {
-            /* Colores */
-            --primary: #4a7c64;        
-            --primary-dark: #375e4b;   
+            --p:       #4a7c64;
+            --p-vivid: #38a878;
+            --p-dark:  #2d6b52;
+            --p-glow:  rgba(56,168,120,.18);
+            --p-glow2: rgba(56,168,120,.08);
             --surface: #ffffff;
-            --bg-right: #f4f7f6; /* Fondo sutil para que resalte la tarjeta blanca */
-            --text-dark: #111827;
-            --text-gray: #6b7280;
-            --border: #e5e7eb;
-            --focus-ring: rgba(74, 124, 100, 0.15); 
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --bg:      #f0f5f3;
+            --border:  #d6e4dd;
+            --text:    #0f1923;
+            --muted:   #6b7280;
+            --error:   #dc2626;
+            --err-bg:  #fff5f5;
+            --err-bd:  #fca5a5;
+            --ease:    cubic-bezier(.4,0,.2,1);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        /* ── Animations ─────────────────────────────── */
+        @keyframes slideUp   { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes fadeIn    { from{opacity:0} to{opacity:1} }
+        @keyframes shake     { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-9px)} 40%{transform:translateX(9px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+        @keyframes shimmer   { 0%{background-position:-300% center} 100%{background-position:300% center} }
+        @keyframes spin      { to{transform:rotate(360deg)} }
+        @keyframes float1    { 0%,100%{transform:translateY(0)   rotate(0deg)  scale(1)}   50%{transform:translateY(-22px) rotate(180deg) scale(1.15)} }
+        @keyframes float2    { 0%,100%{transform:translateY(0)   rotate(0deg)  scale(1)}   50%{transform:translateY(-30px) rotate(-120deg) scale(.9)} }
+        @keyframes float3    { 0%,100%{transform:translateY(0)   rotate(0deg)  scale(1)}   50%{transform:translateY(-15px) rotate(90deg) scale(1.2)} }
+        @keyframes blobPulse { 0%,100%{transform:scale(1) rotate(0deg)} 40%{transform:scale(1.18) rotate(12deg)} 70%{transform:scale(.9) rotate(-7deg)} }
+        @keyframes gridDrift { 0%{background-position:0 0} 100%{background-position:32px 32px} }
+        @keyframes scanLine  { from{width:0;opacity:1} to{width:100%;opacity:1} }
+        @keyframes labelPop  { 0%{transform:translateY(-58%) scale(1)} 50%{transform:translateY(-58%) scale(1.08)} 100%{transform:translateY(-58%) scale(1)} }
 
-        body {
-            font-family: 'Outfit', sans-serif;
-            color: var(--text-dark);
-            min-height: 100vh;
-            display: flex;
+        /* ── Reset ─────────────────────────────────── */
+        *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+        body { font-family:'Outfit',sans-serif; color:var(--text); min-height:100vh; display:flex; overflow:hidden; }
+
+        /* ── Layout ─────────────────────────────────── */
+        .split { display:flex; width:100%; min-height:100vh; }
+
+        /* ══════════════════════════════════════════════
+           PANEL IZQUIERDO
+        ══════════════════════════════════════════════ */
+        .panel-l {
+            flex:1.2; position:relative; display:flex; flex-direction:column;
+            justify-content:space-between; padding:4.5rem; overflow:hidden;
+            background:#1d3328;
         }
-
-        .split-layout {
-            display: flex;
-            width: 100%;
-            min-height: 100vh;
-        }
-
-        /* ==========================================
-           PANEL IZQUIERDO (Intacto - Excelente)
-           ========================================== */
-        .panel-left {
-            flex: 1.2;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 4.5rem;
-            overflow: hidden;
-            background-color: #1d3328;
-        }
-
         .video-bg {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover;
-            z-index: 1;
-            opacity: 1;
+            position:absolute; inset:0; width:100%; height:100%;
+            object-fit:cover; z-index:1;
+        }
+        .overlay {
+            position:absolute; inset:0; z-index:2;
+            background:linear-gradient(135deg,rgba(15,38,28,.72) 0%,rgba(58,168,120,.28) 100%);
         }
 
-        .overlay-gradient {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(135deg, rgba(29, 51, 40, 0.6) 0%, rgba(74, 124, 100, 0.3) 100%);
-            z-index: 2;
+        /* partículas flotantes */
+        .particles { position:absolute; inset:0; z-index:3; pointer-events:none; overflow:hidden; }
+        .par {
+            position:absolute; border-radius:50%;
+            border:1.5px solid rgba(178,216,197,.45);
+        }
+        .par::before {
+            content:''; position:absolute; inset:5px; border-radius:50%;
+            background:rgba(178,216,197,.12);
+        }
+        .par-1 { width:64px;height:64px; top:12%; left:8%;   animation:float1 9s ease-in-out infinite; }
+        .par-2 { width:28px;height:28px; top:28%; left:72%;  animation:float2 6.5s ease-in-out infinite .8s; }
+        .par-3 { width:90px;height:90px; top:60%; left:15%;  animation:float3 11s ease-in-out infinite 2s; }
+        .par-4 { width:18px;height:18px; top:78%; left:58%;  animation:float1 7s  ease-in-out infinite 3s; }
+        .par-5 { width:44px;height:44px; top:42%; left:52%;  animation:float2 8s  ease-in-out infinite 1.5s; }
+        .par-6 { width:36px;height:36px; top:88%; left:30%;  animation:float3 10s ease-in-out infinite 4s; }
+        .par-7 { width:55px;height:55px; top:20%; left:38%;  animation:float1 12s ease-in-out infinite 0.5s; }
+
+        /* contenido panel izquierdo */
+        .brand-block { position:relative; z-index:4; animation:fadeIn .9s .1s ease both; }
+        .logo-row {
+            display:flex; align-items:center; gap:12px; margin-bottom:4rem;
+        }
+        .logo-ico {
+            width:48px; height:48px; border-radius:12px;
+            background:rgba(255,255,255,.14); backdrop-filter:blur(10px);
+            border:1px solid rgba(255,255,255,.22);
+            display:flex; align-items:center; justify-content:center;
+        }
+        .logo-ico i { color:#fff; font-size:24px; }
+        .logo-name { color:#fff; font-family:'Fraunces',serif; font-size:22px; font-weight:500; text-shadow:0 2px 4px rgba(0,0,0,.3); }
+
+        .hero { font-family:'Fraunces',serif; font-size:52px; font-weight:300; color:#fff; line-height:1.1; margin-bottom:1.25rem; text-shadow:0 2px 6px rgba(0,0,0,.35); }
+        .hero em { font-style:italic; color:#b2d8c5; font-weight:400; }
+        .hero-sub { color:rgba(255,255,255,.85); font-size:15px; line-height:1.65; max-width:420px; }
+
+        .feature-grid { position:relative; z-index:4; display:grid; gap:.85rem; animation:fadeIn .9s .4s ease both; }
+        .feat {
+            display:flex; align-items:center; gap:14px; padding:15px 20px;
+            background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18);
+            border-radius:14px; backdrop-filter:blur(8px); color:#fff;
+            font-size:14px; font-weight:400; transition:background .3s,transform .3s;
+        }
+        .feat:hover { background:rgba(255,255,255,.22); transform:translateX(6px); }
+        .feat i { color:#b2d8c5; font-size:20px; flex-shrink:0; }
+
+        /* ══════════════════════════════════════════════
+           PANEL DERECHO
+        ══════════════════════════════════════════════ */
+        .panel-r {
+            flex:1; display:flex; flex-direction:column;
+            justify-content:center; align-items:center;
+            background:var(--bg); padding:2rem;
+            position:relative; overflow:hidden;
         }
 
-        .brand-content { position: relative; z-index: 3; }
-
-        .logo-container {
-            display: flex; align-items: center; gap: 12px; margin-bottom: 4rem;
-        }
-        .logo-icon {
-            width: 48px; height: 48px; background: rgba(255,255,255,0.15);
-            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.25);
-            border-radius: 12px; display: flex; align-items: center; justify-content: center;
-        }
-        .logo-icon i { color: #fff; font-size: 24px; }
-        .logo-text { color: #fff; font-family: 'Fraunces', serif; font-size: 22px; font-weight: 500; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-
-        .hero-text {
-            font-family: 'Fraunces', serif; font-size: 52px; font-weight: 300;
-            color: #fff; line-height: 1.1; margin-bottom: 1.5rem;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-        .hero-text em { font-style: italic; color: #b2d8c5; font-weight: 400; }
-
-        .hero-desc { color: rgba(255,255,255,0.9); font-size: 16px; line-height: 1.6; max-width: 450px; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-
-        .feature-grid {
-            position: relative; z-index: 3; display: grid; gap: 1rem;
-        }
-        .feature-card {
-            display: flex; align-items: center; gap: 15px; padding: 16px 22px;
-            background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 14px; backdrop-filter: blur(8px); color: #fff; font-weight: 400;
-            transition: var(--transition); text-shadow: 0 1px 2px rgba(0,0,0,0.2);
-        }
-        .feature-card:hover { background: rgba(255,255,255,0.25); transform: translateX(5px); }
-        .feature-card i { color: #b2d8c5; font-size: 22px; }
-
-
-        /* ==========================================
-           PANEL DERECHO (Nuevo Estilo SaaS Moderno)
-           ========================================== */
-        .panel-right {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background: var(--bg-right);
-            padding: 2rem;
-            position: relative;
+        /* cuadrícula técnica de fondo */
+        .panel-r::before {
+            content:''; position:absolute; inset:0; pointer-events:none;
+            background-image:
+                linear-gradient(rgba(74,124,100,.05) 1px,transparent 1px),
+                linear-gradient(90deg,rgba(74,124,100,.05) 1px,transparent 1px);
+            background-size:32px 32px;
+            animation:gridDrift 8s linear infinite;
         }
 
-        /* La Tarjeta Blanca Flotante */
-        .auth-card {
-            background: var(--surface);
-            width: 100%;
-            max-width: 440px;
-            padding: 40px;
-            border-radius: 24px;
-            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.05);
-            border: 1px solid rgba(229, 231, 235, 0.6);
+        /* blob decorativo */
+        .panel-r::after {
+            content:''; position:absolute; width:420px; height:420px;
+            border-radius:50%; pointer-events:none;
+            background:radial-gradient(circle,rgba(56,168,120,.1) 0%,transparent 68%);
+            bottom:-100px; right:-80px;
+            animation:blobPulse 10s ease-in-out infinite;
         }
 
-        .auth-header { margin-bottom: 2.2rem; text-align: left; }
-        
-        /* Título ahora usa Outfit y es más limpio */
-        .auth-title { 
-            font-family: 'Outfit', sans-serif; 
-            font-size: 30px; 
-            font-weight: 700; 
-            color: var(--text-dark); 
-            margin-bottom: 6px; 
-            letter-spacing: -0.5px;
+        /* ── Tarjeta ────────────────────────────────── */
+        .card {
+            position:relative; z-index:1; background:var(--surface);
+            width:100%; max-width:440px;
+            padding:2.5rem 2.5rem 2rem;
+            border-radius:24px;
+            box-shadow:0 24px 60px -10px rgba(15,38,28,.1),0 1px 4px rgba(0,0,0,.06);
+            border:1px solid rgba(214,228,221,.8);
+            animation:slideUp .55s var(--ease) both;
         }
-        .auth-subtitle { color: var(--text-gray); font-size: 15px; font-weight: 400; }
+        .card.shake { animation:slideUp .55s var(--ease) both,shake .45s .55s var(--ease) both; }
 
+        /* ── Cabecera ───────────────────────────────── */
+        .card-head { margin-bottom:1.75rem; animation:slideUp .5s .12s var(--ease) both; }
+        .card-title {
+            font-family:'Outfit',sans-serif; font-size:28px; font-weight:700;
+            color:var(--text); letter-spacing:-.6px; margin-bottom:5px;
+        }
+        .card-title span { color:var(--p-vivid); }
+        .card-sub { color:var(--muted); font-size:14.5px; }
+
+        /* ── Banner de error ────────────────────────── */
         .error-banner {
-            background: #fef2f2; color: #991b1b; border: 1px solid #fecaca;
-            padding: 12px 16px; border-radius: 12px; font-size: 14px;
-            display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem;
+            display:flex; align-items:center; gap:10px;
+            background:var(--err-bg); border:1px solid var(--err-bd); border-radius:12px;
+            padding:11px 15px; margin-bottom:1.4rem; font-size:13.5px; color:var(--error);
+            animation:slideUp .4s var(--ease) both;
+        }
+        .error-banner i { font-size:18px; flex-shrink:0; }
+
+        /* ══════════════════════════════════════════════
+           FLOATING-LABEL FIELDS
+        ══════════════════════════════════════════════ */
+        .field-group { margin-bottom:1.4rem; }
+
+        .field-wrap {
+            position:relative;
+            background:#fff;
+            border:2px solid var(--border);
+            border-radius:14px;
+            transition:border-color .25s var(--ease), box-shadow .25s var(--ease);
+        }
+        .field-wrap:focus-within {
+            border-color:var(--p-vivid);
+            box-shadow:0 0 0 4px var(--p-glow);
+        }
+        /* línea de escaneo en la parte inferior al enfocar */
+        .field-wrap::after {
+            content:'';
+            position:absolute; bottom:-2px; left:0;
+            height:2px; width:0; border-radius:0 0 14px 14px;
+            background:linear-gradient(90deg,var(--p-vivid),var(--p-dark));
+            transition:none;
+        }
+        .field-wrap:focus-within::after {
+            animation:scanLine .3s var(--ease) forwards;
         }
 
-        .form-group { margin-bottom: 1.5rem; }
-        
-        /* Acomodo perfecto para las etiquetas y el enlace de olvidar contraseña */
-        .label-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            margin-bottom: 8px;
+        /* icono izquierdo */
+        .fi {
+            position:absolute; left:15px; top:50%; transform:translateY(-50%);
+            color:#a0b4ab; font-size:20px; pointer-events:none; z-index:2;
+            transition:color .25s var(--ease), transform .3s var(--ease);
         }
-        .form-label { font-size: 14px; font-weight: 600; color: #374151; margin: 0; }
-        
-        .link-text { font-size: 13px; font-weight: 600; color: var(--primary); text-decoration: none; transition: var(--transition); }
-        .link-text:hover { color: var(--primary-dark); text-decoration: underline; }
-
-        .input-wrapper { 
-            position: relative; 
-            display: flex;
-            align-items: center;
-            background: #ffffff;
-            border: 1.5px solid #d1d5db; /* Borde un poco más definido */
-            border-radius: 12px;
-            transition: var(--transition);
-            overflow: hidden;
-        }
-        .input-wrapper:focus-within {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 4px var(--focus-ring);
+        .field-wrap:focus-within .fi {
+            color:var(--p-vivid);
+            transform:translateY(-50%) scale(1.12);
         }
 
-        .input-wrapper i.icon-left {
-            position: absolute; left: 16px;
-            color: #9ca3af; font-size: 20px; pointer-events: none;
-            transition: var(--transition);
+        /* input */
+        .fi-input {
+            width:100%; padding:22px 16px 8px 46px;
+            background:transparent; border:none; outline:none;
+            font-family:'Outfit',sans-serif; font-size:15px; color:var(--text);
+            border-radius:14px; position:relative; z-index:1;
         }
-        .input-wrapper:focus-within i.icon-left { color: var(--primary); }
-        
-        .form-control {
-            width: 100%; padding: 14px 16px 14px 46px; 
-            background: transparent; border: none;
-            font-family: inherit; font-size: 15px; color: var(--text-dark);
-        }
-        .form-control:focus { outline: none; }
-        .form-control::placeholder { color: #9ca3af; font-weight: 400; }
+        .fi-input.has-right { padding-right:46px; }
 
-        .password-toggle {
-            position: absolute; right: 12px;
-            background: none; border: none; color: #9ca3af; cursor: pointer;
-            padding: 8px; display: flex; align-items: center; justify-content: center;
-            transition: var(--transition); border-radius: 8px;
+        /* quitar fondo amarillo de autocompletar */
+        .fi-input:-webkit-autofill {
+            -webkit-box-shadow:0 0 0 1000px #fff inset;
+            -webkit-text-fill-color:var(--text);
+            transition:background-color 9999s;
         }
-        .password-toggle:hover { color: var(--primary); background: rgba(74, 124, 100, 0.05); }
 
+        /* etiqueta flotante */
+        .fl {
+            position:absolute; left:46px; top:50%; transform:translateY(-50%);
+            font-size:15px; color:#a0b4ab; font-family:'Outfit',sans-serif;
+            transition:all .22s var(--ease); pointer-events:none; z-index:2;
+            background:transparent; padding:0 3px; white-space:nowrap;
+        }
+
+        /* flotar: cuando el input tiene foco O tiene valor */
+        .fi-input:focus         ~ .fl,
+        .fi-input:not(:placeholder-shown) ~ .fl,
+        .fi-input:-webkit-autofill ~ .fl {
+            top:0; transform:translateY(-58%);
+            font-size:10.5px; font-weight:700; letter-spacing:.06em;
+            text-transform:uppercase; color:var(--p-vivid);
+            background:#fff; left:12px; padding:0 5px;
+            animation:labelPop .3s var(--ease);
+        }
+        .field-wrap:focus-within .fl { color:var(--p-vivid); }
+
+        /* estado de error en el campo */
+        .field-wrap.err { border-color:var(--error); }
+        .field-wrap.err:focus-within { box-shadow:0 0 0 4px rgba(220,38,38,.15); }
+        .field-wrap.err .fi { color:var(--error); }
+        .fi-input:focus ~ .fl.err,
+        .fi-input:not(:placeholder-shown) ~ .fl.err { color:var(--error); }
+
+        /* fila de "olvidé contraseña" */
+        .pw-footer {
+            display:flex; justify-content:flex-end; margin-top:6px;
+        }
+        .forgot {
+            font-size:12.5px; font-weight:600; color:var(--p);
+            text-decoration:none; position:relative;
+            transition:color .2s;
+        }
+        .forgot::after {
+            content:''; position:absolute; bottom:-1px; left:0;
+            width:0; height:1.5px; background:var(--p-vivid);
+            transition:width .25s var(--ease);
+        }
+        .forgot:hover { color:var(--p-vivid); }
+        .forgot:hover::after { width:100%; }
+
+        /* botón del ojo */
+        .eye-btn {
+            position:absolute; right:10px; top:50%; transform:translateY(-50%);
+            background:none; border:none; cursor:pointer; z-index:3;
+            color:#a0b4ab; padding:6px; border-radius:8px;
+            transition:color .2s, background .2s;
+            display:flex; align-items:center;
+        }
+        .eye-btn:hover { color:var(--p-vivid); background:var(--p-glow2); }
+        .eye-btn i { font-size:18px; }
+
+        /* ── Animaciones de entrada por campo ────────── */
+        .field-group:nth-child(1) { animation:slideUp .5s .18s var(--ease) both; }
+        .field-group:nth-child(2) { animation:slideUp .5s .28s var(--ease) both; }
+        .field-group:nth-child(3) { animation:slideUp .5s .38s var(--ease) both; }
+
+        /* ── Botón principal ────────────────────────── */
         .btn-main {
-            width: 100%; padding: 15px; 
-            background: var(--primary); 
-            color: #fff; border: none; border-radius: 12px; 
-            font-family: inherit; font-size: 16px; font-weight: 600;
-            cursor: pointer; margin-top: 0.5rem; transition: var(--transition);
-            box-shadow: 0 4px 6px -1px rgba(74, 124, 100, 0.2);
+            width:100%; padding:15px; margin-top:.25rem;
+            background:linear-gradient(135deg,var(--p) 0%,var(--p-vivid) 100%);
+            color:#fff; border:none; border-radius:14px;
+            font-family:'Outfit',sans-serif; font-size:15.5px; font-weight:700;
+            cursor:pointer; letter-spacing:.02em;
+            position:relative; overflow:hidden;
+            box-shadow:0 4px 14px rgba(56,168,120,.35);
+            transition:transform .2s var(--ease), box-shadow .2s var(--ease);
+            animation:slideUp .5s .46s var(--ease) both;
         }
-        .btn-main:hover { 
-            background: var(--primary-dark);
-            transform: translateY(-1px); 
-            box-shadow: 0 6px 12px -2px rgba(74, 124, 100, 0.3); 
+        .btn-main::before {
+            content:'';
+            position:absolute; inset:0;
+            background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.28) 50%,transparent 100%);
+            background-size:300% 100%; background-position:-300% center;
         }
+        .btn-main:hover { transform:translateY(-2px); box-shadow:0 8px 22px rgba(56,168,120,.45); }
+        .btn-main:hover::before { animation:shimmer .55s var(--ease) forwards; }
+        .btn-main:active { transform:translateY(0); box-shadow:0 3px 10px rgba(56,168,120,.3); }
+        .btn-main:disabled { opacity:.7; cursor:not-allowed; transform:none; }
 
+        .spinner { display:inline-block; animation:spin .7s linear infinite; }
+
+        /* ── Divisor ───────────────────────────────── */
         .divider {
-            display: flex; align-items: center; text-align: center; margin: 2rem 0;
-            color: #9ca3af; font-size: 13px; font-weight: 500;
+            display:flex; align-items:center; gap:14px;
+            margin:1.6rem 0; color:#b0bcb7; font-size:12.5px; font-weight:500;
+            animation:fadeIn .5s .54s var(--ease) both;
         }
-        .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
-        .divider:not(:empty)::before { margin-right: 1.5em; }
-        .divider:not(:empty)::after { margin-left: 1.5em; }
+        .divider::before,.divider::after {
+            content:''; flex:1; height:1px; background:var(--border);
+        }
 
+        /* ── Botón Google ───────────────────────────── */
         .btn-google {
-            display: flex; align-items: center; justify-content: center; gap: 12px;
-            width: 100%; padding: 14px; background: #ffffff; color: #374151;
-            border: 1.5px solid #d1d5db; border-radius: 12px; font-family: inherit;
-            font-size: 15px; font-weight: 600; text-decoration: none; transition: var(--transition);
+            display:flex; align-items:center; justify-content:center; gap:11px;
+            width:100%; padding:13px; background:#fff; color:#374151;
+            border:1.5px solid var(--border); border-radius:14px;
+            font-family:'Outfit',sans-serif; font-size:14.5px; font-weight:600;
+            text-decoration:none;
+            transition:background .2s, border-color .2s, transform .2s, box-shadow .2s;
+            animation:slideUp .5s .6s var(--ease) both;
         }
-        .btn-google:hover { 
-            background: #f9fafb; border-color: #9ca3af; 
-            transform: translateY(-1px);
+        .btn-google:hover {
+            background:#f8faf9; border-color:#a0b8b0;
+            transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.07);
         }
-        .btn-google svg { width: 20px; height: 20px; }
+        .btn-google svg { width:19px; height:19px; flex-shrink:0; }
 
-        .auth-footer { margin-top: 2rem; text-align: center; font-size: 14.5px; color: var(--text-gray); }
+        /* ── Footer ─────────────────────────────────── */
+        .auth-foot {
+            margin-top:1.6rem; text-align:center;
+            font-size:14px; color:var(--muted);
+            animation:fadeIn .5s .68s var(--ease) both;
+        }
+        .auth-foot a {
+            font-weight:700; color:var(--p); text-decoration:none;
+            transition:color .2s;
+        }
+        .auth-foot a:hover { color:var(--p-vivid); }
 
-        /* Responsividad */
-        @media (max-width: 900px) {
-            .split-layout { flex-direction: column; }
-            .panel-left { display: none; }
-            .panel-right { padding: 1.5rem; background: #ffffff; }
-            .auth-card { box-shadow: none; border: none; padding: 20px; }
+        /* ── Responsive ─────────────────────────────── */
+        @media(max-width:900px) {
+            body { overflow:auto; }
+            .split { flex-direction:column; }
+            .panel-l { display:none; }
+            .panel-r { padding:1.5rem; background:#fff; min-height:100vh; }
+            .panel-r::before,.panel-r::after { display:none; }
+            .card { box-shadow:none; border:none; padding:1.5rem 1.25rem; animation:none; }
+            .card.shake { animation:shake .4s var(--ease); }
         }
     </style>
 </head>
 <body>
 
-    <div class="split-layout">
-        
-        <!-- ==========================================
-             PANEL IZQUIERDO (Visual y Video)
-             ========================================== -->
-        <div class="panel-left">
-            <video class="video-bg" autoplay loop muted playsinline>
-                <source src="{% static 'videos/mi_video.mp4' %}" type="video/mp4">
-            </video>
-            
-            <div class="overlay-gradient"></div>
+<div class="split">
 
-            <div class="brand-content">
-                <div class="logo-container">
-                    <div class="logo-icon"><i class="ti ti-dna-2"></i></div>
-                    <span class="logo-text">BioSoil Analytics</span>
-                </div>
+    <!-- ═══════════════════════════════════════════
+         PANEL IZQUIERDO
+    ═══════════════════════════════════════════ -->
+    <div class="panel-l">
+        <video class="video-bg" autoplay loop muted playsinline>
+            <source src="{% static 'videos/mi_video.mp4' %}" type="video/mp4">
+        </video>
+        <div class="overlay"></div>
 
-                <h1 class="hero-text">Análisis microbiano<br>para <em>suelos agrícolas</em></h1>
-                <p class="hero-desc">Plataforma de análisis comparativo de perfiles microbianos 16S e ITS orientada a investigadores y agrónomos.</p>
-            </div>
-
-            <div class="feature-grid">
-                <div class="feature-card"><i class="ti ti-microscope"></i> Pipeline bioinformático automatizado</div>
-                <div class="feature-card"><i class="ti ti-leaf"></i> Clasificación funcional de microorganismos</div>
-                <div class="feature-card"><i class="ti ti-chart-bar"></i> Análisis diferencial 16S e ITS</div>
-            </div>
+        <!-- Partículas biológicas flotantes -->
+        <div class="particles">
+            <div class="par par-1"></div>
+            <div class="par par-2"></div>
+            <div class="par par-3"></div>
+            <div class="par par-4"></div>
+            <div class="par par-5"></div>
+            <div class="par par-6"></div>
+            <div class="par par-7"></div>
         </div>
 
-        <!-- ==========================================
-             PANEL DERECHO (Nuevo Estilo de Tarjeta Flotante)
-             ========================================== -->
-        <div class="panel-right">
-            
-            <div class="auth-card">
-                
-                <div class="auth-header">
-                    <h1 class="auth-title">Bienvenido/a </h1>
-                    <p class="auth-subtitle">Ingresa tus credenciales para acceder al laboratorio</p>
-                </div>
-
-                {% if form.errors %}
-                <div class="error-banner">
-                    <i class="ti ti-alert-triangle-filled" style="font-size: 20px;"></i>
-                    <span>Usuario o contraseña incorrectos.</span>
-                </div>
-                {% endif %}
-
-                <!-- FORMULARIO -->
-                <form method="post">
-                    {% csrf_token %}
-                    
-                    <div class="form-group">
-                        <div class="label-row">
-                            <label class="form-label" for="id_username">Usuario o Correo</label>
-                        </div>
-                        <div class="input-wrapper">
-                            <i class="ti ti-user icon-left"></i>
-                            <input type="text" name="username" id="id_username" class="form-control" placeholder="Ej: analista_utc" autocomplete="username" required>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <div class="label-row">
-                            <label class="form-label" for="id_password">Contraseña</label>
-                            <a href="{% url 'analisis:password_reset' %}" class="link-text">¿Olvidaste tu contraseña?</a>
-                        </div>
-                        <div class="input-wrapper">
-                            <i class="ti ti-lock icon-left"></i>
-                            <input type="password" name="password" id="id_password" class="form-control" placeholder="••••••••" autocomplete="current-password" required>
-                            <button type="button" class="password-toggle" id="togglePassword" title="Mostrar/Ocultar contraseña">
-                                <i class="ti ti-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn-main">Acceder a la plataforma</button>
-                </form>
-
-                <div class="divider">O continuar con</div>
-
-                <!-- GOOGLE LOGIN -->
-                <a href="{% provider_login_url 'google' %}" class="btn-google">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                    </svg>
-                    Ingresar con Google
-                </a>
-
-                <!-- REGISTRO -->
-                <div class="auth-footer">
-                    ¿Aún no tienes una cuenta? <a href="{% url 'account_signup' %}" class="link-text">Regístrate aquí</a>
-                </div>
-
+        <div class="brand-block">
+            <div class="logo-row">
+                <div class="logo-ico"><i class="ti ti-dna-2"></i></div>
+                <span class="logo-name">BioSoil Analytics</span>
             </div>
+            <h1 class="hero">Análisis microbiano<br>para <em>suelos agrícolas</em></h1>
+            <p class="hero-sub">Plataforma de análisis comparativo de perfiles microbianos 16S e ITS orientada a investigadores y agrónomos de la UTC.</p>
         </div>
 
+        <div class="feature-grid">
+            <div class="feat">
+                <i class="ti ti-microscope" style="color:#00e5ff; filter:drop-shadow(0 0 8px rgba(0,229,255,.6));"></i>
+                Pipeline bioinformático automatizado
+            </div>
+            <div class="feat">
+                <i class="ti ti-leaf" style="color:#69f542; filter:drop-shadow(0 0 8px rgba(105,245,66,.6));"></i>
+                Clasificación funcional de microorganismos
+            </div>
+            <div class="feat">
+                <i class="ti ti-chart-bar" style="color:#ffa733; filter:drop-shadow(0 0 8px rgba(255,167,51,.6));"></i>
+                Análisis diferencial 16S e ITS
+            </div>
+        </div>
     </div>
 
-    <!-- Script del botoncito del Ojo -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const togglePassword = document.getElementById('togglePassword');
-            const passwordField = document.getElementById('id_password');
-            const icon = togglePassword.querySelector('i');
+    <!-- ═══════════════════════════════════════════
+         PANEL DERECHO
+    ═══════════════════════════════════════════ -->
+    <div class="panel-r">
+        <div class="card {% if form.errors %}shake{% endif %}">
 
-            togglePassword.addEventListener('click', function() {
-                const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
-                passwordField.setAttribute('type', type);
-                
-                if (type === 'text') {
-                    icon.classList.remove('ti-eye');
-                    icon.classList.add('ti-eye-off');
-                } else {
-                    icon.classList.remove('ti-eye-off');
-                    icon.classList.add('ti-eye');
-                }
-            });
+            <div class="card-head">
+                <h1 class="card-title">Bienvenido<span>/a</span> 🌿</h1>
+                <p class="card-sub">Accede al laboratorio de análisis de suelos</p>
+            </div>
+
+            {% if form.errors %}
+            <div class="error-banner">
+                <i class="ti ti-alert-triangle-filled"></i>
+                <span>Correo o contraseña incorrectos. Verifica tus datos.</span>
+            </div>
+            {% endif %}
+
+            <form method="post" action="{% url 'analisis:login' %}" id="loginForm" novalidate>
+                {% csrf_token %}
+
+                <!-- Campo correo -->
+                <div class="field-group">
+                    <div class="field-wrap {% if form.errors %}err{% endif %}">
+                        <i class="ti ti-mail fi"></i>
+                        <input type="text" name="username" id="id_username"
+                               class="fi-input" placeholder=" "
+                               autocomplete="username email" required
+                               value="{{ form.username.value|default:'' }}">
+                        <label class="fl {% if form.errors %}err{% endif %}" for="id_username">
+                            Correo electrónico
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Campo contraseña -->
+                <div class="field-group">
+                    <div class="field-wrap {% if form.errors %}err{% endif %}">
+                        <i class="ti ti-lock fi"></i>
+                        <input type="password" name="password" id="id_password"
+                               class="fi-input has-right" placeholder=" "
+                               autocomplete="current-password" required>
+                        <label class="fl {% if form.errors %}err{% endif %}" for="id_password">
+                            Contraseña
+                        </label>
+                        <button type="button" class="eye-btn" id="eyeBtn" title="Mostrar contraseña" aria-label="Mostrar contraseña">
+                            <i class="ti ti-eye" id="eyeIcon"></i>
+                        </button>
+                    </div>
+                    <div class="pw-footer">
+                        <a href="{% url 'analisis:password_reset' %}" class="forgot">¿Olvidaste tu contraseña?</a>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-main" id="btnSubmit">
+                    <span id="btnText">Acceder a la plataforma</span>
+                </button>
+            </form>
+
+            <div class="divider">O continuar con</div>
+
+            <a href="{% provider_login_url 'google' %}" class="btn-google">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Ingresar con Google
+            </a>
+
+            <p class="auth-foot">
+                ¿Aún no tienes cuenta? <a href="{% url 'account_signup' %}">Regístrate aquí</a>
+            </p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+(function () {
+    /* ── Ojo de contraseña ── */
+    var eyeBtn  = document.getElementById('eyeBtn');
+    var pwField = document.getElementById('id_password');
+    var eyeIcon = document.getElementById('eyeIcon');
+
+    if (eyeBtn) {
+        eyeBtn.addEventListener('click', function () {
+            var isPass = pwField.type === 'password';
+            pwField.type = isPass ? 'text' : 'password';
+            eyeIcon.className = isPass ? 'ti ti-eye-off' : 'ti ti-eye';
+            eyeBtn.setAttribute('aria-label', isPass ? 'Ocultar contraseña' : 'Mostrar contraseña');
         });
-    </script>
+    }
+
+    /* ── Loading state al hacer submit ── */
+    var form    = document.getElementById('loginForm');
+    var btnText = document.getElementById('btnText');
+    var btn     = document.getElementById('btnSubmit');
+
+    if (form) {
+        form.addEventListener('submit', function () {
+            btn.disabled = true;
+            btnText.innerHTML = '<i class="ti ti-loader-2 spinner"></i> Verificando...';
+        });
+    }
+})();
+</script>
 
 </body>
 </html>

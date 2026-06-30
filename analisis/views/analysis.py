@@ -15,6 +15,7 @@ from ..services.business.analysis_service import (
 from ..services.business.visualization_service import VisualizationService
 from ..models import ResultadoTaxonomico, MuestraSuelo
 from analisis.services.processing.diversity import DiversityService
+from analisis.constants import OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES
 
 @login_required
 def analisis_avanzado(request):
@@ -31,15 +32,14 @@ def analisis_avanzado(request):
         except (ValueError, TypeError):
             pass
 
-    opciones_top_n = [5, 10, 25, 50]
     try:
-        top_n = int(top_n_raw) if int(top_n_raw) in opciones_top_n else 10
+        top_n = int(top_n_raw) if int(top_n_raw) in OPCIONES_TOP_N else 10
     except ValueError:
         top_n = 10
 
     muestras = MuestraSuelo.objects.select_related(
         "cultivo", "variedad_clon"
-    ).order_by("cultivo__nombre", "codigo")
+    ).prefetch_related("archivos_moleculares").order_by("cultivo__nombre", "codigo")
 
     contexto = {
         "top_microorganismos": [],
@@ -58,8 +58,8 @@ def analisis_avanzado(request):
             "tipo_actual": tipo,
             "top_n_actual": top_n,
             "nivel_actual": nivel,
-            "opciones_top_n": opciones_top_n,
-            "niveles_taxonomicos": ["kingdom", "phylum", "class", "order", "family", "genus", "species"],
+            "opciones_top_n": OPCIONES_TOP_N,
+            "niveles_taxonomicos": NIVELES_VALIDOS,
             "marcadores_disponibles": ("16S", "ITS"),
         })
         return render(request, "analisis/analisis_avanzado.html", contexto)
@@ -86,11 +86,7 @@ def analisis_avanzado(request):
         )
 
         if qs.exists():
-            mapa_campo = {
-                'kingdom': 'kingdom', 'phylum': 'phylum', 'class': 'tax_class',
-                'order': 'order', 'family': 'family', 'genus': 'genus', 'species': 'species'
-            }
-            campo_modelo = mapa_campo.get(nivel, 'genus')
+            campo_modelo = MAPA_NIVELES.get(nivel, 'genus')
 
             data = list(qs.values(campo_modelo, 'archivo__muestra__codigo', 'porcentaje_hits'))
             if data:
@@ -164,16 +160,13 @@ def analisis_avanzado(request):
         "tipo_actual": tipo,
         "top_n_actual": top_n,
         "nivel_actual": nivel,
-        "opciones_top_n": opciones_top_n,
-        "niveles_taxonomicos": ["kingdom", "phylum", "class", "order", "family", "genus", "species"],
+        "opciones_top_n": OPCIONES_TOP_N,
+        "niveles_taxonomicos": NIVELES_VALIDOS,
         "marcadores_disponibles": ("16S", "ITS"),
     })
 
     return render(request, "analisis/analisis_avanzado.html", contexto)
 
-
-OPCIONES_TOP_N = [5, 10, 25, 50]
-NIVELES_VALIDOS = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
 
 @login_required
 def resultado_analisis(request, muestra_id):

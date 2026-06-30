@@ -15,8 +15,8 @@ from analisis.services.processing.diversity import DiversityService
 from analisis.services.business.analysis_service import obtener_analisis_avanzado
 from analisis.services.business.export_service import ExportService
 from analisis.services.business.report_generation_service import ReportGenerationService
+from analisis.constants import MARCADORES_VALIDOS, OPCIONES_TOP_N
 
-MARCADORES_VALIDOS = ("16S", "ITS")
 FORMATOS_VALIDOS = ("pdf", "excel", "html", "json")
 
 
@@ -158,7 +158,7 @@ def exportar_reporte_comparativo(request) -> HttpResponseBase:
 
         try:
             top_n = int(request.POST.get("top_n", 10))
-            if top_n not in [5, 10, 25, 50]:
+            if top_n not in OPCIONES_TOP_N:
                 top_n = 10
         except (ValueError, TypeError):
             top_n = 10

@@ -31,7 +31,7 @@
 <div class="card">
     {% if muestras %}
     <div class="table-wrap">
-        <table>
+        <table class="table-inner">
             <thead>
                 <tr>
                     <th>Código Muestra</th>
@@ -45,7 +45,7 @@
                 {% for p in muestras %}
                 <tr>
                     <td><strong>{{ p.codigo|default:"Sin código" }}</strong></td>
-                    <td style="color:var(--text-muted); font-size:13px;">
+                    <td class="td-muted">
                         {{ p.cultivo.nombre|default:"—" }} / {{ p.variedad_clon.nombre|default:"—" }}
                     </td>
                     <td>
