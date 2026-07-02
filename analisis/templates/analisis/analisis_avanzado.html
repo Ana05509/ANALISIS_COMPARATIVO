@@ -6,15 +6,15 @@
 
 {% block extra_css %}
 <style>
-.av-row { border-bottom: 1px solid var(--border-color,#e2e8f0); }
+.av-row { border-bottom: 1px solid var(--gris-light); }
 .av-row:last-child { border-bottom: none; }
-.av-row label { display:flex; align-items:center; gap:0; padding:6px 10px; cursor:pointer; font-size:12px; transition:background .12s; user-select:none; width:100%; box-sizing:border-box; }
-.av-row label:hover { background:var(--bg-light,#f8fafc); }
-.av-row.activa label { background:#eff6ff; font-weight:600; color:#1d4ed8; }
-.av-row input[type=checkbox] { accent-color:#3b82f6; width:14px; height:14px; cursor:pointer; flex-shrink:0; margin-right:8px; }
+.av-row label { display:flex; align-items:center; gap:0; padding:7px 10px; cursor:pointer; font-size:13.5px; transition:background var(--transition); user-select:none; width:100%; box-sizing:border-box; }
+.av-row label:hover { background:var(--gris-light); }
+.av-row.activa label { background:var(--verde-light); font-weight:500; color:var(--verde-dark); }
+.av-row input[type=checkbox] { accent-color:var(--verde); width:15px; height:15px; cursor:pointer; flex-shrink:0; margin-right:9px; }
 .av-row.oculta { display:none; }
 .av-row.marcador-oculta { display:none; }
-.chart-desc { font-size:12px; color:var(--text-hint); margin:0 0 0.5rem; line-height:1.5; }
+.chart-desc { font-size:12.5px; color:var(--text-hint); margin:0 0 0.75rem; line-height:1.55; }
 </style>
 {% endblock %}
 
@@ -31,7 +31,7 @@
         <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:10px;">
             <div>
                 <label class="form-label">Marcador</label>
-                <select name="tipo" id="av-tipo-select" class="form-control" style="width:110px;">
+                <select name="tipo" id="av-tipo-select" class="form-control">
                     {% for m in marcadores_disponibles %}
                     <option value="{{ m }}" {% if tipo_actual == m %}selected{% endif %}>{{ m }}</option>
                     {% endfor %}
@@ -39,7 +39,7 @@
             </div>
             <div>
                 <label class="form-label">Nivel Taxonómico</label>
-                <select name="nivel" class="form-control" style="width:140px;">
+                <select name="nivel" class="form-control">
                     {% for n in niveles_taxonomicos %}
                     <option value="{{ n|lower }}" {% if nivel_actual == n|lower %}selected{% endif %}>{{ n }}</option>
                     {% endfor %}
@@ -47,13 +47,13 @@
             </div>
             <div>
                 <label class="form-label">Profundidad (Top N)</label>
-                <select name="top_n" class="form-control" style="width:110px;">
+                <select name="top_n" class="form-control">
                     {% for opt in opciones_top_n %}
                     <option value="{{ opt }}" {% if top_n_actual == opt %}selected{% endif %}>Top {{ opt }}</option>
                     {% endfor %}
                 </select>
             </div>
-            <button type="submit" id="btn-analizar" class="btn btn-primary" style="height:38px;">
+            <button type="submit" id="btn-analizar" class="btn btn-primary">
                 <i class="ti ti-refresh" aria-hidden="true"></i> Analizar
             </button>
         </div>
@@ -64,13 +64,13 @@
                 <span id="av-counter" style="font-size:11px; font-weight:600; color:var(--text-hint);"></span>
             </label>
             <div style="display:flex; gap:5px; margin-bottom:5px;">
-                <input id="av-search" type="text" placeholder="🔍 Buscar muestra..." autocomplete="off"
+                <input id="av-search" type="text" placeholder="Buscar muestra..." autocomplete="off"
                        aria-label="Filtrar muestras por nombre"
-                       style="flex:1; padding:4px 8px; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; font-size:12px; outline:none;">
-                <button type="button" id="av-btn-all"   class="btn btn-ghost-verde btn-sm">✓ Todo</button>
+                       class="form-control" style="font-size:13px; min-height:34px; padding:0.35rem 0.75rem;">
+                <button type="button" id="av-btn-all"   class="btn btn-ghost-verde btn-sm" style="white-space:nowrap;">✓ Todo</button>
                 <button type="button" id="av-btn-clear" class="btn btn-outline btn-sm">✕</button>
             </div>
-            <div id="av-list-wrap" style="border:1px solid var(--border-color,#e2e8f0); border-radius:6px; max-height:180px; overflow-y:auto;">
+            <div id="av-list-wrap" style="border:1px solid var(--gris-border); border-radius:8px; max-height:190px; overflow-y:auto;">
                 <div id="av-checkbox-list"></div>
             </div>
             <!-- Select oculto — sincronizado por JS, enviado en el GET -->

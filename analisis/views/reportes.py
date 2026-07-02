@@ -43,7 +43,11 @@ def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S"):
     CATS = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
     taxa_qs    = list(qs.values(taxon=F(campo_db)).annotate(hits=Sum("num_hits")).order_by("-hits"))
     grand_total = sum(r["hits"] for r in taxa_qs) or 1
-    catalogo   = {obj.nombre.lower(): obj for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo)}
+    # Mismo filtro que _construir_datos_reporte para mantener consistencia
+    catalogo   = {
+        obj.nombre.lower(): obj
+        for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo)
+    }
 
     detalle = {c: [] for c in CATS}
     totales = {c: 0  for c in CATS}
@@ -51,9 +55,12 @@ def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S"):
         nombre = row["taxon"] or "Desconocido"
         cat_obj = catalogo.get(nombre.lower())
         clas    = (cat_obj.clasificacion if cat_obj and cat_obj.clasificacion in CATS else "sin_clasificar")
+        pct_raw = row["hits"] / grand_total * 100
+        # Usar 4 decimales para que abundancias muy bajas no aparezcan como 0.00
+        pct = round(pct_raw, 4) if pct_raw < 0.01 else round(pct_raw, 2)
         detalle[clas].append({
             "nombre":      nombre,
-            "porcentaje":  round(row["hits"] / grand_total * 100, 2),
+            "porcentaje":  pct,
             "descripcion": cat_obj.descripcion or "" if cat_obj else "",
             "referencia":  cat_obj.referencia  or "" if cat_obj else "",
         })
@@ -79,11 +86,12 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
     catalogo_map = {
         obj["nombre"].lower(): obj["clasificacion"]
         for obj in CatalogoMicroorganismo.objects.filter(
-            nivel__iexact=nivel, marcador=tipo
+            marcador=tipo
         ).values("nombre", "clasificacion")
     }
     for r in todos_raw:
-        r["total_porcentaje"] = round(r["total_hits"] / grand_total * 100, 2)
+        pct_raw = r["total_hits"] / grand_total * 100
+        r["total_porcentaje"] = round(pct_raw, 4) if pct_raw < 0.01 else round(pct_raw, 2)
         r["clasificacion"]    = catalogo_map.get(str(r["taxonomia"] or "").lower(), "sin_clasificar")
 
     diversidad  = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids) or {}
@@ -109,6 +117,7 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
 def _construir_datos_por_muestra(tipo, nivel, top_n, muestras_list):
     """Para reportes comparativos: datos por cada muestra seleccionada."""
     campo_db  = MAPA_NIVELES.get(nivel, "genus")
+    EXCLUIR = {"others", "unclassified", "unknown", "others sp", "nan", ""}
     resultado = []
     for muestra in muestras_list:
         qs_m = ResultadoTaxonomico.objects.filter(
@@ -117,23 +126,33 @@ def _construir_datos_por_muestra(tipo, nivel, top_n, muestras_list):
         if not qs_m.exists():
             continue
         grand_total = qs_m.aggregate(total=Sum("num_hits"))["total"] or 1
-        top_raw = list(qs_m.values(taxonomia=F(campo_db)).annotate(total_hits=Sum("num_hits")).order_by("-total_hits")[:top_n])
-        for r in top_raw:
-            r["total_porcentaje"] = round(r["total_hits"] / grand_total * 100, 2)
+        # Todos los taxa de esta muestra (para diversidad beta)
+        all_raw = list(qs_m.values(taxonomia=F(campo_db)).annotate(total_hits=Sum("num_hits")).order_by("-total_hits"))
+        for r in all_raw:
+            pct_raw = r["total_hits"] / grand_total * 100
+            r["total_porcentaje"] = round(pct_raw, 4) if pct_raw < 0.01 else round(pct_raw, 2)
+        top_raw = all_raw[:top_n]
+        todos_taxa_nombres = {
+            str(r["taxonomia"]) for r in all_raw
+            if r.get("taxonomia") and str(r["taxonomia"]).lower() not in EXCLUIR
+        }
         div_m = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=[muestra.id]) or {}
-        _, totales_m = _obtener_clasificacion_detalle(qs_m, nivel, campo_db)
+        detalle_m, totales_m = _obtener_clasificacion_detalle(qs_m, nivel, campo_db, tipo)
         indice_m, nivel_m = calcular_indice_salud(
             totales_m["benefico"], totales_m["fitopatogeno"],
             totales_m["neutral"],  totales_m["sin_clasificar"],
             shannon=div_m.get("shannon", 0) or 0,
         )
         resultado.append({
-            "muestra":      muestra,
-            "top_taxa":     top_raw,
-            "diversidad":   div_m,
-            "totales_clas": totales_m,
-            "indice_salud": indice_m,
-            "nivel_salud":  nivel_m,
+            "muestra":            muestra,
+            "top_taxa":           top_raw,
+            "todos_taxa":         all_raw,
+            "todos_taxa_nombres": todos_taxa_nombres,
+            "diversidad":         div_m,
+            "detalle_clas":       detalle_m,
+            "totales_clas":       totales_m,
+            "indice_salud":       indice_m,
+            "nivel_salud":        nivel_m,
         })
     return resultado
 
@@ -286,6 +305,22 @@ def generar_reporte(request) -> HttpResponseBase:
         }
 
         if formato == "excel":
+            # Datos adicionales que el PDF no necesita pero el Excel sí
+            if len(muestras_list) > 1:
+                datos["datos_por_muestra"] = _construir_datos_por_muestra(
+                    tipo, nivel, top_n, muestras_list
+                )
+            elif muestras_list:
+                # Análisis diferencial solo para muestra individual
+                try:
+                    from analisis.services.business.analysis_service import obtener_analisis_diferencial
+                    diff = obtener_analisis_diferencial(
+                        tipo=tipo, nivel=nivel, muestra_id=muestras_list[0].id
+                    )
+                    if diff:
+                        datos["analisis_diferencial"] = diff
+                except Exception:
+                    pass
             return ExportService.generar_excel_multisheet(datos)
 
         # PDF — individual si 0-1 muestras, comparativo si 2+

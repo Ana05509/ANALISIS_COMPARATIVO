@@ -46,36 +46,27 @@
 
 {% if graficos_json %}
 <style>
-    .plotly-container {
-        background: var(--card-bg, #ffffff);
-        border: 1px solid var(--border-color, #e2e8f0);
-        border-radius: 8px;
-        padding: 1.25rem;
-        margin-bottom: 1.5rem;
-    }
     .plotly-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+        gap: 1.25rem;
         margin-bottom: 1.5rem;
     }
-    @media (max-width: 576px) {
-        .plotly-grid {
-            grid-template-columns: 1fr;
-        }
+    @media (max-width: 640px) {
+        .plotly-grid { grid-template-columns: 1fr; }
     }
 </style>
 
 <div class="plotly-grid">
     {% if graficos_json.grafico_barras != "null" and graficos_json.grafico_barras %}
-    <div class="plotly-container">
-        <div id="grafico-barras" style="height: 380px; width: 100%;"></div>
+    <div class="card" style="padding: 1.25rem;">
+        <div id="grafico-barras" style="height: 360px; width: 100%;"></div>
     </div>
     {% endif %}
-    
+
     {% if graficos_json.grafico_pie != "null" and graficos_json.grafico_pie %}
-    <div class="plotly-container">
-        <div id="grafico-pie" style="height: 380px; width: 100%;"></div>
+    <div class="card" style="padding: 1.25rem;">
+        <div id="grafico-pie" style="height: 360px; width: 100%;"></div>
     </div>
     {% endif %}
 </div>
@@ -126,13 +117,13 @@
 </div>
 
 {% if productos_por_variedad %}
-<div class="card" style="margin-top: 1.5rem;">
-    <div class="card-title">Muestras Totales por Cultivo</div>
-    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 0.75rem;">
+<div class="card" style="margin-top: 1.25rem;">
+    <div class="card-title">Muestras por Cultivo</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 0.5rem;">
         {% for v in productos_por_variedad %}
-        <div style="background: var(--bg-light, #f8fafc); border: 1px solid var(--border-color, #e2e8f0); border-radius: 6px; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 13px; font-weight: 500; color: var(--text-primary);">{{ v.nombre_variedad }}</span>
-            <span class="td-mono" style="font-size: 11px; background: var(--border-color, #e2e8f0); padding: 1px 6px; border-radius: 4px; color: var(--text-muted); font-weight: 600;">
+        <div style="background: var(--gris-light); border: 1px solid var(--gris-border); border-radius: 8px; padding: 0.45rem 1rem; display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 13.5px; font-weight: 500; color: var(--text-primary);">{{ v.nombre_variedad }}</span>
+            <span class="td-mono" style="font-size: 11px; background: var(--gris-border); padding: 1px 7px; border-radius: 4px; color: var(--text-muted); font-weight: 600;">
                 {{ v.total }}
             </span>
         </div>

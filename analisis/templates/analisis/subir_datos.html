@@ -11,7 +11,18 @@
     <p>Ingesta de datos 16S (Bacterias) o ITS (Hongos) desde secuenciación</p>
 </div>
 
-<div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; align-items: start;">
+<style>
+.upload-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .upload-grid { grid-template-columns: 1fr; }
+}
+</style>
+<div class="upload-grid">
 
     <div class="card">
         <div class="card-title">Datos del archivo</div>
@@ -167,18 +178,18 @@
 }
 .drop-zone:hover,
 .drop-zone:focus-visible {
-    border-color: var(--verde, #22c55e);
-    background: #f0fdf4;
+    border-color: var(--verde);
+    background: var(--verde-light);
 }
 .drop-zone.dz-over {
-    border-color: var(--verde, #22c55e);
+    border-color: var(--verde);
     border-style: solid;
-    background: #f0fdf4;
+    background: var(--verde-light);
     transform: scale(1.01);
 }
 .drop-zone.dz-error {
-    border-color: var(--rojo, #ef4444);
-    background: #fef2f2;
+    border-color: var(--rojo);
+    background: var(--rojo-light);
 }
 .drop-zone__icon {
     font-size: 38px;
@@ -221,9 +232,9 @@
     gap: 10px;
     margin-top: 10px;
     padding: 10px 14px;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-radius: var(--radius, 8px);
+    background: var(--verde-light);
+    border: 1px solid rgba(29,158,117,0.3);
+    border-radius: var(--radius);
 }
 .file-preview__icon {
     font-size: 22px;

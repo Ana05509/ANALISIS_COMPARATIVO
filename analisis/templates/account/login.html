@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acceso — BioSoil Analytics</title>
+    <title>Acceso — BioSuelo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -350,14 +350,47 @@
         .auth-foot a:hover { color:var(--p-vivid); }
 
         /* ── Responsive ─────────────────────────────── */
-        @media(max-width:900px) {
-            body { overflow:auto; }
-            .split { flex-direction:column; }
-            .panel-l { display:none; }
-            .panel-r { padding:1.5rem; background:#fff; min-height:100vh; }
-            .panel-r::before,.panel-r::after { display:none; }
-            .card { box-shadow:none; border:none; padding:1.5rem 1.25rem; animation:none; }
-            .card.shake { animation:shake .4s var(--ease); }
+
+        /* Laptop pequeño (1024–1279 px) */
+        @media (max-width: 1279px) {
+            .panel-l { padding: 3rem; }
+            .hero { font-size: 42px; }
+        }
+
+        /* Tablet (768–1023 px): panel izquierdo compacto, solo logo */
+        @media (max-width: 1023px) {
+            .panel-l {
+                flex: 0 0 260px;
+                padding: 2rem 1.5rem;
+                justify-content: center;
+                gap: 0;
+            }
+            .brand-block {
+                display: flex; flex-direction: column;
+                align-items: center; text-align: center;
+            }
+            .logo-row   { margin-bottom: 0; }
+            .logo-name  { font-size: 14px; }
+            .hero       { display: none; }
+            .hero-sub   { display: none; }
+            .feature-grid { display: none; }
+        }
+
+        /* Móvil (< 768 px): solo el formulario */
+        @media (max-width: 767px) {
+            body { overflow: auto; }
+            .split { flex-direction: column; }
+            .panel-l { display: none; }
+            .panel-r { padding: 1.5rem; background: #fff; min-height: 100vh; }
+            .panel-r::before, .panel-r::after { display: none; }
+            .card { box-shadow: none; border: none; padding: 1.5rem 1.25rem; animation: none; }
+            .card.shake { animation: shake .4s var(--ease); }
+        }
+
+        /* Móvil pequeño (< 480 px) */
+        @media (max-width: 479px) {
+            .panel-r { padding: 1rem; }
+            .card { padding: 1.25rem 1rem; }
         }
     </style>
 </head>
@@ -388,7 +421,7 @@
         <div class="brand-block">
             <div class="logo-row">
                 <div class="logo-ico"><i class="ti ti-dna-2"></i></div>
-                <span class="logo-name">BioSoil Analytics</span>
+                <span class="logo-name">BioSuelo</span>
             </div>
             <h1 class="hero">Análisis microbiano<br>para <em>suelos agrícolas</em></h1>
             <p class="hero-sub">Plataforma de análisis comparativo de perfiles microbianos 16S e ITS orientada a investigadores y agrónomos de la UTC.</p>

@@ -1,0 +1,483 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Acceso{% endblock %} — BioSuelo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <style>
+        /* ── Variables ─────────────────── */
+        :root {
+            --p:       #4a7c64;
+            --p-vivid: #38a878;
+            --p-dark:  #2d6b52;
+            --p-glow:  rgba(56, 168, 120, .18);
+            --p-glow2: rgba(56, 168, 120, .08);
+            --surface: #ffffff;
+            --bg:      #f0f5f3;
+            --border:  #d6e4dd;
+            --text:    #0f1923;
+            --muted:   #6b7280;
+            --error:   #dc2626;
+            --ease:    cubic-bezier(.4, 0, .2, 1);
+        }
+
+        /* ── Keyframes ─────────────────── */
+        @keyframes slideUp   { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn    { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes shake     { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+        @keyframes float1    { 0%,100% { transform: translateY(0) rotate(0deg) scale(1); } 50% { transform: translateY(-22px) rotate(180deg) scale(1.15); } }
+        @keyframes float2    { 0%,100% { transform: translateY(0) rotate(0deg) scale(1); } 50% { transform: translateY(-30px) rotate(-120deg) scale(.9); } }
+        @keyframes float3    { 0%,100% { transform: translateY(0) rotate(0deg) scale(1); } 50% { transform: translateY(-15px) rotate(90deg) scale(1.2); } }
+        @keyframes blobPulse { 0%,100% { transform: scale(1) rotate(0deg); } 40% { transform: scale(1.18) rotate(12deg); } 70% { transform: scale(.9) rotate(-7deg); } }
+        @keyframes gridDrift { 0% { background-position: 0 0; } 100% { background-position: 32px 32px; } }
+        @keyframes shimmer   { 0% { background-position: -300% center; } 100% { background-position: 300% center; } }
+        @keyframes scanLine  { from { width: 0; } to { width: 100%; } }
+        @keyframes spin      { to { transform: rotate(360deg); } }
+
+        /* ── Reset ─────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { overflow-x: hidden; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        /* ── Layout ─────────────────────── */
+        .auth-split { display: flex; width: 100%; min-height: 100vh; }
+
+        /* ─── Panel Izquierdo ─── */
+        .auth-panel-l {
+            flex: 1.2;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 4.5rem;
+            overflow: hidden;
+            background: #1d3328;
+        }
+        .auth-panel-l-media {
+            position: absolute; inset: 0;
+            width: 100%; height: 100%;
+            object-fit: cover; z-index: 1;
+        }
+        .auth-panel-l-overlay {
+            position: absolute; inset: 0; z-index: 2;
+            background: linear-gradient(135deg, rgba(15,38,28,.72) 0%, rgba(58,168,120,.28) 100%);
+        }
+
+        /* Partículas biológicas */
+        .auth-particles {
+            position: absolute; inset: 0; z-index: 3;
+            pointer-events: none; overflow: hidden;
+        }
+        .auth-par {
+            position: absolute; border-radius: 50%;
+            border: 1.5px solid rgba(178,216,197,.45);
+        }
+        .auth-par::before {
+            content: ''; position: absolute; inset: 5px;
+            border-radius: 50%; background: rgba(178,216,197,.12);
+        }
+        .auth-par:nth-child(1) { width:64px; height:64px; top:12%; left:8%;  animation: float1 9s   ease-in-out infinite; }
+        .auth-par:nth-child(2) { width:28px; height:28px; top:28%; left:72%; animation: float2 6.5s ease-in-out infinite .8s; }
+        .auth-par:nth-child(3) { width:90px; height:90px; top:60%; left:15%; animation: float3 11s  ease-in-out infinite 2s; }
+        .auth-par:nth-child(4) { width:18px; height:18px; top:78%; left:58%; animation: float1 7s   ease-in-out infinite 3s; }
+        .auth-par:nth-child(5) { width:44px; height:44px; top:42%; left:52%; animation: float2 8s   ease-in-out infinite 1.5s; }
+        .auth-par:nth-child(6) { width:36px; height:36px; top:88%; left:30%; animation: float3 10s  ease-in-out infinite 4s; }
+        .auth-par:nth-child(7) { width:55px; height:55px; top:20%; left:38%; animation: float1 12s  ease-in-out infinite 0.5s; }
+
+        .auth-brand {
+            position: relative; z-index: 4;
+            animation: fadeIn .9s .1s ease both;
+        }
+        .auth-logo-row {
+            display: flex; align-items: center;
+            gap: 12px; margin-bottom: 4rem;
+        }
+        .auth-logo-ico {
+            width: 48px; height: 48px; border-radius: 12px;
+            background: rgba(255,255,255,.14); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,.22);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .auth-logo-ico i { color: #fff; font-size: 24px; }
+        .auth-logo-name {
+            color: #fff; font-family: 'Fraunces', serif;
+            font-size: 22px; font-weight: 500;
+            text-shadow: 0 2px 4px rgba(0,0,0,.3);
+        }
+        .auth-hero {
+            font-family: 'Fraunces', serif; font-size: 52px;
+            font-weight: 300; color: #fff; line-height: 1.1;
+            margin-bottom: 1.25rem;
+            text-shadow: 0 2px 6px rgba(0,0,0,.35);
+        }
+        .auth-hero em { font-style: italic; color: #b2d8c5; font-weight: 400; }
+        .auth-hero-sub {
+            color: rgba(255,255,255,.82); font-size: 15px;
+            line-height: 1.65; max-width: 420px;
+        }
+
+        .auth-feats {
+            position: relative; z-index: 4;
+            display: grid; gap: .85rem;
+            animation: fadeIn .9s .4s ease both;
+        }
+        .auth-feat {
+            display: flex; align-items: center; gap: 14px;
+            padding: 15px 20px;
+            background: rgba(255,255,255,.1);
+            border: 1px solid rgba(255,255,255,.18);
+            border-radius: 14px; backdrop-filter: blur(8px);
+            color: #fff; font-size: 14px;
+            transition: background .3s, transform .3s;
+        }
+        .auth-feat:hover { background: rgba(255,255,255,.22); transform: translateX(6px); }
+        .auth-feat i { color: #b2d8c5; font-size: 20px; flex-shrink: 0; }
+
+        /* ─── Panel Derecho ─── */
+        .auth-panel-r {
+            flex: 1; display: flex;
+            flex-direction: column;
+            justify-content: center; align-items: center;
+            background: var(--bg); padding: 2rem;
+            position: relative; overflow: hidden;
+        }
+        .auth-panel-r::before {
+            content: ''; position: absolute; inset: 0; pointer-events: none;
+            background-image:
+                linear-gradient(rgba(74,124,100,.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(74,124,100,.05) 1px, transparent 1px);
+            background-size: 32px 32px;
+            animation: gridDrift 8s linear infinite;
+        }
+        .auth-panel-r::after {
+            content: ''; position: absolute;
+            width: 420px; height: 420px;
+            border-radius: 50%; pointer-events: none;
+            background: radial-gradient(circle, rgba(56,168,120,.1) 0%, transparent 68%);
+            bottom: -100px; right: -80px;
+            animation: blobPulse 10s ease-in-out infinite;
+        }
+
+        /* ─── Tarjeta ─── */
+        .auth-card {
+            position: relative; z-index: 1;
+            background: var(--surface);
+            width: 100%; max-width: 440px;
+            padding: 2.5rem 2.5rem 2rem;
+            border-radius: 24px;
+            box-shadow: 0 24px 60px -10px rgba(15,38,28,.1), 0 1px 4px rgba(0,0,0,.06);
+            border: 1px solid rgba(214,228,221,.8);
+            animation: slideUp .5s var(--ease) both;
+        }
+
+        /* ─── Cabecera de tarjeta ─── */
+        .auth-card-head { margin-bottom: 1.75rem; }
+        .auth-card-title {
+            font-size: 27px; font-weight: 700;
+            color: var(--text); letter-spacing: -.6px; margin-bottom: 5px;
+        }
+        .auth-card-title span { color: var(--p-vivid); }
+        .auth-card-sub { color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+
+        /* ─── Ícono decorativo ─── */
+        .auth-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 72px; height: 72px; border-radius: 20px; margin-bottom: 1.5rem;
+            background: var(--p-glow);
+            border: 1px solid rgba(56,168,120,.25);
+            color: var(--p-vivid); font-size: 34px;
+        }
+        .auth-icon.is-error   { background: #fff5f5; border-color: #fca5a5; color: var(--error); }
+        .auth-icon.is-success { background: rgba(22,163,74,.08); border-color: rgba(22,163,74,.3); color: #16a34a; }
+
+        /* ─── Banner de error ─── */
+        .auth-error-banner {
+            display: flex; align-items: center; gap: 10px;
+            background: #fff5f5; border: 1px solid #fca5a5;
+            border-radius: 12px; padding: 11px 15px;
+            margin-bottom: 1.4rem;
+            font-size: 13.5px; color: var(--error);
+            animation: slideUp .4s var(--ease) both;
+        }
+        .auth-error-banner i { font-size: 18px; flex-shrink: 0; }
+
+        /* ─── Campo con etiqueta flotante ─── */
+        .auth-field-group { margin-bottom: 1.4rem; }
+
+        .auth-field-wrap {
+            position: relative; background: #fff;
+            border: 2px solid var(--border); border-radius: 14px;
+            transition: border-color .25s var(--ease), box-shadow .25s var(--ease);
+        }
+        .auth-field-wrap:focus-within {
+            border-color: var(--p-vivid);
+            box-shadow: 0 0 0 4px var(--p-glow);
+        }
+        .auth-field-wrap::after {
+            content: ''; position: absolute; bottom: -2px; left: 0;
+            height: 2px; width: 0; border-radius: 0 0 14px 14px;
+            background: linear-gradient(90deg, var(--p-vivid), var(--p-dark));
+        }
+        .auth-field-wrap:focus-within::after { animation: scanLine .3s var(--ease) forwards; }
+        .auth-field-wrap.err { border-color: var(--error); }
+        .auth-field-wrap.err:focus-within { box-shadow: 0 0 0 4px rgba(220,38,38,.15); }
+
+        .auth-fi {
+            position: absolute; left: 15px; top: 50%;
+            transform: translateY(-50%);
+            color: #a0b4ab; font-size: 20px;
+            pointer-events: none; z-index: 2;
+            transition: color .25s var(--ease), transform .3s var(--ease);
+        }
+        .auth-field-wrap:focus-within .auth-fi { color: var(--p-vivid); transform: translateY(-50%) scale(1.12); }
+        .auth-field-wrap.err .auth-fi { color: var(--error); }
+
+        .auth-fi-input {
+            width: 100%; padding: 22px 16px 8px 46px;
+            background: transparent; border: none; outline: none;
+            font-family: 'Outfit', sans-serif; font-size: 15px; color: var(--text);
+            border-radius: 14px; position: relative; z-index: 1;
+        }
+        .auth-fi-input.has-right { padding-right: 46px; }
+        .auth-fi-input:-webkit-autofill {
+            -webkit-box-shadow: 0 0 0 1000px #fff inset;
+            -webkit-text-fill-color: var(--text);
+            transition: background-color 9999s;
+        }
+
+        .auth-fl {
+            position: absolute; left: 46px; top: 50%;
+            transform: translateY(-50%);
+            font-size: 15px; color: #a0b4ab;
+            font-family: 'Outfit', sans-serif;
+            transition: all .22s var(--ease);
+            pointer-events: none; z-index: 2;
+            background: transparent; padding: 0 3px; white-space: nowrap;
+        }
+        .auth-fi-input:focus ~ .auth-fl,
+        .auth-fi-input:not(:placeholder-shown) ~ .auth-fl,
+        .auth-fi-input:-webkit-autofill ~ .auth-fl {
+            top: 0; transform: translateY(-58%);
+            font-size: 10.5px; font-weight: 700;
+            letter-spacing: .06em; text-transform: uppercase;
+            color: var(--p-vivid); background: #fff;
+            left: 12px; padding: 0 5px;
+        }
+        .auth-field-wrap.err .auth-fl { color: var(--error); }
+        .auth-field-wrap.err .auth-fi-input:focus ~ .auth-fl,
+        .auth-field-wrap.err .auth-fi-input:not(:placeholder-shown) ~ .auth-fl {
+            color: var(--error);
+        }
+
+        /* ─── Botón ojo ─── */
+        .auth-eye {
+            position: absolute; right: 10px; top: 50%;
+            transform: translateY(-50%);
+            background: none; border: none; cursor: pointer; z-index: 3;
+            color: #a0b4ab; padding: 6px; border-radius: 8px;
+            transition: color .2s, background .2s;
+            display: flex; align-items: center;
+        }
+        .auth-eye:hover { color: var(--p-vivid); background: var(--p-glow2); }
+        .auth-eye i { font-size: 18px; }
+
+        /* ─── Botón primario ─── */
+        .auth-btn {
+            width: 100%; padding: 15px; margin-top: .25rem;
+            background: linear-gradient(135deg, var(--p) 0%, var(--p-vivid) 100%);
+            color: #fff; border: none; border-radius: 14px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15.5px; font-weight: 700;
+            cursor: pointer; letter-spacing: .02em;
+            text-decoration: none; position: relative; overflow: hidden;
+            box-shadow: 0 4px 14px rgba(56,168,120,.35);
+            transition: transform .2s var(--ease), box-shadow .2s var(--ease);
+            display: flex; align-items: center;
+            justify-content: center; gap: 10px;
+        }
+        .auth-btn::before {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.28) 50%, transparent 100%);
+            background-size: 300% 100%; background-position: -300% center;
+        }
+        .auth-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(56,168,120,.45); }
+        .auth-btn:hover::before { animation: shimmer .55s var(--ease) forwards; }
+        .auth-btn:active { transform: translateY(0); box-shadow: 0 3px 10px rgba(56,168,120,.3); }
+        .auth-btn:disabled { opacity: .7; cursor: not-allowed; transform: none; }
+        .auth-btn.is-danger {
+            background: linear-gradient(135deg, #b91c1c, var(--error));
+            box-shadow: 0 4px 14px rgba(220,38,38,.35);
+        }
+
+        /* ─── Enlace "olvidé contraseña" ─── */
+        .auth-forgot {
+            font-size: 12.5px; font-weight: 600; color: var(--p);
+            text-decoration: none; position: relative; transition: color .2s;
+        }
+        .auth-forgot::after {
+            content: ''; position: absolute; bottom: -1px; left: 0;
+            width: 0; height: 1.5px; background: var(--p-vivid);
+            transition: width .25s var(--ease);
+        }
+        .auth-forgot:hover { color: var(--p-vivid); }
+        .auth-forgot:hover::after { width: 100%; }
+
+        /* ─── Divisor ─── */
+        .auth-divider {
+            display: flex; align-items: center; gap: 14px;
+            margin: 1.6rem 0; color: #b0bcb7;
+            font-size: 12.5px; font-weight: 500;
+        }
+        .auth-divider::before, .auth-divider::after {
+            content: ''; flex: 1; height: 1px; background: var(--border);
+        }
+
+        /* ─── Footer de tarjeta ─── */
+        .auth-foot {
+            margin-top: 1.75rem;
+            text-align: center; font-size: 14px; color: var(--muted);
+        }
+        .auth-foot a {
+            font-weight: 700; color: var(--p);
+            text-decoration: none; transition: color .2s;
+        }
+        .auth-foot a:hover { color: var(--p-vivid); }
+
+        .auth-links {
+            margin-top: 1.75rem; display: flex; gap: 20px;
+            font-size: 14px; border-top: 1px solid var(--border);
+            padding-top: 1.5rem; justify-content: center; flex-wrap: wrap;
+        }
+        .auth-link {
+            color: var(--muted); text-decoration: none;
+            font-weight: 500; transition: color .2s;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .auth-link:hover { color: var(--p); }
+
+        /* ─── Spinner ─── */
+        .auth-spinner {
+            display: inline-block;
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+        }
+
+        /* ─── Responsive ─── */
+
+        /* Laptop pequeño (1024–1279 px) */
+        @media (max-width: 1279px) {
+            .auth-panel-l { padding: 3rem; }
+            .auth-hero { font-size: 42px; }
+        }
+
+        /* Tablet (768–1023 px): panel izquierdo compacto, solo logo */
+        @media (max-width: 1023px) {
+            .auth-panel-l {
+                flex: 0 0 260px;
+                padding: 2rem 1.5rem;
+                justify-content: center;
+                gap: 0;
+            }
+            .auth-logo-row { margin-bottom: 0; }
+            .auth-logo-name { font-size: 14px; }
+            .auth-brand {
+                display: flex; flex-direction: column;
+                align-items: center; text-align: center;
+            }
+            .auth-hero     { display: none; }
+            .auth-hero-sub { display: none; }
+            .auth-feats    { display: none; }
+        }
+
+        /* Móvil (< 768 px): solo el formulario */
+        @media (max-width: 767px) {
+            body { overflow: auto; }
+            .auth-split { flex-direction: column; }
+            .auth-panel-l { display: none; }
+            .auth-panel-r { padding: 1.5rem; background: #fff; min-height: 100vh; }
+            .auth-panel-r::before, .auth-panel-r::after { display: none; }
+            .auth-card {
+                box-shadow: none; border: none;
+                padding: 1.5rem 1.25rem; animation: none;
+            }
+        }
+
+        /* Móvil pequeño (< 480 px) */
+        @media (max-width: 479px) {
+            .auth-panel-r { padding: 1rem; }
+            .auth-card { padding: 1.25rem 1rem; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: .01ms !important;
+                transition-duration: .01ms !important;
+            }
+        }
+
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+<div class="auth-split">
+
+    <!-- Panel izquierdo -->
+    <div class="auth-panel-l" aria-hidden="true">
+        <video class="auth-panel-l-media" autoplay loop muted playsinline>
+            <source src="{% static 'videos/mi_video.mp4' %}" type="video/mp4">
+        </video>
+        <div class="auth-panel-l-overlay"></div>
+        <div class="auth-particles">
+            <div class="auth-par"></div>
+            <div class="auth-par"></div>
+            <div class="auth-par"></div>
+            <div class="auth-par"></div>
+            <div class="auth-par"></div>
+            <div class="auth-par"></div>
+            <div class="auth-par"></div>
+        </div>
+
+        <div class="auth-brand">
+            <div class="auth-logo-row">
+                <div class="auth-logo-ico"><i class="ti ti-dna-2"></i></div>
+                <span class="auth-logo-name">BioSuelo</span>
+            </div>
+            {% block panel_hero %}
+            <h1 class="auth-hero">Análisis microbiano<br>para <em>suelos agrícolas</em></h1>
+            <p class="auth-hero-sub">Plataforma de análisis comparativo de perfiles microbianos 16S e ITS orientada a investigadores de la UTC.</p>
+            {% endblock %}
+        </div>
+
+        <div class="auth-feats">
+            {% block panel_features %}
+            <div class="auth-feat"><i class="ti ti-microscope"></i> Pipeline bioinformático automatizado</div>
+            <div class="auth-feat"><i class="ti ti-leaf"></i> Clasificación funcional de microorganismos</div>
+            <div class="auth-feat"><i class="ti ti-chart-bar"></i> Análisis diferencial 16S e ITS</div>
+            {% endblock %}
+        </div>
+    </div>
+
+    <!-- Panel derecho -->
+    <div class="auth-panel-r">
+        <div class="auth-card">
+            {% block card_content %}{% endblock %}
+        </div>
+    </div>
+
+</div>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

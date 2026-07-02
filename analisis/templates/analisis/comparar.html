@@ -7,26 +7,39 @@
 {% block extra_css %}
 <style>
 /* ── Panel de selección de muestras ── */
-.muestra-row {
-    border-bottom: 1px solid var(--border-color, #e2e8f0);
-}
+.muestra-row { border-bottom: 1px solid var(--gris-light); }
 .muestra-row:last-child { border-bottom: none; }
 .muestra-row label {
     display: flex; align-items: center; gap: 9px;
-    padding: 7px 12px; cursor: pointer; font-size: 13px;
-    transition: background 0.12s; user-select: none; width: 100%;
-    box-sizing: border-box;
+    padding: 8px 12px; cursor: pointer; font-size: 13.5px;
+    transition: background var(--transition); user-select: none;
+    width: 100%; box-sizing: border-box;
 }
-.muestra-row label:hover { background: var(--bg-light, #f8fafc); }
-.muestra-row.activa label { background: #eff6ff; font-weight: 600; color: #1d4ed8; }
+.muestra-row label:hover { background: var(--gris-light); }
+.muestra-row.activa label {
+    background: var(--verde-light);
+    font-weight: 500;
+    color: var(--verde-dark);
+}
 .muestra-row input[type="checkbox"] {
-    accent-color: #3b82f6; width: 15px; height: 15px;
+    accent-color: var(--verde);
+    width: 15px; height: 15px;
     cursor: pointer; flex-shrink: 0;
+    margin-right: 0;
 }
 .muestra-row.oculta { display: none; }
 .muestra-row.marcador-oculta { display: none; }
-.muestra-row label { display: flex; align-items: center; gap: 0; padding: 7px 12px; cursor: pointer; font-size: 13px; transition: background 0.12s; user-select: none; width: 100%; box-sizing: border-box; }
-.muestra-row input[type="checkbox"] { margin-right: 9px; }
+
+/* ── Grid de gráficos comparativos ── */
+.comp-charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin-top: 1.25rem;
+}
+@media (max-width: 900px) {
+    .comp-charts-grid { grid-template-columns: 1fr; }
+}
 </style>
 {% endblock %}
 
@@ -60,14 +73,14 @@
                 <span id="sample-counter" style="font-size:12px; font-weight:600; color:var(--text-hint);"></span>
             </label>
             <div style="display:flex; gap:6px; margin-bottom:6px; align-items:center;">
-                <input id="muestra-search" type="text" placeholder="🔍 Buscar muestra..."
+                <input id="muestra-search" type="text" placeholder="Buscar muestra..."
                        aria-label="Filtrar muestras por nombre"
                        autocomplete="off"
-                       style="flex:1; padding:5px 10px; border:1px solid var(--border-color,#e2e8f0); border-radius:5px; font-size:12px; outline:none; background:var(--bg-surface,#fff);">
-                <button type="button" id="btn-select-all" class="btn btn-ghost-verde btn-sm">✓ Todo</button>
-                <button type="button" id="btn-clear-all"  class="btn btn-outline btn-sm">✕ Limpiar</button>
+                       class="form-control" style="font-size:13px; min-height:34px; padding:0.35rem 0.75rem;">
+                <button type="button" id="btn-select-all" class="btn btn-ghost-verde btn-sm" style="white-space:nowrap;">✓ Todo</button>
+                <button type="button" id="btn-clear-all"  class="btn btn-outline btn-sm" style="white-space:nowrap;">✕ Limpiar</button>
             </div>
-            <div id="muestra-list-wrap" style="border:1px solid var(--border-color,#e2e8f0); border-radius:6px; max-height:180px; overflow-y:auto;">
+            <div id="muestra-list-wrap" style="border:1px solid var(--gris-border); border-radius:8px; max-height:190px; overflow-y:auto;">
                 <div id="muestra-checkbox-list"></div>
             </div>
             {{ form.muestras }}
@@ -194,24 +207,24 @@
     <div id="grafico-barras-comp" style="height: 420px; width: 100%;"></div>
 </div>
 
-<!-- Gráficos 2 y 3 en grid -->
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+<!-- Gráficos 2 y 3 en grid responsivo -->
+<div class="comp-charts-grid">
 
-    <div class="card" style="margin-bottom: 0;">
+    <div class="card">
         <div class="card-title">
             <i class="ti ti-grid-dots" aria-hidden="true"></i>
             Mapa de Calor Comparativo
         </div>
-        <p style="font-size:12px; color:var(--text-hint); margin: 0 0 0.5rem;">Intensidad de color = abundancia relativa (%). Identifica patrones y taxa diferenciadores entre muestras.</p>
+        <p style="font-size:12.5px; color:var(--text-hint); margin: 0 0 0.75rem;">Intensidad de color = abundancia relativa (%). Identifica patrones y taxa diferenciadores entre muestras.</p>
         <div id="grafico-heatmap-comp" style="height: 380px; width: 100%;"></div>
     </div>
 
-    <div class="card" style="margin-bottom: 0;">
+    <div class="card">
         <div class="card-title">
             <i class="ti ti-chart-dots" aria-hidden="true"></i>
             Diversidad Alfa por Muestra (Shannon H')
         </div>
-        <p style="font-size:12px; color:var(--text-hint); margin: 0 0 0.5rem;">Calculado sobre el perfil completo de cada muestra, sin truncamiento a Top N.</p>
+        <p style="font-size:12.5px; color:var(--text-hint); margin: 0 0 0.75rem;">Calculado sobre el perfil completo de cada muestra, sin truncamiento a Top N.</p>
         <div id="grafico-shannon-comp" style="height: 380px; width: 100%;"></div>
     </div>
 </div>

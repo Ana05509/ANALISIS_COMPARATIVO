@@ -23,7 +23,7 @@
     <form method="get" class="form-row">
         <div>
             <label class="form-label">Nivel taxonómico</label>
-            <select name="nivel" class="form-control" style="width:130px;">
+            <select name="nivel" class="form-control">
                 {% for n in niveles_disponibles %}
                 <option value="{{ n }}" {% if nivel_actual == n %}selected{% endif %}>{{ n|capfirst }}</option>
                 {% endfor %}
@@ -34,13 +34,13 @@
                 Top N
                 <span style="font-size:10px; color:var(--text-hint); font-weight:400;">(solo visualización)</span>
             </label>
-            <select name="top_n" class="form-control" style="width:100px;">
+            <select name="top_n" class="form-control">
                 {% for opt in opciones_top_n %}
                 <option value="{{ opt }}" {% if top_actual == opt %}selected{% endif %}>Top {{ opt }}</option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="btn btn-outline btn-sm" style="height:38px;">
+        <button type="submit" class="btn btn-outline btn-sm">
             <i class="ti ti-refresh" aria-hidden="true"></i> Aplicar
         </button>
     </form>

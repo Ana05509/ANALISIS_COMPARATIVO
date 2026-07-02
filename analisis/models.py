@@ -192,6 +192,13 @@ class Usuario(AbstractUser):
         verbose_name = "Usuario"
         verbose_name_plural = "Usuarios"
 
+    def save(self, *args, **kwargs):
+        if self.first_name:
+            self.first_name = self.first_name.strip().title()
+        if self.last_name:
+            self.last_name = self.last_name.strip().title()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         rol_display = dict(self.ROLES).get(self.rol, self.rol)
         return f"{self.username} ({rol_display})"

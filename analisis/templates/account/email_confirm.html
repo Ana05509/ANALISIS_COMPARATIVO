@@ -2,57 +2,73 @@
 {% load i18n %}
 {% load account %}
 
-{% block title %}{% trans "Confirm E-mail Address" %}{% endblock %}
+{% block title %}Verificación de Cuenta{% endblock %}
 
 {% block content %}
-<div class="container-tight py-4" style="max-width: 550px; margin: 3rem auto;">
-    
-    <div class="page-header text-center mb-4">
+<div style="max-width: 520px; margin: 3rem auto; padding: 0 1rem;">
+
+    <div class="page-header" style="text-align: center; margin-bottom: 1.5rem;">
         <h1>Verificación de Cuenta</h1>
     </div>
 
-    <div class="card" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-        <div class="card-body text-center py-5" style="padding: 2.5rem;">
-            
-            <div class="mb-4" style="display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; background: rgba(29, 158, 117, 0.1); border-radius: 50%;">
-                <i class="ti ti-mail-check" style="font-size: 36px; color: var(--verde, #1D9E75);"></i>
-            </div>
-            
-            <h2 class="card-title mb-3" style="font-size: 1.5rem; font-weight: 600; color: var(--text-primary, #1e293b);">
-                Confirmar dirección de correo electrónico
-            </h2>
+    <div class="card" style="text-align: center; padding: 2.5rem 2rem;">
 
-            {% if confirmation %}
-                {% user_display confirmation.email_address.user as user_display %}
-                
-                <p class="text-muted mb-4" style="font-size: 14px; line-height: 1.6; max-width: 420px; margin-left: auto; margin-right: auto;">
-                    Por favor, confirma que la dirección de correo 
-                    <strong style="color: #0f172a; font-family: 'DM Mono', monospace;">{{ confirmation.email_address.email }}</strong> 
-                    pertenece al usuario <strong style="color: #0f172a;">{{ user_display }}</strong>.
-                </p>
-
-                <form method="post" action="{% url 'account_confirm_email' confirmation.key %}">
-                    {% csrf_token %}
-                    <div style="margin-top: 1.5rem;">
-                        <button type="submit" class="btn btn-primary w-100" style="height: 44px; font-weight: 500; font-size: 15px; border-radius: 6px;">
-                            <i class="ti ti-shield-check" aria-hidden="true" style="margin-right: 6px;"></i> Confirmar Correo
-                        </button>
-                    </div>
-                </form>
-            {% else %}
-                {% url 'account_email' as email_url %}
-                
-                <div class="alert alert-danger mb-4" style="background: #fdf2f2; border: 1px solid #fde8e8; color: #9b1c1c; border-radius: 6px; padding: 1rem; font-size: 14px;">
-                    <i class="ti ti-alert-triangle" style="margin-right: 4px;"></i> 
-                    Este enlace de confirmación ha expirado o no es válido.
-                </div>
-                
-                <p class="text-muted mb-0" style="font-size: 13px;">
-                    Por favor, solicita un <a href="{{ email_url }}" style="color: var(--verde, #1D9E75); font-weight: 500; text-decoration: none;">nuevo enlace de confirmación</a>.
-                </p>
-            {% endif %}
-            
+        <div style="display: inline-flex; align-items: center; justify-content: center;
+                    width: 72px; height: 72px; border-radius: 20px;
+                    background: var(--verde-light, rgba(29,158,117,.1));
+                    border: 1px solid rgba(29,158,117,.25);
+                    margin-bottom: 1.5rem;">
+            <i class="ti ti-mail-check" style="font-size: 34px; color: var(--verde, #1D9E75);" aria-hidden="true"></i>
         </div>
+
+        <h2 style="font-size: 22px; font-weight: 700; color: var(--text-primary, #17171A);
+                   letter-spacing: -.4px; margin-bottom: .75rem;">
+            Confirmar dirección de correo
+        </h2>
+
+        {% if confirmation %}
+            {% user_display confirmation.email_address.user as user_display %}
+
+            <p style="font-size: 14.5px; color: var(--text-muted, #6b7280); line-height: 1.65;
+                      max-width: 400px; margin: 0 auto 2rem;">
+                Por favor confirma que
+                <strong style="color: var(--text-primary, #17171A); font-family: 'DM Mono', monospace;">
+                    {{ confirmation.email_address.email }}
+                </strong>
+                pertenece al usuario <strong style="color: var(--text-primary, #17171A);">{{ user_display }}</strong>.
+            </p>
+
+            <form method="post" action="{% url 'account_confirm_email' confirmation.key %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary"
+                        style="height: 44px; font-size: 15px; font-weight: 600;
+                               padding: 0 2rem; border-radius: 10px;">
+                    <i class="ti ti-shield-check" aria-hidden="true"></i>
+                    Confirmar correo electrónico
+                </button>
+            </form>
+
+        {% else %}
+            {% url 'account_email' as email_url %}
+
+            <div style="background: var(--rojo-light, #fff5f5);
+                        border: 1px solid rgba(163,45,45,.2);
+                        border-radius: 10px; padding: 1rem 1.25rem;
+                        margin-bottom: 1.5rem; font-size: 14px;
+                        color: var(--rojo, #A32D2D); line-height: 1.5;">
+                <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+                Este enlace de confirmación ha expirado o no es válido.
+            </div>
+
+            <p style="font-size: 13.5px; color: var(--text-muted, #6b7280);">
+                Por favor,
+                <a href="{{ email_url }}"
+                   style="color: var(--verde, #1D9E75); font-weight: 600; text-decoration: none;">
+                    solicita un nuevo enlace de confirmación
+                </a>.
+            </p>
+        {% endif %}
+
     </div>
 </div>
 {% endblock %}

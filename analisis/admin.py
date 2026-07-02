@@ -22,8 +22,8 @@ from .models import (
 from analisis.services.processing.pipeline import PipelineProcesamiento
 
 # Configuración de cabeceras
-admin.site.site_header = "TerraBioLab UTC"
-admin.site.site_title  = "Administración TerraBioLab"
+admin.site.site_header = "BioSuelo"
+admin.site.site_title  = "Administración BioSuelo"
 admin.site.index_title = "Panel de Control Microbiológico"
 
 
@@ -448,7 +448,7 @@ class UsuarioAdmin(BaseUserAdmin, BotonEditarMixin, ModelAdmin):
     def get_fieldsets(self, request, obj=None):
         fieldsets = list(super().get_fieldsets(request, obj) or [])
         fieldsets.append((
-            "Rol en TerraBioLab UTC",
+            "Rol en BioSuelo",
             {"fields": ("rol",), "description": "Asigne el rol para determinar los permisos de visualización."}
         ))
         return fieldsets

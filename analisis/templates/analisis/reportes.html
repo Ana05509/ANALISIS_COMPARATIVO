@@ -1,36 +1,36 @@
 {% extends "analisis/base.html" %}
 
-{% block title %}Reportes — TerraBioLab UTC{% endblock %}
+{% block title %}Reportes — BioSuelo{% endblock %}
 {% block nav_reportes %}active{% endblock %}
 {% block topbar_title %}Reporte de Salud del Suelo y Biodiversidad{% endblock %}
 
 {% block extra_css %}
 <style>
 /* ── Barra de progreso del índice de salud ── */
-.indice-bar  { height:13px; border-radius:7px; background:#e2e8f0; overflow:hidden; margin-top:6px; }
+.indice-bar  { height:12px; border-radius:7px; background:var(--gris-border); overflow:hidden; margin-top:6px; }
 .indice-fill { height:100%; border-radius:7px; transition:width .5s ease; max-width:100%; }
 
 /* ── Colores por nivel de salud ── */
-.c-optimo   { color:#14532d; } .bg-optimo   { background:#dcfce7; border-color:#14532d; }
+.c-optimo   { color:#14532d; } .bg-optimo   { background:var(--verde-light); border-color:#14532d; }
 .c-favorable{ color:#16a34a; } .bg-favorable{ background:#f0fdf4; border-color:#16a34a; }
-.c-moderado { color:#ca8a04; } .bg-moderado { background:#fefce8; border-color:#ca8a04; }
-.c-riesgo   { color:#dc2626; } .bg-riesgo   { background:#fef2f2; border-color:#dc2626; }
+.c-moderado { color:#ca8a04; } .bg-moderado { background:var(--amber-light); border-color:#ca8a04; }
+.c-riesgo   { color:#dc2626; } .bg-riesgo   { background:var(--rojo-light); border-color:#dc2626; }
 .c-critico  { color:#7f1d1d; } .bg-critico  { background:#fee2e2; border-color:#7f1d1d; }
 
 /* ── Metric cards con acento superior por clasificación ── */
-.metric-card.mt-verde .metric-value { color: #16a34a; border-top: none; }
-.metric-card.mt-verde { border-top: 3px solid #16a34a; }
-.metric-card.mt-rojo  { border-top: 3px solid #dc2626; }
-.metric-card.mt-rojo  .metric-value { color: #dc2626; }
-.metric-card.mt-gris  { border-top: 3px solid #64748b; }
-.metric-card.mt-gris  .metric-value { color: #64748b; }
+.metric-card.mt-verde { border-top: 3px solid var(--verde); }
+.metric-card.mt-verde .metric-value { color: var(--verde-dark); }
+.metric-card.mt-rojo  { border-top: 3px solid var(--rojo); }
+.metric-card.mt-rojo  .metric-value { color: var(--rojo); }
+.metric-card.mt-gris  { border-top: 3px solid var(--gris); }
+.metric-card.mt-gris  .metric-value { color: var(--gris); }
 .metric-card.mt-slate { border-top: 3px solid #94a3b8; }
 .metric-card.mt-slate .metric-value { color: #94a3b8; }
 
 /* ── Tabla de taxones ── */
-#tabla-reporte th, #tabla-reporte td { padding: 6px 10px; font-size:13px; }
-#tabla-reporte thead th { background:var(--verde-oscuro,#1b4332); color:#fff; }
-#tabla-reporte tbody tr:nth-child(even) { background:var(--bg-light,#f8fafc); }
+#tabla-reporte th, #tabla-reporte td { padding: 7px 10px; font-size:13px; }
+#tabla-reporte thead th { background: var(--verde-dark); color:#fff; }
+#tabla-reporte tbody tr:nth-child(even) { background: var(--gris-light); }
 </style>
 {% endblock %}
 

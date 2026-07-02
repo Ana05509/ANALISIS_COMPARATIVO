@@ -165,13 +165,14 @@ ACCOUNT_SIGNUP_FORM_CLASS = 'analisis.signup_form.CustomSignupForm'
 ACCOUNT_ADAPTER = 'analisis.adapter.CustomAccountAdapter'
 ACCOUNT_PREVENT_ENUMERATION = False
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']  # sin username; email=username
+ACCOUNT_LOGIN_METHODS = {'email'}                               # login con correo (username = email auto)
 ACCOUNT_UNIQUE_EMAIL = True         # un correo = una cuenta
 
 # Configuración del proveedor de Google OAuth2
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'APP': {
-            'client_id': 'TU_CLIENT_ID_DE_GOOGLE_CLOUD.apps.googleusercontent.com',
+            'client_id': '600934483407-um9068np2ol14kr64ui8k7bmpp5klokr.apps.googleusercontent.com',
             'secret': 'TU_SECRET_KEY_DE_GOOGLE_CLOUD',
             'key': ''
         },
@@ -190,9 +191,9 @@ SOCIALACCOUNT_PROVIDERS = {
 # CONFIGURACIÓN INTERFAZ UNFOLD
 # ---------------------------
 UNFOLD = {
-    "SITE_TITLE": "TerraBioLab",
-    "SITE_HEADER": "TerraBioLab UTC",
-    "SITE_SUBHEADER": "Sistema Inteligente de Análisis Microbiológico",
+    "SITE_TITLE": "BioSuelo",
+    "SITE_HEADER": "BioSuelo",
+    "SITE_SUBHEADER": "Procesamiento y visualización de resultados microbiológicos",
     "SITE_SYMBOL": "biotech",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
@@ -302,6 +303,14 @@ UNFOLD = {
 # ---------------------------
 # CONFIGURACIÓN DE CORREO ELECTRÓNICO
 # ---------------------------
-# Muestra los correos en la consola/terminal para pruebas de desarrollo
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# Desarrollo: muestra los correos en la terminal
+# Producción: cambiar a smtp.EmailBackend con las credenciales reales
+EMAIL_BACKEND   = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST      = 'smtp.gmail.com'
+EMAIL_PORT      = 587
+EMAIL_USE_TLS   = True
+EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL  = 'BioSoil Analytics <terraBioLab@gmail.com>'
+
 USE_DJANGO_JQUERY = True
