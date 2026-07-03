@@ -2,10 +2,15 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
+from django.urls import reverse
 from analisis.services.business.upload_service import procesar_upload
+from analisis.services.processing.pipeline import ColumnasInvalidasError
 from analisis.forms import SubirDatosForm
 from analisis.models import VariedadClon, Cultivo
 from analisis.constants import MARCADORES_VALIDOS
+
+def _is_ajax(request):
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
 @login_required
 def subir_datos(request):
@@ -15,8 +20,16 @@ def subir_datos(request):
 
     if request.method == "POST":
         cultivo_id = request.POST.get('cultivo')
+        cultivo_manual = request.POST.get('cultivo_manual', '').strip()
         variedad_manual = request.POST.get('variedad_manual', '').strip()
         form = SubirDatosForm(request.POST, request.FILES)
+        upload_error = None
+
+        # Cuando el cultivo se ingresa a mano el dropdown queda vacío;
+        # desactivamos su validación para que el form no lo rechace.
+        # procesar_upload maneja cultivo_manual directamente en el servicio.
+        if cultivo_manual:
+            form.fields['cultivo'].required = False
 
         # Actualizar queryset de variedad_clon según cultivo
         if cultivo_id:
@@ -52,25 +65,46 @@ def subir_datos(request):
             try:
                 localidad_limpia = form.cleaned_data.get("localidad")
                 resultado = procesar_upload(request)
+                if _is_ajax(request):
+                    return JsonResponse({
+                        "ok": True,
+                        "redirect": reverse("analisis:dashboard"),
+                        "mensaje": f"Archivo de {localidad_limpia} procesado. {resultado.get('total_registros', 0)} registros importados.",
+                    })
                 messages.success(
                     request,
                     f"Archivo de {localidad_limpia} procesado. {resultado.get('total_registros', 0)} registros importados."
                 )
                 return redirect("analisis:dashboard")
+            except ColumnasInvalidasError as e:
+                if _is_ajax(request):
+                    return JsonResponse({
+                        "ok": False,
+                        "tipo": "columnas",
+                        "faltantes": e.faltantes,
+                        "recibidas": e.recibidas,
+                        "requeridas": e.requeridas,
+                    }, status=400)
+                upload_error = str(e)
             except ValueError as e:
-                messages.error(request, f"Error de validación: {str(e)}")
+                upload_error = str(e)
             except Exception as e:
-                messages.error(request, f"Error al procesar: {str(e)}")
+                upload_error = f"Error inesperado al procesar el archivo: {str(e)}"
         else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.warning(request, f"Revisa el campo '{field}': {error}")
+            primer_error = next(
+                (err for errs in form.errors.values() for err in errs), None
+            )
+            upload_error = primer_error or "Revisa los campos del formulario."
+
+        if _is_ajax(request):
+            return JsonResponse({"ok": False, "error": upload_error}, status=400)
 
         cultivos = Cultivo.objects.all()
         return render(request, "analisis/subir_datos.html", {
             "form": form,
             "marcadores_disponibles": MARCADORES_VALIDOS,
             "cultivos": cultivos,
+            "upload_error": upload_error,
         })
 
     # GET

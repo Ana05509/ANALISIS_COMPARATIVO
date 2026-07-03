@@ -7,6 +7,17 @@ COLUMNAS_REQUERIDAS = [
 ]
 
 
+class ColumnasInvalidasError(ValueError):
+    def __init__(self, faltantes, recibidas):
+        self.faltantes = faltantes
+        self.recibidas = recibidas
+        self.requeridas = COLUMNAS_REQUERIDAS
+        super().__init__(
+            f"Columnas faltantes: {', '.join(faltantes)}. "
+            f"Detectadas: {', '.join(recibidas) or '(ninguna)'}."
+        )
+
+
 class PipelineProcesamiento:
     """Motor de procesamiento y normalización de perfiles taxonómicos masivos."""
 
@@ -15,10 +26,9 @@ class PipelineProcesamiento:
         """Valida la presencia de la estructura de datos obligatoria."""
         faltantes = [c for c in COLUMNAS_REQUERIDAS if c not in df.columns]
         if faltantes:
-            raise ValueError(
-                f"El archivo no cumple con el estándar molecular. "
-                f"Columnas faltantes: {faltantes}. "
-                f"Columnas recibidas: {list(df.columns)}"
+            raise ColumnasInvalidasError(
+                faltantes=faltantes,
+                recibidas=df.columns.tolist(),
             )
 
     @staticmethod

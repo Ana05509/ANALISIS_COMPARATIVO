@@ -22,7 +22,15 @@
     <div class="card">
         <div class="card-title">Datos del archivo</div>
 
-        {% if form.errors %}
+        {% if upload_error %}
+        <div style="background: var(--rojo-light); border: 1.5px solid var(--rojo); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1.25rem; display: flex; gap: 0.75rem; align-items: flex-start;">
+            <i class="ti ti-file-x" style="color: var(--rojo); font-size: 22px; flex-shrink: 0; margin-top: 1px;"></i>
+            <div>
+                <strong style="color: var(--rojo); display: block; margin-bottom: 4px;">El archivo no pudo ser procesado</strong>
+                <span style="font-size: 13.5px; color: var(--rojo); line-height: 1.5;">{{ upload_error }}</span>
+            </div>
+        </div>
+        {% elif form.errors %}
         <div style="background: var(--rojo-light); color: var(--rojo); padding: 1rem; border-radius: var(--radius); margin-bottom: 1rem;">
             <strong>Error en la carga:</strong> Por favor, verifica los campos obligatorios.
         </div>
@@ -444,6 +452,67 @@
         submitBtn.disabled = false;
     }
 
+    function mostrarErrorArchivo(data) {
+        let el = document.getElementById('upload-error-inline');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'upload-error-inline';
+            el.style.cssText = 'margin-bottom:1.25rem;';
+            form.parentNode.insertBefore(el, form);
+        }
+
+        if (data && data.tipo === 'columnas') {
+            const faltantesSet = new Set(data.faltantes);
+            const chipsHTML = data.requeridas.map(function(col, i) {
+                const falta = faltantesSet.has(col);
+                return '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">'
+                     +   '<span style="font-size:10px;color:#9ca3af;font-weight:600;">' + (i + 1) + '</span>'
+                     +   '<div style="padding:4px 10px;border-radius:6px;font-size:12px;font-weight:700;font-family:monospace;'
+                     +     'background:' + (falta ? '#fef2f2' : '#f0fdf4') + ';'
+                     +     'color:'      + (falta ? '#dc2626' : '#15803d') + ';'
+                     +     'border:1.5px solid ' + (falta ? '#fca5a5' : '#86efac') + ';'
+                     +     'white-space:nowrap;">' + col + '</div>'
+                     +   '<span style="font-size:10px;font-weight:600;color:' + (falta ? '#dc2626' : '#15803d') + ';">'
+                     +     (falta ? '✗ falta' : '✓') + '</span>'
+                     + '</div>';
+            }).join('');
+
+            const recibidasHTML = data.recibidas.length
+                ? data.recibidas.map(function(c) {
+                    return '<span style="padding:2px 8px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;font-size:11.5px;font-family:monospace;color:#475569;">' + c + '</span>';
+                  }).join(' ')
+                : '<em style="color:#9ca3af;">(ninguna detectada)</em>';
+
+            el.innerHTML =
+                '<div style="background:#fef2f2;border:1.5px solid #dc2626;border-radius:10px;padding:1.25rem;">'
+              +   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:.85rem;">'
+              +     '<i class="ti ti-file-x" style="color:#dc2626;font-size:22px;flex-shrink:0;"></i>'
+              +     '<strong style="color:#dc2626;font-size:15px;">El archivo no tiene el formato requerido</strong>'
+              +   '</div>'
+              +   '<p style="font-size:13px;color:#7f1d1d;margin:0 0 .85rem;">'
+              +     'Faltan <strong>' + data.faltantes.length + '</strong> columna(s). '
+              +     'Su archivo debe tener estas columnas <strong>en este orden</strong>:'
+              +   '</p>'
+              +   '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:.85rem;background:#fff5f5;border-radius:8px;margin-bottom:.85rem;">'
+              +     chipsHTML
+              +   '</div>'
+              +   '<p style="font-size:12px;color:#6b7280;margin:0;">Columnas detectadas en su archivo: ' + recibidasHTML + '</p>'
+              + '</div>';
+        } else {
+            const msg = (data && data.error) ? data.error : String(data || 'Error desconocido.');
+            el.innerHTML =
+                '<div style="background:#fef2f2;border:1.5px solid #dc2626;border-radius:8px;padding:1rem 1.25rem;display:flex;gap:.75rem;align-items:flex-start;">'
+              +   '<i class="ti ti-alert-circle" style="color:#dc2626;font-size:22px;flex-shrink:0;margin-top:1px;"></i>'
+              +   '<div>'
+              +     '<strong style="color:#dc2626;display:block;margin-bottom:4px;">Error al procesar el archivo</strong>'
+              +     '<span style="font-size:13.5px;color:#b91c1c;line-height:1.5;">' + msg + '</span>'
+              +   '</div>'
+              + '</div>';
+        }
+
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
     function setDropError(msg) {
         dropZone.classList.add('dz-error');
         dzIcon.className  = 'ti ti-alert-circle drop-zone__icon';
@@ -569,32 +638,41 @@
             }, 400);
         });
 
-        /* Respuesta del servidor → fase 3: 100% y redirigir */
+        /* Respuesta del servidor → fase 3 */
         xhr.addEventListener('load', function () {
             clearInterval(processingTimer);
             progressBar.classList.remove('pb-processing');
-            setProgress(100, '¡Completado!', 'Redirigiendo…');
-            setStatus('done', 'Listo', 'Archivo procesado correctamente');
-            progressPct.style.color = 'var(--verde)';
 
-            setTimeout(function () {
-                window.location.href = xhr.responseURL || '{{ request.path }}';
-            }, 600);
+            let data = null;
+            try { data = JSON.parse(xhr.responseText); } catch (_) {}
+
+            if (data && data.ok) {
+                setProgress(100, '¡Completado!', 'Redirigiendo…');
+                setStatus('done', 'Listo', 'Archivo procesado correctamente');
+                setTimeout(function () {
+                    window.location.href = data.redirect || '{{ request.path }}';
+                }, 700);
+            } else {
+                progressSection.style.display = 'none';
+                mostrarErrorArchivo(data || { error: 'No se pudo procesar el archivo. Intente de nuevo.' });
+                submitBtn.disabled = false;
+                cancelBtn.style.pointerEvents = '';
+                cancelBtn.style.opacity = '';
+            }
         });
 
         /* Error de red */
         xhr.addEventListener('error', function () {
             clearInterval(processingTimer);
-            progressBar.classList.add('pb-error');
-            progressPct.classList.add('pct-error');
-            setProgress(100, 'Error de conexión', 'No se pudo comunicar con el servidor. Intente de nuevo.');
-            setStatus('error', 'Error', 'Fallo en la red');
+            progressSection.style.display = 'none';
+            mostrarErrorArchivo('No se pudo comunicar con el servidor. Verifica tu conexión e intenta de nuevo.');
             submitBtn.disabled = false;
             cancelBtn.style.pointerEvents = '';
             cancelBtn.style.opacity = '';
         });
 
         xhr.open('POST', form.action || window.location.pathname);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         xhr.send(formData);
     });
 
