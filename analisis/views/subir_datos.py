@@ -1,11 +1,10 @@
-import os
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from analisis.services.business.upload_service import procesar_upload
 from analisis.forms import SubirDatosForm
-from analisis.models import MuestraSuelo, VariedadClon, Cultivo
+from analisis.models import VariedadClon, Cultivo
 from analisis.constants import MARCADORES_VALIDOS
 
 @login_required

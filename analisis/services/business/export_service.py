@@ -18,13 +18,12 @@ from openpyxl.chart.label import DataLabelList
 
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     Image as RLImage, PageBreak, HRFlowable,
 )
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 
 # ---------------------------------------------------------------------------
@@ -783,11 +782,8 @@ class ExportService:
         top_taxa          = datos.get("top_taxa", [])
         diversidad        = datos.get("diversidad", {})
         totales_clas      = datos.get("totales_clas", {})
-        indice_salud      = datos.get("indice_salud", 0)
-        nivel_salud       = datos.get("nivel_salud", "MODERADO")
         tipo              = datos.get("tipo", "16S")
         nivel             = datos.get("nivel", "genus")
-        top_n             = datos.get("top_n", 25)
         usuario           = datos.get("usuario")
 
         buffer = BytesIO()
@@ -905,7 +901,6 @@ class ExportService:
             tc = d.get("totales_clas", {})
             shan = float(d.get("diversidad", {}).get("shannon", 0) or 0)
             n_taxa = len(d.get("top_taxa", []))
-            col_nivel = colors.HexColor(_NIVEL_COLORES.get(d.get("nivel_salud", "MODERADO"), "#64748b"))
             comp_hdr.append([
                 Paragraph(str(m.codigo), S["body_sm"]),
                 Paragraph(str(d.get("indice_salud", 0)), S["body_sm"]),
@@ -1162,8 +1157,6 @@ class ExportService:
         fill_titulo    = PatternFill("solid", fgColor=CV)
         fill_azul      = PatternFill("solid", fgColor=CAZUL)
         fill_rojo      = PatternFill("solid", fgColor=CR)
-        fill_ambar     = PatternFill("solid", fgColor=CA)
-        fill_gris      = PatternFill("solid", fgColor="E8E8E8")
 
         fnt_hdr        = Font(bold=True, color=CBLANCO, size=11)
         fnt_titulo     = Font(bold=True, color=CBLANCO, size=13)
@@ -1174,7 +1167,6 @@ class ExportService:
 
         al_c  = Alignment(horizontal="center", vertical="center", wrap_text=True)
         al_l  = Alignment(horizontal="left",   vertical="center", wrap_text=True)
-        al_r  = Alignment(horizontal="right",  vertical="center", wrap_text=True)
 
         borde = Border(
             left=Side(style="thin", color="D0D0D0"),

@@ -139,21 +139,3 @@ class CatalogoImportarForm(forms.Form):
             if archivo.size > 5 * 1024 * 1024:
                 raise forms.ValidationError("El archivo no puede superar los 5 MB.")
         return archivo
-
-
-class CustomSignupForm(forms.Form):
-    first_name = forms.CharField(
-        max_length=30, 
-        label='Nombre',
-        widget=forms.TextInput(attrs={'placeholder': 'Ej: Juan'})
-    )
-    last_name = forms.CharField(
-        max_length=30, 
-        label='Apellido',
-        widget=forms.TextInput(attrs={'placeholder': 'Ej: Pérez'})
-    )
-
-    def signup(self, request, user):
-        user.first_name = self.cleaned_data['first_name']
-        user.last_name = self.cleaned_data['last_name']
-        user.save()

@@ -2,7 +2,7 @@
 
 {% block layout_wrapper %}
 <div class="bs-app-layout-root">
-    
+
     <aside class="bs-app-sidebar">
         <div class="sidebar-brand">
             <div class="brand-icon">
@@ -53,24 +53,6 @@
             <a href="?tipo=16S" class="marker-tab {% if tipo_actual == '16S' or not tipo_actual %}active-16s{% endif %}">16S</a>
             <a href="?tipo=ITS" class="marker-tab {% if tipo_actual == 'ITS' %}active-its{% endif %}">ITS</a>
         </div>
-
-        <div class="sidebar-user">
-            <div class="user-avatar">
-                {% if request.user.first_name %}{{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}{% else %}{{ request.user.email|slice:":2"|upper }}{% endif %}
-            </div>
-            <div style="flex:1; min-width:0;">
-                <div class="user-name">{{ request.user.get_full_name|default:request.user.username }}</div>
-                <div class="user-role">
-                    {% if request.user.is_staff %}Administrador{% elif request.user.rol == 'docente' %}Docente{% else %}Estudiante{% endif %}
-                </div>
-            </div>
-            <button type="button" id="btn-logout-trigger"
-                    class="user-logout"
-                    title="Cerrar sesión"
-                    aria-haspopup="dialog">
-                <i class="ti ti-logout" aria-hidden="true"></i>
-            </button>
-        </div>
     </aside>
 
     <!-- ── Modal de confirmación de cierre de sesión ── -->
@@ -84,7 +66,6 @@
         <div style="background:#fff; border-radius:var(--radius-lg,16px); padding:2rem 1.75rem 1.5rem;
                     max-width:340px; width:100%; box-shadow:0 24px 64px rgba(0,0,0,.22);
                     text-align:center; animation:modalIn .18s ease;">
-            <!-- Avatar -->
             <div style="width:56px; height:56px; border-radius:50%;
                         background:var(--verde-light); color:var(--verde-dark);
                         display:flex; align-items:center; justify-content:center;
@@ -92,7 +73,6 @@
                         border:2px solid var(--verde);">
                 {% if request.user.first_name %}{{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}{% else %}{{ request.user.email|slice:":2"|upper }}{% endif %}
             </div>
-            <!-- Texto -->
             <h3 id="modal-logout-title"
                 style="font-size:16px; font-weight:700; margin-bottom:6px; color:var(--text-primary);">
                 ¿Cerrar sesión?
@@ -101,7 +81,6 @@
                 Saldrás como <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>.
                 Asegúrate de que tu trabajo esté guardado.
             </p>
-            <!-- Acciones -->
             <div style="display:flex; gap:10px; justify-content:center;">
                 <button id="btn-cancelar-logout"
                         class="btn btn-outline"
@@ -133,15 +112,91 @@
 
     <main class="bs-app-main-panel">
         <div class="topbar">
-            <div style="display:flex;align-items:center;gap:4px;min-width:0;">
-                <button class="sidebar-toggle-btn" id="sidebarToggle" aria-label="Abrir menú" aria-expanded="false">
+
+            <!-- Izquierda: hamburguesa + breadcrumb -->
+            <div class="topbar-left">
+                <button class="sidebar-toggle-btn" id="sidebarToggle"
+                        aria-label="Abrir menú" aria-expanded="false">
                     <i class="ti ti-menu-2" aria-hidden="true"></i>
                 </button>
-                <span class="topbar-title">{% block topbar_title %}{% endblock %}</span>
+                <nav class="topbar-breadcrumb" aria-label="Ruta de navegación">
+                    <span class="tb-crumb-brand">BioSuelo</span>
+                    <i class="ti ti-chevron-right tb-crumb-sep" aria-hidden="true"></i>
+                    <span class="tb-crumb-page">{% block topbar_title %}{% endblock %}</span>
+                </nav>
             </div>
-            <div class="topbar-actions">
-                {% block topbar_actions %}{% endblock %}
+
+            <!-- Derecha: acciones de página + perfil de usuario -->
+            <div class="topbar-right">
+                <div class="topbar-actions">
+                    {% block topbar_actions %}{% endblock %}
+                </div>
+
+                <!-- Selector de tema -->
+                <button id="themeBtn" class="theme-btn"
+                        title="Tema claro" aria-label="Cambiar tema">
+                    <i class="ti ti-sun" aria-hidden="true"></i>
+                </button>
+
+                <!-- Perfil de usuario con dropdown -->
+                <div class="tu-wrap" id="tuWrap">
+                    <button class="tu-btn" id="tuBtn" type="button"
+                            aria-haspopup="true" aria-expanded="false">
+                        <div class="tu-avatar" aria-hidden="true">
+                            {% if request.user.avatar %}
+                            <img src="{{ request.user.avatar.url }}" alt=""
+                                 style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+                            {% elif request.user.first_name %}{{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}
+                            {% else %}{{ request.user.email|slice:":2"|upper }}{% endif %}
+                        </div>
+                        <div class="tu-info">
+                            <span class="tu-name">{{ request.user.get_full_name|default:request.user.username }}</span>
+                            <span class="tu-role">
+                                {% if request.user.is_staff %}Administrador
+                                {% elif request.user.rol == 'docente' %}Docente
+                                {% else %}Estudiante{% endif %}
+                            </span>
+                        </div>
+                        <i class="ti ti-chevron-down tu-caret" aria-hidden="true"></i>
+                    </button>
+
+                    <div class="tu-dropdown" id="tuDropdown"
+                         role="menu" aria-hidden="true">
+                        <div class="tu-drop-header">
+                            <div class="tu-drop-avatar" aria-hidden="true">
+                                {% if request.user.avatar %}
+                                <img src="{{ request.user.avatar.url }}" alt=""
+                                     style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+                                {% elif request.user.first_name %}{{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}
+                                {% else %}{{ request.user.email|slice:":2"|upper }}{% endif %}
+                            </div>
+                            <div style="min-width:0;">
+                                <div class="tu-drop-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+                                <div class="tu-drop-email">{{ request.user.email }}</div>
+                            </div>
+                        </div>
+                        <div style="padding: 6px 0;">
+                            <a href="{% url 'analisis:perfil' %}" class="tu-drop-item" role="menuitem">
+                                <i class="ti ti-user-circle" aria-hidden="true"></i>
+                                Mi perfil
+                            </a>
+                            <a href="{% url 'account_change_password' %}" class="tu-drop-item" role="menuitem">
+                                <i class="ti ti-key" aria-hidden="true"></i>
+                                Cambiar contraseña
+                            </a>
+                        </div>
+                        <div class="tu-drop-divider"></div>
+                        <div style="padding: 6px 0;">
+                            <button class="tu-drop-item tu-drop-logout"
+                                    id="tu-logout-btn" type="button" role="menuitem">
+                                <i class="ti ti-logout" aria-hidden="true"></i>
+                                Cerrar sesión
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
+
         </div>
 
         <div class="page-content">
@@ -153,58 +208,95 @@
 
 <script>
 (function () {
-    /* ── Sidebar móvil ── */
-    var btn     = document.getElementById('sidebarToggle');
-    var sidebar = document.querySelector('.bs-app-sidebar');
-    var overlay = document.getElementById('sidebarOverlay');
-    if (btn && sidebar && overlay) {
-        function openSidebar() {
-            sidebar.classList.add('sidebar-visible');
-            overlay.classList.add('overlay-visible');
-            btn.setAttribute('aria-expanded', 'true');
-        }
-        function closeSidebar() {
-            sidebar.classList.remove('sidebar-visible');
-            overlay.classList.remove('overlay-visible');
-            btn.setAttribute('aria-expanded', 'false');
-        }
-        btn.addEventListener('click', function () {
+    /* ── 1. Sidebar móvil ── */
+    var sidebarToggleBtn = document.getElementById('sidebarToggle');
+    var sidebar          = document.querySelector('.bs-app-sidebar');
+    var overlay          = document.getElementById('sidebarOverlay');
+
+    function openSidebar() {
+        sidebar.classList.add('sidebar-visible');
+        overlay.classList.add('overlay-visible');
+        sidebarToggleBtn.setAttribute('aria-expanded', 'true');
+    }
+    function closeSidebar() {
+        sidebar.classList.remove('sidebar-visible');
+        overlay.classList.remove('overlay-visible');
+        sidebarToggleBtn.setAttribute('aria-expanded', 'false');
+    }
+    if (sidebarToggleBtn && sidebar && overlay) {
+        sidebarToggleBtn.addEventListener('click', function () {
             sidebar.classList.contains('sidebar-visible') ? closeSidebar() : openSidebar();
         });
         overlay.addEventListener('click', closeSidebar);
     }
 
-    /* ── Modal de cierre de sesión ── */
-    var modalLogout  = document.getElementById('modal-logout');
-    var triggerBtn   = document.getElementById('btn-logout-trigger');
-    var cancelarBtn  = document.getElementById('btn-cancelar-logout');
+    /* ── 2. Modal de cierre de sesión ── */
+    var modalLogout = document.getElementById('modal-logout');
+    var cancelarBtn = document.getElementById('btn-cancelar-logout');
 
-    function abrirModal() {
+    window.abrirModalLogout = function () {
+        if (!modalLogout) return;
         modalLogout.style.display = 'flex';
         document.body.style.overflow = 'hidden';
         setTimeout(function () { if (cancelarBtn) cancelarBtn.focus(); }, 50);
-    }
-    function cerrarModal() {
+    };
+    window.cerrarModalLogout = function () {
+        if (!modalLogout) return;
         modalLogout.style.display = 'none';
         document.body.style.overflow = '';
-        if (triggerBtn) triggerBtn.focus();
-    }
+        if (document.getElementById('tuBtn')) document.getElementById('tuBtn').focus();
+    };
 
-    if (triggerBtn)  triggerBtn.addEventListener('click', abrirModal);
-    if (cancelarBtn) cancelarBtn.addEventListener('click', cerrarModal);
-
+    if (cancelarBtn) cancelarBtn.addEventListener('click', window.cerrarModalLogout);
     if (modalLogout) {
         modalLogout.addEventListener('click', function (e) {
-            if (e.target === modalLogout) cerrarModal();
+            if (e.target === modalLogout) window.cerrarModalLogout();
         });
     }
 
+    /* ── 3. Dropdown de perfil de usuario ── */
+    var tuWrap     = document.getElementById('tuWrap');
+    var tuBtn      = document.getElementById('tuBtn');
+    var tuDropdown = document.getElementById('tuDropdown');
+    var tuLogout   = document.getElementById('tu-logout-btn');
+
+    function openUserDropdown() {
+        tuBtn.classList.add('open');
+        tuDropdown.classList.add('open');
+        tuBtn.setAttribute('aria-expanded', 'true');
+        tuDropdown.setAttribute('aria-hidden', 'false');
+    }
+    function closeUserDropdown() {
+        tuBtn.classList.remove('open');
+        tuDropdown.classList.remove('open');
+        tuBtn.setAttribute('aria-expanded', 'false');
+        tuDropdown.setAttribute('aria-hidden', 'true');
+    }
+
+    if (tuBtn) {
+        tuBtn.addEventListener('click', function () {
+            tuDropdown.classList.contains('open') ? closeUserDropdown() : openUserDropdown();
+        });
+    }
+    document.addEventListener('click', function (e) {
+        if (tuWrap && !tuWrap.contains(e.target)) closeUserDropdown();
+    });
+    if (tuLogout) {
+        tuLogout.addEventListener('click', function () {
+            closeUserDropdown();
+            window.abrirModalLogout();
+        });
+    }
+
+    /* ── 4. Escape: cierra dropdown o sidebar ── */
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
             if (modalLogout && modalLogout.style.display !== 'none') {
-                cerrarModal();
+                window.cerrarModalLogout();
+            } else if (tuDropdown && tuDropdown.classList.contains('open')) {
+                closeUserDropdown();
             } else {
-                closeSidebar && closeSidebar();
+                closeSidebar();
             }
         }
     });

@@ -12,71 +12,492 @@
 {% endif %}
 {% endblock %}
 
+{% block extra_css %}
+/* ══════════════════════════════════════════════
+   DASHBOARD USUARIO — BioSuelo
+   ══════════════════════════════════════════════ */
+
+/* ─ Hero / Banner de bienvenida ─ */
+.dash-hero {
+    background: linear-gradient(135deg, #085041 0%, #0F6E56 50%, #1D9E75 100%);
+    border-radius: var(--radius-lg);
+    padding: 1.6rem 2rem;
+    margin-bottom: 1.75rem;
+    position: relative;
+    overflow: hidden;
+    color: #fff;
+    box-shadow: 0 8px 32px rgba(8, 80, 65, 0.28);
+}
+/* ─ Decoraciones biológicas ─ */
+.dash-bio-deco {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+    opacity: 0.22;
+}
+@keyframes bfloat {
+    0%,100% { transform: translateY(0px); }
+    50%      { transform: translateY(-5px); }
+}
+.dash-bio-deco .bg1 { animation: bfloat 9s  ease-in-out infinite; }
+.dash-bio-deco .bg2 { animation: bfloat 11s ease-in-out infinite 1.4s; }
+.dash-bio-deco .bg3 { animation: bfloat 8s  ease-in-out infinite 2.8s; }
+
+.dash-hero-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.dash-hero-greeting {
+    font-size: 12.5px;
+    opacity: 0.72;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+.dash-hero-name {
+    font-family: 'Fraunces', serif;
+    font-size: 26px;
+    font-weight: 500;
+    line-height: 1.2;
+    margin-bottom: 8px;
+}
+.dash-hero-sub {
+    font-size: 13px;
+    opacity: 0.78;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.dash-hero-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255,255,255,0.16);
+    border: 1px solid rgba(255,255,255,0.26);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.4px;
+}
+.dash-hero-date {
+    text-align: right;
+    opacity: 0.68;
+    font-size: 12.5px;
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+    line-height: 1.7;
+}
+
+/* ─ Stat cards premium ─ */
+.dash-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 1.75rem;
+}
+.ds-card {
+    background: var(--surface);
+    border: 1px solid var(--gris-border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.35rem 1.1rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.22s ease, transform 0.22s ease;
+}
+.ds-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+.ds-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--ds-color);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.ds-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.ds-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: var(--ds-icon-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.ds-icon i {
+    font-size: 20px;
+    color: var(--ds-color);
+}
+.ds-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--text-hint);
+    line-height: 1.4;
+}
+.ds-value {
+    font-family: 'Fraunces', serif;
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1;
+    margin-bottom: 10px;
+}
+.ds-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding-top: 10px;
+    border-top: 1px solid var(--gris-light);
+}
+.ds-footer i { font-size: 13px; color: var(--ds-color); flex-shrink: 0; }
+
+.ds-verde { --ds-color: #1D9E75; --ds-icon-bg: #E1F5EE; }
+.ds-azul  { --ds-color: #1565C0; --ds-icon-bg: #E3F2FD; }
+.ds-amber { --ds-color: #BA7517; --ds-icon-bg: #FAEEDA; }
+
+/* ─ Encabezados de sección ─ */
+.section-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+}
+.section-hdr-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--text-hint);
+}
+.section-hdr-title i { font-size: 16px; color: var(--verde); }
+.section-hdr-meta { font-size: 12px; color: var(--text-hint); }
+
+/* ─ Grid de gráficos ─ */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.75rem;
+}
+.chart-card {
+    background: var(--surface);
+    border: 1px solid var(--gris-border);
+    border-radius: var(--radius-lg);
+    padding: 1.35rem 1.5rem;
+    box-shadow: var(--shadow-card);
+}
+.chart-card-hdr {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--gris-light);
+}
+.chart-card-hdr i { font-size: 17px; color: var(--verde); }
+
+/* ─ Card de taxa ─ */
+.taxa-card {
+    background: var(--surface);
+    border: 1px solid var(--gris-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    margin-bottom: 1.75rem;
+}
+.taxa-card-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--gris-light);
+}
+.taxa-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.taxa-card-title i { font-size: 18px; color: var(--verde); }
+
+/* ─ Pills de cultivos ─ */
+.cultivos-card {
+    background: var(--surface);
+    border: 1px solid var(--gris-border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--shadow-card);
+}
+.cultivos-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 0.75rem;
+}
+.cultivo-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--gris-light);
+    border: 1px solid var(--gris-border);
+    border-radius: 24px;
+    padding: 0.4rem 0.9rem 0.4rem 0.75rem;
+    transition: border-color 0.16s ease, background 0.16s ease;
+    cursor: default;
+}
+.cultivo-pill:hover {
+    border-color: var(--verde);
+    background: var(--verde-light);
+}
+.cultivo-pill:hover .cultivo-name  { color: var(--verde-dark); }
+.cultivo-pill:hover .cultivo-count { background: rgba(29,158,117,0.16); color: var(--verde-dark); }
+.cultivo-pill:hover .cultivo-icon  { color: var(--verde); }
+.cultivo-icon {
+    font-size: 14px;
+    color: var(--text-hint);
+    transition: color 0.16s ease;
+}
+.cultivo-name {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-primary);
+    transition: color 0.16s ease;
+}
+.cultivo-count {
+    background: rgba(0,0,0,0.08);
+    color: var(--text-hint);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 20px;
+    min-width: 22px;
+    text-align: center;
+    transition: background 0.16s ease, color 0.16s ease;
+}
+
+/* ─ Responsive ─ */
+@media (max-width: 1100px) {
+    .dash-stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .dash-stats-grid { grid-template-columns: 1fr 1fr; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .dash-hero-date { display: none; }
+    .dash-hero { padding: 1.25rem 1.25rem; }
+    .dash-hero-name { font-size: 21px; }
+}
+@media (max-width: 420px) {
+    .dash-stats-grid { grid-template-columns: 1fr; }
+    .ds-value { font-size: 2.1rem; }
+}
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-    <h1>Resumen General</h1>
-    <p>
-        Monitoreo de perfiles microbianos activos —
-        <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual }}</span>
-    </p>
+
+<!-- ── Banner de bienvenida ── -->
+<div class="dash-hero">
+
+    <!-- Figuras microbiológicas decorativas -->
+    <svg class="dash-bio-deco" aria-hidden="true"
+         xmlns="http://www.w3.org/2000/svg"
+         viewBox="0 0 1200 130"
+         preserveAspectRatio="xMidYMid slice">
+        <defs>
+            <style>
+                .bact { fill: rgba(255,255,255,0.06); stroke: white; stroke-width: 1.6; }
+            </style>
+        </defs>
+
+        <!-- Grupo 1: bacilos superiores (animan suavemente) -->
+        <g class="bg1">
+            <!-- grande, inclinado izquierda, centro-izquierdo -->
+            <rect class="bact" x="60"  y="28" width="130" height="30" rx="15"
+                  transform="rotate(-22 125 43)"/>
+            <!-- mediano, casi horizontal, centro -->
+            <rect class="bact" x="440" y="18" width="105" height="26" rx="13"
+                  transform="rotate(-8 492 31)"/>
+            <!-- grande, inclinado derecha, derecha -->
+            <rect class="bact" x="820" y="15" width="125" height="28" rx="14"
+                  transform="rotate(18 882 29)"/>
+            <!-- pequeño, vertical, extremo derecho -->
+            <rect class="bact" x="1090" y="30" width="70"  height="20" rx="10"
+                  transform="rotate(-40 1125 40)"/>
+        </g>
+
+        <!-- Grupo 2: bacilos medios (fase diferente) -->
+        <g class="bg2">
+            <!-- mediano, cruzado, centro-izquierdo -->
+            <rect class="bact" x="200" y="60" width="95"  height="24" rx="12"
+                  transform="rotate(32 247 72)"/>
+            <!-- grande, diagonal, centro -->
+            <rect class="bact" x="570" y="55" width="120" height="28" rx="14"
+                  transform="rotate(-28 630 69)"/>
+            <!-- mediano, leve ángulo, centro-derecho -->
+            <rect class="bact" x="960" y="52" width="100" height="25" rx="12"
+                  transform="rotate(14 1010 64)"/>
+        </g>
+
+        <!-- Grupo 3: bacilos inferiores / de relleno -->
+        <g class="bg3">
+            <!-- pequeño, casi vertical, izquierda -->
+            <rect class="bact" x="10"  y="70" width="65"  height="18" rx="9"
+                  transform="rotate(-50 42 79)"/>
+            <!-- mediano, cruzado, centro -->
+            <rect class="bact" x="340" y="80" width="90"  height="22" rx="11"
+                  transform="rotate(20 385 91)"/>
+            <!-- grande, poco ángulo, centro-derecha -->
+            <rect class="bact" x="700" y="80" width="115" height="26" rx="13"
+                  transform="rotate(-15 757 93)"/>
+            <!-- pequeño, derecha baja -->
+            <rect class="bact" x="1130" y="75" width="75"  height="20" rx="10"
+                  transform="rotate(35 1167 85)"/>
+        </g>
+    </svg>
+
+    <div class="dash-hero-inner">
+        <div>
+            <div class="dash-hero-greeting">Bienvenido/a de regreso</div>
+            <div class="dash-hero-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+            <div class="dash-hero-sub">
+                Monitoreo microbiano activo
+                <span class="dash-hero-chip">
+                    <i class="ti ti-dna-2" style="font-size:11px;"></i>
+                    {{ tipo_actual }}
+                </span>
+            </div>
+        </div>
+        <div class="dash-hero-date">
+            <i class="ti ti-calendar" style="margin-right:4px;"></i>
+            {% now "l" %}<br>{% now "d \d\e F \d\e Y" %}
+        </div>
+    </div>
 </div>
 
-<div class="metrics-grid">
-    <div class="metric-card verde">
-        <div class="metric-label">Muestras Registradas</div>
-        <div class="metric-value">{{ total_productos }}</div>
-        <div class="metric-sub">Cultivos y variedades agrícolas</div>
+<!-- ── Tarjetas de métricas ── -->
+<div class="dash-stats-grid">
+
+    <div class="ds-card ds-verde">
+        <div class="ds-top">
+            <div class="ds-label">Muestras<br>Registradas</div>
+            <div class="ds-icon"><i class="ti ti-plant"></i></div>
+        </div>
+        <div class="ds-value">{{ total_productos }}</div>
+        <div class="ds-footer">
+            <i class="ti ti-leaf"></i>
+            Cultivos y variedades agrícolas
+        </div>
     </div>
-    <div class="metric-card">
-        <div class="metric-label">Resultados Procesados</div>
-        <div class="metric-value td-mono">{{ total_analisis }}</div>
-        <div class="metric-sub">Pipeline bioinformático ejecutado</div>
+
+    <div class="ds-card ds-azul">
+        <div class="ds-top">
+            <div class="ds-label">Resultados<br>Procesados</div>
+            <div class="ds-icon"><i class="ti ti-dna-2"></i></div>
+        </div>
+        <div class="ds-value">{{ total_analisis }}</div>
+        <div class="ds-footer">
+            <i class="ti ti-cpu"></i>
+            Pipeline bioinformático ejecutado
+        </div>
     </div>
-    <div class="metric-card verde">
-        <div class="metric-label">Microorganismos Benéficos ✅</div>
-        <div class="metric-value td-mono">{{ total_beneficos }}</div>
-        <div class="metric-sub">Mapeados en catálogo</div>
+
+    <div class="ds-card ds-verde">
+        <div class="ds-top">
+            <div class="ds-label">Microorganismos<br>Benéficos</div>
+            <div class="ds-icon"><i class="ti ti-circle-check"></i></div>
+        </div>
+        <div class="ds-value">{{ total_beneficos }}</div>
+        <div class="ds-footer">
+            <i class="ti ti-book-2"></i>
+            Mapeados en catálogo
+        </div>
     </div>
-    <div class="metric-card amber">
-        <div class="metric-label">Agentes Fitopatógenos ⚠️</div>
-        <div class="metric-value td-mono">{{ total_fitopatogenos }}</div>
-        <div class="metric-sub">Alertas biológicas activas</div>
+
+    <div class="ds-card ds-amber">
+        <div class="ds-top">
+            <div class="ds-label">Agentes<br>Fitopatógenos</div>
+            <div class="ds-icon"><i class="ti ti-alert-triangle"></i></div>
+        </div>
+        <div class="ds-value">{{ total_fitopatogenos }}</div>
+        <div class="ds-footer">
+            <i class="ti ti-bell-ringing"></i>
+            Alertas biológicas activas
+        </div>
     </div>
+
 </div>
 
+<!-- ── Gráficos ── -->
 {% if graficos_json %}
-<style>
-    .plotly-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-        gap: 1.25rem;
-        margin-bottom: 1.5rem;
-    }
-    @media (max-width: 640px) {
-        .plotly-grid { grid-template-columns: 1fr; }
-    }
-</style>
-
-<div class="plotly-grid">
+<div class="charts-grid">
     {% if graficos_json.grafico_barras != "null" and graficos_json.grafico_barras %}
-    <div class="card" style="padding: 1.25rem;">
-        <div id="grafico-barras" style="height: 360px; width: 100%;"></div>
+    <div class="chart-card">
+        <div class="chart-card-hdr">
+            <i class="ti ti-chart-bar"></i>
+            Distribución por Género
+        </div>
+        <div id="grafico-barras" style="height: 320px; width: 100%;"></div>
     </div>
     {% endif %}
 
     {% if graficos_json.grafico_pie != "null" and graficos_json.grafico_pie %}
-    <div class="card" style="padding: 1.25rem;">
-        <div id="grafico-pie" style="height: 360px; width: 100%;"></div>
+    <div class="chart-card">
+        <div class="chart-card-hdr">
+            <i class="ti ti-chart-donut"></i>
+            Proporción de Taxa
+        </div>
+        <div id="grafico-pie" style="height: 320px; width: 100%;"></div>
     </div>
     {% endif %}
 </div>
 {% endif %}
 
-<div class="card">
-    <div class="card-title">Últimos Taxa Identificados en el Sistema</div>
+<!-- ── Últimos taxa identificados ── -->
+<div class="taxa-card">
+    <div class="taxa-card-hdr">
+        <div class="taxa-card-title">
+            <i class="ti ti-microscope"></i>
+            Últimos Taxa Identificados en el Sistema
+        </div>
+        {% if analisis_recientes %}
+        <span style="font-size:12px; color:var(--text-hint);">Resultados recientes</span>
+        {% endif %}
+    </div>
 
     {% if analisis_recientes %}
-    <div class="table-wrap">
+    <div class="table-wrap" style="border:none; border-radius:0; box-shadow:none;">
         <table>
             <thead>
                 <tr>
@@ -90,15 +511,25 @@
             <tbody>
                 {% for a in analisis_recientes %}
                 <tr>
-                    <td><strong style="color: var(--text-primary);">{{ a.genus|default:"—" }}</strong></td>
-                    <td style="font-size: 13px; color: var(--text-muted); font-style: italic;">{{ a.species|default:"—" }}</td>
+                    <td><strong style="color:var(--text-primary);">{{ a.genus|default:"—" }}</strong></td>
+                    <td style="font-size:13px; color:var(--text-muted); font-style:italic;">{{ a.species|default:"—" }}</td>
                     <td class="td-mono">
-                        <a href="{% url 'analisis:ver_producto' a.archivo.muestra.id %}" style="color: var(--verde-dark); text-decoration: none; font-weight: 500;">
-                            <i class="ti ti-folder-open" style="font-size: 14px;"></i> {{ a.archivo.muestra.codigo }}
+                        <a href="{% url 'analisis:ver_producto' a.archivo.muestra.id %}"
+                           style="color:var(--verde-dark); text-decoration:none; font-weight:500;
+                                  display:inline-flex; align-items:center; gap:4px;">
+                            <i class="ti ti-folder-open" style="font-size:14px;"></i>
+                            {{ a.archivo.muestra.codigo }}
                         </a>
                     </td>
-                    <td class="td-mono" style="font-weight: 500; color: var(--text-primary);">{{ a.porcentaje_hits|floatformat:4 }}%</td>
-                    <td class="td-mono" style="color: var(--text-muted);">{{ a.num_hits }}</td>
+                    <td>
+                        <div class="pct-bar-wrap">
+                            <div class="pct-bar-track">
+                                <div class="pct-bar-fill" style="width:{{ a.porcentaje_hits|floatformat:2 }}%;"></div>
+                            </div>
+                            <span class="pct-bar-label">{{ a.porcentaje_hits|floatformat:4 }}%</span>
+                        </div>
+                    </td>
+                    <td class="td-mono" style="color:var(--text-muted);">{{ a.num_hits }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -109,28 +540,37 @@
         <i class="ti ti-flask-2" aria-hidden="true"></i>
         <strong>Sin análisis ejecutados</strong>
         <p>No se registran lecturas en la base de datos para este tipo de secuenciación.</p>
-        <a href="{% url 'analisis:subir_datos' %}" class="btn btn-primary" style="margin-top: 1rem;">
+        <a href="{% url 'analisis:subir_datos' %}" class="btn btn-primary" style="margin-top:1rem;">
             <i class="ti ti-upload" aria-hidden="true"></i> Cargar Primer Archivo
         </a>
     </div>
     {% endif %}
 </div>
 
+<!-- ── Muestras por cultivo ── -->
 {% if productos_por_variedad %}
-<div class="card" style="margin-top: 1.25rem;">
-    <div class="card-title">Muestras por Cultivo</div>
-    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 0.5rem;">
+<div class="cultivos-card">
+    <div class="section-hdr">
+        <div class="section-hdr-title">
+            <i class="ti ti-seeding"></i>
+            Muestras por Cultivo
+        </div>
+        <span class="section-hdr-meta">
+            {{ productos_por_variedad|length }} cultivo{% if productos_por_variedad|length != 1 %}s{% endif %}
+        </span>
+    </div>
+    <div class="cultivos-grid">
         {% for v in productos_por_variedad %}
-        <div style="background: var(--gris-light); border: 1px solid var(--gris-border); border-radius: 8px; padding: 0.45rem 1rem; display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 13.5px; font-weight: 500; color: var(--text-primary);">{{ v.nombre_variedad }}</span>
-            <span class="td-mono" style="font-size: 11px; background: var(--gris-border); padding: 1px 7px; border-radius: 4px; color: var(--text-muted); font-weight: 600;">
-                {{ v.total }}
-            </span>
+        <div class="cultivo-pill">
+            <i class="ti ti-plant-2 cultivo-icon" aria-hidden="true"></i>
+            <span class="cultivo-name">{{ v.nombre_variedad }}</span>
+            <span class="cultivo-count">{{ v.total }}</span>
         </div>
         {% endfor %}
     </div>
 </div>
 {% endif %}
+
 {% endblock %}
 
 {% block extra_js %}
@@ -138,40 +578,27 @@
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // 1. Obtención e inyección segura de datos desde Django
     const graficosData = {{ graficos_json|safe }};
     if (!graficosData) return;
 
-    // 2. Estilos comunes de tipografía para la interfaz de BioSoil
     const fontLayout = { family: 'Outfit, sans-serif', size: 12, color: '#334155' };
 
-    // 3. Función optimizada para procesar y renderizar gráficos
     const renderGraph = (divId, dataObj) => {
         const container = document.getElementById(divId);
-        
-        // Validar que el nodo exista en el DOM y que contenga información válida
         if (!container || !dataObj || Object.keys(dataObj).length === 0 || dataObj === "null") return;
-
-        // Clonar el layout para evitar mutaciones directas sobre el objeto original
         let layout = { ...(dataObj.layout || {}) };
         layout.font = fontLayout;
         layout.paper_bgcolor = 'rgba(0,0,0,0)';
-        layout.plot_bgcolor = 'rgba(0,0,0,0)';
-        
-        // Ejecución aislada por gráfico para mitigar caídas en cascada
+        layout.plot_bgcolor  = 'rgba(0,0,0,0)';
         try {
-            Plotly.newPlot(divId, dataObj.data, layout, { 
-                responsive: true, 
-                displayModeBar: false 
-            });
+            Plotly.newPlot(divId, dataObj.data, layout, { responsive: true, displayModeBar: false });
         } catch (err) {
-            console.error(`Error crítico al renderizar el gráfico [${divId}]:`, err);
+            console.error(`Error al renderizar [${divId}]:`, err);
         }
     };
 
-    // 4. Invocación controlada de los componentes visuales
     renderGraph('grafico-barras', graficosData.grafico_barras);
-    renderGraph('grafico-pie', graficosData.grafico_pie);
+    renderGraph('grafico-pie',    graficosData.grafico_pie);
 });
 </script>
 {% endif %}

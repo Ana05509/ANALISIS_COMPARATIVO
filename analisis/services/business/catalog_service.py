@@ -1,7 +1,7 @@
 import io
 import unicodedata
 import pandas as pd
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo
 
 TAXONOMIC_STOPWORDS = {

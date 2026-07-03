@@ -91,11 +91,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'Proyect',
-        'USER': 'postgres',
-        'PASSWORD': 'ABCDE',  
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.environ.get('DB_NAME', 'Proyect'),
+        'USER': os.environ.get('DB_USER', 'postgres'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'ABCDE'),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
 
@@ -172,8 +172,8 @@ ACCOUNT_UNIQUE_EMAIL = True         # un correo = una cuenta
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'APP': {
-            'client_id': '600934483407-um9068np2ol14kr64ui8k7bmpp5klokr.apps.googleusercontent.com',
-            'secret': 'TU_SECRET_KEY_DE_GOOGLE_CLOUD',
+            'client_id': os.environ.get('GOOGLE_CLIENT_ID', ''),
+            'secret': os.environ.get('GOOGLE_CLIENT_SECRET', ''),
             'key': ''
         },
         'SCOPE': [

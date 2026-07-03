@@ -11,13 +11,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Composición Taxonómica</h1>
-    <p>
-        Muestra ID: <span class="td-mono fw-600">#{{ muestra_id|default:"-" }}</span> —
-        <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span>
-    </p>
-</div>
+<p class="page-subtitle">
+    Muestra ID: <span class="td-mono fw-600">#{{ muestra_id|default:"-" }}</span> —
+    <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span>
+</p>
 
 <div class="card card-sm" style="margin-bottom: 1.25rem;">
     <form method="get" class="form-row">

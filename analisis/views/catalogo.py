@@ -2,7 +2,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo
+from analisis.models import CatalogoMicroorganismo
 from analisis.services.business.catalog_service import CatalogService
 from analisis.forms import CatalogoImportarForm
 
@@ -71,21 +71,6 @@ def catalogo_microorganismos(request):
         "clasificaciones_disponibles": clasificaciones_disponibles,
         "niveles_taxonomicos":     niveles_taxonomicos,
     })
-
-
-# =========================================================================
-# FUNCIONES REQUERIDAS POR EL __init__.py (No eliminar para evitar ImportError)
-# =========================================================================
-
-def detalle_microorganismo(request, pk):
-    """
-    Vista para el desglose detallado de un microorganismo específico.
-    """
-    microorganismo = get_object_or_404(ResultadoTaxonomico, pk=pk)
-    context = {
-        "microorganismo": microorganismo
-    }
-    return render(request, "analisis/detalle_producto.html", context)
 
 
 @login_required

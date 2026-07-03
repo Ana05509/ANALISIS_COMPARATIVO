@@ -1,9 +1,7 @@
 from collections import defaultdict
-from io import BytesIO
 from datetime import datetime
 import json
 
-import pandas as pd
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -43,18 +41,20 @@ def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S"):
     CATS = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
     taxa_qs    = list(qs.values(taxon=F(campo_db)).annotate(hits=Sum("num_hits")).order_by("-hits"))
     grand_total = sum(r["hits"] for r in taxa_qs) or 1
-    # Mismo filtro que _construir_datos_reporte para mantener consistencia
-    catalogo   = {
-        obj.nombre.lower(): obj
-        for obj in CatalogoMicroorganismo.objects.filter(marcador=tipo)
-    }
+
+    # Filtrar por marcador Y nivel; fallback a solo marcador si nivel no tiene entradas
+    cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo, nivel__iexact=nivel)
+    if not cat_qs.exists():
+        cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo)
+    catalogo = {obj.nombre.lower().strip(): obj for obj in cat_qs}
 
     detalle = {c: [] for c in CATS}
     totales = {c: 0  for c in CATS}
     for row in taxa_qs:
         nombre = row["taxon"] or "Desconocido"
-        cat_obj = catalogo.get(nombre.lower())
+        cat_obj = catalogo.get(nombre.lower().strip())
         clas    = (cat_obj.clasificacion if cat_obj and cat_obj.clasificacion in CATS else "sin_clasificar")
+
         pct_raw = row["hits"] / grand_total * 100
         # Usar 4 decimales para que abundancias muy bajas no aparezcan como 0.00
         pct = round(pct_raw, 4) if pct_raw < 0.01 else round(pct_raw, 2)
@@ -83,16 +83,18 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
     grand_total = qs.aggregate(total=Sum("num_hits"))["total"] or 1
     todos_raw   = list(qs.values(taxonomia=F(campo_db)).annotate(total_hits=Sum("num_hits")).order_by("-total_hits"))
 
+    # Filtrar catálogo por marcador Y nivel; fallback a solo marcador si nivel sin entradas
+    cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo, nivel__iexact=nivel)
+    if not cat_qs.exists():
+        cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo)
     catalogo_map = {
-        obj["nombre"].lower(): obj["clasificacion"]
-        for obj in CatalogoMicroorganismo.objects.filter(
-            marcador=tipo
-        ).values("nombre", "clasificacion")
+        obj["nombre"].lower().strip(): obj["clasificacion"]
+        for obj in cat_qs.values("nombre", "clasificacion")
     }
     for r in todos_raw:
         pct_raw = r["total_hits"] / grand_total * 100
         r["total_porcentaje"] = round(pct_raw, 4) if pct_raw < 0.01 else round(pct_raw, 2)
-        r["clasificacion"]    = catalogo_map.get(str(r["taxonomia"] or "").lower(), "sin_clasificar")
+        r["clasificacion"]    = catalogo_map.get(str(r["taxonomia"] or "").lower().strip(), "sin_clasificar")
 
     diversidad  = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids) or {}
     detalle_clas, totales_clas = _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo)
@@ -171,14 +173,18 @@ def _clasificacion_por_muestra(tipo, nivel, muestra_ids=None):
     if not data:
         return []
 
-    catalog = {obj.nombre.lower(): obj.clasificacion for obj in CatalogoMicroorganismo.objects.filter(nivel__iexact=nivel)}
+    # Filtrar por marcador Y nivel; fallback a solo marcador si nivel no tiene entradas
+    cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo, nivel__iexact=nivel)
+    if not cat_qs.exists():
+        cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo)
+    catalog = {obj.nombre.lower().strip(): obj.clasificacion for obj in cat_qs}
     CATS    = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
     acc     = defaultdict(lambda: {c: [] for c in CATS})
 
     for row in data:
         m      = row["muestra"] or "Sin código"
         nombre = row["taxon"]   or "Desconocido"
-        clas   = catalog.get(nombre.lower(), "sin_clasificar")
+        clas   = catalog.get(nombre.lower().strip(), "sin_clasificar")
         if nombre not in acc[m][clas]:
             acc[m][clas].append(nombre)
 

@@ -9,7 +9,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse, HttpResponseBase
 from django.views.decorators.http import require_POST
 
-from analisis.models import MuestraSuelo, ResultadoTaxonomico
+from analisis.models import ResultadoTaxonomico
 from analisis.services.business.comparison_service import ejecutar_comparacion_clean
 from analisis.services.processing.diversity import DiversityService
 from analisis.services.business.analysis_service import obtener_analisis_avanzado

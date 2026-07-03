@@ -1,6 +1,4 @@
 import math
-import numpy as np
-import pandas as pd
 
 from analisis.constants import NIVELES_VALIDOS
 

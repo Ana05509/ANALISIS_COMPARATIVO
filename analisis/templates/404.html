@@ -1,0 +1,23 @@
+{% extends "templates_base.html" %}
+
+{% block title %}Página no encontrada{% endblock %}
+
+{% block content %}
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:2rem;">
+    <div class="card" style="max-width:420px; text-align:center; padding:2.5rem 2rem;">
+        <div style="width:64px; height:64px; border-radius:50%; background:var(--gris-light); color:var(--text-hint);
+                    display:flex; align-items:center; justify-content:center; margin:0 auto 1.25rem; font-size:28px;">
+            <i class="ti ti-map-off" aria-hidden="true"></i>
+        </div>
+        <h1 style="font-family:'Fraunces',serif; font-weight:500; font-size:22px; margin-bottom:.5rem;">
+            Página no encontrada
+        </h1>
+        <p style="color:var(--text-muted); font-size:14.5px; margin-bottom:1.75rem;">
+            El enlace que seguiste no existe o fue movido. Verifica la dirección o vuelve al panel principal.
+        </p>
+        <a href="{% url 'analisis:dashboard' %}" class="btn btn-primary" style="text-decoration:none;">
+            <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Ir al dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

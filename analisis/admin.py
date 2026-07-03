@@ -96,6 +96,32 @@ class VariedadClonAdmin(BotonEditarMixin, ModelAdmin):
 # =========================================================
 # MUESTRAS DE SUELO (FORMULARIO CON PLACEHOLDERS)
 # =========================================================
+class VariedadClonSelect(forms.Select):
+    """
+    <select> de variedad/clon donde cada <option> lleva data-cultivo="<id>".
+    admin/js/filtro_cultivos.js usa ese atributo para mostrar solo las
+    variedades del cultivo elegido, sin necesidad de una petición AJAX.
+    """
+    @property
+    def _cultivo_por_variedad(self):
+        # Se consulta al primer uso (durante el render del form), nunca al
+        # importar el módulo admin.py, para no golpear la BD antes de migrar.
+        if not hasattr(self, '_cultivo_por_variedad_cache'):
+            self._cultivo_por_variedad_cache = dict(VariedadClon.objects.values_list('id', 'cultivo_id'))
+        return self._cultivo_por_variedad_cache
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+        try:
+            pk = int(str(value))
+        except (TypeError, ValueError):
+            pk = None
+        cultivo_id = self._cultivo_por_variedad.get(pk) if pk else None
+        if cultivo_id:
+            option['attrs']['data-cultivo'] = cultivo_id
+        return option
+
+
 class MuestraSueloForm(forms.ModelForm):
     """
     Formulario encargado de inyectar las guías de texto invisibles (placeholders)
@@ -111,6 +137,7 @@ class MuestraSueloForm(forms.ModelForm):
             'localidad': forms.TextInput(attrs={'placeholder': 'Ej: Manabí, Guayas, Loja...'}),
             'finca_lote': forms.TextInput(attrs={'placeholder': 'Ej: Finca La Esperanza - Lote Norte'}),
             'altitud': forms.NumberInput(attrs={'placeholder': 'Ej: 250'}),
+            'variedad_clon': VariedadClonSelect(),
         }
 
 

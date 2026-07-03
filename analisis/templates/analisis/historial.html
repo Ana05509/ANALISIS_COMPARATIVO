@@ -5,10 +5,7 @@
 {% block topbar_title %}Historial de muestras{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Historial de análisis</h1>
-    <p>Registro de muestras procesadas — <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"General" }}</span></p>
-</div>
+<p class="page-subtitle">Registro de muestras procesadas — <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"General" }}</span></p>
 
 <div class="card card-sm" style="margin-bottom:1.25rem;">
     <form method="get" style="display:flex; gap:10px; align-items:center;">

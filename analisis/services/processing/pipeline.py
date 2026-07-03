@@ -1,6 +1,5 @@
 import pandas as pd
 
-from analisis.constants import NIVELES_VALIDOS
 
 COLUMNAS_REQUERIDAS = [
     "kingdom", "phylum", "class", "order",

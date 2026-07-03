@@ -1,6 +1,5 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-import os
 
 # -------------------------------
 # Modelos de Catálogo Agronómico
@@ -186,6 +185,13 @@ class Usuario(AbstractUser):
         choices=ROLES,
         default='estudiante',
         verbose_name="Rol en la Plataforma"
+    )
+
+    avatar = models.ImageField(
+        upload_to='avatars/',
+        blank=True,
+        null=True,
+        verbose_name="Foto de perfil"
     )
 
     class Meta:
