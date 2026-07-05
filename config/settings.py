@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',  # Proveedor específico de Google
     'analisis',
     'bioquimica',
+    'portal',
 
 ]
 

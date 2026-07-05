@@ -1,0 +1,999 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioSuelo — Transforma resultados de laboratorio en información clara</title>
+    <meta name="description" content="BioSuelo organiza, procesa y visualiza resultados obtenidos previamente en laboratorio, facilitando su interpretación para el sector agrícola.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <style>
+        /* ═══════════════════════════════════════════════════════════
+           1. TOKENS — paleta, tipografía y ritmo de espaciado
+           ═══════════════════════════════════════════════════════════ */
+        :root {
+            --p:        #4a7c64;
+            --p-vivid:  #38a878;
+            --p-dark:   #2d6b52;
+            --p-mint:   #1b650e;
+            --p-glow:   rgba(56,168,120,.14);
+            --amber:    #BA7517;
+            --amber-glow: rgba(186,117,23,.14);
+            --blue:     #185FA5;
+            --red:      #A32D2D;
+            --bg:       #f8f7f2;
+            --surface:  #ffffff;
+            --border:   #e5e3da;
+            --text:     #17171a;
+            --muted:    #5f5e5a;
+            --hint:     #8a887f;
+            --r-sm:     10px;
+            --r-md:     16px;
+            --r-lg:     22px;
+            --ease:     cubic-bezier(.4,0,.2,1);
+            --shadow-card: 0 1px 2px rgba(23,23,23,.04), 0 8px 24px rgba(23,23,23,.05);
+        }
+
+        *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+        html { scroll-behavior:smooth; }
+        body {
+            font-family:'Outfit',sans-serif; color:var(--text); background:var(--bg);
+            -webkit-font-smoothing:antialiased; line-height:1.65; overflow-x:hidden;
+        }
+        a { color:inherit; }
+        img, video { max-width:100%; display:block; }
+        section { padding:6rem 1.5rem; position:relative; }
+        .wrap { max-width:1120px; margin:0 auto; }
+        .wrap-sm { max-width:760px; margin:0 auto; }
+
+        /* ── Reveal-on-scroll (compartido por todas las secciones) ── */
+        .reveal { opacity:0; transform:translateY(18px); transition:opacity .6s var(--ease), transform .6s var(--ease); }
+        .reveal.in-view { opacity:1; transform:translateY(0); }
+        .reveal-d1.in-view { transition-delay:.08s; }
+        .reveal-d2.in-view { transition-delay:.16s; }
+        .reveal-d3.in-view { transition-delay:.24s; }
+        .reveal-d4.in-view { transition-delay:.32s; }
+        .reveal-d5.in-view { transition-delay:.4s; }
+
+        /* ═══════════════════════════════════════════════════════════
+           2. PRIMITIVOS REUTILIZABLES — cards, iconos, encabezados
+           ═══════════════════════════════════════════════════════════ */
+
+        /* Tarjeta base: usada por ps-card, feat-card, who-card, faq-item, cta-card */
+        .ux-card {
+            background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg);
+            padding:1.75rem; transition:transform .22s var(--ease), box-shadow .22s var(--ease), border-color .22s;
+        }
+        .ux-card--hover {
+            position:relative; overflow:hidden;
+            transition:transform .22s var(--ease), box-shadow .22s var(--ease),
+                       border-color .22s var(--ease), background .22s var(--ease);
+        }
+        .ux-card--hover:hover {
+            transform:translateY(-4px); box-shadow:var(--shadow-card);
+            border-color:var(--p-vivid); background:var(--p-glow);
+        }
+        .ux-card--hover:hover .icon-tile { transform:scale(1.1) rotate(-4deg); }
+        .ux-card--hover h3, .ux-card--hover h4 { transition:color .22s var(--ease); }
+        .ux-card--hover:hover h3, .ux-card--hover:hover h4 { color:var(--p-dark); }
+        .ux-card--muted { background:var(--bg); }
+        .ux-card--glow { background:var(--p-glow); border-color:rgba(56,168,120,.28); }
+        /* Brillo diagonal que recorre la tarjeta al pasar el mouse */
+        .ux-card--hover::after {
+            content:''; position:absolute; top:-60%; left:-70%; width:35%; height:220%;
+            background:linear-gradient(120deg, transparent, rgba(255,255,255,.55), transparent);
+            transform:rotate(20deg); transition:left .65s var(--ease); pointer-events:none;
+        }
+        .ux-card--hover:hover::after { left:130%; }
+
+        /* Icono en pastilla: tamaños sm/md/lg + variante "glow" (fondo suave, sin blanco) */
+        .icon-tile {
+            display:flex; align-items:center; justify-content:center; border-radius:12px;
+            color:#fff; flex-shrink:0; transition:transform .25s var(--ease);
+        }
+        .icon-tile--sm { width:40px; height:40px; font-size:18px; border-radius:10px; }
+        .icon-tile--md { width:44px; height:44px; font-size:21px; }
+        .icon-tile--lg { width:52px; height:52px; font-size:24px; border-radius:14px; }
+        .icon-tile--glow { background:var(--p-glow); color:var(--p-dark); }
+
+        /* Encabezado de sección: eyebrow + título + subtítulo */
+        .section-head { max-width:640px; margin:0 auto 3.25rem; text-align:center; }
+        .section-eyebrow {
+            display:inline-flex; align-items:center; gap:7px;
+            font-size:12.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+            color:var(--p-dark); margin-bottom:1rem; background:var(--p-glow);
+            padding:5px 14px; border-radius:20px;
+        }
+        .section-title {
+            font-family:'Fraunces',serif; font-weight:400; font-size:clamp(28px, 3.8vw, 40px);
+            letter-spacing:-.5px; margin-bottom:1rem; color:var(--text);
+        }
+        .section-sub { color:var(--muted); font-size:15.5px; }
+
+        /* Grids genéricos (colapsan juntos en la media query final) */
+        .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+        .grid-3 { display:grid; grid-template-columns:repeat(3, 1fr); gap:1.5rem; }
+
+        /* Alternancia de fondo entre secciones para dar ritmo visual */
+        .bg-surface { background:var(--surface); }
+        .bg-tint    { background:var(--bg); }
+
+        /* Barra de progreso de lectura, siempre visible en el borde superior */
+        .scroll-progress {
+            position:fixed; top:0; left:0; height:3px; z-index:400;
+            background:linear-gradient(90deg, var(--p-vivid), var(--amber));
+            width:0%;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           3. NAV
+           ═══════════════════════════════════════════════════════════ */
+        .nav {
+            position:fixed; top:0; left:0; right:0; z-index:200;
+            display:flex; align-items:center; justify-content:space-between;
+            padding:0.9rem 2rem;
+            background:rgba(248,247,242,0);
+            border-bottom:1px solid transparent;
+            transition:background .3s var(--ease), border-color .3s var(--ease), box-shadow .3s var(--ease), backdrop-filter .3s var(--ease);
+        }
+        .nav.scrolled {
+            background:rgba(248,247,242,.88); backdrop-filter:blur(12px);
+            border-color:var(--border); box-shadow:0 2px 20px rgba(0,0,0,.05);
+        }
+        .nav-brand { display:flex; align-items:center; gap:10px; }
+        .nav-logo {
+            width:36px; height:36px; border-radius:9px; background:var(--p-vivid);
+            display:flex; align-items:center; justify-content:center; flex-shrink:0;
+            box-shadow:0 2px 8px rgba(56,168,120,.3);
+        }
+        .nav-logo i { color:#fff; font-size:19px; }
+        .nav-brand-name { font-family:'Fraunces',serif; font-size:17px; font-weight:500; }
+        .nav-links { display:flex; align-items:center; gap:2rem; }
+        .nav-links a {
+            position:relative; font-size:14px; font-weight:500; color:var(--muted); text-decoration:none;
+            padding:4px 0; transition:color .2s;
+        }
+        .nav-links a::after {
+            content:''; position:absolute; left:0; bottom:-2px; height:2px; width:0;
+            background:var(--p-vivid); border-radius:2px; transition:width .25s var(--ease);
+        }
+        .nav-links a:hover { color:var(--text); }
+        .nav-links a:hover::after, .nav-links a.active::after { width:100%; }
+        .nav-links a.active { color:var(--text); }
+        .nav-right { display:flex; align-items:center; gap:14px; }
+        .btn-nav-login {
+            display:inline-flex; align-items:center; gap:8px;
+            background:var(--p-vivid); color:#fff; padding:0.55rem 1.3rem;
+            border-radius:10px; font-size:14px; font-weight:600; text-decoration:none;
+            transition:background .2s, transform .2s, box-shadow .2s;
+            box-shadow:0 3px 12px rgba(56,168,120,.28);
+        }
+        .btn-nav-login:hover { background:var(--p-dark); transform:translateY(-1px); }
+        .nav-toggle {
+            display:none; background:none; border:1px solid var(--border); border-radius:9px;
+            width:38px; height:38px; align-items:center; justify-content:center;
+            font-size:19px; color:var(--text); cursor:pointer;
+        }
+
+        /* ── Menú móvil ── */
+        .mobile-menu {
+            position:fixed; inset:0; z-index:300; background:var(--surface);
+            display:flex; flex-direction:column; padding:1.5rem;
+            transform:translateY(-100%); transition:transform .3s var(--ease);
+        }
+        .mobile-menu.open { transform:translateY(0); }
+        .mobile-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:2.5rem; }
+        .mobile-menu-close {
+            background:none; border:1px solid var(--border); border-radius:9px;
+            width:38px; height:38px; font-size:19px; cursor:pointer; color:var(--text);
+        }
+        .mobile-menu nav { display:flex; flex-direction:column; gap:1.75rem; }
+        .mobile-menu nav a {
+            font-family:'Fraunces',serif; font-size:26px; font-weight:400; text-decoration:none; color:var(--text);
+        }
+        .mobile-menu .btn-nav-login { margin-top:auto; justify-content:center; padding:1rem; font-size:15.5px; }
+
+        /* ═══════════════════════════════════════════════════════════
+           4. HERO — mensaje de beneficio + ilustración agrícola
+           ═══════════════════════════════════════════════════════════ */
+        .hero {
+            position:relative; min-height:92vh; display:flex; align-items:center;
+            padding:8rem 1.5rem 4rem; overflow:hidden; background:var(--bg);
+        }
+        .hero-blob { position:absolute; border-radius:50%; filter:blur(60px); z-index:0; pointer-events:none; }
+        .hero-blob-1 { width:460px; height:460px; background:rgba(56,168,120,.16); top:-140px; left:-100px; animation:blobDrift 14s ease-in-out infinite; }
+        .hero-blob-2 { width:380px; height:380px; background:rgba(186,117,23,.12); bottom:-120px; right:-80px; animation:blobDrift 18s ease-in-out infinite reverse; }
+        @keyframes blobDrift {
+            0%, 100% { transform:translate(0,0) scale(1); }
+            50%      { transform:translate(24px,-18px) scale(1.08); }
+        }
+        /* Malla de color que gira muy lentamente detrás de todo, da profundidad y movimiento constante */
+        .hero-mesh {
+            position:absolute; inset:-30%; z-index:0; pointer-events:none;
+            background:conic-gradient(from 0deg at 30% 25%,
+                rgba(56,168,120,.10), rgba(186,117,23,.08), rgba(24,95,165,.06), rgba(56,168,120,.10));
+            animation:meshRotate 30s linear infinite;
+        }
+        @keyframes meshRotate { to { transform:rotate(360deg); } }
+
+        /* Entrada escalonada del hero al cargar la página */
+        .hero-in { opacity:0; transform:translateY(22px); animation:heroIn .7s var(--ease) forwards; }
+        .hero-in-1 { animation-delay:.05s; }
+        .hero-in-2 { animation-delay:.14s; }
+        .hero-in-3 { animation-delay:.23s; }
+        .hero-in-4 { animation-delay:.32s; }
+        .hero-in-5 { animation-delay:.3s; }
+        @keyframes heroIn { to { opacity:1; transform:translateY(0); } }
+
+        .hero-grid {
+            position:relative; z-index:2; max-width:1120px; margin:0 auto;
+            display:grid; grid-template-columns:1.05fr .95fr; gap:3.5rem; align-items:center;
+        }
+        .hero h1 {
+            font-family:'Fraunces',serif; font-weight:300; color:var(--text);
+            font-size:clamp(30px, 3.8vw, 46px); line-height:1.15; letter-spacing:-.6px;
+            margin-bottom:1.4rem; text-align:center;
+        }
+        /* Texto destacado con degradado animado (llama la atención sobre el beneficio clave) */
+        .hero h1 em {
+            font-style:italic; font-weight:400;
+            background:linear-gradient(90deg, var(--p-dark), var(--p-vivid), var(--amber), var(--p-dark));
+            background-size:300% 100%; -webkit-background-clip:text; background-clip:text; color:transparent;
+            animation:gradientFlow 6s ease infinite;
+        }
+        @keyframes gradientFlow {
+            0%, 100% { background-position:0% 50%; }
+            50%      { background-position:100% 50%; }
+        }
+        .hero p { color:var(--muted); font-size:17px; max-width:480px; margin-bottom:2.25rem; }
+        .hero-ctas { display:flex; gap:14px; flex-wrap:wrap; }
+        .btn-hero-primary {
+            position:relative; overflow:hidden;
+            display:inline-flex; align-items:center; gap:9px;
+            background:linear-gradient(135deg, var(--p) 0%, var(--p-vivid) 100%);
+            color:#fff; padding:0.95rem 1.9rem; border-radius:13px;
+            font-size:15.5px; font-weight:700; text-decoration:none;
+            box-shadow:0 6px 20px rgba(56,168,120,.35);
+            transition:transform .2s var(--ease), box-shadow .2s var(--ease);
+        }
+        .btn-hero-primary:hover { transform:translateY(-2px); box-shadow:0 10px 28px rgba(56,168,120,.45); }
+        /* Brillo que recorre el botón principal al pasar el mouse */
+        .btn-hero-primary::before {
+            content:''; position:absolute; inset:0;
+            background:linear-gradient(100deg, transparent 0%, rgba(255,255,255,.4) 50%, transparent 100%);
+            background-size:250% 100%; background-position:-250% center;
+        }
+        .btn-hero-primary:hover::before { animation:shimmerSweep .85s ease forwards; }
+        @keyframes shimmerSweep { to { background-position:250% center; } }
+        .btn-hero-secondary {
+            display:inline-flex; align-items:center; gap:9px;
+            background:var(--surface); color:var(--text); border:1.5px solid var(--border);
+            padding:0.95rem 1.9rem; border-radius:13px; font-size:15.5px; font-weight:600;
+            text-decoration:none; transition:border-color .2s, transform .2s, background .2s;
+        }
+        .btn-hero-secondary:hover { border-color:var(--p-vivid); background:var(--p-glow); transform:translateY(-2px); }
+        /* El ícono se desplaza sutilmente al pasar el mouse por cualquier botón */
+        .btn-hero-primary i, .btn-hero-secondary i, .btn-nav-login i { transition:transform .25s var(--ease); }
+        .btn-hero-primary:hover i, .btn-nav-login:hover i { transform:translateX(3px); }
+        .btn-hero-secondary:hover i { transform:translateY(-2px); }
+
+        /* Ilustración agrícola — construida con formas/CSS, sin imágenes externas */
+        .hero-visual {
+            position:relative; width:100%; max-width:420px; aspect-ratio:1/1; margin:0 auto;
+            transform-style:preserve-3d; transition:transform .2s ease-out;
+        }
+        .hero-visual-core {
+            position:absolute; inset:14%; border-radius:50%; overflow:hidden;
+            background:linear-gradient(135deg, var(--p-vivid) 0%, var(--p-mint) 100%);
+            box-shadow:0 24px 60px -10px rgba(56,168,120,.4);
+            display:flex; align-items:center; justify-content:center;
+        }
+        .hero-visual-core i { color:#fff; font-size:min(96px, 22vw); }
+        /* Si se usa una imagen en vez del ícono, que llene el círculo sin deformarse */
+        .hero-visual-core img { width:100%; height:100%; object-fit:cover; }
+        .hero-visual-ring {
+            position:absolute; inset:2%; border-radius:50%; border:1.5px dashed rgba(56,168,120,.3);
+            animation:ringSpin 40s linear infinite;
+        }
+        @keyframes ringSpin { to { transform:rotate(360deg); } }
+        .hero-float-card {
+            position:absolute; background:var(--surface); border:1px solid var(--border);
+            border-radius:var(--r-md); box-shadow:var(--shadow-card); padding:.8rem 1.1rem;
+            display:flex; align-items:center; gap:10px; font-size:12.5px; font-weight:600;
+            color:var(--text); animation:floatY 5s ease-in-out infinite; white-space:nowrap;
+        }
+        .hero-float-card i { font-size:18px; }
+        .hero-float-a { top:6%; left:-8%; }
+        .hero-float-a i { color:var(--hint); }
+        .hero-float-b { bottom:8%; right:-10%; animation-delay:-2.5s; }
+        .hero-float-b i { color:var(--p-vivid); }
+        @keyframes floatY { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-10px); } }
+
+        /* ═══════════════════════════════════════════════════════════
+           5. PROBLEMA — sin mencionar aún la plataforma
+           ═══════════════════════════════════════════════════════════ */
+        .pain-row { display:grid; grid-template-columns:repeat(3, 1fr); gap:1.25rem; }
+        .pain-item {
+            display:flex; gap:14px; align-items:flex-start; padding:1.4rem;
+            border:1px solid var(--border); border-radius:var(--r-md); background:var(--bg);
+        }
+        .pain-item h4 { font-size:14.5px; font-weight:600; margin-bottom:3px; }
+        .pain-item p { font-size:12.8px; color:var(--muted); }
+
+        /* ═══════════════════════════════════════════════════════════
+           6. QUÉ ES — con mini-diagrama entrada → salida
+           ═══════════════════════════════════════════════════════════ */
+        .transform-visual {
+            display:flex; align-items:center; justify-content:center; gap:1.25rem;
+            margin-top:2.5rem; flex-wrap:wrap;
+        }
+        .transform-node {
+            display:flex; align-items:center; gap:12px; padding:1rem 1.4rem;
+            border-radius:var(--r-md); border:1px solid var(--border); background:var(--surface);
+            font-size:13.5px; font-weight:600;
+        }
+        .transform-node.is-accent { background:var(--p-glow); border-color:rgba(56,168,120,.28); color:var(--p-dark); }
+        .transform-arrow { color:var(--hint); font-size:20px; }
+
+        /* ═══════════════════════════════════════════════════════════
+           7. QUÉ OFRECE — bento asimétrico
+           ═══════════════════════════════════════════════════════════ */
+        .feat-bento { display:grid; grid-template-columns:repeat(3, 1fr); grid-auto-rows:190px; gap:1.25rem; }
+        .feat-card { display:flex; flex-direction:column; }
+        .feat-card.feat-lg { grid-column:span 2; }
+        .feat-card h3 { font-size:16px; font-weight:600; margin:1.1rem 0 .45rem; }
+        .feat-card p { font-size:13.6px; color:var(--muted); max-width:360px; }
+
+        /* ═══════════════════════════════════════════════════════════
+           8. CÓMO FUNCIONA — timeline vertical
+           ═══════════════════════════════════════════════════════════ */
+        .timeline { position:relative; max-width:640px; margin:0 auto; }
+        .timeline::before {
+            content:''; position:absolute; left:25px; top:6px; bottom:6px; width:2px;
+            background:repeating-linear-gradient(180deg, var(--border) 0 8px, transparent 8px 14px);
+        }
+        /* Línea sólida que se "dibuja" de arriba hacia abajo a medida que se hace scroll */
+        .timeline-fill {
+            position:absolute; left:25px; top:6px; width:2px; height:0%;
+            background:linear-gradient(180deg, var(--p-vivid), var(--amber));
+            transition:height .1s linear; z-index:0;
+        }
+        .timeline-item { position:relative; display:flex; gap:1.5rem; padding-bottom:2.5rem; }
+        .timeline-item:last-child { padding-bottom:0; }
+        .timeline-num {
+            position:relative; z-index:1; width:52px; height:52px; border-radius:50%; flex-shrink:0;
+            background:var(--surface); border:2px solid var(--p-vivid); color:var(--p-dark);
+            display:flex; align-items:center; justify-content:center; font-size:22px;
+            transition:background .3s var(--ease), color .3s var(--ease), transform .3s var(--ease);
+        }
+        .timeline-num.is-active {
+            background:var(--p-vivid); color:#fff; transform:scale(1.08);
+            box-shadow:0 6px 18px rgba(56,168,120,.4);
+        }
+        .timeline-body { padding-top:6px; }
+        .timeline-body h4 { font-size:16px; font-weight:600; margin-bottom:.35rem; }
+        .timeline-body p { font-size:13.8px; color:var(--muted); max-width:420px; }
+
+        /* ═══════════════════════════════════════════════════════════
+           9. BENEFICIOS — lista minimalista sin tarjetas pesadas
+           ═══════════════════════════════════════════════════════════ */
+        .benefits-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:2.25rem 1.75rem; }
+        .benefit-item { display:flex; gap:14px; align-items:flex-start; }
+        .benefit-item h4 { font-size:14.5px; font-weight:600; margin-bottom:3px; }
+        .benefit-item p { font-size:12.8px; color:var(--muted); }
+
+        /* ═══════════════════════════════════════════════════════════
+           10. QUIÉNES — tarjetas de audiencia
+           ═══════════════════════════════════════════════════════════ */
+        .who-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:1.25rem; }
+        .who-card { display:flex; gap:14px; align-items:flex-start; }
+        .who-card h4 { font-size:15px; font-weight:600; margin-bottom:3px; }
+        .who-card p { font-size:13px; color:var(--muted); }
+
+        /* ═══════════════════════════════════════════════════════════
+           11. FAQ — acordeón accesible (botón + panel animado por JS)
+           ═══════════════════════════════════════════════════════════ */
+        .faq-list { max-width:760px; margin:0 auto; display:flex; flex-direction:column; gap:.85rem; }
+        .faq-item { padding:0; overflow:hidden; }
+        .faq-question {
+            width:100%; display:flex; align-items:center; justify-content:space-between; gap:1rem;
+            background:none; border:none; text-align:left; cursor:pointer; padding:1.35rem 1.6rem;
+            font-family:'Outfit',sans-serif; font-size:15px; font-weight:600; color:var(--text);
+        }
+        .faq-question i { flex-shrink:0; font-size:18px; color:var(--hint); transition:transform .25s var(--ease); }
+        .faq-item.open .faq-question i { transform:rotate(45deg); color:var(--p-vivid); }
+        .faq-answer { max-height:0; overflow:hidden; transition:max-height .3s var(--ease); }
+        .faq-answer p { padding:0 1.6rem 1.35rem; font-size:14px; color:var(--muted); max-width:600px; }
+
+        /* ═══════════════════════════════════════════════════════════
+           12. CTA FINAL
+           ═══════════════════════════════════════════════════════════ */
+        .cta-final { text-align:center; }
+        .cta-card { max-width:640px; margin:0 auto; padding:3rem 2.5rem; text-align:center; }
+        .cta-card .icon-tile { margin:0 auto 1.25rem; }
+        .cta-final h2 {
+            font-family:'Fraunces',serif; font-weight:400; color:var(--text);
+            font-size:clamp(24px,3.2vw,32px); margin-bottom:.85rem;
+        }
+        .cta-final p { color:var(--muted); margin-bottom:2rem; }
+
+        /* ═══════════════════════════════════════════════════════════
+           13. FOOTER
+           ═══════════════════════════════════════════════════════════ */
+        .foot { background:#101f18; color:rgba(255,255,255,.6); padding:3rem 1.5rem 2.25rem; font-size:13px; }
+        .foot-inner {
+            max-width:1120px; margin:0 auto; display:flex; align-items:center; justify-content:space-between;
+            flex-wrap:wrap; gap:1.25rem; padding-bottom:1.75rem; border-bottom:1px solid rgba(255,255,255,.1);
+        }
+        .foot-brand { display:flex; align-items:center; gap:10px; }
+        .foot-brand .nav-logo { width:32px; height:32px; }
+        .foot-brand-name { font-family:'Fraunces',serif; font-size:15.5px; font-weight:500; color:#fff; }
+        .foot-links { display:flex; gap:1.75rem; flex-wrap:wrap; }
+        .foot-links a { color:rgba(255,255,255,.68); text-decoration:none; font-size:13.5px; transition:color .2s; }
+        .foot-links a:hover { color:#fff; }
+        .foot-bottom { max-width:1120px; margin:1.75rem auto 0; font-size:12.5px; color:rgba(255,255,255,.45); }
+
+        /* ═══════════════════════════════════════════════════════════
+           14. RESPONSIVE — breakpoints agrupados
+           ═══════════════════════════════════════════════════════════ */
+        @media (max-width: 900px) {
+            .nav-links { display:none; }
+            .nav-toggle { display:flex; }
+            .hero-grid { grid-template-columns:1fr; text-align:center; }
+            .hero p { margin-left:auto; margin-right:auto; }
+            .hero-ctas { justify-content:center; }
+            .hero-visual { margin-top:2.5rem; max-width:340px; }
+            .grid-2, .grid-3, .pain-row, .benefits-grid, .who-grid { grid-template-columns:1fr; }
+            .feat-bento { grid-template-columns:repeat(2,1fr); grid-auto-rows:200px; }
+            .feat-card.feat-lg { grid-column:span 2; }
+        }
+        @media (max-width: 640px) {
+            section { padding:3.75rem 1.25rem; }
+            .hero { padding-top:6.5rem; }
+            .feat-bento { grid-template-columns:1fr; grid-auto-rows:auto; }
+            .feat-card.feat-lg { grid-column:span 1; }
+            .feat-card { min-height:170px; }
+            .foot-inner { flex-direction:column; align-items:flex-start; }
+            .cta-card { padding:2.25rem 1.5rem; }
+            .hero-float-card { display:none; } /* evita solaparse en pantallas muy angostas */
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
+            html { scroll-behavior:auto; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Barra fina que marca el avance de lectura de la página -->
+<div class="scroll-progress" id="scrollProgress"></div>
+
+<!-- ═══════════════════ NAV ═══════════════════ -->
+<nav class="nav" id="mainNav">
+    <div class="nav-brand">
+        <div class="nav-logo"><i class="ti ti-dna-2"></i></div>
+        <span class="nav-brand-name">BioSuelo</span>
+    </div>
+    <div class="nav-links" id="navLinks">
+        <a href="#inicio" data-nav="inicio">Inicio</a>
+        <a href="#que-es" data-nav="que-es">La plataforma</a>
+        <a href="#como-funciona" data-nav="como-funciona">Cómo funciona</a>
+        <a href="#faq" data-nav="faq">Preguntas frecuentes</a>
+    </div>
+    <div class="nav-right">
+        <a href="{% url 'analisis:login' %}" class="btn-nav-login">
+            <i class="ti ti-login-2"></i> Iniciar sesión
+        </a>
+        <button class="nav-toggle" id="navToggle" aria-label="Abrir menú" aria-expanded="false">
+            <i class="ti ti-menu-2"></i>
+        </button>
+    </div>
+</nav>
+
+<!-- ═══════════════════ MENÚ MÓVIL ═══════════════════ -->
+<div class="mobile-menu" id="mobileMenu">
+    <div class="mobile-menu-head">
+        <div class="nav-brand">
+            <div class="nav-logo"><i class="ti ti-dna-2"></i></div>
+            <span class="nav-brand-name">BioSuelo</span>
+        </div>
+        <button class="mobile-menu-close" id="mobileMenuClose" aria-label="Cerrar menú"><i class="ti ti-x"></i></button>
+    </div>
+    <nav>
+        <a href="#inicio">Inicio</a>
+        <a href="#que-es">La plataforma</a>
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#faq">Preguntas frecuentes</a>
+    </nav>
+    <a href="{% url 'analisis:login' %}" class="btn-nav-login">
+        <i class="ti ti-login-2"></i> Iniciar sesión
+    </a>
+</div>
+
+<!-- ═══════════════════ 1. HERO ═══════════════════ -->
+<header class="hero" id="inicio">
+    <div class="hero-mesh"></div>
+    <div class="hero-blob hero-blob-1"></div>
+    <div class="hero-blob hero-blob-2"></div>
+
+    <div class="hero-grid">
+        <div>
+            <h1 class="hero-in hero-in-1">Transforma resultados de<br>laboratorio en <em>información clara</em></h1>
+            <p class="hero-in hero-in-3">BioSuelo organiza, procesa y visualiza información obtenida previamente en laboratorio, para apoyar la toma de decisiones con datos fáciles de interpretar.</p>
+            <div class="hero-ctas hero-in hero-in-4">
+                <a href="#que-es" class="btn-hero-secondary">
+                    <i class="ti ti-compass"></i> Conocer la plataforma
+                </a>
+                <a href="{% url 'analisis:login' %}" class="btn-hero-primary">
+                    <i class="ti ti-login-2"></i> Iniciar sesión
+                </a>
+            </div>
+        </div>
+
+        <!-- Ilustración agrícola construida con formas CSS (sin dependencias externas) -->
+        <div class="hero-visual hero-in hero-in-5" aria-hidden="true">
+            <div class="hero-visual-ring"></div>
+            <div class="hero-visual-core">
+                <img src="{% static 'portal/img/logo.png' %}" alt="">
+            </div>
+            <div class="hero-float-card hero-float-a"><i class="ti ti-file-text"></i> Resultado de laboratorio</div>
+            <div class="hero-float-card hero-float-b"><i class="ti ti-chart-infographic"></i> Información clara</div>
+        </div>
+    </div>
+</header>
+
+<!-- ═══════════════════ 2. EL PROBLEMA (aún sin mencionar BioSuelo) ═══════════════════ -->
+<section class="bg-surface" id="por-que">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <span class="section-eyebrow"><i class="ti ti-help-circle"></i> El desafío</span>
+            <h2 class="section-title">Interpretar información científica<br>no siempre es sencillo</h2>
+            <p class="section-sub">Los resultados que entrega un laboratorio suelen presentarse en formatos extensos y técnicos. Sin las herramientas adecuadas, comprenderlos y aprovecharlos para tomar decisiones puede tomar mucho tiempo.</p>
+        </div>
+
+        <div class="pain-row">
+            <div class="pain-item reveal reveal-d1">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-file-text"></i></div>
+                <div><h4>Formatos técnicos</h4><p>La información suele llegar en un formato difícil de leer sin experiencia previa.</p></div>
+            </div>
+            <div class="pain-item reveal reveal-d2">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-clock"></i></div>
+                <div><h4>Consume tiempo</h4><p>Ordenar e interpretar la información manualmente puede tomar horas.</p></div>
+            </div>
+            <div class="pain-item reveal reveal-d3">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-puzzle"></i></div>
+                <div><h4>Difícil de comparar</h4><p>Sin un formato común, comparar distintos registros se vuelve complicado.</p></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════ 3. ¿QUÉ ES BIOSUELO? ═══════════════════ -->
+<section class="bg-tint" id="que-es">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <span class="section-eyebrow"><i class="ti ti-sparkles"></i> ¿Qué es BioSuelo?</span>
+            <h2 class="section-title">Una plataforma que transforma<br>resultados en información</h2>
+            <p class="section-sub">BioSuelo es una plataforma web que toma resultados obtenidos previamente en un laboratorio y los transforma en información organizada, visual e interpretable. No realiza análisis de laboratorio: su función es ayudarte a comprender y aprovechar mejor esos resultados.</p>
+        </div>
+
+        <div class="transform-visual reveal reveal-d1">
+            <div class="transform-node"><i class="ti ti-file-text" style="color:var(--hint);"></i> Resultados de laboratorio</div>
+            <i class="ti ti-arrow-right transform-arrow"></i>
+            <div class="transform-node is-accent"><i class="ti ti-chart-infographic"></i> Información clara</div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════ 4. ¿QUÉ OFRECE LA PLATAFORMA? ═══════════════════ -->
+<section class="bg-surface" id="ofrece">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <span class="section-eyebrow"><i class="ti ti-apps"></i> Qué ofrece</span>
+            <h2 class="section-title">Todo lo que necesitas para<br>interpretar tus resultados</h2>
+            <p class="section-sub">Cada herramienta está pensada para que aproveches al máximo la información que ya tienes.</p>
+        </div>
+
+        <div class="feat-bento">
+            <div class="ux-card ux-card--hover feat-card feat-lg reveal reveal-d1">
+                <div class="icon-tile icon-tile--md" style="background:var(--p-vivid);"><i class="ti ti-chart-infographic"></i></div>
+                <h3>Visualización de resultados</h3>
+                <p>Convierte información extensa en gráficos y vistas claras, fáciles de leer de un vistazo.</p>
+            </div>
+            <div class="ux-card ux-card--hover feat-card reveal reveal-d2">
+                <div class="icon-tile icon-tile--md" style="background:var(--blue);"><i class="ti ti-layout-grid"></i></div>
+                <h3>Organización de información</h3>
+                <p>Centraliza y ordena la información en un solo lugar, lista para consultarse.</p>
+            </div>
+            <div class="ux-card ux-card--hover feat-card reveal reveal-d3">
+                <div class="icon-tile icon-tile--md" style="background:var(--amber);"><i class="ti ti-refresh"></i></div>
+                <h3>Procesamiento automático</h3>
+                <p>La plataforma organiza la información automáticamente, sin pasos manuales adicionales.</p>
+            </div>
+            <div class="ux-card ux-card--hover feat-card reveal reveal-d4">
+                <div class="icon-tile icon-tile--md" style="background:#5F5E5A;"><i class="ti ti-report"></i></div>
+                <h3>Reportes</h3>
+                <p>Genera reportes listos para compartir o presentar.</p>
+            </div>
+            <div class="ux-card ux-card--hover feat-card reveal reveal-d5">
+                <div class="icon-tile icon-tile--md" style="background:var(--red);"><i class="ti ti-arrows-diff"></i></div>
+                <h3>Comparación de información</h3>
+                <p>Compara distintos registros para identificar diferencias con claridad.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════ 5. ¿CÓMO FUNCIONA? — TIMELINE ═══════════════════ -->
+<section class="bg-tint" id="como-funciona">
+    <div class="wrap-sm">
+        <div class="section-head reveal">
+            <span class="section-eyebrow"><i class="ti ti-route"></i> Cómo funciona</span>
+            <h2 class="section-title">De un resultado a una decisión</h2>
+        </div>
+
+        <div class="timeline" id="timeline">
+            <div class="timeline-fill" id="timelineFill"></div>
+            <div class="timeline-item reveal reveal-d1">
+                <div class="timeline-num"><i class="ti ti-flask"></i></div>
+                <div class="timeline-body">
+                    <h4>Resultados de laboratorio</h4>
+                    <p>Partimos de la información que ya obtuviste mediante un análisis previo.</p>
+                </div>
+            </div>
+            <div class="timeline-item reveal reveal-d2">
+                <div class="timeline-num"><i class="ti ti-refresh"></i></div>
+                <div class="timeline-body">
+                    <h4>Procesamiento</h4>
+                    <p>La plataforma organiza esa información de forma automática.</p>
+                </div>
+            </div>
+            <div class="timeline-item reveal reveal-d3">
+                <div class="timeline-num"><i class="ti ti-chart-infographic"></i></div>
+                <div class="timeline-body">
+                    <h4>Visualización</h4>
+                    <p>Se transforma en gráficos y vistas fáciles de leer.</p>
+                </div>
+            </div>
+            <div class="timeline-item reveal reveal-d4">
+                <div class="timeline-num"><i class="ti ti-bulb"></i></div>
+                <div class="timeline-body">
+                    <h4>Interpretación</h4>
+                    <p>Facilita comprender lo que la información significa.</p>
+                </div>
+            </div>
+            <div class="timeline-item reveal reveal-d5">
+                <div class="timeline-num"><i class="ti ti-report"></i></div>
+                <div class="timeline-body">
+                    <h4>Reportes</h4>
+                    <p>Generas y compartes un reporte final con los hallazgos.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════ 6. BENEFICIOS ═══════════════════ -->
+<section class="bg-surface" id="beneficios">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <span class="section-eyebrow"><i class="ti ti-award"></i> Beneficios</span>
+            <h2 class="section-title">Diseñado para ahorrarte<br>tiempo y esfuerzo</h2>
+        </div>
+
+        <div class="benefits-grid">
+            <div class="benefit-item reveal reveal-d1">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-clock"></i></div>
+                <div><h4>Reduce tiempo</h4><p>Menos tiempo dedicado a ordenar información manualmente.</p></div>
+            </div>
+            <div class="benefit-item reveal reveal-d2">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-layout-grid"></i></div>
+                <div><h4>Información organizada</h4><p>Todo en un mismo lugar, sin archivos dispersos.</p></div>
+            </div>
+            <div class="benefit-item reveal reveal-d3">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-chart-infographic"></i></div>
+                <div><h4>Resultados claros</h4><p>Información presentada de forma visual y comprensible.</p></div>
+            </div>
+            <div class="benefit-item reveal reveal-d4">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-bulb"></i></div>
+                <div><h4>Fácil interpretación</h4><p>Pensada para que cualquier persona pueda entenderla.</p></div>
+            </div>
+            <div class="benefit-item reveal reveal-d5">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-world"></i></div>
+                <div><h4>Plataforma web</h4><p>Disponible desde cualquier navegador, sin instalaciones.</p></div>
+            </div>
+            <div class="benefit-item reveal">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-shield-check"></i></div>
+                <div><h4>Acceso seguro</h4><p>Ingreso protegido y organizado por roles de usuario.</p></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════ 7. ¿QUIÉNES PUEDEN UTILIZARLA? ═══════════════════ -->
+<section class="bg-tint" id="quienes">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <span class="section-eyebrow"><i class="ti ti-users"></i> ¿Para quién es?</span>
+            <h2 class="section-title">Pensada para distintos perfiles</h2>
+        </div>
+
+        <div class="who-grid">
+            <div class="ux-card ux-card--hover who-card reveal reveal-d1">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-microscope"></i></div>
+                <div><h4>Investigadores</h4><p>Organizan y comparan información para sus estudios.</p></div>
+            </div>
+            <div class="ux-card ux-card--hover who-card reveal reveal-d2">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-presentation"></i></div>
+                <div><h4>Docentes</h4><p>Apoyan procesos de enseñanza con información clara.</p></div>
+            </div>
+            <div class="ux-card ux-card--hover who-card reveal reveal-d3">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-school"></i></div>
+                <div><h4>Estudiantes</h4><p>Aprenden a interpretar información real.</p></div>
+            </div>
+            <div class="ux-card ux-card--hover who-card reveal reveal-d4">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-flask"></i></div>
+                <div><h4>Laboratorios</h4><p>Centralizan y comparten resultados con sus clientes.</p></div>
+            </div>
+            <div class="ux-card ux-card--hover who-card reveal reveal-d5">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-building-bank"></i></div>
+                <div><h4>Instituciones</h4><p>Gestionan información de múltiples proyectos.</p></div>
+            </div>
+            <div class="ux-card ux-card--hover who-card reveal">
+                <div class="icon-tile icon-tile--sm icon-tile--glow"><i class="ti ti-plant-2"></i></div>
+                <div><h4>Profesionales del sector agrícola</h4><p>Consultan información para apoyar sus decisiones.</p></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════ 8. PREGUNTAS FRECUENTES ═══════════════════ -->
+<section class="bg-surface" id="faq">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <span class="section-eyebrow"><i class="ti ti-message-circle"></i> Preguntas frecuentes</span>
+            <h2 class="section-title">Resolvemos tus dudas</h2>
+        </div>
+
+        <div class="faq-list reveal">
+            <div class="ux-card faq-item">
+                <button class="faq-question" aria-expanded="false">
+                    ¿BioSuelo realiza análisis de laboratorio?
+                    <i class="ti ti-plus"></i>
+                </button>
+                <div class="faq-answer">
+                    <p>No. BioSuelo no realiza análisis de laboratorio. Su función es organizar, procesar y visualizar resultados que ya fueron obtenidos previamente, para facilitar su interpretación.</p>
+                </div>
+            </div>
+            <div class="ux-card faq-item">
+                <button class="faq-question" aria-expanded="false">
+                    ¿Necesito conocimientos técnicos para usarla?
+                    <i class="ti ti-plus"></i>
+                </button>
+                <div class="faq-answer">
+                    <p>No. La plataforma está diseñada para que cualquier persona, sin conocimientos técnicos, pueda comprender la información presentada.</p>
+                </div>
+            </div>
+            <div class="ux-card faq-item">
+                <button class="faq-question" aria-expanded="false">
+                    ¿Quién puede crear una cuenta?
+                    <i class="ti ti-plus"></i>
+                </button>
+                <div class="faq-answer">
+                    <p>El acceso está disponible para investigadores, docentes, estudiantes, laboratorios, instituciones y profesionales del sector agrícola. El ingreso se gestiona mediante roles de usuario.</p>
+                </div>
+            </div>
+            <div class="ux-card faq-item">
+                <button class="faq-question" aria-expanded="false">
+                    ¿Puedo comparar distintos registros de información?
+                    <i class="ti ti-plus"></i>
+                </button>
+                <div class="faq-answer">
+                    <p>Sí. La plataforma permite comparar diferentes registros para identificar semejanzas y diferencias con facilidad.</p>
+                </div>
+            </div>
+            <div class="ux-card faq-item">
+                <button class="faq-question" aria-expanded="false">
+                    ¿Es necesario instalar algún programa?
+                    <i class="ti ti-plus"></i>
+                </button>
+                <div class="faq-answer">
+                    <p>No. BioSuelo funciona completamente desde el navegador, sin instalaciones adicionales.</p>
+                </div>
+            </div>
+            <div class="ux-card faq-item">
+                <button class="faq-question" aria-expanded="false">
+                    ¿Es segura la información que gestiono en la plataforma?
+                    <i class="ti ti-plus"></i>
+                </button>
+                <div class="faq-answer">
+                    <p>Sí. El acceso a la plataforma está protegido mediante inicio de sesión y organizado por roles de usuario.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════ 9. CTA FINAL ═══════════════════ -->
+<section class="bg-tint cta-final">
+    <div class="ux-card cta-card reveal">
+        <div class="icon-tile icon-tile--lg icon-tile--glow"><i class="ti ti-login-2"></i></div>
+        <h2>Empieza a transformar tus resultados en información clara</h2>
+        <p>Inicia sesión y descubre cómo BioSuelo puede facilitar tu trabajo.</p>
+        <a href="{% url 'analisis:login' %}" class="btn-hero-primary">
+            <i class="ti ti-login-2"></i> Iniciar sesión
+        </a>
+    </div>
+</section>
+
+<!-- ═══════════════════ 10. FOOTER ═══════════════════ -->
+<footer class="foot">
+    <div class="foot-inner">
+        <div class="foot-brand">
+            <div class="nav-logo"><i class="ti ti-dna-2"></i></div>
+            <span class="foot-brand-name">BioSuelo</span>
+        </div>
+        <div class="foot-links">
+            <a href="#inicio">Inicio</a>
+            <a href="#que-es">La plataforma</a>
+            <a href="#como-funciona">Cómo funciona</a>
+            <a href="#faq">Preguntas frecuentes</a>
+            <a href="{% url 'analisis:login' %}">Iniciar sesión</a>
+        </div>
+    </div>
+    <div class="foot-bottom">
+        <span>Plataforma web para la interpretación de resultados de laboratorio en el sector agrícola.</span>
+    </div>
+</footer>
+
+<script>
+(function () {
+    var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* ── Nav: fondo al hacer scroll + barra de progreso de lectura ── */
+    var nav = document.getElementById('mainNav');
+    var progressBar = document.getElementById('scrollProgress');
+    var ticking = false;
+
+    function onScroll() {
+        nav.classList.toggle('scrolled', window.scrollY > 12);
+
+        if (progressBar) {
+            var scrollable = document.documentElement.scrollHeight - window.innerHeight;
+            var pct = scrollable > 0 ? (window.scrollY / scrollable) * 100 : 0;
+            progressBar.style.width = pct + '%';
+        }
+        updateTimelineFill();
+        ticking = false;
+    }
+    window.addEventListener('scroll', function () {
+        if (!ticking) {
+            window.requestAnimationFrame(onScroll);
+            ticking = true;
+        }
+    });
+    onScroll();
+
+    /* ── Menú móvil ── */
+    var toggle = document.getElementById('navToggle');
+    var menu   = document.getElementById('mobileMenu');
+    var close  = document.getElementById('mobileMenuClose');
+
+    function openMenu() {
+        menu.classList.add('open');
+        toggle.setAttribute('aria-expanded', 'true');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeMenu() {
+        menu.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+        document.body.style.overflow = '';
+    }
+    if (toggle) toggle.addEventListener('click', openMenu);
+    if (close) close.addEventListener('click', closeMenu);
+    menu.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', closeMenu);
+    });
+
+    /* ── Scrollspy: resalta el link de la sección visible ── */
+    var sections = ['inicio', 'que-es', 'como-funciona', 'faq'].map(function (id) {
+        return document.getElementById(id);
+    }).filter(Boolean);
+    var navLinks = document.querySelectorAll('.nav-links a');
+
+    if ('IntersectionObserver' in window && sections.length) {
+        var spy = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (!entry.isIntersecting) return;
+                navLinks.forEach(function (link) {
+                    link.classList.toggle('active', link.dataset.nav === entry.target.id);
+                });
+            });
+        }, { rootMargin: '-45% 0px -50% 0px' });
+        sections.forEach(function (s) { spy.observe(s); });
+    }
+
+    /* ── Reveal-on-scroll ── */
+    var reveals = document.querySelectorAll('.reveal');
+    if ('IntersectionObserver' in window && reveals.length) {
+        var ro = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('in-view');
+                    ro.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15 });
+        reveals.forEach(function (el) { ro.observe(el); });
+    } else {
+        reveals.forEach(function (el) { el.classList.add('in-view'); });
+    }
+
+    /* ── Acordeón de preguntas frecuentes (un solo panel abierto a la vez) ── */
+    var faqItems = document.querySelectorAll('.faq-item');
+    faqItems.forEach(function (item) {
+        var btn   = item.querySelector('.faq-question');
+        var panel = item.querySelector('.faq-answer');
+
+        btn.addEventListener('click', function () {
+            var isOpen = item.classList.contains('open');
+
+            faqItems.forEach(function (other) {
+                other.classList.remove('open');
+                other.querySelector('.faq-question').setAttribute('aria-expanded', 'false');
+                other.querySelector('.faq-answer').style.maxHeight = null;
+            });
+
+            if (!isOpen) {
+                item.classList.add('open');
+                btn.setAttribute('aria-expanded', 'true');
+                panel.style.maxHeight = panel.scrollHeight + 'px';
+            }
+        });
+    });
+
+    /* ── Línea del timeline "Cómo funciona": se dibuja y activa nodos según el scroll ── */
+    var timelineEl   = document.getElementById('timeline');
+    var timelineFill = document.getElementById('timelineFill');
+    var timelineNums = timelineEl ? timelineEl.querySelectorAll('.timeline-num') : [];
+
+    function updateTimelineFill() {
+        if (!timelineEl || !timelineFill) return;
+        var rect = timelineEl.getBoundingClientRect();
+        var viewportMid = window.innerHeight * 0.65;
+        var progress = (viewportMid - rect.top) / rect.height;
+        progress = Math.max(0, Math.min(1, progress));
+
+        timelineFill.style.height = (progress * 100) + '%';
+
+        var activeCount = Math.round(progress * timelineNums.length);
+        timelineNums.forEach(function (num, i) {
+            num.classList.toggle('is-active', i < activeCount);
+        });
+    }
+
+    /* ── Paralaje sutil: la ilustración del hero sigue al cursor ── */
+    var heroVisual = document.querySelector('.hero-visual');
+    var heroSection = document.querySelector('.hero');
+    if (heroVisual && heroSection && !prefersReducedMotion && window.matchMedia('(hover: hover)').matches) {
+        heroSection.addEventListener('mousemove', function (e) {
+            var rect = heroSection.getBoundingClientRect();
+            var relX = (e.clientX - rect.left) / rect.width - 0.5;
+            var relY = (e.clientY - rect.top) / rect.height - 0.5;
+            var rotY = relX * 10;
+            var rotX = relY * -10;
+            heroVisual.style.transform =
+                'perspective(900px) rotateX(' + rotX + 'deg) rotateY(' + rotY + 'deg)';
+        });
+        heroSection.addEventListener('mouseleave', function () {
+            heroVisual.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg)';
+        });
+    }
+})();
+</script>
+
+</body>
+</html>

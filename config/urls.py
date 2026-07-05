@@ -10,6 +10,7 @@ urlpatterns = [
     # Redirigir la URL de login de allauth a nuestra vista personalizada
     path('accounts/login/', RedirectView.as_view(url='/login/', permanent=False)),
     path('accounts/', include('allauth.urls')),
+    path('', include('portal.urls')),
     path('', include('analisis.urls')),
     path('bioquimica/', include('bioquimica.urls')),
     path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),

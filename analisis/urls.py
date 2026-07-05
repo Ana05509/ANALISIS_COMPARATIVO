@@ -18,7 +18,7 @@ urlpatterns = [
     # que ya cuenta con sus propias plantillas (account/password_reset*.html).
 
     # 2. DASHBOARD Y CARGA
-    path("", views.dashboard, name="dashboard"),
+    path("dashboard/", views.dashboard, name="dashboard"),
     path("perfil/", views.perfil_usuario, name="perfil"),
     path("subir/", views.subir_datos, name="subir_datos"),
     path("cargar-variedades/", views.cargar_variedades, name="cargar_variedades"),
