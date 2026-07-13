@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 from django.templatetags.static import static
 from django.urls import reverse_lazy
 
@@ -8,13 +9,40 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ---------------------------
 # SEGURIDAD
 # ---------------------------
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key')
+_INSECURE_SECRET_KEY = 'django-insecure-dev-key'
+SECRET_KEY = os.environ.get('SECRET_KEY', _INSECURE_SECRET_KEY)
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.environ.get(
     'ALLOWED_HOSTS',
     '127.0.0.1,localhost'
 ).split(',')
+
+# ---------------------------
+# ENDURECIMIENTO PARA PRODUCCIÓN
+# Todo esto queda inactivo con DEBUG=True para no romper el entorno local
+# (cookies "secure" y redirección HTTPS no funcionan sobre http://localhost).
+# ---------------------------
+if not DEBUG:
+    if SECRET_KEY == _INSECURE_SECRET_KEY:
+        raise ImproperlyConfigured(
+            "SECRET_KEY sigue en su valor de desarrollo con DEBUG=False. "
+            "Define la variable de entorno SECRET_KEY antes de desplegar "
+            "(python -c \"from django.core.management.utils import get_random_secret_key; "
+            "print(get_random_secret_key())\")."
+        )
+
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True'
+    # Necesario cuando Django corre detrás de un proxy (nginx, etc.) que termina el TLS:
+    # así sabe que el request original fue HTTPS aunque le llegue como HTTP interno.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', 31536000))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 # ---------------------------
 # APLICACIONES
@@ -37,6 +65,13 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',  # Proveedor específico de Google
+
+    # Auditoría: historial de cambios en modelos de gestión.
+    # unfold.contrib.simple_history debe ir antes que simple_history para que
+    # sus plantillas (tema Unfold) tengan prioridad sobre las de simple_history.
+    'unfold.contrib.simple_history',
+    'simple_history',
+
     'analisis',
     'bioquimica',
     'portal',
@@ -55,9 +90,13 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    
+
     # Middleware requerido por allauth para gestionar sesiones de cuentas sociales
     'allauth.account.middleware.AccountMiddleware',
+
+    # Auditoría: adjunta el usuario autenticado a cada registro histórico,
+    # sin importar si el cambio vino del admin, de una vista o de la API
+    'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
 # ---------------------------

@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from simple_history.models import HistoricalRecords
 
 # -------------------------------
 # Modelos de Catálogo Agronómico
@@ -8,6 +9,8 @@ from django.contrib.auth.models import AbstractUser
 class Cultivo(models.Model):
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Cultivo")
     descripcion = models.TextField(blank=True, verbose_name="Descripción")
+
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Cultivo"
@@ -59,6 +62,8 @@ class MuestraSuelo(models.Model):
     localidad = models.CharField(max_length=100, db_index=True, verbose_name="Localidad")
     finca_lote = models.CharField(max_length=150, verbose_name="Finca / Lote")
     altitud = models.IntegerField(null=True, blank=True, db_index=True, verbose_name="Altitud (msnm)")
+
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Muestra de Suelo"
@@ -169,6 +174,8 @@ class CatalogoMicroorganismo(models.Model):
         help_text="Región genética usada para identificación (16S o ITS)"
     )
 
+    history = HistoricalRecords()
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['nombre', 'nivel'], name='unique_nombre_nivel')
@@ -203,6 +210,8 @@ class Usuario(AbstractUser):
         null=True,
         verbose_name="Foto de perfil"
     )
+
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Usuario"

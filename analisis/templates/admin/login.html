@@ -56,7 +56,10 @@
             align-items: center;
             justify-content: center;
             background: #0b2e0d;
-            overflow: hidden;
+            /* overflow-x (no overflow a secas): si la tarjeta es más alta que
+               la ventana, el body debe poder hacer scroll vertical o el
+               contenido queda inaccesible sin forma de llegar a él. */
+            overflow-x: hidden;
             padding: 1.25rem;
         }
 
@@ -438,7 +441,11 @@
         /* ══════════════════════════════════════════
            RESPONSIVE
            ══════════════════════════════════════════ */
-        @media (max-width: 740px) {
+        /* 900px (no 740px): a los ~723px de ancho útil que le quedan a la
+           tarjeta en un iPad vertical (768px), 2 columnas dejaban cada panel
+           en ~360px — muy justo para el texto. Con este umbral, tablets en
+           vertical ya caen en el layout de una sola columna. */
+        @media (max-width: 900px) {
             html { font-size: 17px; }
             .login-card {
                 grid-template-columns: 1fr;

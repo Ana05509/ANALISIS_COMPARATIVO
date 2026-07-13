@@ -1,4 +1,5 @@
 {% extends "analisis/base.html" %}
+{% load custom_filters %}
 
 {% block title %}Análisis Avanzado Ecológico{% endblock %}
 {% block nav_analisis %}active{% endblock %}
@@ -118,7 +119,7 @@
                 </option>
                 {% endfor %}
             </select>
-            <script>var TIPOS_POR_MUESTRA_AV = {{ tipos_por_muestra_json|safe }};</script>
+            <script>var TIPOS_POR_MUESTRA_AV = {{ tipos_por_muestra_json|json_embed }};</script>
         </div>
     </form>
 </div>
@@ -557,7 +558,7 @@ document.addEventListener("DOMContentLoaded", function() {
     try {
         const PALETA = ['#1D9E75','#0F6E56','#085041','#BA7517','#9E6515','#185FA5','#0C447C','#A32D2D','#6B4E9E','#2E8B57','#c7a640','#5F5E5A'];
         const OTROS_COLOR = '#B0B8C1';
-        const topData = {{ top_microorganismos_json|safe }};
+        const topData = {{ top_microorganismos_json|json_embed }};
         if (Array.isArray(topData) && topData.length > 0) {
             const labels = topData.map(r => r.taxonomia || 'Desconocido');
             const values = topData.map(r => parseFloat(r.total_porcentaje || 0));
@@ -596,7 +597,7 @@ document.addEventListener("DOMContentLoaded", function() {
 {% if graficos_avanzados %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    var graficos = {{ graficos_avanzados_json|safe }};
+    var graficos = {{ graficos_avanzados_json|json_embed }};
     
     var CFG = { responsive: true };
 

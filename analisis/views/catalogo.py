@@ -79,7 +79,13 @@ def catalogo_microorganismos(request):
 def actualizar_clasificacion(request, pk):
     """
     Vista para reescribir o corregir manualmente un rol en el catálogo.
+    Solo staff: reclasificar afecta el catálogo compartido que usan todos
+    los análisis y reportes del sistema, no solo la muestra que se ve.
     """
+    if not request.user.is_staff:
+        messages.error(request, "No tiene permisos para realizar esta acción.")
+        return redirect('analisis:catalogo')
+
     if request.method == "POST":
         nueva_clasificacion = request.POST.get("clasificacion")
         microorganismo = get_object_or_404(CatalogoMicroorganismo, pk=pk)

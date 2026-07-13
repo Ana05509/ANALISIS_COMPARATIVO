@@ -17,3 +17,4 @@ requests==2.34.2
 asgiref==3.11.1
 dnspython==2.8.0
 pdfplumber==0.11.10
+django-simple-history==3.12.0

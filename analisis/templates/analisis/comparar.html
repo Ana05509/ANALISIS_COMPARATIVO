@@ -1,4 +1,5 @@
 {% extends "analisis/base.html" %}
+{% load custom_filters %}
 
 {% block title %}Comparar Perfiles{% endblock %}
 {% block nav_comparar %}active{% endblock %}
@@ -550,7 +551,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-<script>var TIPOS_POR_MUESTRA_CMP = {{ tipos_por_muestra_json|safe }};</script>
+<script>var TIPOS_POR_MUESTRA_CMP = {{ tipos_por_muestra_json|json_embed }};</script>
 
 <script>
 (function () {
@@ -676,7 +677,7 @@
 
         /* 1. Barras agrupadas */
         try {
-            var gBarras = {{ graficos_json|safe }};
+            var gBarras = {{ graficos_json|json_embed }};
             if (gBarras && gBarras.data) {
                 gBarras.data.forEach(function(trace, i) {
                     trace.marker = trace.marker || {};
@@ -699,7 +700,7 @@
 
         /* 2. Heatmap */
         try {
-            var tablaData = {{ tabla_json|safe }};
+            var tablaData = {{ tabla_json|json_embed }};
             if (Array.isArray(tablaData) && tablaData.length > 0) {
                 var muestrasHM = Object.keys(tablaData[0]).filter(function(k) {
                     return k !== 'taxonomia' && k !== 'clasificacion';
@@ -727,7 +728,7 @@
 
         /* 3. Shannon — umbrales absolutos (igual que en análisis avanzado) */
         try {
-            var alfaData = {{ alfa_json|safe }};
+            var alfaData = {{ alfa_json|json_embed }};
             var muestrasS = Object.keys(alfaData);
 
             if (muestrasS.length > 0) {

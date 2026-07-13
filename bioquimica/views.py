@@ -94,9 +94,9 @@ def _grafico_heatmap_pruebas(ensayo):
         text=textos,
         texttemplate='%{text}',
         colorscale=[
-            [0.0, '#FAEEDA'],
-            [0.5, '#F1EFE8'],
-            [1.0, '#E1F5EE'],
+            [0.0, '#FDBA74'],   # naranja-300 → negativo
+            [0.5, '#E5E7EB'],   # gris-200    → neutro
+            [1.0, '#86EFAC'],   # verde-300   → positivo
         ],
         showscale=False,
         hovertemplate='<b>%{y}</b><br>%{x}: <b>%{text}</b><extra></extra>',
@@ -202,93 +202,117 @@ def detalle_ensayo(request, pk):
     return render(request, 'bioquimica/detalle.html', context)
 
 
+def _fecha(valor):
+    if not valor:
+        return date.today()
+    try:
+        from datetime import datetime
+        return datetime.strptime(valor, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        return date.today()
+
+
+def _guardar_ensayo(archivo, request):
+    """
+    Parsea y guarda un PDF. Retorna (ensayo, msg_ok) o lanza ValueError/Exception.
+    Raises ValueError con mensaje amigable para duplicados y errores de validación.
+    """
+    from .services.pdf_parser import parsear_pdf
+
+    if not archivo.name.lower().endswith('.pdf'):
+        raise ValueError(f"«{archivo.name}» no es un PDF.")
+
+    try:
+        resultado = parsear_pdf(archivo)
+    except Exception as e:
+        raise ValueError(f"No se pudo leer «{archivo.name}»: {e}")
+
+    header = resultado['header']
+    codigo = header.get('codigo')
+    if not codigo:
+        raise ValueError(f"«{archivo.name}»: no se encontró código MAg-XXX-XXXX.")
+
+    if EnsayoMicrobiologico.objects.filter(codigo=codigo).exists():
+        existing = EnsayoMicrobiologico.objects.get(codigo=codigo)
+        raise _DuplicadoError(codigo, existing.pk)
+
+    with transaction.atomic():
+        ensayo = EnsayoMicrobiologico(
+            codigo=codigo,
+            tipo=resultado['tipo'],
+            nombre_muestra=header.get('nombre_muestra', 'Muestra'),
+            etiqueta=header.get('etiqueta', ''),
+            fecha_recepcion=_fecha(header.get('fecha_recepcion')),
+            fecha_ejecucion=_fecha(header.get('fecha_ejecucion')),
+            fecha_reporte=_fecha(header.get('fecha_reporte')),
+            temp_ambiental=header.get('temp_ambiental'),
+            humedad_ambiental=header.get('humedad_ambiental'),
+            registrado_por=request.user,
+        )
+        archivo.seek(0)
+        ensayo.archivo_pdf.save(archivo.name, archivo, save=False)
+        ensayo.save()
+
+        if resultado['tipo'] == 'recuento':
+            RecuentoUFC.objects.bulk_create([
+                RecuentoUFC(ensayo=ensayo, **d) for d in resultado['datos']
+            ])
+        else:
+            for org_data in resultado['datos']:
+                taxonomia = org_data.pop('taxonomia', {})
+                pruebas   = org_data.pop('pruebas', [])
+                org = MicroorganismoAislado(ensayo=ensayo, **org_data, **taxonomia)
+                org.save()
+                if pruebas:
+                    PruebaBioquimica.objects.bulk_create([
+                        PruebaBioquimica(microorganismo=org, **p) for p in pruebas
+                    ])
+
+    return ensayo
+
+
+class _DuplicadoError(Exception):
+    def __init__(self, codigo, pk):
+        self.codigo = codigo
+        self.pk = pk
+
+
 @login_required
 def subir_pdf(request):
     if request.method != 'POST':
         return render(request, 'bioquimica/subir_pdf.html')
 
-    archivo = request.FILES.get('archivo')
-    if not archivo:
-        messages.error(request, "Debe seleccionar un archivo PDF.")
+    archivos = request.FILES.getlist('archivos')
+    if not archivos:
+        messages.error(request, "Debe seleccionar al menos un archivo PDF.")
         return render(request, 'bioquimica/subir_pdf.html')
 
-    if not archivo.name.lower().endswith('.pdf'):
-        messages.error(request, "El archivo debe tener extensión .pdf.")
-        return render(request, 'bioquimica/subir_pdf.html')
+    creados = []      # [(codigo, pk), ...]
+    duplicados = []   # [codigo, ...]
+    errores = []      # [mensaje, ...]
 
-    try:
-        from .services.pdf_parser import parsear_pdf
-        resultado = parsear_pdf(archivo)
-    except Exception as e:
-        messages.error(request, f"No se pudo leer el PDF: {e}")
-        return render(request, 'bioquimica/subir_pdf.html')
-
-    header = resultado['header']
-    codigo = header.get('codigo')
-
-    if not codigo:
-        messages.error(request, "No se encontró el código del ensayo en el PDF (ej: MAg-225-2023).")
-        return render(request, 'bioquimica/subir_pdf.html')
-
-    if EnsayoMicrobiologico.objects.filter(codigo=codigo).exists():
-        messages.warning(request, f"El ensayo '{codigo}' ya existe en el sistema.")
-        ensayo = EnsayoMicrobiologico.objects.get(codigo=codigo)
-        return redirect('bioquimica:detalle', pk=ensayo.pk)
-
-    def _fecha(valor):
-        if not valor:
-            return date.today()
+    for archivo in archivos:
         try:
-            from datetime import datetime
-            return datetime.strptime(valor, '%Y-%m-%d').date()
-        except (ValueError, TypeError):
-            return date.today()
+            ensayo = _guardar_ensayo(archivo, request)
+            creados.append((ensayo.codigo, ensayo.pk))
+        except _DuplicadoError as e:
+            duplicados.append(e.codigo)
+        except (ValueError, Exception) as e:
+            errores.append(str(e))
 
-    try:
-        with transaction.atomic():
-            ensayo = EnsayoMicrobiologico(
-                codigo=codigo,
-                tipo=resultado['tipo'],
-                nombre_muestra=header.get('nombre_muestra', 'Muestra'),
-                etiqueta=header.get('etiqueta', ''),
-                fecha_recepcion=_fecha(header.get('fecha_recepcion')),
-                fecha_ejecucion=_fecha(header.get('fecha_ejecucion')),
-                fecha_reporte=_fecha(header.get('fecha_reporte')),
-                temp_ambiental=header.get('temp_ambiental'),
-                humedad_ambiental=header.get('humedad_ambiental'),
-                registrado_por=request.user,
-            )
-            archivo.seek(0)
-            ensayo.archivo_pdf.save(archivo.name, archivo, save=False)
-            ensayo.save()
+    if creados:
+        lista = ', '.join(c for c, _ in creados)
+        messages.success(request, f"{len(creados)} ensayo(s) importado(s): {lista}.")
+    if duplicados:
+        lista = ', '.join(duplicados)
+        messages.warning(request, f"{len(duplicados)} ya existente(s) omitido(s): {lista}.")
+    for msg in errores:
+        messages.error(request, msg)
 
-            if resultado['tipo'] == 'recuento':
-                RecuentoUFC.objects.bulk_create([
-                    RecuentoUFC(ensayo=ensayo, **d)
-                    for d in resultado['datos']
-                ])
-                total = len(resultado['datos'])
-            else:
-                total = 0
-                for org_data in resultado['datos']:
-                    taxonomia = org_data.pop('taxonomia', {})
-                    pruebas   = org_data.pop('pruebas', [])
-                    org = MicroorganismoAislado(ensayo=ensayo, **org_data, **taxonomia)
-                    org.save()
-                    if pruebas:
-                        PruebaBioquimica.objects.bulk_create([
-                            PruebaBioquimica(microorganismo=org, **p)
-                            for p in pruebas
-                        ])
-                    total += 1
+    if len(creados) == 1 and not duplicados and not errores:
+        return redirect('bioquimica:detalle', pk=creados[0][1])
 
-        messages.success(
-            request,
-            f"PDF procesado: ensayo {codigo} creado con {total} "
-            f"{'registros UFC/g' if resultado['tipo'] == 'recuento' else 'organismos aislados'}."
-        )
-        return redirect('bioquimica:detalle', pk=ensayo.pk)
-
-    except Exception as e:
-        messages.error(request, f"Error al guardar los datos: {e}")
+    if not creados and not duplicados and not errores:
         return render(request, 'bioquimica/subir_pdf.html')
+
+    return redirect('bioquimica:lista')

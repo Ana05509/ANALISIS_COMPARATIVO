@@ -14,6 +14,9 @@ import io
 from unfold.admin import ModelAdmin
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
+# Auditoría: agrega la pestaña "Historial" (quién cambió qué y cuándo)
+from simple_history.admin import SimpleHistoryAdmin
+
 # Importaciones de tu app
 from .models import (
     Cultivo, VariedadClon, MuestraSuelo, ArchivoMolecular,
@@ -50,7 +53,7 @@ class BotonEditarMixin:
 # CULTIVOS
 # =========================================================
 @admin.register(Cultivo)
-class CultivoAdmin(BotonEditarMixin, ModelAdmin):
+class CultivoAdmin(SimpleHistoryAdmin, BotonEditarMixin, ModelAdmin):
     list_display  = ("id", "nombre", "descripcion", "acciones_columna")
     list_display_links = ("id", "nombre")
     search_fields = ("nombre", "descripcion")
@@ -142,7 +145,7 @@ class MuestraSueloForm(forms.ModelForm):
 
 
 @admin.register(MuestraSuelo)
-class MuestraSueloAdmin(BotonEditarMixin, ModelAdmin):
+class MuestraSueloAdmin(SimpleHistoryAdmin, BotonEditarMixin, ModelAdmin):
     form = MuestraSueloForm  # 🌟 Acoplamos el formulario con guías de texto
     
     list_display = ("codigo", "cultivo", "variedad_clon", "localidad", "altitud_display", "tipo_muestra", "fecha_registro", "acciones_columna")
@@ -312,7 +315,7 @@ class CatalogoImportAdminForm(forms.Form):
 # CATÁLOGO MICROORGANISMOS
 # =========================================================
 @admin.register(CatalogoMicroorganismo)
-class CatalogoMicroorganismoAdmin(BotonEditarMixin, ModelAdmin):
+class CatalogoMicroorganismoAdmin(SimpleHistoryAdmin, BotonEditarMixin, ModelAdmin):
     change_list_template = "admin/analisis/catalogomicroorganismo/change_list.html"
 
     list_display  = ("nombre", "nivel", "marcador_badge", "clasificacion_badge", "descripcion_corta", "acciones_columna")
@@ -441,7 +444,7 @@ class CustomUserChangeForm(UserChangeForm):
 # USUARIOS
 # =========================================================
 @admin.register(Usuario)
-class UsuarioAdmin(BaseUserAdmin, BotonEditarMixin, ModelAdmin):
+class UsuarioAdmin(SimpleHistoryAdmin, BaseUserAdmin, BotonEditarMixin, ModelAdmin):
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
     change_password_form = AdminPasswordChangeForm

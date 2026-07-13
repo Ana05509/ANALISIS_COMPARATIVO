@@ -1,4 +1,5 @@
 {% extends "analisis/base.html" %}
+{% load custom_filters %}
 
 {% block title %}Reportes{% endblock %}
 {% block nav_reportes %}active{% endblock %}
@@ -1133,15 +1134,15 @@
 <script>
 /* ── Datos del servidor ──────────────────────────────────────────── */
 var _MODO    = {{ muestra_ids_seleccionados|length }};
-var _RES     = {% if resumen_json %}{{ resumen_json|safe }}{% else %}[]{% endif %};
-var _CLAS    = {{ datos_clasificacion_json|safe }};
+var _RES     = {% if resumen_json %}{{ resumen_json|json_embed }}{% else %}[]{% endif %};
+var _CLAS    = {{ datos_clasificacion_json|json_embed }};
 var _TOT     = {
     benefico:       {{ totales_clasificacion.benefico|default:0 }},
     fitopatogeno:   {{ totales_clasificacion.fitopatogeno|default:0 }},
     neutral:        {{ totales_clasificacion.neutral|default:0 }},
     sin_clasificar: {{ totales_clasificacion.sin_clasificar|default:0 }},
 };
-var _ALFA_PM = {{ alfa_por_muestra_json|safe }};
+var _ALFA_PM = {{ alfa_por_muestra_json|json_embed }};
 var CLR      = { benefico:'#16a34a', fitopatogeno:'#dc2626', neutral:'#64748b', sin_clasificar:'#94a3b8' };
 var LBL      = { benefico:'Benéfico', fitopatogeno:'Fitopatógeno', neutral:'Neutral', sin_clasificar:'Sin catalogar' };
 

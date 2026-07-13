@@ -27,6 +27,43 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 
 # ---------------------------------------------------------------------------
+# Inyección de fórmulas en Excel (CWE-1236)
+# ---------------------------------------------------------------------------
+# codigo/localidad/finca_lote/cultivo/variedad vienen de texto libre que
+# cualquier usuario con permiso de carga escribe en el formulario, y
+# genus/species/family vienen tal cual del CSV/Excel subido. Si alguno
+# empieza con = + - @ (o tab/CR), Excel/LibreOffice lo interpreta como
+# fórmula al abrir el reporte generado — p. ej. un "código de muestra"
+# =HYPERLINK("http://evil.com","click") ejecutaría esa fórmula para quien
+# abra el reporte. Se sanea en todo el módulo justo antes de escribir a
+# Excel (nunca se toca lo que se guarda en la base de datos).
+_EXCEL_FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _excel_safe(value):
+    """Antepone un apóstrofe a texto que Excel interpretaría como fórmula."""
+    if isinstance(value, str) and value.startswith(_EXCEL_FORMULA_TRIGGERS):
+        return "'" + value
+    return value
+
+
+def _excel_safe_df(df):
+    """
+    Aplica _excel_safe a todas las columnas de texto de un DataFrame.
+
+    No filtra por dtype antes de mapear: pandas >= 2.x puede tipar columnas
+    de texto como 'object' o como su nuevo dtype 'str' dedicado según la
+    versión/configuración, y _excel_safe ya ignora internamente cualquier
+    valor que no sea str, así que aplicarlo a todas las columnas es más
+    simple y no depende de adivinar qué dtype exacto usa pandas en cada caso.
+    """
+    df = df.copy()
+    for col in df.columns:
+        df[col] = df[col].map(_excel_safe)
+    return df
+
+
+# ---------------------------------------------------------------------------
 # Paleta global
 # ---------------------------------------------------------------------------
 _DONUT_PALETTE = [
@@ -1901,7 +1938,7 @@ class ExportService:
                 ]
 
                 df_res = pd.DataFrame(res_rows[1:], columns=res_rows[0])
-                df_res.to_excel(writer, index=False, sheet_name="Resumen")
+                _excel_safe_df(df_res).to_excel(writer, index=False, sheet_name="Resumen")
                 ws_r = writer.sheets["Resumen"]
 
                 SECCIONES_R = {
@@ -1948,7 +1985,7 @@ class ExportService:
                 df_top = (pd.DataFrame(top_rec) if top_rec
                           else pd.DataFrame(columns=["#","Taxón","Total_Hits",
                                                      "Abundancia_%","Clasificación"]))
-                df_top.to_excel(writer, index=False, sheet_name="Top_N_Taxa")
+                _excel_safe_df(df_top).to_excel(writer, index=False, sheet_name="Top_N_Taxa")
                 ws_top = writer.sheets["Top_N_Taxa"]
                 _hdr(ws_top, len(df_top.columns))
                 _datos_filas(ws_top, 2, len(df_top) + 1)
@@ -1979,7 +2016,7 @@ class ExportService:
                 df_tod = (pd.DataFrame(todos_rec) if todos_rec
                           else pd.DataFrame(columns=["#","Taxón","Total_Hits",
                                                      "Abundancia_%","Clasificación"]))
-                df_tod.to_excel(writer, index=False, sheet_name="Taxonomia_Completa")
+                _excel_safe_df(df_tod).to_excel(writer, index=False, sheet_name="Taxonomia_Completa")
                 ws_tod = writer.sheets["Taxonomia_Completa"]
                 _hdr(ws_tod, len(df_tod.columns))
                 _datos_filas(ws_tod, 2, len(df_tod) + 1)
@@ -2018,7 +2055,7 @@ class ExportService:
                     "Alta riqueza >100 taxa | Moderada 30-100 | Baja <30 taxa"
                 )
                 df_div = pd.DataFrame(div_rec)
-                df_div.to_excel(writer, index=False, sheet_name="Diversidad_Alfa")
+                _excel_safe_df(df_div).to_excel(writer, index=False, sheet_name="Diversidad_Alfa")
                 ws_div = writer.sheets["Diversidad_Alfa"]
                 _hdr(ws_div, 4, fill=fill_azul)
                 _datos_filas(ws_div, 2, 6)
@@ -2068,7 +2105,7 @@ class ExportService:
                          "No presentes en el catálogo funcional del sistema"},
                 ]
                 df_clf = pd.DataFrame(clf_rec)
-                df_clf.to_excel(writer, index=False, sheet_name="Clasificacion_Funcional")
+                _excel_safe_df(df_clf).to_excel(writer, index=False, sheet_name="Clasificacion_Funcional")
                 ws_clf = writer.sheets["Clasificacion_Funcional"]
                 _hdr(ws_clf, 4, fill=PatternFill("solid", fgColor=CA),
                      font=Font(bold=True, color=CBLANCO, size=11))
@@ -2101,7 +2138,7 @@ class ExportService:
                 df_ben = (pd.DataFrame(ben_rec) if ben_rec
                           else pd.DataFrame(columns=["#","Organismo","Abundancia_%",
                                                      "Función_Agronómica","Referencia"]))
-                df_ben.to_excel(writer, index=False, sheet_name="Beneficos")
+                _excel_safe_df(df_ben).to_excel(writer, index=False, sheet_name="Beneficos")
                 ws_ben = writer.sheets["Beneficos"]
                 _hdr(ws_ben, 5, fill=PatternFill("solid", fgColor="0F6E56"))
                 _datos_filas(ws_ben, 2, len(df_ben) + 1)
@@ -2123,7 +2160,7 @@ class ExportService:
                 df_fito = (pd.DataFrame(fito_rec) if fito_rec
                            else pd.DataFrame(columns=["#","Organismo","Abundancia_%",
                                                       "Riesgo_Fitosanitario","Referencia"]))
-                df_fito.to_excel(writer, index=False, sheet_name="Fitopatogenos")
+                _excel_safe_df(df_fito).to_excel(writer, index=False, sheet_name="Fitopatogenos")
                 ws_fito = writer.sheets["Fitopatogenos"]
                 _hdr(ws_fito, 5, fill=fill_rojo)
                 _datos_filas(ws_fito, 2, len(df_fito) + 1)
@@ -2143,7 +2180,7 @@ class ExportService:
                 } for i, n in enumerate(neutrales)]
                 df_neu = (pd.DataFrame(neu_rec) if neu_rec
                           else pd.DataFrame(columns=["#","Organismo","Abundancia_%","Notas"]))
-                df_neu.to_excel(writer, index=False, sheet_name="Neutrales")
+                _excel_safe_df(df_neu).to_excel(writer, index=False, sheet_name="Neutrales")
                 ws_neu = writer.sheets["Neutrales"]
                 _hdr(ws_neu, 4, fill=PatternFill("solid", fgColor=CGRIS_H))
                 _datos_filas(ws_neu, 2, len(df_neu) + 1)
@@ -2169,7 +2206,7 @@ class ExportService:
                             else "= Sin diferencia"),
                     } for i, d in enumerate(diferencial)]
                     df_dif = pd.DataFrame(dif_rec)
-                    df_dif.to_excel(writer, index=False, sheet_name="Analisis_Diferencial")
+                    _excel_safe_df(df_dif).to_excel(writer, index=False, sheet_name="Analisis_Diferencial")
                     ws_dif = writer.sheets["Analisis_Diferencial"]
                     _hdr(ws_dif, 6, fill=fill_azul)
                     _datos_filas(ws_dif, 2, len(df_dif) + 1)
@@ -2289,7 +2326,7 @@ class ExportService:
                 ]
 
                 df_res2 = pd.DataFrame(res2[1:], columns=res2[0])
-                df_res2.to_excel(writer, index=False, sheet_name="Resumen_Comparativo")
+                _excel_safe_df(df_res2).to_excel(writer, index=False, sheet_name="Resumen_Comparativo")
                 ws_rc = writer.sheets["Resumen_Comparativo"]
 
                 SECCIONES_RC = {
@@ -2345,7 +2382,7 @@ class ExportService:
                                "Localidad","Índice_Salud","Nivel","Riqueza",
                                "Shannon_H'","Simpson_D","Equitatividad_J'",
                                "Benéficos","Fitopatógenos","Neutrales","Sin_Catalogar"]))
-                df_cuad.to_excel(writer, index=False, sheet_name="Cuadro_Comparativo")
+                _excel_safe_df(df_cuad).to_excel(writer, index=False, sheet_name="Cuadro_Comparativo")
                 ws_cuad = writer.sheets["Cuadro_Comparativo"]
                 _hdr(ws_cuad, len(df_cuad.columns))
                 _datos_filas(ws_cuad, 2, len(df_cuad) + 1, alin=al_c)
@@ -2413,7 +2450,7 @@ class ExportService:
                            else pd.DataFrame(columns=["Muestra","Riqueza","Shannon_H'",
                                                       "Nivel_Diversidad","Simpson_D",
                                                       "Equitatividad_J'"]))
-                df_alfa.to_excel(writer, index=False, sheet_name="Diversidad_Alfa")
+                _excel_safe_df(df_alfa).to_excel(writer, index=False, sheet_name="Diversidad_Alfa")
                 ws_alfa = writer.sheets["Diversidad_Alfa"]
                 _hdr(ws_alfa, 6, fill=fill_azul)
                 _datos_filas(ws_alfa, 2, len(df_alfa) + 1, alin=al_c)
@@ -2459,12 +2496,15 @@ class ExportService:
                 # Construir sets de taxa por muestra
                 taxa_sets: dict = {}
                 for dpm in datos_por_muestra:
-                    cod = str(dpm["muestra"].codigo)
+                    # _excel_safe: cod y los nombres de taxón terminan como valores de
+                    # celda en esta hoja (Diversidad_Beta se escribe con openpyxl directo,
+                    # no vía DataFrame, así que _excel_safe_df no los cubre).
+                    cod = _excel_safe(str(dpm["muestra"].codigo))
                     if "todos_taxa_nombres" in dpm:
-                        taxa_sets[cod] = dpm["todos_taxa_nombres"]
+                        taxa_sets[cod] = {_excel_safe(n) for n in dpm["todos_taxa_nombres"]}
                     else:
                         taxa_sets[cod] = {
-                            str(r.get("taxonomia", "")) for r in dpm.get("top_taxa", [])
+                            _excel_safe(str(r.get("taxonomia", ""))) for r in dpm.get("top_taxa", [])
                             if r.get("taxonomia")
                         }
 
@@ -2609,7 +2649,7 @@ class ExportService:
                 df_top = (pd.DataFrame(top_rec) if top_rec
                           else pd.DataFrame(columns=["#","Taxón","Total_Hits",
                                                      "Abundancia_%","Clasificación"]))
-                df_top.to_excel(writer, index=False, sheet_name="Top_N_Global")
+                _excel_safe_df(df_top).to_excel(writer, index=False, sheet_name="Top_N_Global")
                 ws_top = writer.sheets["Top_N_Global"]
                 _hdr(ws_top, len(df_top.columns))
                 _datos_filas(ws_top, 2, len(df_top) + 1)
@@ -2638,7 +2678,7 @@ class ExportService:
                 df_tod = (pd.DataFrame(todos_rec) if todos_rec
                           else pd.DataFrame(columns=["#","Taxón","Total_Hits",
                                                      "Abundancia_%","Clasificación"]))
-                df_tod.to_excel(writer, index=False, sheet_name="Taxonomia_Completa")
+                _excel_safe_df(df_tod).to_excel(writer, index=False, sheet_name="Taxonomia_Completa")
                 ws_tod = writer.sheets["Taxonomia_Completa"]
                 _hdr(ws_tod, len(df_tod.columns))
                 _datos_filas(ws_tod, 2, len(df_tod) + 1)
@@ -2667,7 +2707,7 @@ class ExportService:
                           else pd.DataFrame(columns=[
                               "Muestra","Benéficos","Fitopatógenos","Neutrales",
                               "Sin_Catalogar","Total_Taxa","%_Benéficos","%_Fitopatógenos"]))
-                df_cls.to_excel(writer, index=False, sheet_name="Clas_Por_Muestra")
+                _excel_safe_df(df_cls).to_excel(writer, index=False, sheet_name="Clas_Por_Muestra")
                 ws_cls = writer.sheets["Clas_Por_Muestra"]
                 _hdr(ws_cls, len(df_cls.columns),
                      fill=PatternFill("solid", fgColor=CA),
@@ -2694,7 +2734,7 @@ class ExportService:
                 df_ben = (pd.DataFrame(ben_rec) if ben_rec
                           else pd.DataFrame(columns=["#","Organismo","Abundancia_%",
                                                      "Función_Agronómica","Referencia"]))
-                df_ben.to_excel(writer, index=False, sheet_name="Beneficos")
+                _excel_safe_df(df_ben).to_excel(writer, index=False, sheet_name="Beneficos")
                 ws_ben = writer.sheets["Beneficos"]
                 _hdr(ws_ben, 5, fill=PatternFill("solid", fgColor="0F6E56"))
                 _datos_filas(ws_ben, 2, len(df_ben) + 1)
@@ -2716,7 +2756,7 @@ class ExportService:
                 df_fito = (pd.DataFrame(fito_rec) if fito_rec
                            else pd.DataFrame(columns=["#","Organismo","Abundancia_%",
                                                       "Riesgo_Fitosanitario","Referencia"]))
-                df_fito.to_excel(writer, index=False, sheet_name="Fitopatogenos")
+                _excel_safe_df(df_fito).to_excel(writer, index=False, sheet_name="Fitopatogenos")
                 ws_fito = writer.sheets["Fitopatogenos"]
                 _hdr(ws_fito, 5, fill=fill_rojo)
                 _datos_filas(ws_fito, 2, len(df_fito) + 1)
@@ -2736,7 +2776,7 @@ class ExportService:
                 } for i, n in enumerate(neutrales)]
                 df_neu = (pd.DataFrame(neu_rec) if neu_rec
                           else pd.DataFrame(columns=["#","Organismo","Abundancia_%","Notas"]))
-                df_neu.to_excel(writer, index=False, sheet_name="Neutrales")
+                _excel_safe_df(df_neu).to_excel(writer, index=False, sheet_name="Neutrales")
                 ws_neu = writer.sheets["Neutrales"]
                 _hdr(ws_neu, 4, fill=PatternFill("solid", fgColor=CGRIS_H))
                 _datos_filas(ws_neu, 2, len(df_neu) + 1)

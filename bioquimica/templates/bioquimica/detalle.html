@@ -1,4 +1,5 @@
 {% extends "analisis/base.html" %}
+{% load custom_filters %}
 
 {% block title %}{{ ensayo.codigo }} — TerraBioLab{% endblock %}
 {% block nav_ensayos %}active{% endblock %}
@@ -83,24 +84,24 @@
 </div>
 {% endif %}
 
-<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:1.25rem; margin-bottom:1.25rem;">
+<div style="display:flex; flex-direction:column; gap:1.25rem; margin-bottom:1.25rem;">
 
     {% if recuentos_bacterias %}
     <div class="card">
         <div class="card-title" style="color:var(--verde-dark);">🦠 Bacterias</div>
-        <div class="table-wrap" style="margin-top:0.6rem;">
-            <table class="table-inner">
+        <div style="margin-top:0.6rem; overflow-x:visible;">
+            <table class="table-inner" style="min-width:0; width:100%;">
                 <thead>
                     <tr>
                         <th>Microorganismo</th>
-                        <th class="td-right">UFC/g</th>
+                        <th class="td-right" style="white-space:nowrap; width:110px;">UFC/g</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for r in recuentos_bacterias %}
                     <tr>
-                        <td>{{ r.nombre }}</td>
-                        <td class="td-mono td-right" style="color:var(--verde-dark); font-weight:600;">{{ r.valor_display }}</td>
+                        <td style="font-style:italic; word-break:break-word;">{{ r.nombre }}</td>
+                        <td class="td-mono td-right" style="color:var(--verde-dark); font-weight:600; white-space:nowrap;">{{ r.valor_display }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -112,19 +113,19 @@
     {% if recuentos_hongos %}
     <div class="card">
         <div class="card-title" style="color:#5a3a00;">🍄 Hongos</div>
-        <div class="table-wrap" style="margin-top:0.6rem;">
-            <table class="table-inner">
+        <div style="margin-top:0.6rem; overflow-x:visible;">
+            <table class="table-inner" style="min-width:0; width:100%;">
                 <thead>
                     <tr>
                         <th>Microorganismo</th>
-                        <th class="td-right">UFC/g</th>
+                        <th class="td-right" style="white-space:nowrap; width:110px;">UFC/g</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for r in recuentos_hongos %}
                     <tr>
-                        <td>{{ r.nombre }}</td>
-                        <td class="td-mono td-right" style="color:#5a3a00; font-weight:600;">{{ r.valor_display }}</td>
+                        <td style="font-style:italic; word-break:break-word;">{{ r.nombre }}</td>
+                        <td class="td-mono td-right" style="color:#5a3a00; font-weight:600; white-space:nowrap;">{{ r.valor_display }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -170,40 +171,42 @@
 
 {% for org in aislados_con_pruebas %}
 <div class="card" style="margin-bottom:1.25rem;">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem; flex-wrap:wrap; gap:12px;">
-        <div>
-            <h3 style="font-size:16px; font-weight:700; margin:0 0 6px; font-style:italic; color:var(--text-primary);">
-                {{ org.nombre_cientifico }}
-            </h3>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <span class="badge {% if org.tipo == 'hongo' %}tipo-hongo{% else %}tipo-bacteria{% endif %}">
-                    {% if org.tipo == 'hongo' %}🍄 Hongo{% else %}🦠 Bacteria{% endif %}
-                </span>
-                {% if org.clasificacion_catalogo == 'benefico' %}
-                <span class="badge badge-benefico"><i class="ti ti-shield-check"></i> Benéfico</span>
-                {% elif org.clasificacion_catalogo == 'fitopatogeno' %}
-                <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle"></i> Fitopatógeno</span>
-                {% elif org.clasificacion_catalogo == 'neutral' %}
-                <span class="badge badge-neutral">— Neutral</span>
-                {% else %}
-                <span class="badge badge-sin-clas">Sin clasificar</span>
-                {% endif %}
-            </div>
-        </div>
 
-        {% if org.tiene_taxonomia %}
-        <div style="font-size:12px; color:var(--text-muted); line-height:1.8;">
-            {% if org.dominio %}<div><strong>Dominio:</strong> {{ org.dominio }}</div>{% endif %}
-            {% if org.filo    %}<div><strong>Filo:</strong> {{ org.filo }}</div>{% endif %}
-            {% if org.clase   %}<div><strong>Clase:</strong> {{ org.clase }}</div>{% endif %}
-            {% if org.orden_taxonomico %}<div><strong>Orden:</strong> {{ org.orden_taxonomico }}</div>{% endif %}
-            {% if org.familia %}<div><strong>Familia:</strong> {{ org.familia }}</div>{% endif %}
-            {% if org.genero  %}<div><strong>Género:</strong> <em>{{ org.genero }}</em></div>{% endif %}
-            {% if org.especie %}<div><strong>Especie:</strong> <em>{{ org.especie }}</em></div>{% endif %}
+    {# — Cabecera: nombre + badges — #}
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:0.75rem;">
+        <h3 style="font-size:16px; font-weight:700; margin:0; font-style:italic; color:var(--text-primary);">
+            {{ org.nombre_cientifico }}
+        </h3>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+            <span class="badge {% if org.tipo == 'hongo' %}tipo-hongo{% else %}tipo-bacteria{% endif %}">
+                {% if org.tipo == 'hongo' %}🍄 Hongo{% else %}🦠 Bacteria{% endif %}
+            </span>
+            {% if org.clasificacion_catalogo == 'benefico' %}
+            <span class="badge badge-benefico"><i class="ti ti-shield-check"></i> Benéfico</span>
+            {% elif org.clasificacion_catalogo == 'fitopatogeno' %}
+            <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle"></i> Fitopatógeno</span>
+            {% elif org.clasificacion_catalogo == 'neutral' %}
+            <span class="badge badge-neutral">— Neutral</span>
+            {% else %}
+            <span class="badge badge-sin-clas">Sin clasificar</span>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 
+    {# — Taxonomía como franja de píldoras horizontales — #}
+    {% if org.tiene_taxonomia %}
+    <div style="display:flex; flex-wrap:wrap; gap:6px 16px; padding:8px 10px; background:var(--gris-light); border-radius:6px; margin-bottom:1rem; font-size:12px; color:var(--text-muted);">
+        {% if org.dominio %}<span><strong>Dominio:</strong> {{ org.dominio }}</span>{% endif %}
+        {% if org.filo %}<span><strong>Filo:</strong> {{ org.filo }}</span>{% endif %}
+        {% if org.clase %}<span><strong>Clase:</strong> {{ org.clase }}</span>{% endif %}
+        {% if org.orden_taxonomico %}<span><strong>Orden:</strong> {{ org.orden_taxonomico }}</span>{% endif %}
+        {% if org.familia %}<span><strong>Familia:</strong> {{ org.familia }}</span>{% endif %}
+        {% if org.genero %}<span><strong>Género:</strong> <em>{{ org.genero }}</em></span>{% endif %}
+        {% if org.especie %}<span><strong>Especie:</strong> <em>{{ org.especie }}</em></span>{% endif %}
+    </div>
+    {% endif %}
+
+    {# — Tabla de pruebas bioquímicas — #}
     {% if org.pruebas.all %}
     <div class="table-wrap">
         <table class="table-inner">
@@ -211,7 +214,7 @@
                 <tr>
                     <th style="width:44px;">N°</th>
                     <th>Prueba bioquímica</th>
-                    <th class="td-center">Resultado</th>
+                    <th class="td-center" style="width:110px;">Resultado</th>
                 </tr>
             </thead>
             <tbody>
@@ -229,7 +232,7 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="2" style="color:var(--text-hint);">
+                    <td colspan="2" style="color:var(--text-hint); font-size:12px;">
                         Metodología: Pruebas bioquímicas en medios selectivos
                     </td>
                     <td class="td-center" style="font-size:12px; font-weight:600; color:var(--verde-dark);">
@@ -240,6 +243,7 @@
         </table>
     </div>
     {% endif %}
+
 </div>
 {% endfor %}
 
@@ -260,13 +264,13 @@
 <script>
 {% if grafico_recuento_json %}
 (function(){
-    var data = {{ grafico_recuento_json|safe }};
+    var data = {{ grafico_recuento_json|json_embed }};
     Plotly.newPlot('grafico-recuento', data.data, data.layout, {responsive: true, displayModeBar: false});
 })();
 {% endif %}
 {% if grafico_heatmap_json %}
 (function(){
-    var data = {{ grafico_heatmap_json|safe }};
+    var data = {{ grafico_heatmap_json|json_embed }};
     Plotly.newPlot('grafico-heatmap', data.data, data.layout, {responsive: true, displayModeBar: false});
 })();
 {% endif %}

@@ -11,15 +11,15 @@
 {% block nav_ensayos %}active{% endblock %}
 
 {% block content %}
-<div style="max-width: 560px; margin: 0 auto;">
+<div style="max-width: 580px; margin: 0 auto;">
 
     <div class="page-header">
         <h1 style="font-family:'Fraunces',serif; font-size:24px; font-weight:500; color:#1A1A18;">
-            Procesar Reporte de Laboratorio
+            Procesar Reportes de Laboratorio
         </h1>
         <p style="color:#5F5E5A; font-size:14px; margin-top:6px;">
-            Sube el PDF del reporte DISErLAB-PUCE. El sistema extrae automáticamente
-            los datos de recuento UFC/g o las pruebas bioquímicas de aislamiento.
+            Sube uno o varios PDFs del laboratorio DISErLAB-PUCE. El sistema extrae
+            automáticamente los datos de recuento UFC/g o pruebas bioquímicas.
         </p>
     </div>
 
@@ -28,11 +28,11 @@
             {% csrf_token %}
 
             <div class="form-group">
-                <label class="form-label">Archivo PDF del reporte</label>
+                <label class="form-label">Archivos PDF</label>
                 <div id="drop-zone" style="
                     border: 2px dashed #D3D1C7;
                     border-radius: 12px;
-                    padding: 40px 20px;
+                    padding: 36px 20px;
                     text-align: center;
                     cursor: pointer;
                     transition: border-color 0.2s, background 0.2s;
@@ -41,21 +41,27 @@
                    ondragover="event.preventDefault(); this.style.borderColor='#1D9E75'; this.style.background='#F0FAF6';"
                    ondragleave="this.style.borderColor='#D3D1C7'; this.style.background='#FAFAF8';"
                    ondrop="handleDrop(event);">
-
-                    <i class="ti ti-file-type-pdf" style="font-size:40px; color:#C8C5BC;" id="drop-icon"></i>
-                    <p style="margin-top:12px; font-size:14px; color:#5F5E5A;" id="drop-text">
-                        Arrastra el PDF aquí o <span style="color:#1D9E75; font-weight:600;">haz clic para seleccionar</span>
+                    <i class="ti ti-files" style="font-size:38px; color:#C8C5BC;" id="drop-icon"></i>
+                    <p style="margin-top:10px; font-size:14px; color:#5F5E5A;" id="drop-text">
+                        Arrastra los PDFs aquí o <span style="color:#1D9E75; font-weight:600;">haz clic para seleccionar</span>
                     </p>
-                    <p style="font-size:12px; color:#888780; margin-top:4px;">Solo archivos .pdf — MAg-XXX-XXXX</p>
-                    <input type="file" name="archivo" id="archivo-input" accept=".pdf" style="display:none;"
-                           aria-label="Seleccionar archivo PDF">
+                    <p style="font-size:12px; color:#888780; margin-top:4px;">Puedes seleccionar varios archivos a la vez · Solo .pdf</p>
+                    <input type="file" name="archivos" id="archivo-input" accept=".pdf" multiple style="display:none;"
+                           aria-label="Seleccionar archivos PDF">
                 </div>
             </div>
 
-            <div id="archivo-seleccionado" style="display:none; background:#E1F5EE; border-radius:8px; padding:10px 14px; margin-bottom:16px;">
-                <i class="ti ti-check" style="color:#085041;"></i>
-                <span id="nombre-archivo" style="font-size:13px; color:#085041; font-weight:500; margin-left:6px;"></span>
-                <a href="#" onclick="limpiarArchivo(); return false;" style="float:right; font-size:12px; color:#A32D2D;">✕ Quitar</a>
+            {# Lista de archivos seleccionados #}
+            <div id="lista-archivos" style="display:none; margin-bottom:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span id="contador-archivos" style="font-size:13px; font-weight:600; color:#1A1A18;"></span>
+                    <a href="#" onclick="limpiarArchivos(); return false;" style="font-size:12px; color:#A32D2D;">✕ Quitar todos</a>
+                </div>
+                <ul id="nombres-archivos" style="
+                    margin:0; padding:0; list-style:none;
+                    background:#F4F3EF; border-radius:8px;
+                    max-height:160px; overflow-y:auto;
+                "></ul>
             </div>
 
             <div style="background:#F8F7F4; border-radius:10px; padding:14px 16px; margin-bottom:20px; font-size:13px; color:#5F5E5A; line-height:1.7;">
@@ -67,7 +73,7 @@
             </div>
 
             <button type="submit" id="btn-procesar" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;">
-                <i class="ti ti-cpu" aria-hidden="true"></i> Procesar PDF
+                <i class="ti ti-cpu" aria-hidden="true"></i> <span id="btn-label">Procesar PDF</span>
             </button>
         </form>
     </div>
@@ -76,44 +82,91 @@
 
 {% block extra_js %}
 <script>
-function mostrarArchivo(input) {
-    if (input.files && input.files[0]) {
-        document.getElementById('nombre-archivo').textContent = input.files[0].name;
-        document.getElementById('archivo-seleccionado').style.display = 'block';
-        document.getElementById('drop-icon').style.color = '#1D9E75';
-        document.getElementById('drop-text').innerHTML = 'Archivo listo para procesar';
+var archivosActuales = new DataTransfer();
+
+function actualizarLista() {
+    var files = archivosActuales.files;
+    var lista = document.getElementById('lista-archivos');
+    var ul    = document.getElementById('nombres-archivos');
+    var contador = document.getElementById('contador-archivos');
+    var btnLabel = document.getElementById('btn-label');
+
+    if (files.length === 0) {
+        lista.style.display = 'none';
+        document.getElementById('drop-icon').className = 'ti ti-files';
+        document.getElementById('drop-icon').style.color = '#C8C5BC';
+        document.getElementById('drop-text').innerHTML =
+            'Arrastra los PDFs aquí o <span style="color:#1D9E75;font-weight:600;">haz clic para seleccionar</span>';
+        btnLabel.textContent = 'Procesar PDF';
+        return;
     }
+
+    lista.style.display = 'block';
+    document.getElementById('drop-icon').style.color = '#1D9E75';
+    document.getElementById('drop-text').innerHTML = 'Añadir más archivos';
+    contador.textContent = files.length === 1 ? '1 archivo seleccionado' : files.length + ' archivos seleccionados';
+    btnLabel.textContent = files.length === 1 ? 'Procesar PDF' : 'Procesar ' + files.length + ' PDFs';
+
+    ul.innerHTML = '';
+    for (var i = 0; i < files.length; i++) {
+        var li = document.createElement('li');
+        li.style.cssText = 'display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid #E5E3DC; font-size:13px;';
+        li.innerHTML = '<i class="ti ti-file-type-pdf" style="color:#C8443A; flex-shrink:0;"></i>'
+            + '<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + files[i].name + '</span>'
+            + '<a href="#" data-idx="' + i + '" onclick="quitarArchivo(this); return false;" style="color:#A32D2D; flex-shrink:0; font-size:12px;">✕</a>';
+        ul.appendChild(li);
+    }
+    li = ul.querySelector('li:last-child');
+    if (li) li.style.borderBottom = 'none';
+
+    document.getElementById('archivo-input').files = archivosActuales.files;
 }
 
-function limpiarArchivo() {
-    document.getElementById('archivo-input').value = '';
-    document.getElementById('archivo-seleccionado').style.display = 'none';
-    document.getElementById('drop-icon').style.color = '#C8C5BC';
-    document.getElementById('drop-text').innerHTML =
-        'Arrastra el PDF aquí o <span style="color:#1D9E75;font-weight:600;">haz clic para seleccionar</span>';
+function agregarArchivos(fileList) {
+    var existentes = new Set();
+    for (var i = 0; i < archivosActuales.files.length; i++) {
+        existentes.add(archivosActuales.files[i].name);
+    }
+    for (var i = 0; i < fileList.length; i++) {
+        if (fileList[i].name.toLowerCase().endsWith('.pdf') && !existentes.has(fileList[i].name)) {
+            archivosActuales.items.add(fileList[i]);
+        }
+    }
+    actualizarLista();
+}
+
+function quitarArchivo(a) {
+    var idx = parseInt(a.getAttribute('data-idx'));
+    var nuevo = new DataTransfer();
+    for (var i = 0; i < archivosActuales.files.length; i++) {
+        if (i !== idx) nuevo.items.add(archivosActuales.files[i]);
+    }
+    archivosActuales = nuevo;
+    actualizarLista();
+}
+
+function limpiarArchivos() {
+    archivosActuales = new DataTransfer();
+    actualizarLista();
 }
 
 function handleDrop(e) {
     e.preventDefault();
     document.getElementById('drop-zone').style.borderColor = '#D3D1C7';
     document.getElementById('drop-zone').style.background  = '#FAFAF8';
-    const file = e.dataTransfer.files[0];
-    if (file && file.name.toLowerCase().endsWith('.pdf')) {
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        document.getElementById('archivo-input').files = dt.files;
-        mostrarArchivo(document.getElementById('archivo-input'));
-    }
+    agregarArchivos(e.dataTransfer.files);
 }
 
-document.getElementById('upload-form').addEventListener('submit', function() {
-    const btn = document.getElementById('btn-procesar');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-inline"></span> Procesando…';
+document.getElementById('archivo-input').addEventListener('change', function () {
+    agregarArchivos(this.files);
+    this.value = '';
 });
 
-document.getElementById('archivo-input').addEventListener('change', function () {
-    mostrarArchivo(this);
+document.getElementById('upload-form').addEventListener('submit', function(e) {
+    document.getElementById('archivo-input').files = archivosActuales.files;
+    var btn = document.getElementById('btn-procesar');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-inline"></span> Procesando…';
 });
 </script>
 {% endblock extra_js %}

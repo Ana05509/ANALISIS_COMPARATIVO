@@ -64,7 +64,13 @@
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        html { scroll-behavior: smooth; }
+        html {
+            scroll-behavior: smooth;
+            /* Red de seguridad: si algún componente se desborda en una pantalla
+               angosta, esto evita que TODA la página gane scroll horizontal. */
+            overflow-x: hidden;
+            width: 100%;
+        }
 
         body {
             font-family: 'Outfit', sans-serif;
@@ -75,7 +81,11 @@
             color: var(--text-primary);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+            width: 100%;
         }
+
+        img, svg, video { max-width: 100%; height: auto; }
 
         /* ── INTERFAZ DE USUARIO: CONTENEDORES CON PREFIJOS PROPIOS (Protege el Admin) ── */
         .bs-app-layout-root {
@@ -564,6 +574,16 @@
             line-height: 1.5;
         }
 
+        .page-header { margin-bottom: 1.5rem; }
+        .page-header h1 {
+            font-family: 'Fraunces', serif;
+            font-size: 28px;
+            font-weight: 500;
+            color: var(--text-primary);
+            overflow-wrap: anywhere;
+        }
+        .page-header p { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
+
         .card {
             background: var(--surface);
             border: 1px solid var(--gris-border);
@@ -679,7 +699,12 @@
         @keyframes spinBtn { to { transform: rotate(360deg); } }
 
         /* Tabla interna (sin bordes externos, para usar dentro de .card) */
-        .table-inner { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+        /* min-width: sin esto, en un celular el navegador encoge las columnas
+           para que quepan en vez de activar el scroll horizontal de
+           .table-wrap — la tabla "se ajusta" apretando el contenido en vez
+           de adaptarse. Con min-width, si no entra, se ve completa con scroll
+           en lugar de columnas ilegibles. */
+        .table-inner { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13.5px; }
         .table-inner thead tr { border-bottom: 2px solid var(--gris-border); }
         .table-inner thead th { background: var(--gris-light); font-size: 11px; font-weight: 600;
                                  text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
@@ -792,6 +817,12 @@
             border-collapse: collapse;
             font-size: 14px;
         }
+
+        /* Igual que en .table-inner: sin un mínimo, el navegador aprieta las
+           columnas en vez de dejar que .table-wrap la haga scrollable. Tablas
+           puntuales (ids con su propio min-width, como #tabla-historial)
+           siguen ganando por especificidad si necesitan otro valor. */
+        .table-wrap table { min-width: 560px; }
 
         thead th {
             background: var(--gris-light);
@@ -1349,6 +1380,42 @@
                 });
             });
         });
+    })();
+
+    /* ── AJUSTE DE ALTURA DE GRÁFICOS PLOTLY EN MÓVIL ──
+       Las páginas con gráficos (dashboard, comparar, análisis avanzado,
+       reportes, bioquímica) fijan la altura en píxeles desde el backend
+       (400-560px, y en algún caso crece con la cantidad de datos). Con
+       Plotly {responsive:true} el ANCHO ya se adapta solo, pero la altura
+       se queda fija — en un teléfono angosto el gráfico queda muy alto y
+       angosto. Esto corre después de que cada página renderiza sus propios
+       gráficos (no toca cómo los genera cada una) y solo actúa sobre los
+       que Plotly ya haya dibujado en el DOM. */
+    (function () {
+        var MOBILE_HEIGHT = 300;
+
+        function ajustarGraficos() {
+            if (typeof Plotly === 'undefined') return;
+            var esMovil = window.innerWidth < 640;
+            document.querySelectorAll('.js-plotly-plot').forEach(function (gd) {
+                var alturaActual = gd._fullLayout && gd._fullLayout.height;
+                if (!alturaActual) return;
+                if (esMovil && alturaActual > MOBILE_HEIGHT) {
+                    if (!gd.dataset.bsAlturaOriginal) gd.dataset.bsAlturaOriginal = alturaActual;
+                    Plotly.relayout(gd, { height: MOBILE_HEIGHT });
+                } else if (!esMovil && gd.dataset.bsAlturaOriginal) {
+                    Plotly.relayout(gd, { height: parseInt(gd.dataset.bsAlturaOriginal, 10) });
+                    delete gd.dataset.bsAlturaOriginal;
+                }
+            });
+        }
+
+        var debounceId;
+        window.addEventListener('resize', function () {
+            clearTimeout(debounceId);
+            debounceId = setTimeout(ajustarGraficos, 200);
+        });
+        window.addEventListener('load', function () { setTimeout(ajustarGraficos, 50); });
     })();
 
     /* ── INICIALIZACIÓN ── */

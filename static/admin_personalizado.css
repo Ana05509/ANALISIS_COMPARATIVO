@@ -5,10 +5,29 @@
 /* ─── ESCALA DE FUENTE GLOBAL (texto más legible al 100% zoom) ─── */
 html {
     font-size: 106.25% !important; /* 17px base: text-sm → ~15px, text-xs → ~13px */
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
 }
 
 body {
     line-height: 1.6 !important;
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+}
+
+/*
+ * Unfold envuelve las tablas del changelist en su propio contenedor con
+ * scroll horizontal (overflow-x-auto + simplebar), así que una tabla ancha
+ * NUNCA debería ensanchar la página completa. El hueco está un nivel más
+ * arriba: el <div class="@container px-4 pb-4 grow"> que envuelve #content
+ * es hijo flex de #main (flex-col) pero no trae min-width:0 de Tailwind,
+ * así que el contenido ancho de sus descendientes puede "empujar" el ancho
+ * mínimo de ese contenedor y, con él, el de toda la página. Forzamos
+ * min-width:0 para que el desbordamiento se quede contenido en la tabla
+ * (que sí tiene su propia barra) en vez de en la página entera.
+ */
+#main > div.\@container {
+    min-width: 0 !important;
 }
 
 /* ─── TOKENS SEMÁNTICOS PROPIOS ─── */

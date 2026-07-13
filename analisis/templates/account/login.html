@@ -44,7 +44,10 @@
 
         /* ── Reset ─────────────────────────────────── */
         *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
-        body { font-family:'Outfit',sans-serif; color:var(--text); min-height:100vh; display:flex; overflow:hidden; }
+        /* overflow-x (no overflow a secas): si la tarjeta es más alta que la
+           ventana -laptops 1366x768, zoom del navegador, etc.- el body debe
+           poder hacer scroll vertical o el contenido queda inaccesible. */
+        body { font-family:'Outfit',sans-serif; color:var(--text); min-height:100vh; display:flex; overflow-x:hidden; }
 
         /* ── Layout ─────────────────────────────────── */
         .split { display:flex; width:100%; min-height:100vh; }

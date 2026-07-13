@@ -155,7 +155,7 @@ def _parsear_recuento(pdf) -> list:
                 else:
                     continue
 
-                if not nombre or 'IDENTIFICACI' in nombre.upper():
+                if not nombre or 'IDENTIFICACI' in nombre.upper() or nombre.upper() in ('HONGOS', 'BACTERIA', 'BACTERIAS', 'HONGO'):
                     continue
 
                 coef, exp, menor = _parsear_ufc(ufc_str)
@@ -210,6 +210,9 @@ def _parsear_aislamiento(pdf) -> list:
                     if len(fila) >= 2:
                         clave = _celda(fila[0]).lower().rstrip(':').strip()
                         valor = _celda(fila[1]).strip()
+                        # Tablas de 3 columnas tienen columna vacía en el medio
+                        if not valor and len(fila) >= 3:
+                            valor = _celda(fila[2]).strip()
                         campo = _TAXON_MAP.get(clave)
                         if campo and valor and 'TAXONOM' not in valor.upper():
                             org_actual['taxonomia'][campo] = valor
