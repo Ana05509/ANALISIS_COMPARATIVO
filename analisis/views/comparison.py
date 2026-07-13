@@ -9,13 +9,23 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse, HttpResponseBase
 from django.views.decorators.http import require_POST
 
-from analisis.models import ResultadoTaxonomico
+from django.db.models import Sum
+
+from analisis.models import ResultadoTaxonomico, ArchivoMolecular
 from analisis.services.business.comparison_service import ejecutar_comparacion_clean
 from analisis.services.processing.diversity import DiversityService
-from analisis.services.business.analysis_service import obtener_analisis_avanzado
+from analisis.services.business.analysis_service import (
+    obtener_analisis_avanzado,
+    obtener_diversidad_beta_inter,
+    obtener_diversidad_gamma,
+    obtener_permanova,
+)
 from analisis.services.business.export_service import ExportService
 from analisis.services.business.report_generation_service import ReportGenerationService
-from analisis.constants import MARCADORES_VALIDOS, OPCIONES_TOP_N
+from analisis.constants import (
+    MARCADORES_VALIDOS, OPCIONES_TOP_N, NIVELES_ES, MARCADORES_ES,
+    NIVELES_CHOICES, MARCADORES_CHOICES, get_taxonomia_annotation,
+)
 
 FORMATOS_VALIDOS = ("pdf", "excel", "html", "json")
 
@@ -34,6 +44,12 @@ def comparar(request):
     from analisis.forms import CompararForm
 
     form = CompararForm(request.GET or None)
+
+    _tipos_raw: dict = {}
+    for mid, t in ArchivoMolecular.objects.values_list("muestra_id", "tipo_analisis").distinct():
+        _tipos_raw.setdefault(mid, []).append(t)
+    tipos_por_muestra_json = json.dumps(_tipos_raw)
+
     contexto: Dict[str, Any] = {
         "form": form,
         "marcador_seleccionado": None,
@@ -49,22 +65,34 @@ def comparar(request):
         "top_taxonomia": "—",
         "top_actual": 10,
         "nivel_actual": "genus",
+        "nivel_actual_label": NIVELES_ES.get("genus", "Género"),
+        "opciones_top_n": OPCIONES_TOP_N,
         "tabla_json": "[]",
         "shannon_json": "{}",
+        "alfa_json": "{}",
+        "alfa_por_muestra": {},
+        "diversidad_beta": None,
+        "diversidad_gamma": None,
+        "permanova": None,
+        "tipos_por_muestra_json": tipos_por_muestra_json,
     }
-
-    TOP_N_VISUALIZACION = 25  # fijo; el usuario ya no lo selecciona
 
     if request.GET and form.is_valid():
         muestras_seleccionadas = form.cleaned_data.get("muestras")
         marcador = form.cleaned_data.get("marcador")
         nivel = form.cleaned_data.get("nivel")
+        try:
+            top_n_form = int(form.cleaned_data.get("top_n", 10))
+            TOP_N_VISUALIZACION = top_n_form if top_n_form in OPCIONES_TOP_N else 10
+        except (ValueError, TypeError):
+            TOP_N_VISUALIZACION = 10
 
         if muestras_seleccionadas and len(muestras_seleccionadas) >= 2:
             contexto["marcador_seleccionado"] = marcador
             contexto["total_muestras"] = len(muestras_seleccionadas)
             contexto["top_actual"] = TOP_N_VISUALIZACION
             contexto["nivel_actual"] = nivel
+            contexto["nivel_actual_label"] = NIVELES_ES.get(nivel, nivel.capitalize())
 
             cleaned_data = {
                 "tipo": marcador,
@@ -110,26 +138,62 @@ def comparar(request):
                                 title=f"Comparación de Abundancias — {(nivel or '').capitalize()} (Top {TOP_N_VISUALIZACION})",
                                 template="plotly_white",
                             )
-                            fig.update_layout(xaxis_tickangle=-45, height=420)
+                            fig.update_layout(
+                                xaxis=dict(tickangle=-45, automargin=True, tickfont=dict(size=10)),
+                                margin=dict(b=160, t=60, l=60, r=20),
+                                height=460,
+                            )
                             contexto["graficos_json"] = fig.to_json()
 
                     contexto["tabla_json"] = json.dumps(tabla)
 
-                    # Shannon H' individual por muestra (sobre todos los taxones)
+                    # Diversidad alfa completa por muestra
+                    # Agrega Sum(num_hits) por taxon al nivel elegido para evitar
+                    # contar múltiples especies del mismo genus como taxa distintos
+                    taxonomia_expr = get_taxonomia_annotation(nivel)
+                    alfa_por_muestra = {}
                     shannon_por_muestra = {}
                     for muestra in muestras_seleccionadas:
-                        qs_m = ResultadoTaxonomico.objects.filter(
-                            archivo__tipo_analisis=marcador,
-                            archivo__muestra=muestra,
+                        rows = list(
+                            ResultadoTaxonomico.objects
+                            .filter(archivo__tipo_analisis=marcador, archivo__muestra=muestra)
+                            .values(t=taxonomia_expr)
+                            .annotate(h=Sum('num_hits'))
                         )
-                        if qs_m.exists():
-                            hits = list(qs_m.values_list('porcentaje_hits', flat=True))
-                            df_m = pd.DataFrame({'%_hits': hits})
+                        rows = [r for r in rows if r['t']]
+                        if rows:
+                            total = sum(r['h'] for r in rows) or 1
+                            df_m = pd.DataFrame({'%_hits': [r['h'] / total * 100 for r in rows]})
                             df_m = df_m[df_m['%_hits'] > 0]
                             if not df_m.empty:
                                 alfa = DiversityService.calcular_diversidad_alfa(df_m)
-                                shannon_por_muestra[muestra.codigo] = round(alfa.get('shannon', 0), 4)
+                                alfa_por_muestra[muestra.codigo] = {
+                                    'riqueza': int(alfa.get('riqueza', 0)),
+                                    'shannon': round(alfa.get('shannon', 0), 4),
+                                    'simpson': round(alfa.get('simpson', 0), 4),
+                                    'equitatividad': round(alfa.get('equitatividad', 0), 4),
+                                }
+                                shannon_por_muestra[muestra.codigo] = alfa_por_muestra[muestra.codigo]['shannon']
+                    contexto["alfa_por_muestra"] = alfa_por_muestra
+                    contexto["alfa_json"] = json.dumps(alfa_por_muestra)
                     contexto["shannon_json"] = json.dumps(shannon_por_muestra)
+
+                    muestra_ids = [m.id for m in muestras_seleccionadas]
+
+                    # Diversidad beta inter-muestra
+                    beta_inter = obtener_diversidad_beta_inter(tipo=marcador, nivel=nivel, muestra_ids=muestra_ids)
+                    if beta_inter:
+                        contexto["diversidad_beta"] = beta_inter
+
+                    # Diversidad gamma (metacomunidad)
+                    gamma = obtener_diversidad_gamma(tipo=marcador, nivel=nivel, muestra_ids=muestra_ids)
+                    if gamma:
+                        contexto["diversidad_gamma"] = gamma
+
+                    # PERMANOVA
+                    permanova = obtener_permanova(tipo=marcador, nivel=nivel, muestra_ids=muestra_ids)
+                    if permanova:
+                        contexto["permanova"] = permanova
 
                 else:
                     messages.info(request, "No se encontraron datos para las muestras seleccionadas.")

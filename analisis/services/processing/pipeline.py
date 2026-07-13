@@ -57,7 +57,7 @@ class PipelineProcesamiento:
                 df["species"]
                 .str.replace(r"\(.*?\)", "", regex=True)
                 .str.replace("_", " ", regex=False)
-                .str.replace(r"\bsp\.?\b", "sp", regex=True)
+                .str.replace(r"\bsp\b\.?", "sp", regex=True)
                 .str.strip()
             )
             df["species"] = df["species"].replace(["", "nan"], "Unclassified")

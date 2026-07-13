@@ -45,13 +45,15 @@ def catalogo_microorganismos(request):
         "total_sin_clas":    conteos.get('sin_clasificar', 0),
     }
 
-    # Niveles distintos presentes en el catálogo (dinámico)
-    niveles_taxonomicos = (
-        CatalogoMicroorganismo.objects
-        .values_list('nivel', flat=True)
-        .distinct()
-        .order_by('nivel')
+    # Niveles con etiqueta en español — solo los que tienen registros
+    niveles_existentes = set(
+        CatalogoMicroorganismo.objects.values_list('nivel', flat=True).distinct()
     )
+    niveles_taxonomicos = [
+        (val, label)
+        for val, label in CatalogoMicroorganismo.NIVEL_CHOICES
+        if val in niveles_existentes
+    ]
 
     clasificaciones_disponibles = [
         ("benefico",      "Benéfico"),

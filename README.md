@@ -41,7 +41,7 @@ El sistema está orientado a investigadores, docentes y estudiantes que trabajan
 - Perfil taxonómico con rankings Top 5, 10, 25 y 50 microorganismos.
 - Selección multi-muestra para análisis agregado.
 - Cuatro gráficos interactivos (Plotly): composición taxonómica, abundancia relativa, diversidad y comparativa.
-- Índices de diversidad (Shannon, Simpson, Chao1) calculados con `DiversityService`.
+- Índices de diversidad (Shannon, Simpson y equitatividad de Pielou) calculados con `DiversityService`.
 - Análisis diferencial: microorganismos **Dominantes**, **Compartidos** (Core) y **Exclusivos**.
 - Exportación de resultados en Excel.
 
@@ -92,7 +92,7 @@ ANALISIS_COMPARATIVO/
 │   │   └── processing/
 │   │       ├── pipeline.py     # Pipeline bioinformático principal
 │   │       ├── abundance.py    # Cálculo de abundancias y comparativas
-│   │       └── diversity.py    # Índices de diversidad (Shannon, Simpson, Chao1)
+│   │       └── diversity.py    # Índices de diversidad (Shannon, Simpson, Pielou)
 │   ├── templates/analisis/     # HTML de todas las vistas
 │   ├── admin.py                # Admin personalizado (django-unfold)
 │   └── urls.py                 # Rutas de la aplicación

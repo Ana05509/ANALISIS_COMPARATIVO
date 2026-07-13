@@ -16,30 +16,149 @@
     width: 100%; box-sizing: border-box;
 }
 .muestra-row label:hover { background: var(--gris-light); }
-.muestra-row.activa label {
-    background: var(--verde-light);
-    font-weight: 500;
-    color: var(--verde-dark);
-}
-.muestra-row input[type="checkbox"] {
-    accent-color: var(--verde);
-    width: 15px; height: 15px;
-    cursor: pointer; flex-shrink: 0;
-    margin-right: 0;
-}
-.muestra-row.oculta { display: none; }
+.muestra-row.activa label { background: var(--verde-light); font-weight: 500; color: var(--verde-dark); }
+.muestra-row input[type="checkbox"] { accent-color: var(--verde); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
+.muestra-row.oculta        { display: none; }
 .muestra-row.marcador-oculta { display: none; }
 
-/* ── Grid de gráficos comparativos ── */
-.comp-charts-grid {
+/* ── Contenedores de gráficas ── */
+.cmp-chart-wrap { width: 100%; max-width: 100%; overflow: hidden; }
+
+/* ── Grid Gamma + PERMANOVA ── */
+.cmp-stats-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.25rem;
-    margin-top: 1.25rem;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    gap: 1rem;
+    margin-top: 1rem;
+    align-items: start;
 }
-@media (max-width: 900px) {
-    .comp-charts-grid { grid-template-columns: 1fr; }
+.cmp-stats-grid.solo { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 860px) {
+    .cmp-stats-grid,
+    .cmp-stats-grid.solo { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Grid interno PERMANOVA ── */
+.permanova-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+@media (max-width: 700px) {
+    .permanova-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ── Tabla comparativa responsive ── */
+#tabla-comparativa {
+    table-layout: auto;
+    width: 100%;
+    min-width: 400px;
+}
+#tabla-comparativa td, #tabla-comparativa th {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+/* ── Card titles ── */
+.card-title { word-break: break-word; overflow-wrap: anywhere; }
+
+/* ── Panel taxonómico (Dominantes / Core / Exclusivos) ── */
+.taxa-panels {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+@media (max-width: 780px) {
+    .taxa-panels { grid-template-columns: minmax(0, 1fr); }
+}
+.taxa-panel {
+    border-radius: var(--radius);
+    border: 1px solid var(--gris-border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.taxa-panel-head {
+    padding: 0.85rem 1rem 0.75rem;
+    border-bottom: 1px solid var(--gris-border);
+}
+.taxa-panel-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+.taxa-panel-count {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 0.2rem;
+}
+.taxa-panel-desc {
+    font-size: 11.5px;
+    color: var(--text-hint);
+    line-height: 1.45;
+}
+.taxa-panel-body {
+    padding: 0.6rem 0.85rem;
+    max-height: 200px;
+    overflow-y: auto;
+    flex: 1;
+}
+.taxa-panel-body::-webkit-scrollbar { width: 4px; }
+.taxa-panel-body::-webkit-scrollbar-thumb { background: var(--gris-border); border-radius: 2px; }
+.taxa-item {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--gris-light);
+    font-size: 13px;
+    font-style: italic;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+.taxa-item:last-child { border-bottom: none; }
+.taxa-item-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 5px;
+}
+.taxa-empty {
+    padding: 1rem 0;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--text-hint);
+    font-style: normal;
+}
+
+/* colores por panel */
+.taxa-panel.dom .taxa-panel-head  { background: #f0faf6; }
+.taxa-panel.dom .taxa-panel-label { color: var(--verde-dark); }
+.taxa-panel.dom .taxa-panel-count { color: var(--verde); }
+.taxa-panel.dom .taxa-item-dot    { background: var(--verde); }
+.taxa-panel.dom                   { border-top: 3px solid var(--verde); }
+
+.taxa-panel.core .taxa-panel-head  { background: #eff6ff; }
+.taxa-panel.core .taxa-panel-label { color: #1e40af; }
+.taxa-panel.core .taxa-panel-count { color: #2563eb; }
+.taxa-panel.core .taxa-item-dot    { background: #2563eb; }
+.taxa-panel.core                   { border-top: 3px solid #2563eb; }
+
+.taxa-panel.excl .taxa-panel-head  { background: #fffbeb; }
+.taxa-panel.excl .taxa-panel-label { color: #92400e; }
+.taxa-panel.excl .taxa-panel-count { color: #d97706; }
+.taxa-panel.excl .taxa-item-dot    { background: #d97706; }
+.taxa-panel.excl                   { border-top: 3px solid #d97706; }
 </style>
 {% endblock %}
 
@@ -48,7 +167,6 @@
 <div class="card" style="margin-bottom: 1.5rem;">
     <div class="card-title">Parámetros de comparación</div>
     <form method="get">
-        <!-- Fila 1: controles compactos + botón (sin mezclar alturas con la lista) -->
         <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:10px;">
             <div>
                 <label class="form-label">Marcador Molecular</label>
@@ -58,11 +176,14 @@
                 <label class="form-label">Nivel Taxonómico</label>
                 {{ form.nivel }}
             </div>
+            <div>
+                <label class="form-label">Top N taxa</label>
+                {{ form.top_n }}
+            </div>
             <button type="submit" id="btn-comparar" class="btn btn-primary" style="height:38px;">
                 <i class="ti ti-arrows-diff" aria-hidden="true"></i> Comparar
             </button>
         </div>
-        <!-- Fila 2: panel de selección de muestras (fila propia) -->
         <div>
             <label class="form-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
                 <span>Seleccione muestras</span>
@@ -70,11 +191,10 @@
             </label>
             <div style="display:flex; gap:6px; margin-bottom:6px; align-items:center;">
                 <input id="muestra-search" type="text" placeholder="Buscar muestra..."
-                       aria-label="Filtrar muestras por nombre"
-                       autocomplete="off"
+                       aria-label="Filtrar muestras por nombre" autocomplete="off"
                        class="form-control" style="font-size:13px; min-height:34px; padding:0.35rem 0.75rem;">
                 <button type="button" id="btn-select-all" class="btn btn-ghost-verde btn-sm" style="white-space:nowrap;">✓ Todo</button>
-                <button type="button" id="btn-clear-all"  class="btn btn-outline btn-sm" style="white-space:nowrap;">✕ Limpiar</button>
+                <button type="button" id="btn-clear-all"  class="btn btn-outline btn-sm"       style="white-space:nowrap;">✕ Limpiar</button>
             </div>
             <div id="muestra-list-wrap" style="border:1px solid var(--gris-border); border-radius:8px; max-height:190px; overflow-y:auto;">
                 <div id="muestra-checkbox-list"></div>
@@ -85,106 +205,147 @@
 </div>
 
 {% if tabla_comparativa %}
-<div class="metrics-grid">
+
+<!-- MÉTRICAS RESUMEN -->
+<div class="metrics-grid" style="margin-bottom:1.25rem;">
     <div class="metric-card">
         <div class="metric-label">Taxa comparados</div>
         <div class="metric-value td-mono">{{ total_taxonomias }}</div>
+        <div class="metric-sub">{{ nivel_actual_label|capfirst }} en el set</div>
     </div>
     <div class="metric-card">
         <div class="metric-label">Taxa Compartidos</div>
         <div class="metric-value td-mono">{{ pct_compartidos|floatformat:1 }}%</div>
+        <div class="metric-sub">Presentes en todas las muestras</div>
     </div>
     <div class="metric-card verde">
-        <div class="metric-label">Benéficos ✅</div>
+        <div class="metric-label"><i class="ti ti-shield-check"></i> Benéficos</div>
         <div class="metric-value td-mono">{{ conteo_clasificaciones.benefico }}</div>
+        <div class="metric-sub">Roles funcionales positivos</div>
     </div>
     <div class="metric-card amber">
-        <div class="metric-label">Fitopatógenos ⚠️</div>
+        <div class="metric-label"><i class="ti ti-alert-triangle"></i> Fitopatógenos</div>
         <div class="metric-value td-mono">{{ conteo_clasificaciones.fitopatogeno }}</div>
+        <div class="metric-sub">Riesgo potencial identificado</div>
     </div>
 </div>
 
+<!-- DOMINANTES / CORE / EXCLUSIVOS -->
 {% if dominantes or compartidos or exclusivos %}
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+<div class="taxa-panels">
 
-    <div class="card card-sm">
-        <div class="card-title" style="color: var(--verde-dark); margin-bottom: 0.5rem;">
-            <i class="ti ti-trending-up" aria-hidden="true"></i> Dominantes
+    <!-- Dominantes -->
+    <div class="taxa-panel dom">
+        <div class="taxa-panel-head">
+            <div class="taxa-panel-label">
+                <i class="ti ti-trending-up"></i> Dominantes
+            </div>
+            <div class="taxa-panel-count">{{ dominantes|length }}</div>
+            <div class="taxa-panel-desc">
+                Taxa de mayor abundancia relativa acumulada en el conjunto de muestras.
+            </div>
         </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <div class="taxa-panel-body">
             {% for d in dominantes %}
-                <span style="font-size: 11px; font-family: 'DM Mono', monospace; background: var(--verde-light); color: var(--verde-dark); padding: 2px 8px; border-radius: 4px;">{{ d }}</span>
+            <div class="taxa-item">
+                <span class="taxa-item-dot"></span>
+                {{ d }}
+            </div>
             {% empty %}
-                <span style="font-size: 13px; color: var(--text-hint);">Sin dominantes identificados</span>
+            <div class="taxa-empty">Sin dominantes identificados</div>
             {% endfor %}
         </div>
     </div>
 
-    <div class="card card-sm">
-        <div class="card-title" style="color: #185FA5; margin-bottom: 0.5rem;">
-            <i class="ti ti-circles-relation" aria-hidden="true"></i> Compartidos (Core)
+    <!-- Core / Compartidos -->
+    <div class="taxa-panel core">
+        <div class="taxa-panel-head">
+            <div class="taxa-panel-label">
+                <i class="ti ti-circles-relation"></i> Microbioma Core
+            </div>
+            <div class="taxa-panel-count">{{ compartidos|length }}</div>
+            <div class="taxa-panel-desc">
+                Presentes en <strong>todas</strong> las muestras comparadas. Forman la comunidad estable del suelo.
+            </div>
         </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <div class="taxa-panel-body">
             {% for c in compartidos %}
-                <span style="font-size: 11px; font-family: 'DM Mono', monospace; background: #E6F1FB; color: #0C447C; padding: 2px 8px; border-radius: 4px;">{{ c }}</span>
+            <div class="taxa-item">
+                <span class="taxa-item-dot"></span>
+                {{ c }}
+            </div>
             {% empty %}
-                <span style="font-size: 13px; color: var(--text-hint);">Sin taxa compartidos</span>
+            <div class="taxa-empty">Sin taxa compartidos en todas las muestras</div>
             {% endfor %}
         </div>
     </div>
 
-    <div class="card card-sm">
-        <div class="card-title" style="color: var(--amber); margin-bottom: 0.5rem;">
-            <i class="ti ti-sparkles" aria-hidden="true"></i> Exclusivos
+    <!-- Exclusivos -->
+    <div class="taxa-panel excl">
+        <div class="taxa-panel-head">
+            <div class="taxa-panel-label">
+                <i class="ti ti-sparkles"></i> Exclusivos
+            </div>
+            <div class="taxa-panel-count">{{ exclusivos|length }}</div>
+            <div class="taxa-panel-desc">
+                Detectados en una sola muestra. Indican diferenciación local de la comunidad microbiana.
+            </div>
         </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <div class="taxa-panel-body">
             {% for e in exclusivos %}
-                <span style="font-size: 11px; font-family: 'DM Mono', monospace; background: var(--amber-light); color: #5a3a00; padding: 2px 8px; border-radius: 4px;">{{ e }}</span>
+            <div class="taxa-item">
+                <span class="taxa-item-dot"></span>
+                {{ e }}
+            </div>
             {% empty %}
-                <span style="font-size: 13px; color: var(--text-hint);">Sin taxa exclusivos</span>
+            <div class="taxa-empty">Sin taxa exclusivos de una sola muestra</div>
             {% endfor %}
         </div>
     </div>
+
 </div>
 {% endif %}
 
-<div class="card">
-    <div class="card-title">Tabla comparativa por {{ nivel_actual|capfirst }}</div>
-    <div style="margin-bottom: 0.75rem; font-size: 13px; color: var(--text-muted);">
-        Taxón más abundante en el set: <strong style="color: var(--verde-dark); font-family: 'DM Mono', monospace;">{{ top_taxonomia|default:"—" }}</strong>
+<!-- TABLA COMPARATIVA -->
+<div class="card" style="margin-bottom:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:0.75rem;">
+        <div class="card-title" style="margin:0;">Tabla comparativa por {{ nivel_actual_label }}</div>
+        <span style="font-size:12px; color:var(--text-hint);">
+            Taxón más abundante:
+            <strong style="color:var(--verde-dark); font-style:italic;">{{ top_taxonomia|default:"—" }}</strong>
+        </span>
     </div>
-    
     <div class="table-wrap">
         <table id="tabla-comparativa">
             <thead>
                 <tr>
-                    <th>Taxonomía</th>
+                    <th style="min-width:140px;">Taxonomía</th>
                     {% if tabla_comparativa %}
-                        {% for key in tabla_comparativa.0.keys %}
-                            {% if key != 'taxonomia' and key != 'clasificacion' %}
-                            <th>{{ key }}</th>
-                            {% endif %}
-                        {% endfor %}
+                    {% for key in tabla_comparativa.0.keys %}
+                    {% if key != 'taxonomia' and key != 'clasificacion' %}
+                    <th style="min-width:90px; text-align:right;">{{ key }}</th>
                     {% endif %}
-                    <th>Clasificación</th>
+                    {% endfor %}
+                    {% endif %}
+                    <th style="min-width:130px;">Clasificación</th>
                 </tr>
             </thead>
             <tbody>
                 {% for fila in tabla_comparativa %}
                 <tr>
-                    <td class="td-mono" style="font-weight: 500; color: var(--text-primary);">{{ fila.taxonomia }}</td>
+                    <td style="font-style:italic; font-weight:500; color:var(--text-primary);">{{ fila.taxonomia }}</td>
                     {% for key, val in fila.items %}
-                        {% if key != 'taxonomia' and key != 'clasificacion' %}
-                        <td class="td-mono">{{ val|floatformat:4 }}</td>
-                        {% endif %}
+                    {% if key != 'taxonomia' and key != 'clasificacion' %}
+                    <td class="td-mono" style="text-align:right;">{{ val|floatformat:4 }}</td>
+                    {% endif %}
                     {% endfor %}
                     <td>
                         {% if fila.clasificacion == 'benefico' %}
-                            <span class="badge badge-benefico"><i class="ti ti-shield-check"></i> Benéfico</span>
+                        <span class="badge badge-benefico"><i class="ti ti-shield-check"></i> Benéfico</span>
                         {% elif fila.clasificacion == 'fitopatogeno' %}
-                            <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle"></i> Fitopatógeno</span>
+                        <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle"></i> Fitopatógeno</span>
                         {% else %}
-                            <span class="badge badge-sin-clas">Sin clasificación</span>
+                        <span class="badge badge-sin-clas">Sin clasificación</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -194,52 +355,206 @@
     </div>
 </div>
 
-<!-- Gráfico 1: Barras agrupadas (Plotly) -->
-<div class="card" style="margin-top: 1.5rem;">
+<!-- GRÁFICO BARRAS AGRUPADAS -->
+<div class="card" style="margin-bottom:0;">
     <div class="card-title">
-        <i class="ti ti-chart-bar" aria-hidden="true"></i>
-        Abundancia Relativa Comparada — Top {{ top_actual }} por {{ nivel_actual|capfirst }}
+        <i class="ti ti-chart-bar"></i>
+        Abundancia Relativa Comparada — Top {{ top_actual }} por {{ nivel_actual_label }}
     </div>
-    <div id="grafico-barras-comp" style="height: 420px; width: 100%;"></div>
-</div>
-
-<!-- Gráficos 2 y 3 en grid responsivo -->
-<div class="comp-charts-grid">
-
-    <div class="card">
-        <div class="card-title">
-            <i class="ti ti-grid-dots" aria-hidden="true"></i>
-            Mapa de Calor Comparativo
-        </div>
-        <p style="font-size:12.5px; color:var(--text-hint); margin: 0 0 0.75rem;">Intensidad de color = abundancia relativa (%). Identifica patrones y taxa diferenciadores entre muestras.</p>
-        <div id="grafico-heatmap-comp" style="height: 380px; width: 100%;"></div>
-    </div>
-
-    <div class="card">
-        <div class="card-title">
-            <i class="ti ti-chart-dots" aria-hidden="true"></i>
-            Diversidad Alfa por Muestra (Shannon H')
-        </div>
-        <p style="font-size:12.5px; color:var(--text-hint); margin: 0 0 0.75rem;">Calculado sobre el perfil completo de cada muestra, sin truncamiento a Top N.</p>
-        <div id="grafico-shannon-comp" style="height: 380px; width: 100%;"></div>
+    <p style="font-size:12.5px; color:var(--text-hint); margin:0.25rem 0 0.75rem;">
+        Cada grupo de barras representa un taxón; el color distingue la muestra. Permite identificar taxa que dominan en una muestra pero están ausentes en otra.
+    </p>
+    <div class="cmp-chart-wrap">
+        <div id="grafico-barras-comp" style="min-height:420px;"></div>
     </div>
 </div>
+
+<!-- HEATMAP -->
+<div class="card" style="margin-top:1.25rem;">
+    <div class="card-title">
+        <i class="ti ti-grid-dots"></i> Mapa de Calor Comparativo
+    </div>
+    <p style="font-size:12.5px; color:var(--text-hint); margin:0 0 0.75rem;">
+        Intensidad = abundancia relativa (%). Identifica taxa diferenciadores entre muestras.
+    </p>
+    <div class="cmp-chart-wrap">
+        <div id="grafico-heatmap-comp" style="min-height:380px;"></div>
+    </div>
+</div>
+
+<!-- SHANNON -->
+<div class="card" style="margin-top:1.25rem;">
+    <div class="card-title">
+        <i class="ti ti-chart-bar"></i> Shannon H' por Muestra
+    </div>
+    <p style="font-size:12.5px; color:var(--text-hint); margin:0 0 0.75rem;">
+        Diversidad alfa sobre el perfil taxonómico completo.
+        <span style="color:#DC2626;font-weight:600;">■</span>&nbsp;&lt;1 baja ·
+        <span style="color:#F97316;font-weight:600;">■</span>&nbsp;1–2 ·
+        <span style="color:#EAB308;font-weight:600;">■</span>&nbsp;2–3 ·
+        <span style="color:#16A34A;font-weight:600;">■</span>&nbsp;≥3 alta
+    </p>
+    <div class="cmp-chart-wrap">
+        <div id="grafico-shannon-comp" style="min-height:380px;"></div>
+    </div>
+</div>
+
+<!-- TABLA DIVERSIDAD ALFA COMPLETA -->
+{% if alfa_por_muestra %}
+<div class="card" style="margin-top:1.25rem;">
+    <div class="card-title"><i class="ti ti-leaf"></i> Diversidad Alfa — Métricas por Muestra</div>
+    <p style="font-size:12.5px; color:var(--text-hint); margin:0 0 0.75rem;">Perfil taxonómico completo por muestra (sin truncar al Top N).</p>
+    <div class="table-wrap">
+        <table style="width:100%;">
+            <thead>
+                <tr>
+                    <th>Muestra</th>
+                    <th style="text-align:right;">Riqueza (S)</th>
+                    <th style="text-align:right;">Shannon H'</th>
+                    <th style="text-align:right;">Simpson D</th>
+                    <th style="text-align:right;">Equitatividad J'</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for codigo, m in alfa_por_muestra.items %}
+                <tr>
+                    <td style="font-weight:500; font-style:italic;">{{ codigo }}</td>
+                    <td class="td-mono" style="text-align:right;">{{ m.riqueza }}</td>
+                    <td class="td-mono" style="text-align:right;">{{ m.shannon }}</td>
+                    <td class="td-mono" style="text-align:right;">{{ m.simpson }}</td>
+                    <td class="td-mono" style="text-align:right;">{{ m.equitatividad }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- BETA INTER-MUESTRA -->
+{% if diversidad_beta %}
+<div class="card" style="margin-top:1.25rem;">
+    <div class="card-title"><i class="ti ti-arrows-diff"></i> Diversidad Beta — Disimilitud entre Muestras</div>
+    <p style="font-size:12.5px; color:var(--text-hint); margin:0.2rem 0 0.85rem;">
+        Mide qué tan diferentes son las comunidades entre las {{ diversidad_beta.n_muestras }} muestras
+        ({{ diversidad_beta.n_pares }} par{{ diversidad_beta.n_pares|pluralize:"es" }} comparado{{ diversidad_beta.n_pares|pluralize:"s" }}).
+    </p>
+    <div class="metrics-grid" style="margin-bottom:0.75rem;">
+        <div class="metric-card">
+            <div class="metric-label">Bray-Curtis (prom.)</div>
+            <div class="metric-value td-mono">{{ diversidad_beta.bc_promedio }}</div>
+            <div class="metric-sub">Disimilitud de abundancias (0–1)</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Jaccard (prom.)</div>
+            <div class="metric-value td-mono">{{ diversidad_beta.jaccard_promedio }}</div>
+            <div class="metric-sub">Similitud presencia/ausencia (0–1)</div>
+        </div>
+        <div class="metric-card verde">
+            <div class="metric-label">Taxa del Core</div>
+            <div class="metric-value td-mono">{{ diversidad_beta.n_core }}</div>
+            <div class="metric-sub">Presentes en todas las muestras</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Taxa Únicos</div>
+            <div class="metric-value td-mono">{{ diversidad_beta.n_unicos }}</div>
+            <div class="metric-sub">Exclusivos de una sola muestra</div>
+        </div>
+    </div>
+    <div style="padding:0.65rem 1rem; border-radius:var(--radius); font-size:13px; background:var(--gris-light); color:var(--text-muted); border-left:3px solid var(--gris-border);">
+        <i class="ti ti-info-circle"></i> {{ diversidad_beta.interpretacion }}
+    </div>
+</div>
+{% endif %}
+
+<!-- GAMMA + PERMANOVA -->
+{% if diversidad_gamma or permanova %}
+<div class="cmp-stats-grid {% if not diversidad_gamma or not permanova %}solo{% endif %}">
+
+    {% if diversidad_gamma %}
+    <div class="card" style="margin-bottom:0;">
+        <div class="card-title"><i class="ti ti-planet"></i> Diversidad Gamma</div>
+        <p style="font-size:12px; color:var(--text-hint); margin:0.2rem 0 0.85rem;">
+            Metacomunidad — {{ diversidad_gamma.n_muestras }} muestras combinadas en un pool.
+        </p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem;">
+            <div class="metric-card" style="padding:0.6rem;">
+                <div class="metric-label" style="font-size:10px;">Riqueza γ (S)</div>
+                <div class="metric-value td-mono" style="font-size:22px;">{{ diversidad_gamma.riqueza_gamma }}</div>
+            </div>
+            <div class="metric-card" style="padding:0.6rem;">
+                <div class="metric-label" style="font-size:10px;">Shannon γ (H')</div>
+                <div class="metric-value td-mono" style="font-size:22px;">{{ diversidad_gamma.shannon_gamma }}</div>
+            </div>
+            <div class="metric-card" style="padding:0.6rem;">
+                <div class="metric-label" style="font-size:10px;">Simpson γ (D)</div>
+                <div class="metric-value td-mono" style="font-size:22px;">{{ diversidad_gamma.simpson_gamma }}</div>
+            </div>
+            <div class="metric-card" style="padding:0.6rem;">
+                <div class="metric-label" style="font-size:10px;">Equitatividad γ</div>
+                <div class="metric-value td-mono" style="font-size:22px;">{{ diversidad_gamma.equitatividad_gamma }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if permanova %}
+    <div class="card" style="margin-bottom:0;">
+        <div class="card-title"><i class="ti ti-test-pipe-2"></i> PERMANOVA</div>
+        {% if permanova.ejecutado %}
+        <div class="permanova-metrics">
+            <div class="metric-card {% if permanova.significativo %}verde{% endif %}" style="padding:0.5rem;">
+                <div class="metric-label" style="font-size:10px;">Pseudo-F</div>
+                <div class="metric-value td-mono" style="font-size:18px;">{{ permanova.pseudo_f }}</div>
+            </div>
+            <div class="metric-card {% if permanova.significativo %}verde{% endif %}" style="padding:0.5rem;">
+                <div class="metric-label" style="font-size:10px;">p-valor</div>
+                <div class="metric-value td-mono" style="font-size:18px;">{{ permanova.p_value }}</div>
+            </div>
+            <div class="metric-card" style="padding:0.5rem;">
+                <div class="metric-label" style="font-size:10px;">R² (%)</div>
+                <div class="metric-value td-mono" style="font-size:18px;">{{ permanova.r2_pct }}%</div>
+            </div>
+            <div class="metric-card" style="padding:0.5rem;">
+                <div class="metric-label" style="font-size:10px;">Grupos</div>
+                <div class="metric-value td-mono" style="font-size:18px;">{{ permanova.n_grupos }}</div>
+                <div class="metric-sub" style="font-size:9px;">por {{ permanova.nivel_agrupacion }}</div>
+            </div>
+        </div>
+        <div style="padding:0.65rem 0.9rem; border-radius:var(--radius); font-size:12.5px; line-height:1.55;
+            {% if permanova.significativo %}background:var(--verde-light); color:var(--verde-dark); border-left:3px solid var(--verde);
+            {% else %}background:var(--gris-light); color:var(--text-muted); border-left:3px solid var(--gris-border);{% endif %}">
+            <i class="ti ti-{% if permanova.significativo %}circle-check{% else %}info-circle{% endif %}"></i>
+            {{ permanova.interpretacion }}
+        </div>
+        {% else %}
+        <div style="padding:0.65rem 0.9rem; border-radius:var(--radius); font-size:12.5px; background:var(--gris-light); color:var(--text-muted); border-left:3px solid var(--gris-border);">
+            <i class="ti ti-info-circle"></i> {{ permanova.razon }}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+</div>
+{% endif %}
 
 {% else %}
 <div class="empty-state">
     <i class="ti ti-arrows-diff" aria-hidden="true"></i>
     <strong>Seleccione productos para comparar</strong>
-    <p>Elija dos o más productos y configure los parámetros del análisis taxonómico masivo.</p>
+    <p>Elija dos o más muestras y configure los parámetros del análisis taxonómico comparativo.</p>
 </div>
 {% endif %}
+
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>var TIPOS_POR_MUESTRA_CMP = {{ tipos_por_muestra_json|safe }};</script>
 
 <script>
 (function () {
-    /* ── Panel de selección de muestras (construido desde el select oculto) ── */
+    /* ── Panel de selección de muestras ── */
     var sel     = document.getElementById('id_muestras');
     var listDiv = document.getElementById('muestra-checkbox-list');
     var counter = document.getElementById('sample-counter');
@@ -261,17 +576,10 @@
         }
     }
 
-    /* Construir checkboxes desde las <option> del select oculto */
-    function detectarTipo(text) {
-        if (/_16S/i.test(text)) return '16S';
-        if (/_ITS/i.test(text)) return 'ITS';
-        return '';
-    }
-
     function filtrarPorMarcadorComparar(marcador) {
         listDiv.querySelectorAll('.muestra-row').forEach(function (row) {
-            var rowTipo = row.dataset.tipo;
-            var visible = !rowTipo || rowTipo === marcador;
+            var rowTipos = row.dataset.tipos || '';
+            var visible = !rowTipos || rowTipos.indexOf(marcador) !== -1;
             row.classList.toggle('marcador-oculta', !visible);
             if (!visible) {
                 var cb = row.querySelector('input');
@@ -287,20 +595,17 @@
 
     if (sel && listDiv) {
         Array.from(sel.options).forEach(function(opt, i) {
-            var tipo = detectarTipo(opt.textContent);
+            var tipos = (typeof TIPOS_POR_MUESTRA_CMP !== 'undefined' && TIPOS_POR_MUESTRA_CMP[parseInt(opt.value)]) || [];
             var row = document.createElement('div');
             row.className = 'muestra-row' + (opt.selected ? ' activa' : '');
-            row.dataset.tipo = tipo;
+            row.dataset.tipos = tipos.join(' ');
 
             var lbl = document.createElement('label');
             lbl.htmlFor = 'mcb_' + i;
 
             var cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.id   = 'mcb_' + i;
-            cb.checked = opt.selected;
-            cb.dataset.idx = i;
-
+            cb.type = 'checkbox'; cb.id = 'mcb_' + i;
+            cb.checked = opt.selected; cb.dataset.idx = i;
             cb.addEventListener('change', function() {
                 sel.options[this.dataset.idx].selected = this.checked;
                 row.classList.toggle('activa', this.checked);
@@ -314,13 +619,13 @@
             lbl.appendChild(cb);
             lbl.appendChild(txt);
 
-            if (tipo) {
+            tipos.forEach(function(t) {
                 var pill = document.createElement('span');
-                pill.className = tipo === '16S' ? 'pill-16s' : 'pill-its';
-                pill.style.cssText = 'font-size:10px;padding:1px 6px;margin-left:8px;flex-shrink:0;white-space:nowrap;';
-                pill.textContent = tipo === '16S' ? '16S · Bacteria' : 'ITS · Hongo';
+                pill.className = t === '16S' ? 'pill-16s' : 'pill-its';
+                pill.style.cssText = 'font-size:10px;padding:1px 6px;margin-left:4px;flex-shrink:0;white-space:nowrap;';
+                pill.textContent = t === '16S' ? '16S · Bacteria' : 'ITS · Hongo';
                 lbl.appendChild(pill);
-            }
+            });
 
             row.appendChild(lbl);
             listDiv.appendChild(row);
@@ -335,7 +640,7 @@
 
     if (btnAll) {
         btnAll.addEventListener('click', function() {
-            listDiv.querySelectorAll('.muestra-row:not(.oculta) input').forEach(function(cb) {
+            listDiv.querySelectorAll('.muestra-row:not(.oculta):not(.marcador-oculta) input').forEach(function(cb) {
                 cb.checked = true;
                 sel.options[cb.dataset.idx].selected = true;
                 cb.closest('.muestra-row').classList.add('activa');
@@ -343,7 +648,6 @@
             actualizarContador();
         });
     }
-
     if (btnClear) {
         btnClear.addEventListener('click', function() {
             listDiv.querySelectorAll('input').forEach(function(cb) {
@@ -354,7 +658,6 @@
             actualizarContador();
         });
     }
-
     if (search) {
         search.addEventListener('input', function() {
             var q = this.value.toLowerCase().trim();
@@ -363,37 +666,38 @@
             });
         });
     }
-
     actualizarContador();
 
     {% if tabla_comparativa %}
     document.addEventListener('DOMContentLoaded', function () {
 
-        var COLORES = ['#085041','#BA7517','#185FA5','#A32D2D','#0F6E56','#5a3a00','#0C447C','#5F5E5A'];
+        var COLORES = ['#1D9E75','#BA7517','#185FA5','#A32D2D','#0F6E56','#6B4E9E','#0C447C','#5F5E5A',
+                       '#E07B39','#264653','#E9C46A','#3A86FF'];
 
-        /* ── 1. Barras agrupadas (Plotly desde graficos_json) ── */
+        /* 1. Barras agrupadas */
         try {
             var gBarras = {{ graficos_json|safe }};
             if (gBarras && gBarras.data) {
-                // Aplicar paleta de colores consistente
                 gBarras.data.forEach(function(trace, i) {
                     trace.marker = trace.marker || {};
                     trace.marker.color = COLORES[i % COLORES.length];
+                    trace.marker.line  = { width: 0 };
                 });
                 gBarras.layout = Object.assign({}, gBarras.layout, {
                     template: 'plotly_white',
                     font: { family: 'Outfit, sans-serif' },
-                    legend: { orientation: 'h', y: -0.22 },
-                    height: 420,
-                    margin: { t: 50, b: 100, l: 60, r: 20 },
+                    legend: { orientation: 'h', y: -0.25, x: 0.5, xanchor: 'center' },
+                    height: 440,
+                    margin: { t: 50, b: 110, l: 60, r: 20 },
+                    xaxis: Object.assign({}, (gBarras.layout||{}).xaxis, {
+                        tickangle: -40, automargin: true, tickfont: { size: 10 }
+                    }),
                 });
                 Plotly.newPlot('grafico-barras-comp', gBarras.data, gBarras.layout, { responsive: true });
             }
-        } catch (e) {
-            console.error('Error al renderizar barras comparativas:', e);
-        }
+        } catch (e) { console.error('Barras comparativas:', e); }
 
-        /* ── 2. Heatmap comparativo (construido desde tabla_json) ── */
+        /* 2. Heatmap */
         try {
             var tablaData = {{ tabla_json|safe }};
             if (Array.isArray(tablaData) && tablaData.length > 0) {
@@ -404,12 +708,9 @@
                 var zValues = muestrasHM.map(function(m) {
                     return tablaData.map(function(r) { return parseFloat(r[m] || 0); });
                 });
-
                 Plotly.newPlot('grafico-heatmap-comp', [{
                     type: 'heatmap',
-                    x: taxa,
-                    y: muestrasHM,
-                    z: zValues,
+                    x: taxa, y: muestrasHM, z: zValues,
                     colorscale: 'Viridis',
                     hovertemplate: '<b>%{y}</b><br>%{x}<br>Abundancia: %{z:.4f}%<extra></extra>',
                     colorbar: { title: { text: '%', side: 'right' } }
@@ -417,67 +718,110 @@
                     template: 'plotly_white',
                     font: { family: 'Outfit, sans-serif' },
                     height: 380,
-                    margin: { t: 20, b: 90, l: 110, r: 30 },
-                    xaxis: { tickangle: -35, tickfont: { family: 'DM Mono, monospace', size: 10 } },
-                    yaxis: { tickfont: { family: 'DM Mono, monospace', size: 11 } },
+                    margin: { t: 20, b: 90, l: 120, r: 30 },
+                    xaxis: { tickangle: -35, tickfont: { size: 10 }, automargin: true },
+                    yaxis: { tickfont: { size: 11 }, automargin: true },
                 }, { responsive: true });
             }
-        } catch (e) {
-            console.error('Error al renderizar heatmap:', e);
-        }
+        } catch (e) { console.error('Heatmap comparativo:', e); }
 
-        /* ── 3. Diversidad alfa Shannon por muestra ─────────── */
+        /* 3. Shannon — umbrales absolutos (igual que en análisis avanzado) */
         try {
-            var shannonData = {{ shannon_json|safe }};
-            var muestrasS = Object.keys(shannonData);
-            if (muestrasS.length > 0) {
-                var valoresS = muestrasS.map(function(m) { return shannonData[m]; });
-                var maxS = Math.max.apply(null, valoresS);
+            var alfaData = {{ alfa_json|safe }};
+            var muestrasS = Object.keys(alfaData);
 
-                Plotly.newPlot('grafico-shannon-comp', [{
-                    type: 'bar',
-                    x: muestrasS,
-                    y: valoresS,
-                    text: valoresS.map(function(v) { return v.toFixed(4); }),
-                    textposition: 'outside',
-                    marker: {
-                        color: valoresS.map(function(v) {
-                            var t = maxS > 0 ? v / maxS : 0;
-                            // Degradado verde oscuro → ámbar según valor relativo
-                            return t > 0.66 ? '#085041' : (t > 0.33 ? '#1D9E75' : '#BA7517');
-                        }),
-                        line: { width: 0 }
-                    },
-                    hovertemplate: '<b>%{x}</b><br>Shannon H\': %{y:.4f}<extra></extra>',
-                }], {
-                    template: 'plotly_white',
-                    font: { family: 'Outfit, sans-serif' },
-                    yaxis: {
-                        title: { text: "Shannon H'", font: { family: 'Outfit, sans-serif' } },
-                        rangemode: 'tozero',
-                    },
-                    xaxis: {
-                        tickfont: { family: 'DM Mono, monospace', size: 11 },
-                        tickangle: muestrasS.length > 4 ? -30 : 0,
-                    },
-                    height: 380,
-                    margin: { t: 30, b: 70, l: 60, r: 20 },
-                }, { responsive: true });
+            if (muestrasS.length > 0) {
+                var valoresS  = muestrasS.map(function(m) { return alfaData[m].shannon || 0; });
+                var riquezaS  = muestrasS.map(function(m) { return alfaData[m].riqueza  || 0; });
+                var simpsonS  = muestrasS.map(function(m) { return alfaData[m].simpson  || 0; });
+                var equitS    = muestrasS.map(function(m) { return alfaData[m].equitatividad || 0; });
+
+                /* Color por umbral absoluto — consistente con análisis avanzado */
+                function colorShannon(h) {
+                    if (h < 1.0) return '#DC2626';
+                    if (h < 2.0) return '#F97316';
+                    if (h < 3.0) return '#EAB308';
+                    return '#16A34A';
+                }
+
+                var hoverTexts = muestrasS.map(function(m, i) {
+                    return [
+                        '<b>' + m + '</b><br>' +
+                        "Shannon H': <b>" + valoresS[i].toFixed(4) + '</b><br>' +
+                        'Riqueza (S): ' + riquezaS[i] + ' taxa<br>' +
+                        'Simpson (1-D): ' + simpsonS[i].toFixed(4) + '<br>' +
+                        "Equitatividad (J'): " + equitS[i].toFixed(4)
+                    ];
+                });
+
+                /* Ordenar de mayor a menor H' */
+                var orden = muestrasS.map(function(_, i) { return i; })
+                    .sort(function(a, b) { return valoresS[b] - valoresS[a]; });
+                var muestrasOrden  = orden.map(function(i) { return muestrasS[i]; });
+                var valoresOrden   = orden.map(function(i) { return valoresS[i]; });
+                var coloresOrden   = valoresOrden.map(colorShannon);
+                var hoverOrden     = orden.map(function(i) { return hoverTexts[i]; });
+
+                var hMax = Math.max.apply(null, valoresOrden);
+                var figShannon = {
+                    data: [{
+                        type: 'bar',
+                        x: muestrasOrden,
+                        y: valoresOrden,
+                        text: valoresOrden.map(function(v) { return v.toFixed(3); }),
+                        textposition: 'outside',
+                        textfont: { size: 10 },
+                        marker: { color: coloresOrden, line: { color: 'white', width: 1.5 } },
+                        customdata: hoverOrden,
+                        hovertemplate: '%{customdata[0]}<extra></extra>',
+                        showlegend: false,
+                    }],
+                    layout: {
+                        template: 'plotly_white',
+                        font: { family: 'Outfit, sans-serif' },
+                        yaxis: { title: "Shannon H'", rangemode: 'tozero',
+                                 gridcolor: 'rgba(220,220,220,0.5)', zeroline: false },
+                        xaxis: { tickangle: -30, automargin: true, tickfont: { size: 10 } },
+                        height: 380,
+                        margin: { t: 50, b: 100, l: 60, r: 30 },
+                        bargap: 0.35,
+                        annotations: [],
+                    }
+                };
+
+                /* Líneas de referencia con etiqueta dentro del área */
+                [[1.0, "Baja (H'=1)",     'rgba(220,38,38,0.6)'],
+                 [2.0, "Moderada (H'=2)", 'rgba(234,179,8,0.7)'],
+                 [3.0, "Alta (H'=3)",     'rgba(22,163,74,0.7)']].forEach(function(ref) {
+                    var ry = ref[0], rl = ref[1], rc = ref[2];
+                    if (ry <= hMax * 1.3) {
+                        figShannon.layout.shapes = figShannon.layout.shapes || [];
+                        figShannon.layout.shapes.push({
+                            type: 'line', x0: 0, x1: 1, xref: 'paper',
+                            y0: ry, y1: ry, yref: 'y',
+                            line: { dash: 'dot', color: rc, width: 1.2 }
+                        });
+                        figShannon.layout.annotations.push({
+                            x: 0.99, y: ry, xref: 'paper', yref: 'y',
+                            text: rl, showarrow: false,
+                            xanchor: 'right', yanchor: 'bottom',
+                            font: { size: 9, color: 'gray' },
+                            bgcolor: 'rgba(255,255,255,0.75)',
+                        });
+                    }
+                });
+
+                Plotly.newPlot('grafico-shannon-comp', figShannon.data, figShannon.layout, { responsive: true });
             } else {
                 document.getElementById('grafico-shannon-comp').innerHTML =
-                    '<p style="padding:2rem;text-align:center;color:var(--text-hint);font-size:13px;">No hay datos de diversidad disponibles para las muestras seleccionadas.</p>';
+                    '<p style="padding:2rem;text-align:center;color:var(--text-hint);font-size:13px;">No hay datos de diversidad para las muestras seleccionadas.</p>';
             }
-        } catch (e) {
-            console.error('Error al renderizar Shannon:', e);
-        }
+        } catch (e) { console.error('Shannon comparativo:', e); }
 
     });
     {% endif %}
-})();
-</script>
 
-<script>
-(function () {
+    /* Spinner al enviar */
     var form = document.querySelector('form[method="get"]');
     var btn  = document.getElementById('btn-comparar');
     if (form && btn) {

@@ -2,7 +2,7 @@ import json
 import pandas as pd
 from django.db.models import F, Sum
 from analisis.models import MuestraSuelo, ResultadoTaxonomico, VariedadClon
-from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, MAPA_NIVELES, OPCIONES_TOP_N
+from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, MAPA_NIVELES, OPCIONES_TOP_N, get_taxonomia_annotation, clasificar_taxon
 from analisis.services.business.analysis_service import obtener_lookup_catalogo
 
 
@@ -15,13 +15,21 @@ def comparar_productos(analisis_filtrado, nivel="genus", taxa_top=None, tipo="16
         return []
 
     campo_db = MAPA_NIVELES.get(nivel, "genus")
-    mapa_clasificacion = obtener_lookup_catalogo(tipo)
+    mapa_clasificacion = obtener_lookup_catalogo(tipo, nivel=nivel)
 
     data = []
     muestras_vistas = set()
 
     for a in analisis_filtrado:
-        nombre_tax = getattr(a, campo_db, "") or "Unclassified"
+        if nivel == "species":
+            g = (a.genus or "").strip()
+            s = (a.species or "").strip()
+            if s.lower().startswith(g.lower()) and g:
+                nombre_tax = s or "Unclassified"
+            else:
+                nombre_tax = f"{g} {s}".strip() or "Unclassified"
+        else:
+            nombre_tax = getattr(a, campo_db, "") or "Unclassified"
         codigo_muestra = a.archivo.muestra.codigo
         porcentaje = float(a.porcentaje_hits or 0)
         muestras_vistas.add(codigo_muestra)
@@ -39,7 +47,7 @@ def comparar_productos(analisis_filtrado, nivel="genus", taxa_top=None, tipo="16
                 "muestra": codigo_muestra,
                 "taxonomia": nombre_tax,
                 "%_hits": porcentaje,
-                "clasificacion": mapa_clasificacion.get(nombre_tax.lower(), "sin_clasificar"),
+                "clasificacion": clasificar_taxon(nombre_tax, mapa_clasificacion, nivel),
             })
 
     df = pd.DataFrame(data)
@@ -133,9 +141,10 @@ def ejecutar_comparacion_clean(cleaned_data):
     if not analisis.exists():
         return vacio
 
-    # Top N por suma de num_hits (conteos reales) entre todas las muestras seleccionadas
+    # Top N por suma de num_hits usando binomio completo para species
+    taxonomia_expr = get_taxonomia_annotation(nivel)
     taxa_top = list(
-        analisis.values(tax=F(campo_db))
+        analisis.values(tax=taxonomia_expr)
         .annotate(total=Sum("num_hits"))
         .order_by("-total")
         .values_list("tax", flat=True)[:top_n]
@@ -145,7 +154,11 @@ def ejecutar_comparacion_clean(cleaned_data):
     tabla = comparar_productos(analisis, nivel, taxa_top=taxa_top, tipo=tipo)
 
     sets = {
-        mid: set(analisis.filter(archivo__muestra_id=mid).values_list(campo_db, flat=True))
+        mid: set(
+            analisis.filter(archivo__muestra_id=mid)
+            .annotate(_tax=taxonomia_expr)
+            .values_list("_tax", flat=True)
+        )
         for mid in ids
     }
     dominantes, compartidos, exclusivos = _calcular_diferencial(sets)

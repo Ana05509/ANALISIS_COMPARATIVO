@@ -1,65 +1,258 @@
 {% extends "analisis/base.html" %}
 
-{% block title %}Historial{% endblock %}
+{% block title %}Historial de Muestras{% endblock %}
 {% block nav_historial %}active{% endblock %}
-{% block topbar_title %}Historial de muestras{% endblock %}
+{% block topbar_title %}Bitácora de Muestras Procesadas{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Filtros ── */
+.hist-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.hist-filters .form-control { font-size: 13px; min-height: 36px; }
+.hist-search    { flex: 1; min-width: 200px; }
+.hist-localidad { min-width: 150px; flex: 0 1 220px; }
+
+/* ── Barra info ── */
+.hist-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0.85rem 0 0.5rem;
+    font-size: 12.5px;
+    color: var(--text-hint);
+}
+.hist-bar strong { color: var(--text-primary); }
+
+/* ── Tabla ── */
+.hist-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+#tabla-historial {
+    table-layout: auto;
+    width: 100%;
+    min-width: 600px;
+    border-collapse: collapse;
+}
+#tabla-historial thead th {
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-hint);
+    font-weight: 700;
+    padding: 0.55rem 0.9rem;
+    border-bottom: 2px solid var(--gris-border);
+    background: var(--gris-light);
+    white-space: nowrap;
+}
+#tabla-historial tbody td {
+    padding: 0.7rem 0.9rem;
+    font-size: 13.5px;
+    border-bottom: 1px solid var(--gris-light);
+    vertical-align: middle;
+}
+#tabla-historial tbody tr:last-child td { border-bottom: none; }
+#tabla-historial tbody tr:hover td { background: rgba(29,158,117,0.04); }
+
+.hist-codigo {
+    font-weight: 700;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+.hist-sub {
+    font-size: 11.5px;
+    color: var(--text-hint);
+    margin-top: 2px;
+    line-height: 1.35;
+}
+.hist-taxa {
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--verde-dark);
+}
+.hist-taxa-zero { color: var(--text-hint); font-weight: 400; font-size: 13px; }
+
+/* ── Botones de acción ── */
+.hist-actions { display: flex; gap: 5px; }
+.hist-actions .btn { white-space: nowrap; }
+
+/* ── Paginación ── */
+.hist-pag {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    padding: 0.85rem 1rem;
+    border-top: 1px solid var(--gris-light);
+    flex-wrap: wrap;
+}
+.pg-btn {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--gris-border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: background var(--transition);
+}
+.pg-btn:hover  { background: var(--gris-light); }
+.pg-btn.activo { background: var(--verde); border-color: var(--verde); color: #fff; font-weight: 700; }
+.pg-btn.off    { opacity: .35; pointer-events: none; }
+.pg-sep        { color: var(--text-hint); font-size: 13px; padding: 0 2px; line-height: 34px; }
+</style>
+{% endblock %}
 
 {% block content %}
-<p class="page-subtitle">Registro de muestras procesadas — <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"General" }}</span></p>
 
-<div class="card card-sm" style="margin-bottom:1.25rem;">
-    <form method="get" style="display:flex; gap:10px; align-items:center;">
+<!-- FILTROS -->
+<div class="card card-sm" style="margin-bottom:1rem;">
+    <form method="get" id="form-hist">
         <input type="hidden" name="tipo" value="{{ tipo_actual }}">
-        <input type="text" name="q" value="{{ busqueda|default:'' }}" placeholder="Buscar por código de muestra..."
-               aria-label="Buscar muestra por código"
-               class="form-control" style="max-width:360px;">
-        <button type="submit" class="btn btn-outline btn-sm">
-            <i class="ti ti-search" aria-hidden="true"></i> Buscar
-        </button>
-        {% if busqueda %}
-        <a href="{% url 'analisis:historial' %}?tipo={{ tipo_actual }}" class="btn btn-outline btn-sm">
-            <i class="ti ti-x" aria-hidden="true"></i> Limpiar
-        </a>
-        {% endif %}
-        <span style="margin-left:auto; font-size:13px; color:var(--text-hint);">{{ muestras|length }} muestra(s)</span>
+        <div class="hist-filters">
+
+            <input type="text" name="q" value="{{ busqueda }}"
+                   placeholder="Buscar por código, cultivo, localidad o finca…"
+                   aria-label="Buscar muestra" autocomplete="off"
+                   class="form-control hist-search">
+
+            <select name="localidad" class="form-control hist-localidad"
+                    aria-label="Filtrar por localidad"
+                    onchange="document.getElementById('form-hist').submit()">
+                <option value="">Todas las localidades</option>
+                {% for loc in localidades %}
+                <option value="{{ loc }}" {% if localidad_f == loc %}selected{% endif %}>{{ loc }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="btn btn-outline btn-sm">
+                <i class="ti ti-search"></i>
+                <span class="d-sm-inline" style="display:none;">Buscar</span>
+            </button>
+
+            {% if busqueda or localidad_f %}
+            <a href="?tipo={{ tipo_actual }}" class="btn btn-outline btn-sm">
+                <i class="ti ti-x"></i> Limpiar
+            </a>
+            {% endif %}
+        </div>
     </form>
 </div>
 
-<div class="card">
-    {% if muestras %}
-    <div class="table-wrap">
-        <table class="table-inner">
+<!-- BARRA DE ESTADO -->
+<div class="hist-bar">
+    <span>
+        <strong>{{ total_muestras }}</strong>
+        muestra{{ total_muestras|pluralize:"s" }}
+        {% if busqueda %} — "<em>{{ busqueda }}</em>"{% endif %}
+        {% if localidad_f %} — <em>{{ localidad_f }}</em>{% endif %}
+        {% if page_obj and page_obj.paginator.num_pages > 1 %}
+        &nbsp;· Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+        {% endif %}
+    </span>
+    <span>
+        Marcador activo:
+        <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}" style="font-size:11px; margin-left:3px;">
+            {{ tipo_actual }}
+        </span>
+    </span>
+</div>
+
+<!-- TABLA -->
+<div class="card" style="padding:0; overflow:hidden;">
+    {% if page_obj and page_obj.object_list %}
+
+    <div class="hist-table-wrap">
+        <table id="tabla-historial">
             <thead>
                 <tr>
-                    <th>Código Muestra</th>
+                    <th>Código de Muestra</th>
+                    <th>Localidad / Finca</th>
                     <th>Cultivo / Variedad</th>
-                    <th>Marcador</th>
-                    <th>Análisis</th>
-                    <th>Acciones</th>
+                    <th>Altitud</th>
+                    <th>Fecha de Ingreso</th>
+                    <th style="text-align:right;">Taxa</th>
+                    <th style="text-align:center;">Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                {% for p in muestras %}
+                {% for m in page_obj %}
                 <tr>
-                    <td><strong>{{ p.codigo|default:"Sin código" }}</strong></td>
-                    <td class="td-muted">
-                        {{ p.cultivo.nombre|default:"—" }} / {{ p.variedad_clon.nombre|default:"—" }}
-                    </td>
+                    <!-- Código -->
                     <td>
-                        {% with primer_archivo=p.archivos_moleculares.first %}
-                        <span class="{% if primer_archivo.tipo_analisis == '16S' %}pill-16s{% else %}pill-its{% endif %}">
-                            {{ primer_archivo.tipo_analisis|default:"N/A" }}
-                        </span>
-                        {% endwith %}
+                        <div class="hist-codigo">{{ m.codigo }}</div>
+                        {% if m.tipo_muestra and m.tipo_muestra != "Suelo" %}
+                        <div class="hist-sub">{{ m.tipo_muestra }}</div>
+                        {% endif %}
                     </td>
-                    <td class="td-mono">{{ p.total_analisis|default:"0" }}</td>
+
+                    <!-- Localidad / Finca -->
                     <td>
-                        <div style="display:flex; gap:6px;">
-                            <a href="{% url 'analisis:ver_producto' p.id %}" class="btn btn-outline btn-sm">
-                                <i class="ti ti-eye" aria-hidden="true"></i> Ver
+                        <div style="font-weight:500;">{{ m.localidad|default:"—" }}</div>
+                        {% if m.finca_lote %}
+                        <div class="hist-sub">{{ m.finca_lote }}</div>
+                        {% endif %}
+                    </td>
+
+                    <!-- Cultivo / Variedad -->
+                    <td>
+                        <div>{{ m.cultivo.nombre|default:"—" }}</div>
+                        {% if m.variedad_clon.nombre %}
+                        <div class="hist-sub" style="font-style:italic;">{{ m.variedad_clon.nombre }}</div>
+                        {% endif %}
+                    </td>
+
+                    <!-- Altitud -->
+                    <td style="white-space:nowrap; color:var(--text-muted); font-size:13px;">
+                        {% if m.altitud %}
+                        <i class="ti ti-mountain" style="font-size:11px; opacity:.55;"></i>
+                        {{ m.altitud }} msnm
+                        {% else %}—{% endif %}
+                    </td>
+
+                    <!-- Fecha -->
+                    <td style="white-space:nowrap; font-size:12.5px; color:var(--text-muted);">
+                        {{ m.fecha_registro|date:"d M Y" }}<br>
+                        <span style="font-size:11px; color:var(--text-hint);">{{ m.fecha_registro|date:"H:i" }}</span>
+                    </td>
+
+                    <!-- Taxa -->
+                    <td style="text-align:right;">
+                        {% if m.total_resultados %}
+                        <span class="hist-taxa">{{ m.total_resultados }}</span>
+                        <div class="hist-sub" style="text-align:right;">
+                            {{ m.total_archivos }} archivo{{ m.total_archivos|pluralize:"s" }}
+                        </div>
+                        {% else %}
+                        <span class="hist-taxa-zero">—</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Acciones -->
+                    <td style="text-align:center;">
+                        <div class="hist-actions" style="justify-content:center;">
+                            <a href="{% url 'analisis:ver_producto' m.id %}"
+                               class="btn btn-outline btn-sm"
+                               title="Ver detalle de la muestra">
+                                <i class="ti ti-eye"></i>
                             </a>
-                            <a href="{% url 'analisis:analisis_avanzado' %}?producto_id={{ p.id }}&tipo={{ tipo_actual }}" class="btn btn-outline btn-sm">
-                                <i class="ti ti-chart-dots" aria-hidden="true"></i> Analizar
+                            <a href="{% url 'analisis:analisis_avanzado' %}?producto_id={{ m.id }}&tipo={{ tipo_actual }}"
+                               class="btn btn-ghost-verde btn-sm"
+                               title="Abrir análisis avanzado">
+                                <i class="ti ti-chart-dots"></i>
                             </a>
                         </div>
                     </td>
@@ -68,15 +261,56 @@
             </tbody>
         </table>
     </div>
+
+    <!-- PAGINACIÓN -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="hist-pag">
+        {% if page_obj.has_previous %}
+        <a href="?tipo={{ tipo_actual }}&page={{ page_obj.previous_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if localidad_f %}&localidad={{ localidad_f }}{% endif %}"
+           class="pg-btn"><i class="ti ti-chevron-left"></i></a>
+        {% else %}
+        <span class="pg-btn off"><i class="ti ti-chevron-left"></i></span>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if num == page_obj.number %}
+            <span class="pg-btn activo">{{ num }}</span>
+            {% elif num == 1 or num == page_obj.paginator.num_pages %}
+            <a href="?tipo={{ tipo_actual }}&page={{ num }}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if localidad_f %}&localidad={{ localidad_f }}{% endif %}" class="pg-btn">{{ num }}</a>
+            {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+            <a href="?tipo={{ tipo_actual }}&page={{ num }}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if localidad_f %}&localidad={{ localidad_f }}{% endif %}" class="pg-btn">{{ num }}</a>
+            {% elif num == page_obj.number|add:"-3" or num == page_obj.number|add:"3" %}
+            <span class="pg-sep">…</span>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <a href="?tipo={{ tipo_actual }}&page={{ page_obj.next_page_number }}{% if busqueda %}&q={{ busqueda }}{% endif %}{% if localidad_f %}&localidad={{ localidad_f }}{% endif %}"
+           class="pg-btn"><i class="ti ti-chevron-right"></i></a>
+        {% else %}
+        <span class="pg-btn off"><i class="ti ti-chevron-right"></i></span>
+        {% endif %}
+    </div>
+    {% endif %}
+
     {% else %}
     <div class="empty-state">
-        <i class="ti ti-history" aria-hidden="true"></i>
-        <strong>Sin registros</strong>
-        <p>No se encontraron muestras {% if busqueda %}para "{{ busqueda }}"{% endif %}.</p>
-        {% if busqueda %}
-            <a href="{% url 'analisis:historial' %}?tipo={{ tipo_actual }}" class="btn btn-outline btn-sm">Ver todas las muestras</a>
+        <i class="ti ti-database-off"></i>
+        <strong>Sin registros para {{ tipo_actual }}</strong>
+        <p>
+            {% if busqueda or localidad_f %}
+                No hay muestras que coincidan con los filtros aplicados.
+            {% else %}
+                Aún no se han procesado muestras con marcador {{ tipo_actual }}.
+            {% endif %}
+        </p>
+        {% if busqueda or localidad_f %}
+        <a href="?tipo={{ tipo_actual }}" class="btn btn-outline btn-sm" style="margin-top:0.5rem;">
+            <i class="ti ti-x"></i> Quitar filtros
+        </a>
         {% endif %}
     </div>
     {% endif %}
 </div>
+
 {% endblock %}

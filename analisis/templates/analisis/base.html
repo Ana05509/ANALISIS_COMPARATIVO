@@ -8,8 +8,10 @@
             <div class="brand-icon">
                 <i class="ti ti-dna-2" aria-hidden="true"></i>
             </div>
-            <div class="brand-name">BioSuelo</div>
-            <div class="brand-sub">Análisis 16S &amp; ITS</div>
+            <div class="brand-text">
+                <div class="brand-name">BioSuelo</div>
+                <div class="brand-sub">Análisis 16S &amp; ITS</div>
+            </div>
         </div>
 
         <nav class="sidebar-nav">
@@ -50,8 +52,8 @@
         </nav>
 
         <div class="marker-tabs">
-            <a href="?tipo=16S" class="marker-tab {% if tipo_actual == '16S' or not tipo_actual %}active-16s{% endif %}">16S</a>
-            <a href="?tipo=ITS" class="marker-tab {% if tipo_actual == 'ITS' %}active-its{% endif %}">ITS</a>
+            <a href="?tipo=16S" class="marker-tab" data-tipo="16S">16S</a>
+            <a href="?tipo=ITS" class="marker-tab" data-tipo="ITS">ITS</a>
         </div>
     </aside>
 

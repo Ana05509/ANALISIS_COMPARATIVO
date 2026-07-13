@@ -10,9 +10,9 @@ from django.http import JsonResponse, HttpResponse, HttpResponseBase
 from django.views.decorators.http import require_POST
 
 from analisis.models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo
-from analisis.services.business.analysis_service import obtener_analisis_avanzado, obtener_diversidad
+from analisis.services.business.analysis_service import obtener_analisis_avanzado, obtener_diversidad, _filtrar_catalogo_por_nivel
 from analisis.services.business.export_service import ExportService
-from analisis.constants import MARCADORES_VALIDOS, OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES
+from analisis.constants import MARCADORES_VALIDOS, OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES, get_taxonomia_annotation, clasificar_taxon, buscar_en_catalogo, NIVELES_ES, MARCADORES_ES, NIVELES_CHOICES, MARCADORES_CHOICES, normalizar_nombre_catalogo
 
 FORMATOS_VALIDOS = ("pdf", "excel")
 
@@ -39,20 +39,21 @@ def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S"):
     detalle_dict[cat] = [{nombre, porcentaje, descripcion, referencia}, ...]
     """
     CATS = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
-    taxa_qs    = list(qs.values(taxon=F(campo_db)).annotate(hits=Sum("num_hits")).order_by("-hits"))
+    taxa_qs    = list(qs.values(taxon=get_taxonomia_annotation(nivel)).annotate(hits=Sum("num_hits")).order_by("-hits"))
     grand_total = sum(r["hits"] for r in taxa_qs) or 1
 
-    # Filtrar por marcador Y nivel; fallback a solo marcador si nivel no tiene entradas
-    cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo, nivel__iexact=nivel)
-    if not cat_qs.exists():
-        cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo)
-    catalogo = {obj.nombre.lower().strip(): obj for obj in cat_qs}
+    catalogo = {
+        normalizar_nombre_catalogo(obj.nombre): obj
+        for obj in _filtrar_catalogo_por_nivel(
+            CatalogoMicroorganismo.objects.filter(marcador=tipo), nivel
+        )
+    }
 
     detalle = {c: [] for c in CATS}
     totales = {c: 0  for c in CATS}
     for row in taxa_qs:
         nombre = row["taxon"] or "Desconocido"
-        cat_obj = catalogo.get(nombre.lower().strip())
+        cat_obj = buscar_en_catalogo(nombre, catalogo, nivel)
         clas    = (cat_obj.clasificacion if cat_obj and cat_obj.clasificacion in CATS else "sin_clasificar")
 
         pct_raw = row["hits"] / grand_total * 100
@@ -81,20 +82,18 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
         return None
 
     grand_total = qs.aggregate(total=Sum("num_hits"))["total"] or 1
-    todos_raw   = list(qs.values(taxonomia=F(campo_db)).annotate(total_hits=Sum("num_hits")).order_by("-total_hits"))
+    todos_raw   = list(qs.values(taxonomia=get_taxonomia_annotation(nivel)).annotate(total_hits=Sum("num_hits")).order_by("-total_hits"))
 
-    # Filtrar catálogo por marcador Y nivel; fallback a solo marcador si nivel sin entradas
-    cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo, nivel__iexact=nivel)
-    if not cat_qs.exists():
-        cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo)
     catalogo_map = {
-        obj["nombre"].lower().strip(): obj["clasificacion"]
-        for obj in cat_qs.values("nombre", "clasificacion")
+        normalizar_nombre_catalogo(obj["nombre"]): obj["clasificacion"]
+        for obj in _filtrar_catalogo_por_nivel(
+            CatalogoMicroorganismo.objects.filter(marcador=tipo), nivel
+        ).values("nombre", "clasificacion")
     }
     for r in todos_raw:
         pct_raw = r["total_hits"] / grand_total * 100
         r["total_porcentaje"] = round(pct_raw, 4) if pct_raw < 0.01 else round(pct_raw, 2)
-        r["clasificacion"]    = catalogo_map.get(str(r["taxonomia"] or "").lower().strip(), "sin_clasificar")
+        r["clasificacion"]    = clasificar_taxon(str(r["taxonomia"] or ""), catalogo_map, nivel)
 
     diversidad  = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids) or {}
     detalle_clas, totales_clas = _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo)
@@ -129,7 +128,7 @@ def _construir_datos_por_muestra(tipo, nivel, top_n, muestras_list):
             continue
         grand_total = qs_m.aggregate(total=Sum("num_hits"))["total"] or 1
         # Todos los taxa de esta muestra (para diversidad beta)
-        all_raw = list(qs_m.values(taxonomia=F(campo_db)).annotate(total_hits=Sum("num_hits")).order_by("-total_hits"))
+        all_raw = list(qs_m.values(taxonomia=get_taxonomia_annotation(nivel)).annotate(total_hits=Sum("num_hits")).order_by("-total_hits"))
         for r in all_raw:
             pct_raw = r["total_hits"] / grand_total * 100
             r["total_porcentaje"] = round(pct_raw, 4) if pct_raw < 0.01 else round(pct_raw, 2)
@@ -169,22 +168,23 @@ def _clasificacion_por_muestra(tipo, nivel, muestra_ids=None):
     if muestra_ids:
         qs = qs.filter(archivo__muestra_id__in=muestra_ids)
 
-    data = list(qs.values(muestra=F("archivo__muestra__codigo"), taxon=F(campo_db)).annotate(hits=Sum("num_hits")))
+    data = list(qs.values(muestra=F("archivo__muestra__codigo"), taxon=get_taxonomia_annotation(nivel)).annotate(hits=Sum("num_hits")))
     if not data:
         return []
 
-    # Filtrar por marcador Y nivel; fallback a solo marcador si nivel no tiene entradas
-    cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo, nivel__iexact=nivel)
-    if not cat_qs.exists():
-        cat_qs = CatalogoMicroorganismo.objects.filter(marcador=tipo)
-    catalog = {obj.nombre.lower().strip(): obj.clasificacion for obj in cat_qs}
+    catalog = {
+        normalizar_nombre_catalogo(obj.nombre): obj.clasificacion
+        for obj in _filtrar_catalogo_por_nivel(
+            CatalogoMicroorganismo.objects.filter(marcador=tipo), nivel
+        )
+    }
     CATS    = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
     acc     = defaultdict(lambda: {c: [] for c in CATS})
 
     for row in data:
         m      = row["muestra"] or "Sin código"
         nombre = row["taxon"]   or "Desconocido"
-        clas   = catalog.get(nombre.lower().strip(), "sin_clasificar")
+        clas   = clasificar_taxon(nombre, catalog, nivel)
         if nombre not in acc[m][clas]:
             acc[m][clas].append(nombre)
 
@@ -214,8 +214,9 @@ def reportes(request):
         "nivel_actual":            nivel,
         "top_n_actual":            top_n,
         "opciones_top_n":          OPCIONES_TOP_N,
-        "marcadores_disponibles":  MARCADORES_VALIDOS,
-        "niveles_disponibles":     NIVELES_VALIDOS,
+        "marcadores_choices":      MARCADORES_CHOICES,
+        "niveles_choices":         NIVELES_CHOICES,
+        "nivel_actual_label":      NIVELES_ES.get(nivel, nivel.capitalize()),
         "muestra_ids_seleccionados": muestra_ids,
         "productos": MuestraSuelo.objects.filter(
             archivos_moleculares__tipo_analisis=tipo
@@ -227,6 +228,7 @@ def reportes(request):
         "totales_clasificacion":   {"benefico": 0, "fitopatogeno": 0, "neutral": 0, "sin_clasificar": 0},
         "indice_salud":            None,
         "nivel_salud":             None,
+        "alfa_por_muestra_json":   "{}",
     }
 
     # Solo cargar datos si el usuario seleccionó al menos una muestra
@@ -235,7 +237,6 @@ def reportes(request):
             # ① Tabla Top N
             resultado      = obtener_analisis_avanzado(tipo=tipo, top_n=top_n, nivel=nivel, muestra_ids=muestra_ids)
             ctx["resumen"] = resultado.get("resumen", [])
-            # JSON para la gráfica de perfil de abundancia
             ctx["resumen_json"] = json.dumps([
                 {
                     "nombre":        str(r.get("taxonomia") or "Desconocido"),
@@ -246,10 +247,10 @@ def reportes(request):
                 for r in ctx["resumen"]
             ])
 
-            # ② Métricas diversidad
+            # ② Diversidad Alfa (promedio del set; incluye simpson y equitatividad)
             ctx["diversidad"] = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids) or {}
 
-            # ③ Gráfica de tendencia
+            # ③ Gráfica de tendencia clasificación por muestra
             datos_clas                      = _clasificacion_por_muestra(tipo, nivel, muestra_ids=muestra_ids)
             ctx["datos_clasificacion"]      = datos_clas
             ctx["datos_clasificacion_json"] = json.dumps(datos_clas)
@@ -260,6 +261,23 @@ def reportes(request):
                 ctx["indice_salud"]          = datos_rpt["indice_salud"]
                 ctx["nivel_salud"]           = datos_rpt["nivel_salud"]
                 ctx["totales_clasificacion"] = datos_rpt["totales_clas"]
+
+            # ⑤ Alpha diversidad individual por muestra (para gráfico Shannon multi-muestra)
+            if len(muestra_ids) > 1:
+                muestras_set = MuestraSuelo.objects.filter(
+                    id__in=muestra_ids
+                ).only("id", "codigo").order_by("codigo")
+                alfa_pm = {}
+                for m in muestras_set:
+                    div_m = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=[m.id]) or {}
+                    if div_m:
+                        alfa_pm[m.codigo] = {
+                            "riqueza":       int(div_m.get("riqueza", 0)),
+                            "shannon":       round(float(div_m.get("shannon", 0)), 4),
+                            "simpson":       round(float(div_m.get("simpson", 0)), 4),
+                            "equitatividad": round(float(div_m.get("equitatividad", 0)), 4),
+                        }
+                ctx["alfa_por_muestra_json"] = json.dumps(alfa_pm)
 
         except Exception as exc:
             import traceback; traceback.print_exc()

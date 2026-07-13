@@ -106,7 +106,11 @@ def dashboard(request):
                 title=f'Top 15 Géneros - {tipo}',
                 labels={'taxonomia': 'Género', 'porcentaje': 'Abundancia relativa (%)'},
             )
-            fig_bar.update_layout(xaxis_tickangle=-45, height=400)
+            fig_bar.update_layout(
+                xaxis=dict(tickangle=-45, automargin=True, tickfont=dict(size=10)),
+                margin=dict(b=160, t=60, l=60, r=20),
+                height=480,
+            )
 
             fig_pie = px.pie(
                 df_genera, names='taxonomia', values='porcentaje',

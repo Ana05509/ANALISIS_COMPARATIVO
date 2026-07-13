@@ -97,9 +97,33 @@ class CatalogService:
 
     @staticmethod
     def _quitar_tildes(texto: str) -> str:
-        """Convierte 'Benéfico' → 'benefico', 'Fitopatógeno' → 'fitopatogeno'."""
         nfkd = unicodedata.normalize('NFD', texto)
         return ''.join(c for c in nfkd if unicodedata.category(c) != 'Mn')
+
+    @classmethod
+    def _normalizar_nivel(cls, valor: str) -> str:
+        """
+        Acepta variantes en español e inglés (con/sin tilde, mayúsculas, abreviaturas)
+        y retorna el valor canónico: genus | species | family | order | class | phylum.
+        Si no reconoce el valor devuelve 'genus' como fallback seguro.
+        """
+        clave = cls._quitar_tildes(str(valor).strip().lower())
+        MAPA = {
+            # genus
+            'genus': 'genus', 'genero': 'genus', 'gen': 'genus', 'g': 'genus',
+            # species
+            'species': 'species', 'especie': 'species', 'specie': 'species',
+            'sp': 'species', 'spp': 'species',
+            # family
+            'family': 'family', 'familia': 'family', 'fam': 'family',
+            # order
+            'order': 'order', 'orden': 'order', 'ord': 'order',
+            # class
+            'class': 'class', 'clase': 'class', 'cls': 'class',
+            # phylum
+            'phylum': 'phylum', 'filo': 'phylum', 'division': 'phylum',
+        }
+        return MAPA.get(clave, 'genus')
 
     @classmethod
     def _normalizar_clasificacion(cls, valor: str) -> str:
@@ -175,7 +199,7 @@ class CatalogService:
 
         for _, row in df.iterrows():
             nombre = str(row.get('nombre', '')).strip()
-            nivel  = str(row.get('nivel', '')).strip().lower()
+            nivel  = CatalogService._normalizar_nivel(row.get('nivel', 'genus'))
 
             if not nombre or nombre.lower() in _nan:
                 errores += 1

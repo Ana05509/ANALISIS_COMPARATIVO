@@ -33,8 +33,8 @@
             --text-primary: #17171A;
             --text-muted:   #5F5E5A;
             --text-hint:    #888780;
-            --sidebar-w:    268px;
-            --topbar-h:     60px;
+            --sidebar-w:    210px;
+            --topbar-h:     52px;
             --radius:       10px;
             --radius-lg:    16px;
             --shadow-sm:    0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
@@ -107,36 +107,50 @@
 
         /* ── COMPONENTES GENERALES DE LA APP ── */
         .sidebar-brand {
-            padding: 1.5rem 1.25rem 1.1rem;
+            padding: 0.8rem 1rem;
             border-bottom: 1px solid var(--gris-border);
             flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .brand-icon {
-            width: 38px; height: 38px;
+            width: 32px; height: 32px;
             background: var(--verde);
-            border-radius: 10px;
+            border-radius: 8px;
             display: flex; align-items: center; justify-content: center;
-            margin-bottom: 0.6rem;
-            box-shadow: 0 2px 8px rgba(29,158,117,0.30);
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(29,158,117,0.28);
         }
 
-        .brand-icon i { color: #fff; font-size: 20px; }
+        .brand-icon i { color: #fff; font-size: 17px; }
+
+        .brand-text {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            line-height: 1.2;
+        }
 
         .brand-name {
             font-family: 'Fraunces', serif;
-            font-size: 17.5px;
+            font-size: 16px;
             font-weight: 500;
             color: var(--text-primary);
-            letter-spacing: -0.3px;
+            letter-spacing: -0.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .brand-sub {
-            font-size: 10.5px;
+            font-size: 10px;
             color: var(--text-hint);
             text-transform: uppercase;
-            letter-spacing: 0.9px;
-            margin-top: 2px;
+            letter-spacing: 0.8px;
+            margin-top: 1px;
+            white-space: nowrap;
         }
 
         .sidebar-nav {
@@ -305,7 +319,7 @@
         .topbar {
             background: var(--surface);
             border-bottom: 1px solid var(--gris-border);
-            padding: 0 2rem;
+            padding: 0 1.5rem;
             height: var(--topbar-h);
             display: flex;
             align-items: center;
@@ -532,7 +546,7 @@
         .tu-drop-logout:hover { background: var(--rojo-light); }
 
         .page-content {
-            padding: 2rem;
+            padding: 1.25rem 1.5rem;
             flex: 1;
             min-width: 0;
             animation: pageFadeIn 0.28s ease both;
@@ -1024,8 +1038,8 @@
 
         /* ── RESPONSIVE: móvil (hasta 640px) ── */
         @media (max-width: 640px) {
-            .page-content { padding: 1.25rem 1rem; }
-            .topbar { padding: 0 1rem; height: 54px; }
+            .page-content { padding: 1rem 0.875rem; }
+            .topbar { padding: 0 0.875rem; height: 48px; }
             .metrics-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
             .page-header h1 { font-size: 24px; }
             /* En móvil: ocultar nombre/rol del usuario, solo avatar */
@@ -1291,6 +1305,48 @@
 
             window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function () {
                 if ((localStorage.getItem(KEY) || 'light') === 'system') applyTheme('system');
+            });
+        });
+    })();
+
+    /* ── MARCADOR PERSISTENTE (16S / ITS) ── */
+    (function () {
+        var KEY   = 'bs-marker';
+        var VALID = { '16S': 'active-16s', 'ITS': 'active-its' };
+
+        // Si la URL actual trae ?tipo=, guardarlo como preferencia
+        var urlTipo = new URLSearchParams(window.location.search).get('tipo');
+        if (VALID[urlTipo]) localStorage.setItem(KEY, urlTipo);
+
+        var tipo = localStorage.getItem(KEY) || '16S';
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // 1. Marcar el tab correcto como activo
+            document.querySelectorAll('.marker-tab[data-tipo]').forEach(function (tab) {
+                var t = tab.getAttribute('data-tipo');
+                tab.classList.remove('active-16s', 'active-its');
+                if (t === tipo) tab.classList.add(VALID[t]);
+            });
+
+            // 2. Inyectar ?tipo= en todos los links del nav para que la
+            //    navegación conserve la selección del usuario
+            document.querySelectorAll('.sidebar-nav .nav-link').forEach(function (a) {
+                var href = a.getAttribute('href') || '';
+                if (!href || href.charAt(0) === '#') return;
+                try {
+                    var url = new URL(href, location.origin);
+                    if (!url.searchParams.has('tipo')) {
+                        url.searchParams.set('tipo', tipo);
+                        a.setAttribute('href', url.pathname + '?' + url.searchParams.toString());
+                    }
+                } catch (e) {}
+            });
+
+            // 3. Al hacer clic en un tab, guardar la preferencia antes de navegar
+            document.querySelectorAll('.marker-tab[data-tipo]').forEach(function (tab) {
+                tab.addEventListener('click', function () {
+                    localStorage.setItem(KEY, tab.getAttribute('data-tipo'));
+                });
             });
         });
     })();

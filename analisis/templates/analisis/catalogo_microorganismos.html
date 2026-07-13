@@ -4,13 +4,189 @@
 {% block nav_catalogo %}active{% endblock %}
 {% block topbar_title %}Catálogo de Referencia Microbiana{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ══════════════════════════════════════════════
+   CHIPS DE NIVEL TAXONÓMICO
+══════════════════════════════════════════════ */
+.nivel-chip {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    padding: 2px 9px; border-radius: 20px;
+    white-space: nowrap; letter-spacing: 0.02em;
+    background: var(--bg-subtle, #f1f5f9);
+    color: var(--text-muted, #64748b);
+    border: 1px solid transparent;
+}
+.nivel-genus   { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+.nivel-species { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
+.nivel-family  { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.nivel-order   { background: #f3e8ff; color: #6d28d9; border-color: #ddd6fe; }
+.nivel-class   { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.nivel-phylum  { background: #fce7f3; color: #9d174d; border-color: #fbcfe8; }
+
+@media (prefers-color-scheme: dark) {
+    .nivel-genus   { background: #1e3a5f; color: #93c5fd; border-color: #1d4ed8; }
+    .nivel-species { background: #14532d; color: #86efac; border-color: #15803d; }
+    .nivel-family  { background: #451a03; color: #fcd34d; border-color: #92400e; }
+    .nivel-order   { background: #3b0764; color: #d8b4fe; border-color: #6d28d9; }
+    .nivel-class   { background: #450a0a; color: #fca5a5; border-color: #991b1b; }
+    .nivel-phylum  { background: #500724; color: #f9a8d4; border-color: #9d174d; }
+}
+
+/* ══════════════════════════════════════════════
+   BADGES DE MARCADOR MOLECULAR (sin emoji)
+══════════════════════════════════════════════ */
+.mkr-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; padding: 3px 9px;
+    border-radius: 6px; white-space: nowrap;
+}
+.mkr-16s { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+.mkr-its { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+@media (prefers-color-scheme: dark) {
+    .mkr-16s { background: #0c4a6e; color: #7dd3fc; border-color: #0369a1; }
+    .mkr-its { background: #451a03; color: #fcd34d; border-color: #92400e; }
+}
+
+/* ══════════════════════════════════════════════
+   NOMBRE CIENTÍFICO
+══════════════════════════════════════════════ */
+.taxon-name {
+    font-style: italic; font-weight: 600;
+    color: var(--text-primary); font-size: 13px;
+    word-break: break-word; overflow-wrap: anywhere;
+    line-height: 1.45; display: block;
+}
+
+/* ══════════════════════════════════════════════
+   TABLA PRINCIPAL
+══════════════════════════════════════════════ */
+#tabla-catalogo {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Anchos de columna */
+#tabla-catalogo th:nth-child(1) { width: 20%; }
+#tabla-catalogo th:nth-child(2) { width: 10%; }
+#tabla-catalogo th:nth-child(3) { width: 9%;  }
+#tabla-catalogo th:nth-child(4) { width: 39%; }
+#tabla-catalogo th:nth-child(5) { width: 14%; }
+#tabla-catalogo th:nth-child(6) { width: 8%; text-align: center; }
+
+/* Cabeceras */
+#tabla-catalogo thead th {
+    font-size: 10.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-muted, #64748b);
+    padding: 10px 12px 10px;
+    white-space: normal; line-height: 1.3;
+    border-bottom: 2px solid var(--gris-border, #e2e8f0);
+    background: var(--bg-subtle, #f8fafc);
+}
+#tabla-catalogo thead th:first-child { border-radius: 8px 0 0 0; }
+#tabla-catalogo thead th:last-child  { border-radius: 0 8px 0 0; }
+
+/* Celdas */
+#tabla-catalogo td {
+    padding: 11px 12px;
+    vertical-align: top;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    border-bottom: 1px solid var(--gris-border, #f1f5f9);
+    font-size: 13px;
+}
+
+/* Acento lateral por clasificación + rayas + hover */
+#tabla-catalogo tbody tr {
+    border-left: 3px solid transparent;
+    transition: background 0.12s;
+}
+#tabla-catalogo tbody tr td:first-child {
+    padding-left: 10px;
+}
+#tabla-catalogo tbody tr[data-clas="benefico"]     { border-left-color: #1D9E75; }
+#tabla-catalogo tbody tr[data-clas="fitopatogeno"] { border-left-color: #DC2626; }
+#tabla-catalogo tbody tr[data-clas="neutral"]      { border-left-color: #94a3b8; }
+#tabla-catalogo tbody tr[data-clas="sin_clasificar"] { border-left-color: #cbd5e1; }
+
+#tabla-catalogo tbody tr:nth-child(even) td {
+    background: var(--bg-subtle, rgba(0,0,0,0.018));
+}
+#tabla-catalogo tbody tr:hover td {
+    background: rgba(29,158,117,0.05) !important;
+}
+
+/* ══════════════════════════════════════════════
+   CABECERAS ORDENABLES
+══════════════════════════════════════════════ */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--verde, #1D9E75); }
+.sort-icon { display: inline-block; font-size: 9px; opacity: .35; margin-left: 3px; }
+.sort-icon::after { content: '⇅'; }
+th.sort-asc  .sort-icon::after { content: '↑'; opacity: 1; color: var(--verde,#1D9E75); }
+th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; color: var(--verde,#1D9E75); }
+
+/* ══════════════════════════════════════════════
+   DESCRIPCIÓN EXPANDIBLE
+══════════════════════════════════════════════ */
+.desc-full  { display: none; }
+.desc-short { color: var(--text-secondary, #475569); font-size: 12.5px; line-height: 1.5; }
+.btn-expand {
+    background: none; border: none; cursor: pointer;
+    color: var(--verde, #1D9E75); font-size: 11px; font-weight: 600;
+    padding: 0 2px; text-decoration: none;
+    border-bottom: 1px dashed currentColor;
+    vertical-align: baseline; line-height: 1;
+}
+.btn-expand:hover { opacity: .75; }
+.desc-full-text { color: var(--text-secondary); font-size: 12.5px; line-height: 1.55; }
+.referencia-line {
+    display: flex; align-items: flex-start; gap: 5px;
+    font-size: 11px; color: var(--text-hint); font-style: italic;
+    margin-top: 6px; line-height: 1.4;
+    padding-top: 5px; border-top: 1px solid var(--gris-border, #e2e8f0);
+}
+.referencia-line i { flex-shrink: 0; margin-top: 1px; }
+
+/* ══════════════════════════════════════════════
+   BÚSQUEDA RÁPIDA
+══════════════════════════════════════════════ */
+#busq-rapida {
+    width: 100%; padding: 0.5rem 1rem 0.5rem 2.5rem;
+    border: 1.5px solid var(--gris-border); border-radius: 8px;
+    font-size: 13px; background: var(--bg-card);
+    color: var(--text-primary); outline: none; transition: border-color .2s, box-shadow .2s;
+}
+#busq-rapida:focus {
+    border-color: var(--verde, #1D9E75);
+    box-shadow: 0 0 0 3px rgba(29,158,117,.12);
+}
+.busq-wrap { position: relative; flex: 1; min-width: 200px; }
+.busq-wrap .busq-icon {
+    position: absolute; left: .75rem; top: 50%; transform: translateY(-50%);
+    color: var(--text-hint); pointer-events: none; font-size: 15px;
+}
+#result-count {
+    font-size: 12px; color: var(--text-hint);
+    white-space: nowrap; flex-shrink: 0;
+    background: var(--bg-subtle, #f1f5f9);
+    padding: 4px 10px; border-radius: 20px;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
+
 {% block content %}
+
 {% if estadisticas %}
 {% with total=estadisticas.total|default:1 %}
 <div class="metrics-grid" style="margin-bottom: 1.5rem;">
 
     <div class="metric-card">
-        <div class="metric-label">Total en Catálogo</div>
+        <div class="metric-label">Total registros</div>
         <div class="metric-value td-mono">{{ estadisticas.total }}</div>
     </div>
 
@@ -21,9 +197,7 @@
             <div style="height:4px;background:rgba(0,0,0,.1);border-radius:4px;overflow:hidden;">
                 <div style="height:100%;background:#1D9E75;border-radius:4px;width:{% widthratio estadisticas.total_beneficos total 100 %}%;"></div>
             </div>
-            <div style="font-size:12px;font-weight:600;color:#1D9E75;margin-top:4px;">
-                {% widthratio estadisticas.total_beneficos total 100 %}% del catálogo
-            </div>
+            <div style="font-size:11px;font-weight:600;color:#1D9E75;margin-top:4px;">{% widthratio estadisticas.total_beneficos total 100 %}% del catálogo</div>
         </div>
     </div>
 
@@ -34,9 +208,7 @@
             <div style="height:4px;background:rgba(0,0,0,.1);border-radius:4px;overflow:hidden;">
                 <div style="height:100%;background:#BA7517;border-radius:4px;width:{% widthratio estadisticas.total_fitopatogenos total 100 %}%;"></div>
             </div>
-            <div style="font-size:12px;font-weight:600;color:#BA7517;margin-top:4px;">
-                {% widthratio estadisticas.total_fitopatogenos total 100 %}% del catálogo
-            </div>
+            <div style="font-size:11px;font-weight:600;color:#BA7517;margin-top:4px;">{% widthratio estadisticas.total_fitopatogenos total 100 %}% del catálogo</div>
         </div>
     </div>
 
@@ -47,22 +219,18 @@
             <div style="height:4px;background:rgba(0,0,0,.1);border-radius:4px;overflow:hidden;">
                 <div style="height:100%;background:#185FA5;border-radius:4px;width:{% widthratio estadisticas.total_neutrales total 100 %}%;"></div>
             </div>
-            <div style="font-size:12px;font-weight:600;color:#185FA5;margin-top:4px;">
-                {% widthratio estadisticas.total_neutrales total 100 %}% del catálogo
-            </div>
+            <div style="font-size:11px;font-weight:600;color:#185FA5;margin-top:4px;">{% widthratio estadisticas.total_neutrales total 100 %}% del catálogo</div>
         </div>
     </div>
 
     <div class="metric-card">
-        <div class="metric-label">Sin Clasificación</div>
+        <div class="metric-label">Sin clasificar</div>
         <div class="metric-value td-mono">{{ estadisticas.total_sin_clas }}</div>
         <div style="margin-top:8px;">
             <div style="height:4px;background:rgba(0,0,0,.1);border-radius:4px;overflow:hidden;">
-                <div style="height:100%;background:#5F5E5A;border-radius:4px;width:{% widthratio estadisticas.total_sin_clas total 100 %}%;"></div>
+                <div style="height:100%;background:#94a3b8;border-radius:4px;width:{% widthratio estadisticas.total_sin_clas total 100 %}%;"></div>
             </div>
-            <div style="font-size:12px;font-weight:600;color:#5F5E5A;margin-top:4px;">
-                {% widthratio estadisticas.total_sin_clas total 100 %}% del catálogo
-            </div>
+            <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-top:4px;">{% widthratio estadisticas.total_sin_clas total 100 %}% del catálogo</div>
         </div>
     </div>
 
@@ -70,24 +238,15 @@
 {% endwith %}
 {% endif %}
 
-<!-- Acciones de staff: Agregar / Importar -->
-{% if request.user.is_staff %}
-<div style="display:flex;gap:10px;margin-bottom:1.25rem;flex-wrap:wrap;">
-    <button id="btn-abrir-importar" class="btn btn-primary">
-        <i class="ti ti-upload" aria-hidden="true"></i> Importar CSV / Excel
-    </button>
-    <a href="{% url 'analisis:reclasificar' 0 %}" style="display:none"></a><!-- preload URL pattern -->
-</div>
-{% endif %}
-
-<!-- Formulario de filtros -->
-<div class="card card-sm" style="margin-bottom: 1.5rem;">
-    <form method="get" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;">
-        <div style="flex: 2; min-width: 150px;">
+<!-- Filtros + botón importar en una sola fila -->
+<div class="card card-sm" style="margin-bottom: 1.25rem;">
+    <form method="get" style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end;">
+        <div style="flex:2; min-width:140px;">
             <label class="form-label">Buscar</label>
-            <input type="text" name="busqueda" value="{{ busqueda|default:'' }}" placeholder="Ej: Bacillus" class="form-control">
+            <input type="text" name="busqueda" value="{{ busqueda|default:'' }}"
+                   placeholder="Ej: Bacillus" class="form-control">
         </div>
-        <div style="flex: 1; min-width: 120px;">
+        <div style="flex:1; min-width:110px;">
             <label class="form-label">Tipo</label>
             <select name="filtro_marcador" class="form-control">
                 <option value="">Todos</option>
@@ -95,7 +254,7 @@
                 <option value="ITS" {% if filtro_marcador == 'ITS' %}selected{% endif %}>Hongo (ITS)</option>
             </select>
         </div>
-        <div style="flex: 1; min-width: 130px;">
+        <div style="flex:1; min-width:120px;">
             <label class="form-label">Clasificación</label>
             <select name="filtro_clasificacion" class="form-control">
                 <option value="">Todas</option>
@@ -104,12 +263,12 @@
                 {% endfor %}
             </select>
         </div>
-        <div style="flex: 1; min-width: 110px;">
+        <div style="flex:1; min-width:100px;">
             <label class="form-label">Nivel</label>
             <select name="filtro_nivel" class="form-control">
                 <option value="">Todos</option>
-                {% for n in niveles_taxonomicos %}
-                <option value="{{ n }}" {% if filtro_nivel == n %}selected{% endif %}>{{ n|capfirst }}</option>
+                {% for val, label in niveles_taxonomicos %}
+                <option value="{{ val }}" {% if filtro_nivel == val %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -119,45 +278,84 @@
         <a href="{% url 'analisis:catalogo' %}" class="btn btn-outline">
             <i class="ti ti-x" aria-hidden="true"></i> Limpiar
         </a>
+        {% if request.user.is_staff %}
+        <button type="button" id="btn-abrir-importar" class="btn btn-outline" style="margin-left:auto;">
+            <i class="ti ti-upload" aria-hidden="true"></i> Importar
+        </button>
+        {% endif %}
     </form>
 </div>
 
-<div class="card">
+<div class="card" style="padding: 0; overflow: hidden;">
     {% if microorganismos %}
-    <div class="table-wrap">
+
+    <!-- Búsqueda instantánea + contador -->
+    <div style="display:flex; gap:10px; align-items:center; padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid var(--gris-border, #e2e8f0); flex-wrap:wrap;">
+        <div class="busq-wrap">
+            <i class="ti ti-search busq-icon" aria-hidden="true"></i>
+            <input id="busq-rapida" type="text"
+                   placeholder="Filtro instantáneo — nombre, descripción…"
+                   autocomplete="off">
+        </div>
+        <span id="result-count"></span>
+    </div>
+
+    <div class="table-wrap" style="margin:0;">
         <table id="tabla-catalogo">
             <thead>
                 <tr>
-                    <th>Nombre Científico</th>
-                    <th>Nivel</th>
+                    <th class="sortable" data-col="0">Organismo <span class="sort-icon"></span></th>
+                    <th class="sortable" data-col="1">Nivel <span class="sort-icon"></span></th>
                     <th>Marcador</th>
                     <th>Descripción</th>
-                    <th style="padding-left: 2rem;">Clasificación Funcional</th>
-                    {% if request.user.is_staff %}
-                    <th style="text-align: center; width: 90px;">Acciones</th>
-                    {% endif %}
+                    <th class="sortable" data-col="4">Clasificación <span class="sort-icon"></span></th>
+                    {% if request.user.is_staff %}<th>Acc.</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
                 {% for m in microorganismos %}
-                <tr>
+                <tr data-search="{{ m.nombre|lower }} {{ m.nivel|lower }} {{ m.descripcion|lower }} {{ m.clasificacion }}"
+                    data-clas="{{ m.clasificacion }}">
+
                     <td>
-                        <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
-                            {{ m.nombre }}
-                        </strong>
+                        <em class="taxon-name">{{ m.nombre }}</em>
                     </td>
-                    <td style="font-size: 12px; color: var(--text-muted); text-transform: capitalize;">{{ m.nivel }}</td>
+
+                    <td>
+                        <span class="nivel-chip nivel-{{ m.nivel }}">{{ m.get_nivel_display }}</span>
+                    </td>
+
                     <td>
                         {% if m.marcador == '16S' %}
-                        <span class="pill-16s" title="Bacteria — Marcador 16S">🦠 Bacteria</span>
+                        <span class="mkr-badge mkr-16s">
+                            <i class="ti ti-dna" aria-hidden="true"></i> Bacteria
+                        </span>
                         {% else %}
-                        <span class="pill-its" title="Hongo — Marcador ITS">🍄 Hongo</span>
+                        <span class="mkr-badge mkr-its">
+                            <i class="ti ti-leaf" aria-hidden="true"></i> Hongo
+                        </span>
                         {% endif %}
                     </td>
-                    <td style="font-size: 13px; color: var(--text-muted); max-width: 280px; white-space: normal;">
-                        {{ m.descripcion|default:"—"|truncatechars:100 }}
+
+                    <td>
+                        {% if m.descripcion %}
+                            <span class="desc-short">{{ m.descripcion|truncatechars:85 }}</span>
+                            {% if m.descripcion|length > 85 %}
+                            <button class="btn-expand" type="button">ver más</button>
+                            <span class="desc-full"><span class="desc-full-text">{{ m.descripcion }}</span></span>
+                            {% endif %}
+                        {% else %}
+                            <span style="color:var(--text-hint);">—</span>
+                        {% endif %}
+                        {% if m.referencia %}
+                        <span class="referencia-line">
+                            <i class="ti ti-book-2" aria-hidden="true"></i>
+                            <span title="{{ m.referencia }}">{{ m.referencia|truncatechars:65 }}</span>
+                        </span>
+                        {% endif %}
                     </td>
-                    <td style="padding-left: 2rem;">
+
+                    <td>
                         {% if m.clasificacion == 'benefico' %}
                             <span class="badge badge-benefico"><i class="ti ti-shield-check" aria-hidden="true"></i> Benéfico</span>
                         {% elif m.clasificacion == 'fitopatogeno' %}
@@ -165,16 +363,17 @@
                         {% elif m.clasificacion == 'neutral' %}
                             <span class="badge badge-neutral"><i class="ti ti-minus" aria-hidden="true"></i> Neutral</span>
                         {% else %}
-                            <span class="badge badge-sin-clas">Sin clasificación</span>
+                            <span class="badge badge-sin-clas"><i class="ti ti-circle-dashed" aria-hidden="true"></i> Sin clasif.</span>
                         {% endif %}
                     </td>
+
                     {% if request.user.is_staff %}
-                    <td style="text-align: center;">
+                    <td style="text-align:center;">
                         <button class="btn btn-outline btn-sm btn-reclasificar"
                             data-id="{{ m.id }}"
                             data-taxon="{{ m.nombre|escapejs }}"
                             data-clas="{{ m.clasificacion|escapejs }}"
-                            title="Reclasificar taxón">
+                            title="Reclasificar">
                             <i class="ti ti-edit" aria-hidden="true"></i>
                         </button>
                     </td>
@@ -184,24 +383,22 @@
             </tbody>
         </table>
     </div>
+
     {% else %}
-    <div class="empty-state">
+    <div class="empty-state" style="padding: 2.5rem;">
         {% if estadisticas and estadisticas.total > 0 %}
         <i class="ti ti-filter-off" aria-hidden="true"></i>
-        <strong>Sin coincidencias con los filtros</strong>
-        <p>
-            El catálogo tiene {{ estadisticas.total }} microorganismo{{ estadisticas.total|pluralize:",s" }},
-            pero ninguno cumple los criterios seleccionados.
-        </p>
-        <a href="{% url 'analisis:catalogo' %}" class="btn btn-outline btn-sm" style="margin-top:0.75rem;">
+        <strong>Sin coincidencias</strong>
+        <p>Hay {{ estadisticas.total }} microorganismos en el catálogo pero ninguno cumple los filtros actuales.</p>
+        <a href="{% url 'analisis:catalogo' %}" class="btn btn-outline btn-sm" style="margin-top:.75rem;">
             <i class="ti ti-x"></i> Limpiar filtros
         </a>
         {% else %}
         <i class="ti ti-database-off" aria-hidden="true"></i>
         <strong>Catálogo vacío</strong>
-        <p>Aún no hay microorganismos registrados en el sistema.</p>
+        <p>Aún no hay microorganismos registrados.</p>
         {% if request.user.is_staff %}
-        <button id="btn-abrir-importar-empty" class="btn btn-primary btn-sm" style="margin-top:0.75rem;">
+        <button id="btn-abrir-importar-empty" class="btn btn-primary btn-sm" style="margin-top:.75rem;">
             <i class="ti ti-upload"></i> Importar microorganismos
         </button>
         {% endif %}
@@ -211,16 +408,22 @@
 </div>
 
 {% if request.user.is_staff %}
-<!-- Dialog: Reclasificar taxón -->
 <dialog id="modal-reclasificar" aria-labelledby="dlg-reclas-title">
-    <h3 id="dlg-reclas-title" style="margin:0 0 0.75rem;">Reclasificar microorganismo</h3>
-    <p style="font-size:14px; color:var(--text-muted); margin:0 0 1rem;">
-        Taxón: <strong id="modal-taxon"></strong>
-    </p>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:1rem;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(29,158,117,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="ti ti-edit" style="color:var(--verde,#1D9E75);font-size:18px;" aria-hidden="true"></i>
+        </div>
+        <div>
+            <h3 id="dlg-reclas-title" style="margin:0;font-size:15px;">Reclasificar microorganismo</h3>
+            <p style="margin:2px 0 0;font-size:12px;color:var(--text-hint);">
+                <em id="modal-taxon" style="font-style:italic;"></em>
+            </p>
+        </div>
+    </div>
     <form id="form-reclasificar" method="post" action="">
         {% csrf_token %}
         <div class="form-group" style="margin-bottom:1.25rem;">
-            <label class="form-label" for="select-clasificacion">Nueva clasificación</label>
+            <label class="form-label" for="select-clasificacion">Nueva clasificación funcional</label>
             <select id="select-clasificacion" name="clasificacion" class="form-control" required>
                 <option value="benefico">Benéfico</option>
                 <option value="fitopatogeno">Fitopatógeno</option>
@@ -228,47 +431,51 @@
                 <option value="sin_clasificar">Sin clasificar</option>
             </select>
         </div>
-        <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
             <button type="button" id="btn-cancel-reclasificar" class="btn btn-outline">Cancelar</button>
-            <button type="submit" class="btn btn-primary">Guardar cambio</button>
+            <button type="submit" class="btn btn-primary">
+                <i class="ti ti-check" aria-hidden="true"></i> Guardar
+            </button>
         </div>
     </form>
 </dialog>
 
-<!-- Dialog: Importar CSV/Excel -->
 <dialog id="modal-importar" aria-labelledby="dlg-importar-title">
-    <h3 id="dlg-importar-title" style="margin:0 0 0.4rem;">
-        <i class="ti ti-file-import"></i> Importar Catálogo
-    </h3>
-    <p style="font-size:13px; color:var(--text-muted); margin:0 0 1rem; line-height:1.6;">
-        Suba un CSV o Excel con los microorganismos a registrar o actualizar.<br>
-        <strong>Columnas requeridas:</strong> nombre, nivel, marcador (16S/ITS), clasificacion.<br>
-        <strong>Opcionales:</strong> descripcion, referencia.
-    </p>
-
-    <div style="background:var(--verde-light); border:1px solid rgba(29,158,117,0.3); border-radius:8px;
-                padding:10px 14px; font-size:12px; margin-bottom:1rem; font-family:'DM Mono',monospace; color:var(--verde-dark);">
-        nombre,nivel,marcador,clasificacion,descripcion<br>
-        Bacillus,genus,16S,benefico,Promotor de crecimiento<br>
-        Fusarium,genus,ITS,fitopatogeno,Agente de marchitez
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:1rem;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(29,158,117,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="ti ti-upload" style="color:var(--verde,#1D9E75);font-size:18px;" aria-hidden="true"></i>
+        </div>
+        <div>
+            <h3 id="dlg-importar-title" style="margin:0;font-size:15px;">Importar catálogo</h3>
+            <p style="margin:2px 0 0;font-size:12px;color:var(--text-hint);">CSV o Excel con los microorganismos a registrar</p>
+        </div>
     </div>
-
+    <div style="background:var(--bg-subtle,#f8fafc); border:1px solid var(--gris-border);
+                border-radius:8px; padding:10px 14px; font-size:11.5px; margin-bottom:1rem;
+                font-family:'DM Mono',monospace; line-height:1.7; color:var(--text-secondary);">
+        <strong style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-hint);">Columnas requeridas</strong><br>
+        nombre, nivel, marcador (16S/ITS), clasificacion<br>
+        <strong style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-hint);">Opcionales</strong><br>
+        descripcion, referencia<br>
+        <span style="color:var(--verde,#1D9E75);">
+        Bacillus,genus,16S,benefico,Promotor de crecimiento<br>
+        Fusarium,genus,ITS,fitopatogeno,Marchitez vascular
+        </span>
+    </div>
     <form id="form-importar" method="post" action="{% url 'analisis:importar_catalogo' %}" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="form-group" style="margin-bottom:1rem;">
-            <label class="form-label" for="import-file-input">Archivo CSV / Excel</label>
+            <label class="form-label" for="import-file-input">Archivo</label>
             <input type="file" name="archivo" accept=".csv,.tsv,.xlsx,.xls"
                    class="form-control" required id="import-file-input">
         </div>
-
         <div id="import-progress" style="display:none; margin-bottom:1rem;">
-            <div style="background:var(--gris-border); border-radius:4px; height:6px; overflow:hidden;">
-                <div style="background:var(--verde); height:6px; width:20%; animation:progress-anim 1.2s ease-in-out infinite alternate;"></div>
+            <div style="background:var(--gris-border);border-radius:4px;height:5px;overflow:hidden;">
+                <div style="background:var(--verde);height:5px;width:20%;animation:progress-anim 1.2s ease-in-out infinite alternate;"></div>
             </div>
-            <p style="font-size:12px; color:var(--text-hint); margin-top:4px;">Procesando archivo…</p>
+            <p style="font-size:11px;color:var(--text-hint);margin-top:4px;">Procesando archivo…</p>
         </div>
-
-        <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
             <button type="button" id="btn-cancel-importar" class="btn btn-outline">Cancelar</button>
             <button type="submit" id="btn-importar" class="btn btn-primary">
                 <i class="ti ti-upload" aria-hidden="true"></i> Importar
@@ -276,74 +483,124 @@
         </div>
     </form>
 </dialog>
+{% endif %}
 
 <style>
 dialog {
-    border: none;
-    border-radius: 14px;
-    padding: 1.75rem 2rem;
-    max-width: 560px;
-    width: calc(100% - 2rem);
-    box-shadow: 0 24px 64px rgba(0,0,0,0.22);
-    font-family: 'Outfit', sans-serif;
+    border: none; border-radius: 14px; padding: 1.5rem 1.75rem;
+    max-width: 520px; width: calc(100% - 2rem);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    font-family: 'Outfit', sans-serif; color: var(--text-primary);
+    background: var(--bg-card, #fff);
 }
-dialog::backdrop { background: rgba(0,0,0,0.48); }
-#modal-reclasificar { max-width: 400px; }
-
-@keyframes progress-anim { from { width: 20%; } to { width: 80%; } }
+dialog::backdrop { background: rgba(0,0,0,0.45); }
+#modal-reclasificar { max-width: 380px; }
+@keyframes progress-anim { from { width:15%; } to { width:80%; } }
 </style>
 
+{% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+(function () {
+    var inputBusq   = document.getElementById('busq-rapida');
+    var resultCount = document.getElementById('result-count');
+    var filas       = Array.from(document.querySelectorAll('#tabla-catalogo tbody tr'));
+
+    function actualizarContador(n) {
+        if (!resultCount) return;
+        resultCount.textContent = n + ' / ' + filas.length;
+    }
+    actualizarContador(filas.length);
+
+    /* Búsqueda instantánea */
+    if (inputBusq) {
+        inputBusq.addEventListener('input', function () {
+            var term = this.value.toLowerCase().trim();
+            var visible = 0;
+            filas.forEach(function (f) {
+                var match = !term || (f.dataset.search || '').indexOf(term) !== -1;
+                f.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+            actualizarContador(visible);
+        });
+    }
+
+    /* Ordenamiento por columna */
+    document.querySelectorAll('th.sortable').forEach(function (th) {
+        th.addEventListener('click', function () {
+            var col = parseInt(this.dataset.col);
+            var asc = this.classList.contains('sort-desc') || !this.classList.contains('sort-asc');
+            document.querySelectorAll('th.sortable').forEach(function (h) {
+                h.classList.remove('sort-asc', 'sort-desc');
+            });
+            this.classList.add(asc ? 'sort-asc' : 'sort-desc');
+            var tbody = document.querySelector('#tabla-catalogo tbody');
+            filas.sort(function (a, b) {
+                var va = (a.cells[col] ? a.cells[col].textContent : '').trim().toLowerCase();
+                var vb = (b.cells[col] ? b.cells[col].textContent : '').trim().toLowerCase();
+                return asc ? va.localeCompare(vb, 'es') : vb.localeCompare(va, 'es');
+            });
+            filas.forEach(function (f) { tbody.appendChild(f); });
+        });
+    });
+
+    /* Descripción expandible */
+    document.querySelectorAll('.btn-expand').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var short  = this.previousElementSibling;
+            var full   = this.nextElementSibling;
+            var expand = full.style.display === 'none';
+            short.style.display = expand ? 'none' : 'inline';
+            full.style.display  = expand ? 'inline' : 'none';
+            this.textContent    = expand ? 'ver menos' : 'ver más';
+        });
+    });
+
+    /* Modales */
     var dlgReclas   = document.getElementById('modal-reclasificar');
     var dlgImportar = document.getElementById('modal-importar');
 
-    // ── Reclasificar: abrir desde botones de la tabla ──
     if (dlgReclas) {
         document.querySelectorAll('.btn-reclasificar').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var id = this.dataset.id;
-                var taxon = this.dataset.taxon;
-                var clas = this.dataset.clas;
-                document.getElementById('modal-taxon').textContent = taxon;
+                document.getElementById('modal-taxon').textContent = this.dataset.taxon;
                 var form = document.getElementById('form-reclasificar');
-                form.action = "{% url 'analisis:reclasificar' 0 %}".replace('0', id);
-                var select = form.querySelector('select[name="clasificacion"]');
-                for (var i = 0; i < select.options.length; i++) {
-                    select.options[i].selected = (select.options[i].value === clas);
-                }
+                form.action = "{% url 'analisis:reclasificar' 0 %}".replace('0', this.dataset.id);
+                var sel = form.querySelector('select[name="clasificacion"]');
+                for (var i = 0; i < sel.options.length; i++)
+                    sel.options[i].selected = (sel.options[i].value === this.dataset.clas);
                 dlgReclas.showModal();
             });
         });
-        var btnCancelReclas = document.getElementById('btn-cancel-reclasificar');
-        if (btnCancelReclas) btnCancelReclas.addEventListener('click', function () { dlgReclas.close(); });
-        dlgReclas.addEventListener('click', function (e) { if (e.target === dlgReclas) dlgReclas.close(); });
+        document.getElementById('btn-cancel-reclasificar')
+            ?.addEventListener('click', function () { dlgReclas.close(); });
+        dlgReclas.addEventListener('click', function (e) {
+            if (e.target === dlgReclas) dlgReclas.close();
+        });
     }
 
-    // ── Importar: abrir / cerrar ──
     if (dlgImportar) {
-        var btnAbrir = document.getElementById('btn-abrir-importar');
-        if (btnAbrir) btnAbrir.addEventListener('click', function () { dlgImportar.showModal(); });
-        var btnAbrirEmpty = document.getElementById('btn-abrir-importar-empty');
-        if (btnAbrirEmpty) btnAbrirEmpty.addEventListener('click', function () { dlgImportar.showModal(); });
-
-        var btnCancelImportar = document.getElementById('btn-cancel-importar');
-        if (btnCancelImportar) btnCancelImportar.addEventListener('click', function () { dlgImportar.close(); });
-
-        dlgImportar.addEventListener('click', function (e) { if (e.target === dlgImportar) dlgImportar.close(); });
-
-        // Loading state al enviar
+        ['btn-abrir-importar', 'btn-abrir-importar-empty'].forEach(function (id) {
+            document.getElementById(id)?.addEventListener('click', function () {
+                dlgImportar.showModal();
+            });
+        });
+        document.getElementById('btn-cancel-importar')
+            ?.addEventListener('click', function () { dlgImportar.close(); });
+        dlgImportar.addEventListener('click', function (e) {
+            if (e.target === dlgImportar) dlgImportar.close();
+        });
         var formImportar = document.getElementById('form-importar');
         var btnImportar  = document.getElementById('btn-importar');
         if (formImportar && btnImportar) {
             formImportar.addEventListener('submit', function () {
                 document.getElementById('import-progress').style.display = 'block';
                 btnImportar.disabled = true;
-                btnImportar.innerHTML = '<span class="spinner-inline"></span> Importando…';
+                btnImportar.innerHTML = '<i class="ti ti-loader-2"></i> Importando…';
             });
         }
     }
-});
+})();
 </script>
-{% endif %}
+{% endblock %}
 {% endblock %}

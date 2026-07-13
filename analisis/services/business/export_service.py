@@ -58,58 +58,153 @@ _C_INNER     = colors.HexColor('#e9ecef')
 
 def _get_styles():
     styles = getSampleStyleSheet()
+    _gray   = colors.HexColor('#374151')
+    _muted  = colors.HexColor('#64748b')
+    _white  = colors.white
+
     style_titulo = ParagraphStyle(
-        'ScientificTitle', parent=styles['Heading1'], fontSize=20, leading=24,
-        textColor=_C_PRIMARY, spaceAfter=15, alignment=TA_LEFT, fontName='Helvetica-Bold',
+        'ScientificTitle', parent=styles['Heading1'], fontSize=22, leading=27,
+        textColor=_white, spaceAfter=0, alignment=TA_LEFT, fontName='Helvetica-Bold',
+    )
+    style_subtitle = ParagraphStyle(
+        'ScientificSubtitle', parent=styles['Normal'], fontSize=11, leading=15,
+        textColor=colors.HexColor('#d1fae5'), fontName='Helvetica',
     )
     style_h2 = ParagraphStyle(
-        'ScientificH2', parent=styles['Heading2'], fontSize=13, leading=17,
-        textColor=_C_SECONDARY, spaceBefore=14, spaceAfter=7, fontName='Helvetica-Bold',
+        'ScientificH2', parent=styles['Heading2'], fontSize=11, leading=14,
+        textColor=_white, spaceBefore=0, spaceAfter=0, fontName='Helvetica-Bold',
     )
     style_h3 = ParagraphStyle(
-        'ScientificH3', parent=styles['Heading3'], fontSize=11, leading=14,
-        textColor=_C_PRIMARY, spaceBefore=10, spaceAfter=4, fontName='Helvetica-Bold',
+        'ScientificH3', parent=styles['Heading3'], fontSize=10.5, leading=14,
+        textColor=_C_PRIMARY, spaceBefore=10, spaceAfter=5, fontName='Helvetica-Bold',
     )
     style_body = ParagraphStyle(
-        'ScientificBody', parent=styles['Normal'], fontSize=9.5, leading=13,
-        textColor=colors.HexColor('#212529'),
+        'ScientificBody', parent=styles['Normal'], fontSize=9.5, leading=13.5,
+        textColor=_gray,
     )
     style_body_sm = ParagraphStyle(
         'ScientificBodySm', parent=styles['Normal'], fontSize=8.5, leading=11.5,
-        textColor=colors.HexColor('#374151'),
+        textColor=_gray,
     )
     style_th = ParagraphStyle(
-        'TableTh', parent=styles['Normal'], fontSize=9, leading=11,
-        textColor=colors.white, fontName='Helvetica-Bold',
+        'TableTh', parent=styles['Normal'], fontSize=8.5, leading=11,
+        textColor=_white, fontName='Helvetica-Bold',
+    )
+    style_th_dark = ParagraphStyle(
+        'TableThDark', parent=styles['Normal'], fontSize=8.5, leading=11,
+        textColor=_white, fontName='Helvetica-Bold', alignment=TA_CENTER,
     )
     style_center = ParagraphStyle(
         'CenteredBody', parent=styles['Normal'], fontSize=9.5, leading=13,
-        textColor=colors.HexColor('#212529'), alignment=TA_CENTER,
+        textColor=_gray, alignment=TA_CENTER,
     )
     style_italic = ParagraphStyle(
         'ItalicBody', parent=styles['Normal'], fontSize=8.5, leading=12,
-        textColor=colors.HexColor('#64748b'), fontName='Helvetica-Oblique',
+        textColor=_muted, fontName='Helvetica-Oblique',
+    )
+    style_caption = ParagraphStyle(
+        'Caption', parent=styles['Normal'], fontSize=7.5, leading=10,
+        textColor=_muted, fontName='Helvetica-Oblique', alignment=TA_CENTER,
+        spaceBefore=3, spaceAfter=6,
+    )
+    style_kpi_val = ParagraphStyle(
+        'KpiVal', parent=styles['Normal'], fontSize=26, leading=30,
+        fontName='Helvetica-Bold', alignment=TA_CENTER,
+    )
+    style_kpi_lbl = ParagraphStyle(
+        'KpiLbl', parent=styles['Normal'], fontSize=7.5, leading=10,
+        textColor=_muted, alignment=TA_CENTER,
+    )
+    style_label = ParagraphStyle(
+        'LabelDark', parent=styles['Normal'], fontSize=8.5, leading=11,
+        textColor=_C_PRIMARY, fontName='Helvetica-Bold',
+    )
+    style_muted = ParagraphStyle(
+        'Muted', parent=styles['Normal'], fontSize=8, leading=11,
+        textColor=_muted,
     )
     return {
-        "titulo": style_titulo,
-        "h2": style_h2,
-        "h3": style_h3,
-        "body": style_body,
-        "body_sm": style_body_sm,
-        "th": style_th,
-        "center": style_center,
-        "italic": style_italic,
+        "titulo":    style_titulo,
+        "subtitle":  style_subtitle,
+        "h2":        style_h2,
+        "h3":        style_h3,
+        "body":      style_body,
+        "body_sm":   style_body_sm,
+        "th":        style_th,
+        "th_dark":   style_th_dark,
+        "center":    style_center,
+        "italic":    style_italic,
+        "caption":   style_caption,
+        "kpi_val":   style_kpi_val,
+        "kpi_lbl":   style_kpi_lbl,
+        "label":     style_label,
+        "muted":     style_muted,
     }
 
 
 def _pdf_footer(canvas, doc):
-    """Footer con número de página para todos los PDF del sistema."""
+    """Footer con separador y número de página."""
     canvas.saveState()
-    canvas.setFont('Helvetica', 7.5)
+    canvas.setStrokeColor(colors.HexColor('#e2e8f0'))
+    canvas.setLineWidth(0.5)
+    canvas.line(40, 30, A4[0] - 40, 30)
+    canvas.setFont('Helvetica', 7)
     canvas.setFillColor(colors.HexColor('#94a3b8'))
-    canvas.drawString(40, 18, "BioSuelo — Universidad Técnica de Cotopaxi")
-    canvas.drawRightString(A4[0] - 40, 18, f"Página {canvas.getPageNumber()}")
+    canvas.drawString(40, 20, "TerraBioLab UTC — Análisis Microbiológico de Suelos")
+    canvas.drawRightString(A4[0] - 40, 20, f"Pág. {canvas.getPageNumber()}")
     canvas.restoreState()
+
+
+def _seccion_hdr(titulo, ancho_util, S, color=None, numero=None):
+    """Banda de encabezado de sección: fondo verde oscuro, texto blanco."""
+    bg = color or _C_PRIMARY
+    texto = f"{'  ' + str(numero) + '.  ' if numero else '  '}{titulo}"
+    t = Table([[Paragraph(texto, S["h2"])]], colWidths=[ancho_util])
+    t.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, -1), bg),
+        ('TOPPADDING',    (0, 0), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 9),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 12),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 12),
+    ]))
+    return t
+
+
+def _kpi_tiles(items, ancho_util, S):
+    """
+    Fila de tarjetas KPI.
+    items = [{'val': str, 'lbl': str, 'color': hex_str, 'sub': str (opcional)}]
+    """
+    n = len(items)
+    w = ancho_util / n
+
+    cells = []
+    for it in items:
+        kpi_style = ParagraphStyle(
+            'KpiValDyn', parent=S["kpi_val"],
+            textColor=colors.HexColor(it.get("color", "#1b4332")),
+        )
+        sub_p = Paragraph(it.get("sub", ""), S["kpi_lbl"]) if it.get("sub") else Spacer(1, 2)
+        cells.append(
+            Table(
+                [[Paragraph(str(it["val"]), kpi_style)],
+                 [Paragraph(it["lbl"], S["kpi_lbl"])],
+                 [sub_p]],
+                colWidths=[w - 2],
+            )
+        )
+
+    t = Table([cells], colWidths=[w] * n)
+    t.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+        ('BOX',           (0, 0), (-1, -1), 1,   colors.HexColor('#e2e8f0')),
+        ('INNERGRID',     (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('TOPPADDING',    (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+    ]))
+    return t
 
 
 def _nivel_color_rl(nivel_salud: str):
@@ -125,8 +220,9 @@ class ExportService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _chart_donut_taxa(top_taxa, width_pt=250, height_pt=200):
-        """Genera donut chart de top 10 taxa. Devuelve RLImage o None."""
+    def _chart_donut_taxa(top_taxa, width_pt=250, height_pt=200,
+                          titulo="Composición Taxonómica", subtitulo="Top 10 taxa por abundancia relativa (%)"):
+        """Donut chart de top 10 taxa con título interno. Devuelve RLImage o None."""
         try:
             import matplotlib
             matplotlib.use('Agg')
@@ -148,6 +244,8 @@ class ExportService:
                 palette = _DONUT_PALETTE[:len(labels)]
 
             fig, ax = plt.subplots(figsize=(width_pt / 72, height_pt / 72))
+            fig.patch.set_facecolor('#ffffff')
+
             wedges, _ = ax.pie(
                 sizes, labels=None, colors=palette,
                 startangle=90, counterclock=False,
@@ -159,7 +257,14 @@ class ExportService:
                 fontsize=5.5, frameon=False,
             )
             ax.set(aspect='equal')
-            plt.tight_layout(pad=0.3)
+
+            # Título y subtítulo internos
+            fig.text(0.5, 0.97, titulo,
+                     ha='center', va='top', fontsize=7.5, fontweight='bold', color='#1b4332')
+            fig.text(0.5, 0.90, subtitulo,
+                     ha='center', va='top', fontsize=6, color='#64748b', style='italic')
+
+            plt.tight_layout(pad=0.3, rect=[0, 0, 1, 0.88])
 
             buf = BytesIO()
             fig.savefig(buf, format='png', dpi=120, bbox_inches='tight')
@@ -170,8 +275,9 @@ class ExportService:
             return None
 
     @staticmethod
-    def _chart_barras_clas(totales, width_pt=220, height_pt=130):
-        """Gráfica de barras horizontales para clasificación funcional."""
+    def _chart_barras_clas(totales, width_pt=220, height_pt=130,
+                           titulo="Categorías Funcionales", subtitulo="N.° de taxa por rol en el suelo"):
+        """Barras horizontales de resumen funcional (4 categorías) con título interno."""
         try:
             import matplotlib
             matplotlib.use('Agg')
@@ -183,13 +289,19 @@ class ExportService:
             values = [totales.get(k, 0) for k in keys]
 
             fig, ax = plt.subplots(figsize=(width_pt / 72, height_pt / 72))
-            bars = ax.barh(cats, values, color=clrs, edgecolor='white', linewidth=0.6)
-            ax.bar_label(bars, padding=3, fontsize=7, color='#374151')
-            ax.set_xlabel("N.° de taxones", fontsize=7)
+            fig.patch.set_facecolor('#ffffff')
+
+            bars = ax.barh(cats, values, color=clrs, edgecolor='white', linewidth=0.6, height=0.55)
+            ax.bar_label(bars, padding=4, fontsize=7, color='#374151', fontweight='bold')
+            ax.set_xlabel("N.° de taxa", fontsize=6.5)
             ax.tick_params(axis='y', labelsize=7)
             ax.tick_params(axis='x', labelsize=6)
             ax.spines[['top', 'right']].set_visible(False)
-            plt.tight_layout(pad=0.3)
+            ax.set_title(f"{titulo}\n{subtitulo}",
+                         fontsize=7.5, fontweight='bold', color='#1b4332',
+                         pad=6, loc='left')
+
+            plt.tight_layout(pad=0.4)
 
             buf = BytesIO()
             fig.savefig(buf, format='png', dpi=120, bbox_inches='tight')
@@ -200,12 +312,99 @@ class ExportService:
             return None
 
     @staticmethod
-    def _chart_comparativo_shannon(datos_por_muestra, width_pt=460, height_pt=160):
-        """Dos subplots: Shannon H' y Índice de Salud por muestra."""
+    def _chart_ranked_bar_taxa(top_taxa, width_pt=440, height_pt=None,
+                               titulo="Perfil de Abundancia Relativa",
+                               subtitulo="Taxa ordenados de mayor a menor — color indica rol funcional"):
+        """
+        Barras horizontales rankeadas de top taxa, coloreadas por clasificación funcional.
+        Forma estándar para perfiles de abundancia en microbiología de suelos.
+        """
         try:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
+            from matplotlib.patches import Patch
+
+            if not top_taxa:
+                return None
+
+            CLR_MAP = {
+                'benefico':      '#16a34a',
+                'fitopatogeno':  '#dc2626',
+                'neutral':       '#64748b',
+                'sin_clasificar':'#94a3b8',
+            }
+
+            # Ordenar: menor→mayor abundancia (el de mayor abundancia queda arriba en el eje Y)
+            sorted_taxa = sorted(
+                top_taxa,
+                key=lambda r: float(r.get("total_porcentaje", r.get("porcentaje", 0)) or 0)
+            )
+
+            nombres = [str(r.get("taxonomia", r.get("nombre", "?"))) for r in sorted_taxa]
+            valores = [float(r.get("total_porcentaje", r.get("porcentaje", 0)) or 0) for r in sorted_taxa]
+            colores = [CLR_MAP.get(r.get("clasificacion", "sin_clasificar"), '#94a3b8') for r in sorted_taxa]
+
+            n     = len(nombres)
+            dyn_h = height_pt or min(max(n * 14 + 80, 140), 520)
+            max_v = max(valores) if valores else 1
+
+            fig, ax = plt.subplots(figsize=(width_pt / 72, dyn_h / 72))
+            fig.patch.set_facecolor('#ffffff')
+
+            bars = ax.barh(nombres, valores, color=colores, edgecolor='white', linewidth=0.5, height=0.70)
+
+            # Etiqueta de porcentaje fuera de la barra
+            for bar, val in zip(bars, valores):
+                ax.text(
+                    bar.get_width() + max_v * 0.012,
+                    bar.get_y() + bar.get_height() / 2,
+                    f"{val:.2f}%",
+                    va='center', ha='left', fontsize=6.5, color='#374151',
+                )
+
+            ax.set_xlabel("Abundancia relativa (%)", fontsize=7)
+            ax.tick_params(axis='y', labelsize=6.5)
+            ax.tick_params(axis='x', labelsize=6)
+            ax.spines[['top', 'right']].set_visible(False)
+            ax.set_xlim(0, max_v * 1.20)
+
+            # Título y subtítulo encima del área de plot
+            ax.set_title(titulo, fontsize=8, fontweight='bold', color='#1b4332', pad=4, loc='left')
+            ax.annotate(subtitulo, xy=(0, 1.01), xycoords='axes fraction',
+                        fontsize=6, color='#64748b', style='italic', va='bottom')
+
+            # Leyenda compacta
+            legend_elements = [
+                Patch(facecolor='#16a34a', label='Benéfico'),
+                Patch(facecolor='#dc2626', label='Fitopatógeno'),
+                Patch(facecolor='#64748b', label='Neutral'),
+                Patch(facecolor='#94a3b8', label='Sin catalogar'),
+            ]
+            ax.legend(handles=legend_elements, loc='lower right',
+                      fontsize=6, framealpha=0.8, ncol=2,
+                      edgecolor='#e2e8f0')
+
+            plt.tight_layout(pad=0.5)
+            buf = BytesIO()
+            fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
+            plt.close(fig)
+            buf.seek(0)
+            return RLImage(buf, width=width_pt, height=dyn_h)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _chart_comparativo_shannon(datos_por_muestra, width_pt=460, height_pt=170):
+        """
+        Dos subplots: Shannon H' (colores por umbral absoluto) e Índice de Salud por muestra.
+        Umbrales Shannon: <1 rojo · 1-2 naranja · 2-3 amarillo · ≥3 verde.
+        """
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            from matplotlib.patches import Patch
 
             if not datos_por_muestra:
                 return None
@@ -214,34 +413,131 @@ class ExportService:
             shannons = [float(d.get("diversidad", {}).get("shannon", 0) or 0) for d in datos_por_muestra]
             indices  = [d.get("indice_salud", 0) for d in datos_por_muestra]
 
-            def color_indice(v):
-                if v >= 80:   return '#14532d'
-                if v >= 65:   return '#16a34a'
-                if v >= 50:   return '#ca8a04'
+            def _color_shannon(v):
+                if v >= 3.0:  return '#16A34A'
+                if v >= 2.0:  return '#EAB308'
+                if v >= 1.0:  return '#F97316'
+                return '#DC2626'
+
+            def _color_indice(v):
+                if v >= 80:  return '#14532d'
+                if v >= 65:  return '#16a34a'
+                if v >= 50:  return '#ca8a04'
                 return '#dc2626'
 
-            bar_colors = [color_indice(v) for v in indices]
+            shan_colors = [_color_shannon(v) for v in shannons]
+            bar_colors  = [_color_indice(v)  for v in indices]
 
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(width_pt / 72, height_pt / 72))
+            fig.patch.set_facecolor('#ffffff')
 
-            ax1.bar(codigos, shannons, color='#185FA5', edgecolor='white', linewidth=0.6)
-            ax1.set_title("Shannon H'", fontsize=8, fontweight='bold')
-            ax1.set_ylabel("H'", fontsize=7)
-            ax1.tick_params(axis='x', labelsize=6, rotation=30)
+            # ── Subplot izquierdo: Shannon H' ───────────────────────────
+            ax1.bar(codigos, shannons, color=shan_colors, edgecolor='white', linewidth=0.6, width=0.55)
+            for ref, lbl in [(1.0, "H'=1 (bajo)"), (2.0, "H'=2"), (3.0, "H'=3 (alto)")]:
+                ax1.axhline(ref, color='#94a3b8', linewidth=0.7, linestyle='--', zorder=0)
+                ax1.text(len(codigos) - 0.45, ref + 0.06, lbl,
+                         fontsize=5, color='#94a3b8', va='bottom', ha='right')
+            ax1.bar_label(ax1.containers[0], fmt='%.2f', fontsize=5.5, padding=2, color='#374151')
+            ax1.set_title("Diversidad Alfa — Shannon H'",
+                          fontsize=7.5, fontweight='bold', color='#1b4332', pad=4)
+            ax1.set_ylabel("Índice H' (nats)", fontsize=6.5)
+            ax1.tick_params(axis='x', labelsize=6, rotation=35)
             ax1.tick_params(axis='y', labelsize=6)
             ax1.spines[['top', 'right']].set_visible(False)
+            # Mini leyenda de colores Shannon
+            shan_leg = [
+                Patch(facecolor='#16A34A', label='Alta (≥3)'),
+                Patch(facecolor='#EAB308', label='Media-alta (2-3)'),
+                Patch(facecolor='#F97316', label='Media-baja (1-2)'),
+                Patch(facecolor='#DC2626', label='Baja (<1)'),
+            ]
+            ax1.legend(handles=shan_leg, fontsize=5, framealpha=0.8,
+                       ncol=2, loc='upper left', edgecolor='#e2e8f0')
 
-            ax2.bar(codigos, indices, color=bar_colors, edgecolor='white', linewidth=0.6)
-            ax2.set_title("Índice de Salud", fontsize=8, fontweight='bold')
-            ax2.set_ylabel("Índice (0-100)", fontsize=7)
-            ax2.set_ylim(0, 100)
-            ax2.tick_params(axis='x', labelsize=6, rotation=30)
+            # ── Subplot derecho: Índice de Salud ────────────────────────
+            ax2.bar(codigos, indices, color=bar_colors, edgecolor='white', linewidth=0.6, width=0.55)
+            for ref, lbl in [(50, "Crítico"), (65, "Moderado"), (80, "Bueno")]:
+                ax2.axhline(ref, color='#94a3b8', linewidth=0.7, linestyle='--', zorder=0)
+                ax2.text(len(codigos) - 0.45, ref + 1.5, lbl,
+                         fontsize=5, color='#94a3b8', va='bottom', ha='right')
+            ax2.bar_label(ax2.containers[0], fmt='%d', fontsize=5.5, padding=2, color='#374151')
+            ax2.set_title("Índice de Salud del Suelo (0-100)",
+                          fontsize=7.5, fontweight='bold', color='#1b4332', pad=4)
+            ax2.set_ylabel("Puntuación", fontsize=6.5)
+            ax2.set_ylim(0, 105)
+            ax2.tick_params(axis='x', labelsize=6, rotation=35)
             ax2.tick_params(axis='y', labelsize=6)
             ax2.spines[['top', 'right']].set_visible(False)
+            # Mini leyenda de niveles de salud
+            sal_leg = [
+                Patch(facecolor='#14532d', label='Excelente (≥80)'),
+                Patch(facecolor='#16a34a', label='Bueno (65-80)'),
+                Patch(facecolor='#ca8a04', label='Moderado (50-65)'),
+                Patch(facecolor='#dc2626', label='Crítico (<50)'),
+            ]
+            ax2.legend(handles=sal_leg, fontsize=5, framealpha=0.8,
+                       ncol=2, loc='upper left', edgecolor='#e2e8f0')
+
+            plt.tight_layout(pad=0.6)
+            buf = BytesIO()
+            fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
+            plt.close(fig)
+            buf.seek(0)
+            return RLImage(buf, width=width_pt, height=height_pt)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _chart_barras_agrupadas_funcional(datos_por_muestra, width_pt=460, height_pt=175,
+                                          titulo="Composición Funcional Comparativa",
+                                          subtitulo="N.° de taxa por categoría funcional en cada muestra"):
+        """
+        Barras agrupadas por clasificación funcional, una barra por muestra.
+        Equivalente visual al modo multi-muestra del preview web.
+        """
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            import numpy as np
+
+            if not datos_por_muestra:
+                return None
+
+            codigos = [d["muestra"].codigo for d in datos_por_muestra]
+            cats    = ['benefico', 'fitopatogeno', 'neutral', 'sin_clasificar']
+            labels  = ['Benéfico', 'Fitopatógeno', 'Neutral', 'Sin catalogar']
+            clrs    = ['#16a34a', '#dc2626', '#64748b', '#94a3b8']
+
+            x       = np.arange(len(codigos))
+            n_c     = len(cats)
+            w       = 0.18
+            offsets = np.linspace(-(n_c - 1) * w / 2, (n_c - 1) * w / 2, n_c)
+
+            fig, ax = plt.subplots(figsize=(width_pt / 72, height_pt / 72))
+            fig.patch.set_facecolor('#ffffff')
+
+            for cat, lbl, clr, off in zip(cats, labels, clrs, offsets):
+                vals = [d.get("totales_clas", {}).get(cat, 0) for d in datos_por_muestra]
+                if any(v > 0 for v in vals):
+                    bars = ax.bar(x + off, vals, width=w, label=lbl,
+                                  color=clr, edgecolor='white', linewidth=0.5)
+                    ax.bar_label(bars, fmt='%d', fontsize=5.5, padding=2, color='#374151')
+
+            ax.set_xticks(x)
+            ax.set_xticklabels(codigos, rotation=30 if len(codigos) > 4 else 0, fontsize=7)
+            ax.set_ylabel("N.° de taxa únicos", fontsize=7)
+            ax.tick_params(axis='y', labelsize=6)
+            ax.spines[['top', 'right']].set_visible(False)
+            ax.set_title(titulo, fontsize=8, fontweight='bold', color='#1b4332', pad=4, loc='left')
+            ax.annotate(subtitulo, xy=(0, 1.01), xycoords='axes fraction',
+                        fontsize=6, color='#64748b', style='italic', va='bottom')
+            ax.legend(fontsize=6.5, framealpha=0.8, ncol=2, loc='upper right',
+                      edgecolor='#e2e8f0')
 
             plt.tight_layout(pad=0.5)
             buf = BytesIO()
-            fig.savefig(buf, format='png', dpi=120, bbox_inches='tight')
+            fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
             plt.close(fig)
             buf.seek(0)
             return RLImage(buf, width=width_pt, height=height_pt)
@@ -295,469 +591,561 @@ class ExportService:
 
         ancho_util = A4[0] - 80  # 455 pt aprox
 
-        # ----------------------------------------------------------------
-        # Página 1 — Portada
-        # ----------------------------------------------------------------
-        # Header block
-        header_data = [[
-            Paragraph(
-                "<font color='#ffffff'><b>BioSuelo</b><br/>"
-                "<font size='9'>Universidad Técnica de Cotopaxi — Laboratorio de Bioinformática de Suelos</font></font>",
-                S["body"],
-            )
-        ]]
-        t_header = Table(header_data, colWidths=[ancho_util])
-        t_header.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), _C_PRIMARY),
-            ('TOPPADDING', (0, 0), (-1, -1), 14),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 14),
-            ('LEFTPADDING', (0, 0), (-1, -1), 16),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 16),
-            ('ROUNDEDCORNERS', [4, 4, 4, 4]),
-        ]))
-        contenido.append(t_header)
-        contenido.append(Spacer(1, 18))
+        # ── helpers locales ────────────────────────────────────────────────
+        shannon_v = float(diversidad.get("shannon", 0.0) or 0.0)
+        simpson_v = float(diversidad.get("simpson", 0.0) or 0.0)
+        equit_v   = float(diversidad.get("equitatividad", 0.0) or 0.0)
+        riqueza_v = diversidad.get("riqueza", len(todos_taxa))
 
-        contenido.append(Paragraph("REPORTE DE SALUD MICROBIOLÓGICA DEL SUELO", S["titulo"]))
-        contenido.append(Paragraph(f"Marcador: <b>{marcador_lbl}</b>", S["body"]))
-        contenido.append(Spacer(1, 14))
+        def _shannon_color(v):
+            if v >= 3.0: return "#16A34A"
+            if v >= 2.0: return "#CA8A04"
+            if v >= 1.0: return "#EA580C"
+            return "#DC2626"
 
-        # Tabla info muestra (2x4)
-        info_rows = [
-            ["Código", _safe(muestra, "codigo"), "Cultivo", cultivo_nom],
-            ["Variedad/Clon", var_nom, "Tipo de Muestra", _safe(muestra, "tipo_muestra")],
-            ["Localidad", _safe(muestra, "localidad"), "Finca/Lote", _safe(muestra, "finca_lote")],
-            ["Altitud (msnm)", _safe(muestra, "altitud", "N/A"), "Fecha de Registro", _safe(muestra, "fecha_registro")],
+        # ================================================================
+        # PÁGINA 1 — Portada
+        # ================================================================
+        # Banner superior de institución (ancho completo)
+        banner_rows = [
+            [Paragraph(
+                "<font size='16'><b>TerraBioLab UTC</b></font>",
+                S["titulo"],
+            )],
+            [Paragraph(
+                "Universidad Técnica de Cotopaxi · Laboratorio de Bioinformática de Suelos",
+                S["subtitle"],
+            )],
         ]
-        col_w = [ancho_util / 4] * 4
-        t_info = Table(
-            [[Paragraph(f"<b>{r[0]}</b>", S["body_sm"]), Paragraph(r[1], S["body_sm"]),
-              Paragraph(f"<b>{r[2]}</b>", S["body_sm"]), Paragraph(r[3], S["body_sm"])]
-             for r in info_rows],
-            colWidths=col_w,
-        )
+        t_banner = Table(banner_rows, colWidths=[ancho_util])
+        t_banner.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, -1), _C_PRIMARY),
+            ('TOPPADDING',    (0, 0), (-1, -1), 22),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 22),
+            ('BOTTOMPADDING', (0, 0), (0, 0), 4),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 18),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 18),
+        ]))
+        contenido.append(t_banner)
+
+        # Franja de tipo de reporte (verde medio)
+        tipo_style = ParagraphStyle('TipoBanner', parent=S["body_sm"],
+            textColor=colors.white, fontName='Helvetica-Bold', fontSize=9)
+        t_tipo = Table([[Paragraph(
+            f"  REPORTE INDIVIDUAL DE SALUD MICROBIOLÓGICA · MARCADOR {marcador_lbl}",
+            tipo_style,
+        )]], colWidths=[ancho_util])
+        t_tipo.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, -1), _C_SECONDARY),
+            ('TOPPADDING',    (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 18),
+        ]))
+        contenido.append(t_tipo)
+        contenido.append(Spacer(1, 20))
+
+        # Título del reporte
+        title_style = ParagraphStyle('ReportTitle', parent=S["body"],
+            fontSize=17, fontName='Helvetica-Bold',
+            textColor=_C_PRIMARY, leading=21)
+        contenido.append(Paragraph("Análisis de Comunidad Microbiana de Suelo", title_style))
+        contenido.append(Spacer(1, 4))
+        sub_style = ParagraphStyle('ReportSub', parent=S["body_sm"],
+            textColor=colors.HexColor('#64748b'), fontSize=9.5)
+        contenido.append(Paragraph(
+            f"Nivel taxonómico: <b>{nivel.capitalize()}</b> · "
+            f"Top <b>{top_n}</b> taxa más abundantes · {fecha_gen}",
+            sub_style,
+        ))
+        contenido.append(Spacer(1, 16))
+
+        # Tabla de identificación de la muestra (etiqueta oscura | valor claro)
+        lbl_col  = ancho_util * 0.28
+        val_col  = ancho_util * 0.22
+        info_rows = [
+            ("Código de muestra", _safe(muestra, "codigo"),
+             "Cultivo", cultivo_nom),
+            ("Variedad / Clon", var_nom,
+             "Tipo de muestra", _safe(muestra, "tipo_muestra")),
+            ("Localidad", _safe(muestra, "localidad"),
+             "Finca / Lote", _safe(muestra, "finca_lote")),
+            ("Altitud (m.s.n.m.)", _safe(muestra, "altitud", "—"),
+             "Fecha de registro", _safe(muestra, "fecha_registro")),
+        ]
+        tbl_info_data = [
+            [Paragraph(f"<b>{r[0]}</b>", S["body_sm"]), Paragraph(r[1], S["body_sm"]),
+             Paragraph(f"<b>{r[2]}</b>", S["body_sm"]), Paragraph(r[3], S["body_sm"])]
+            for r in info_rows
+        ]
+        t_info = Table(tbl_info_data, colWidths=[lbl_col, val_col, lbl_col, val_col])
         t_info.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), _C_LIGHT),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BACKGROUND',    (0, 0), (0, -1), colors.HexColor('#e8f5ef')),
+            ('BACKGROUND',    (2, 0), (2, -1), colors.HexColor('#e8f5ef')),
+            ('BACKGROUND',    (1, 0), (1, -1), colors.white),
+            ('BACKGROUND',    (3, 0), (3, -1), colors.white),
+            ('BOX',           (0, 0), (-1, -1), 1, _C_BORDER),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+            ('TOPPADDING',    (0, 0), (-1, -1), 5),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 7),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         contenido.append(t_info)
-        contenido.append(Spacer(1, 10))
+        contenido.append(Spacer(1, 12))
 
-        gen_rows = [
-            [Paragraph("<b>Fecha de generación:</b>", S["body_sm"]), Paragraph(fecha_gen, S["body_sm"]),
-             Paragraph("<b>Analista:</b>", S["body_sm"]), Paragraph(analista, S["body_sm"])],
-            [Paragraph("<b>Nivel taxonómico:</b>", S["body_sm"]), Paragraph(nivel.capitalize(), S["body_sm"]),
-             Paragraph("<b>Top N:</b>", S["body_sm"]), Paragraph(str(top_n), S["body_sm"])],
-        ]
-        t_gen = Table(gen_rows, colWidths=col_w)
-        t_gen.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), _C_LIGHT),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        # Barra de metadatos del análisis
+        meta_style = ParagraphStyle('MetaBar', parent=S["body_sm"],
+            textColor=colors.HexColor('#374151'), fontSize=8.5)
+        t_meta = Table([[
+            Paragraph(f"<b>Analista:</b> {analista}", meta_style),
+            Paragraph(f"<b>Marcador:</b> {marcador_lbl}", meta_style),
+            Paragraph(f"<b>Nivel:</b> {nivel.capitalize()}", meta_style),
+            Paragraph(f"<b>Generado:</b> {fecha_gen}", meta_style),
+        ]], colWidths=[ancho_util / 4] * 4)
+        t_meta.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, -1), colors.HexColor('#f1f5f9')),
+            ('BOX',           (0, 0), (-1, -1), 0.5, _C_BORDER),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.4, colors.HexColor('#e2e8f0')),
+            ('TOPPADDING',    (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
         ]))
-        contenido.append(t_gen)
+        contenido.append(t_meta)
+        contenido.append(Spacer(1, 16))
+
+        # Nota al pie de portada
+        contenido.append(HRFlowable(width=ancho_util, thickness=0.5,
+                                    color=colors.HexColor('#cbd5e1')))
+        contenido.append(Spacer(1, 6))
+        contenido.append(Paragraph(
+            "Este reporte ha sido generado automáticamente por el sistema TerraBioLab UTC. "
+            "Los resultados deben ser interpretados por un profesional en microbiología de suelos.",
+            S["muted"],
+        ))
 
         contenido.append(PageBreak())
 
-        # ----------------------------------------------------------------
-        # Página 2 — Resumen Ejecutivo
-        # ----------------------------------------------------------------
-        contenido.append(Paragraph("Resumen Ejecutivo", S["h2"]))
-        contenido.append(HRFlowable(width=ancho_util, thickness=1, color=_C_SECONDARY))
-        contenido.append(Spacer(1, 12))
+        # ================================================================
+        # PÁGINA 2 — Resumen Ejecutivo
+        # ================================================================
+        contenido.append(_seccion_hdr("RESUMEN EJECUTIVO", ancho_util, S, numero=1))
+        contenido.append(Spacer(1, 14))
 
-        # Bloque índice de salud
+        # ── Tarjeta Índice de Salud ─────────────────────────────────────
         nivel_color_hex = _NIVEL_COLORES.get(nivel_salud, "#64748b")
         nivel_color_rl  = colors.HexColor(nivel_color_hex)
 
-        # Barra de progreso visible (fill + empty)
-        _barra_util = ancho_util - 20   # margen interno
+        _barra_util = ancho_util * 0.75 - 24
         _fill_w  = max(_barra_util * (indice_salud / 100), 1.0)
         _empty_w = max(_barra_util - _fill_w, 1.0)
         t_bar = Table([["", ""]], colWidths=[_fill_w, _empty_w])
         t_bar.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, 0), nivel_color_rl),
-            ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#e2e8f0')),
+            ('BACKGROUND',    (0, 0), (0, 0), nivel_color_rl),
+            ('BACKGROUND',    (1, 0), (1, 0), colors.HexColor('#e2e8f0')),
             ('LEFTPADDING',   (0, 0), (-1, -1), 0),
             ('RIGHTPADDING',  (0, 0), (-1, -1), 0),
             ('TOPPADDING',    (0, 0), (-1, -1), 0),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-            ('ROWHEIGHT', (0, 0), (-1, -1), 14),
+            ('ROWHEIGHT',     (0, 0), (-1, -1), 12),
         ]))
 
-        salud_style = ParagraphStyle(
-            'SaludNum', parent=S["body"], fontSize=34, fontName='Helvetica-Bold',
-            textColor=nivel_color_rl, alignment=TA_CENTER,
-        )
-        salud_lbl_style = ParagraphStyle(
-            'SaludLbl', parent=S["body"], fontSize=10, fontName='Helvetica-Bold',
-            textColor=nivel_color_rl,
-        )
-        salud_sub_style = ParagraphStyle(
-            'SaludSub', parent=S["body_sm"], textColor=colors.HexColor('#64748b'),
-        )
+        salud_num_style = ParagraphStyle('SaludN', parent=S["body"],
+            fontSize=40, fontName='Helvetica-Bold',
+            textColor=nivel_color_rl, alignment=TA_CENTER)
+        salud_lbl_style = ParagraphStyle('SaludL', parent=S["body"],
+            fontSize=13, fontName='Helvetica-Bold', textColor=nivel_color_rl)
+        salud_sub_style = ParagraphStyle('SaludS', parent=S["body_sm"],
+            textColor=colors.HexColor('#64748b'))
+
         barra_data = [[
-            Paragraph(str(indice_salud), salud_style),
+            Paragraph(str(indice_salud), salud_num_style),
             Table(
                 [[Paragraph(f"<b>{nivel_salud}</b>", salud_lbl_style)],
-                 [Paragraph("Índice de Salud del Suelo (0 – 100)", salud_sub_style)],
+                 [Paragraph("Índice de Salud del Suelo  (escala 0 – 100)", salud_sub_style)],
+                 [Spacer(1, 4)],
                  [t_bar]],
-                colWidths=[ancho_util * 0.65],
+                colWidths=[ancho_util * 0.70],
             ),
         ]]
-        t_salud = Table(barra_data, colWidths=[ancho_util * 0.18, ancho_util * 0.82])
+        t_salud = Table(barra_data, colWidths=[ancho_util * 0.20, ancho_util * 0.80])
         t_salud.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-            ('TOPPADDING', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-            ('BOX', (0, 0), (-1, -1), 2, nivel_color_rl),
-            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#f0faf4')),
-            ('BACKGROUND', (1, 0), (1, 0), colors.white),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 14),
+            ('TOPPADDING',    (0, 0), (-1, -1), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 14),
+            ('BOX',           (0, 0), (-1, -1), 2, nivel_color_rl),
+            ('BACKGROUND',    (0, 0), (0, 0), colors.HexColor('#f0fdf4')),
+            ('BACKGROUND',    (1, 0), (1, 0), colors.white),
         ]))
         contenido.append(t_salud)
         contenido.append(Spacer(1, 12))
 
-        # Métricas diversidad + clasificación
-        shannon_v = diversidad.get("shannon", 0.0) or 0.0
-        simpson_v = diversidad.get("simpson", 0.0) or 0.0
-        equit_v   = diversidad.get("equitatividad", 0.0) or 0.0
-        riqueza_v = diversidad.get("riqueza", len(todos_taxa))
+        # ── Fila de 4 KPI tiles de diversidad ──────────────────────────
+        shan_color = _shannon_color(shannon_v)
+        shan_nivel = (
+            "Alta (H'≥3)" if shannon_v >= 3 else
+            "Media-alta" if shannon_v >= 2 else
+            "Media-baja" if shannon_v >= 1 else "Baja (H'<1)"
+        )
+        kpi_div = _kpi_tiles([
+            {"val": str(riqueza_v),     "lbl": "Riqueza (S)",   "color": "#185FA5", "sub": "Taxa detectados"},
+            {"val": f"{shannon_v:.3f}", "lbl": "Shannon H'",    "color": shan_color, "sub": shan_nivel},
+            {"val": f"{simpson_v:.3f}", "lbl": "Simpson (1-D)", "color": "#6B4E9E", "sub": "Gini-Simpson"},
+            {"val": f"{equit_v:.3f}",   "lbl": "Pielou (J')",  "color": "#BA7517", "sub": "Equitatividad"},
+        ], ancho_util, S)
+        contenido.append(kpi_div)
+        contenido.append(Spacer(1, 10))
 
-        metr_rows = [
-            [Paragraph("<b>Métrica</b>", S["th"]), Paragraph("<b>Valor</b>", S["th"]),
-             Paragraph("<b>Métrica</b>", S["th"]), Paragraph("<b>Valor</b>", S["th"])],
-            [Paragraph("Taxa Totales", S["body_sm"]), Paragraph(str(riqueza_v), S["body_sm"]),
-             Paragraph("Benéficos", S["body_sm"]), Paragraph(str(totales_clas.get("benefico", 0)), S["body_sm"])],
-            [Paragraph("Shannon H'", S["body_sm"]), Paragraph(f"{shannon_v:.4f}", S["body_sm"]),
-             Paragraph("Fitopatógenos", S["body_sm"]), Paragraph(str(totales_clas.get("fitopatogeno", 0)), S["body_sm"])],
-            [Paragraph("Simpson D", S["body_sm"]), Paragraph(f"{simpson_v:.4f}", S["body_sm"]),
-             Paragraph("Neutrales", S["body_sm"]), Paragraph(str(totales_clas.get("neutral", 0)), S["body_sm"])],
-            [Paragraph("Equitatividad", S["body_sm"]), Paragraph(f"{equit_v:.4f}", S["body_sm"]),
-             Paragraph("Sin Catalogar", S["body_sm"]), Paragraph(str(totales_clas.get("sin_clasificar", 0)), S["body_sm"])],
-        ]
-        col_w2 = [ancho_util * 0.28, ancho_util * 0.22, ancho_util * 0.28, ancho_util * 0.22]
-        t_metr = Table(metr_rows, colWidths=col_w2)
-        t_metr.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), _C_SECONDARY),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, _C_LIGHT]),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        contenido.append(t_metr)
+        # ── Fila de 4 KPI tiles de clasificación funcional ─────────────
+        kpi_func = _kpi_tiles([
+            {"val": str(totales_clas.get("benefico", 0)),      "lbl": "Benéficos",     "color": "#16A34A", "sub": "Taxa"},
+            {"val": str(totales_clas.get("fitopatogeno", 0)),  "lbl": "Fitopatógenos", "color": "#DC2626", "sub": "Taxa"},
+            {"val": str(totales_clas.get("neutral", 0)),       "lbl": "Neutrales",     "color": "#64748b", "sub": "Taxa"},
+            {"val": str(totales_clas.get("sin_clasificar", 0)),"lbl": "Sin catalogar", "color": "#94A3B8", "sub": "Taxa"},
+        ], ancho_util, S)
+        contenido.append(kpi_func)
         contenido.append(Spacer(1, 12))
 
-        # Conclusión auto-generada
+        # ── Conclusión ─────────────────────────────────────────────────
         cod_muestra = _safe(muestra, "codigo", "la muestra seleccionada")
         conclusion = (
             f"La muestra <b>{cod_muestra}</b> del cultivo <b>{cultivo_nom}</b> presenta un "
             f"Índice de Salud del Suelo de <b>{indice_salud}/100</b> ({nivel_salud}). "
-            f"El análisis con marcador <b>{marcador_lbl}</b> a nivel <b>{nivel}</b> detectó "
-            f"<b>{riqueza_v}</b> taxa únicos con una diversidad Shannon H'= <b>{shannon_v:.3f}</b>. "
-            f"La comunidad microbiana incluye <b>{totales_clas.get('benefico', 0)}</b> taxa benéficos "
-            f"y <b>{totales_clas.get('fitopatogeno', 0)}</b> fitopatógenos potenciales."
+            f"El análisis con marcador <b>{marcador_lbl}</b> a nivel taxonómico de <b>{nivel}</b> detectó "
+            f"<b>{riqueza_v}</b> taxa únicos con diversidad Shannon H' = <b>{shannon_v:.3f}</b> ({shan_nivel}). "
+            f"La comunidad incluye <b>{totales_clas.get('benefico', 0)}</b> taxa benéficos y "
+            f"<b>{totales_clas.get('fitopatogeno', 0)}</b> fitopatógenos potenciales."
         )
         contenido.append(Paragraph(conclusion, S["body"]))
 
         contenido.append(PageBreak())
 
-        # ----------------------------------------------------------------
-        # Página 3 — Perfil Taxonómico
-        # ----------------------------------------------------------------
-        contenido.append(Paragraph("Perfil Taxonómico", S["h2"]))
-        contenido.append(HRFlowable(width=ancho_util, thickness=1, color=_C_SECONDARY))
+        # ================================================================
+        # PÁGINA 3 — Perfil Taxonómico
+        # ================================================================
+        contenido.append(_seccion_hdr("PERFIL DE ABUNDANCIA RELATIVA", ancho_util, S, numero=2))
         contenido.append(Spacer(1, 10))
 
-        chart_donut = ExportService._chart_donut_taxa(top_taxa, width_pt=220, height_pt=180)
-        chart_clas  = ExportService._chart_barras_clas(totales_clas, width_pt=200, height_pt=150)
+        # ── Gráfica rankeada (principal) ────────────────────────────────
+        chart_ranked = ExportService._chart_ranked_bar_taxa(
+            top_taxa, width_pt=ancho_util,
+            titulo=f"Perfil de Abundancia Relativa — Top {top_n} {nivel.capitalize()}",
+            subtitulo=f"Marcador {tipo} · Muestra {cod_muestra} · Ordenado de mayor a menor abundancia relativa",
+        )
+        if chart_ranked:
+            contenido.append(chart_ranked)
+            contenido.append(Paragraph(
+                f"Figura 1. Top {top_n} {nivel} detectados en la muestra {cod_muestra} "
+                f"(marcador {tipo}). Barras coloreadas por rol funcional: "
+                "verde = benéfico · rojo = fitopatógeno · gris = neutral · gris claro = sin catalogar.",
+                S["caption"],
+            ))
 
+        # ── Donut composición + barras funcionales (fila complementaria) ─
+        chart_donut = ExportService._chart_donut_taxa(
+            top_taxa, width_pt=200, height_pt=158,
+            titulo="Composición Taxonómica",
+            subtitulo=f"Top 10 {nivel} · muestra {cod_muestra}",
+        )
+        chart_clas  = ExportService._chart_barras_clas(
+            totales_clas, width_pt=200, height_pt=128,
+            titulo="Categorías Funcionales",
+            subtitulo=f"N.° taxa por rol · muestra {cod_muestra}",
+        )
         if chart_donut or chart_clas:
+            cap_d = Paragraph("Composición relativa (top 10 taxa)", S["caption"])
+            cap_c = Paragraph("N.° taxa por categoría funcional", S["caption"])
             chart_cells = [
-                chart_donut if chart_donut else Paragraph("(Sin datos suficientes)", S["body_sm"]),
-                chart_clas  if chart_clas  else Paragraph("", S["body_sm"]),
+                Table([[chart_donut or Spacer(1,1)], [cap_d]], colWidths=[ancho_util * 0.52]),
+                Table([[chart_clas  or Spacer(1,1)], [cap_c]], colWidths=[ancho_util * 0.48]),
             ]
             t_charts = Table([chart_cells], colWidths=[ancho_util * 0.52, ancho_util * 0.48])
             t_charts.setStyle(TableStyle([
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+                ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+                ('TOPPADDING',    (0, 0), (-1, -1), 4),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
             ]))
             contenido.append(t_charts)
-            contenido.append(Spacer(1, 10))
+            contenido.append(Spacer(1, 8))
 
-        # Tabla top taxa
+        # ── Tabla Top N taxa ────────────────────────────────────────────
         def _clas_badge(clas):
-            if clas == 'benefico':      return Paragraph("<font color='#16a34a'>&#9679; Benéfico</font>", S["body_sm"])
-            if clas == 'fitopatogeno':  return Paragraph("<font color='#dc2626'>&#9679; Fitopatógeno</font>", S["body_sm"])
-            if clas == 'neutral':       return Paragraph("<font color='#64748b'>&#9675; Neutral</font>", S["body_sm"])
+            if clas == 'benefico':     return Paragraph("<font color='#16a34a'>&#9679; Benéfico</font>",    S["body_sm"])
+            if clas == 'fitopatogeno': return Paragraph("<font color='#dc2626'>&#9679; Fitopatógeno</font>", S["body_sm"])
+            if clas == 'neutral':      return Paragraph("<font color='#64748b'>&#9675; Neutral</font>",      S["body_sm"])
             return Paragraph("<font color='#94a3b8'>· Sin clas.</font>", S["body_sm"])
 
         taxa_rows = [[
-            Paragraph("<b>#</b>", S["th"]),
-            Paragraph("<b>Taxón</b>", S["th"]),
-            Paragraph("<b>Hits</b>", S["th"]),
+            Paragraph("<b>#</b>",           S["th"]),
+            Paragraph("<b>Taxón</b>",        S["th"]),
+            Paragraph("<b>Reads</b>",        S["th"]),
             Paragraph("<b>Abundancia %</b>", S["th"]),
-            Paragraph("<b>Clasificación</b>", S["th"]),
+            Paragraph("<b>Rol funcional</b>",S["th"]),
         ]]
         for i, r in enumerate(top_taxa, 1):
             taxa_rows.append([
                 Paragraph(str(i), S["body_sm"]),
-                Paragraph(str(r.get("taxonomia", r.get("nombre", "?"))), S["body_sm"]),
+                Paragraph(f"<i>{r.get('taxonomia', r.get('nombre','?'))}</i>", S["body_sm"]),
                 Paragraph(str(r.get("total_hits", r.get("hits", 0))), S["body_sm"]),
                 Paragraph(f"{r.get('total_porcentaje', r.get('porcentaje', 0)):.2f}%", S["body_sm"]),
                 _clas_badge(r.get("clasificacion", "sin_clasificar")),
             ])
 
-        col_taxa = [30, ancho_util * 0.38, 60, 80, 100]
+        col_taxa = [26, ancho_util * 0.40, 55, 75, 100]
         t_taxa = Table(taxa_rows, colWidths=col_taxa, repeatRows=1)
         t_taxa.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), _C_SECONDARY),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, _C_LIGHT]),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BACKGROUND',    (0, 0), (-1, 0),  _C_PRIMARY),
+            ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor('#f8faf9')]),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+            ('BOX',           (0, 0), (-1, -1), 1,   _C_BORDER),
+            ('TOPPADDING',    (0, 0), (-1, -1), 4),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN',         (0, 0), (0, -1),  'CENTER'),
+            ('ALIGN',         (2, 1), (3, -1),  'RIGHT'),
         ]))
         contenido.append(t_taxa)
 
         contenido.append(PageBreak())
 
-        # ----------------------------------------------------------------
-        # Página 4 — Diversidad Alfa
-        # ----------------------------------------------------------------
-        contenido.append(Paragraph("Diversidad Alfa", S["h2"]))
-        contenido.append(HRFlowable(width=ancho_util, thickness=1, color=_C_SECONDARY))
-        contenido.append(Spacer(1, 10))
+        # ================================================================
+        # PÁGINA 4 — Diversidad Alfa
+        # ================================================================
+        contenido.append(_seccion_hdr("DIVERSIDAD ALFA", ancho_util, S, numero=3))
+        contenido.append(Spacer(1, 14))
 
-        # bar_total: ancho disponible dentro de la celda exterior (colWidth - L/R padding)
-        _bar_total = max(ancho_util * 0.30 - 14, 10.0)
+        # KPI tiles con los 4 índices (con color Shannon)
+        contenido.append(_kpi_tiles([
+            {"val": str(riqueza_v),     "lbl": "Riqueza (S)",   "color": "#185FA5", "sub": "Taxa únicos"},
+            {"val": f"{shannon_v:.4f}", "lbl": "Shannon H'",    "color": _shannon_color(shannon_v), "sub": shan_nivel},
+            {"val": f"{simpson_v:.4f}", "lbl": "Simpson (1-D)", "color": "#6B4E9E", "sub": "Gini-Simpson"},
+            {"val": f"{equit_v:.4f}",   "lbl": "Pielou (J')",  "color": "#BA7517", "sub": "Equitatividad"},
+        ], ancho_util, S))
+        contenido.append(Spacer(1, 12))
+
+        # Tabla de interpretación con barra de progreso
+        _bar_total = max(ancho_util * 0.28 - 14, 10.0)
 
         def _interp_bar(valor, max_val, color_hex):
-            """Barra de progreso sin padding interior para evitar ancho negativo."""
-            pct = min(max(float(valor or 0), 0.0) / max(float(max_val or 1), 1e-9), 1.0)
+            pct    = min(max(float(valor or 0), 0.0) / max(float(max_val or 1), 1e-9), 1.0)
             fill_w = max(_bar_total * pct, 1.0)
             rest_w = max(_bar_total * (1.0 - pct), 1.0)
             t = Table([["", ""]], colWidths=[fill_w, rest_w])
             t.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (0, 0), colors.HexColor(color_hex)),
-                ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#e2e8f0')),
+                ('BACKGROUND',    (0, 0), (0, 0), colors.HexColor(color_hex)),
+                ('BACKGROUND',    (1, 0), (1, 0), colors.HexColor('#e2e8f0')),
                 ('LEFTPADDING',   (0, 0), (-1, -1), 0),
                 ('RIGHTPADDING',  (0, 0), (-1, -1), 0),
                 ('TOPPADDING',    (0, 0), (-1, -1), 0),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-                ('ROWHEIGHT', (0, 0), (-1, -1), 9),
+                ('ROWHEIGHT',     (0, 0), (-1, -1), 9),
             ]))
             return t
 
         div_rows = [
-            [Paragraph("<b>Métrica</b>", S["th"]), Paragraph("<b>Valor</b>", S["th"]),
-             Paragraph("<b>Barra</b>", S["th"]), Paragraph("<b>Interpretación</b>", S["th"])],
-            [
-                Paragraph("Riqueza de especies", S["body_sm"]),
-                Paragraph(str(riqueza_v), S["body_sm"]),
-                _interp_bar(riqueza_v, max(riqueza_v, 1), '#185FA5'),
-                Paragraph(
-                    "Alta" if riqueza_v > 100 else ("Moderada" if riqueza_v > 30 else "Baja"),
-                    S["body_sm"],
-                ),
-            ],
-            [
-                Paragraph("Shannon H'", S["body_sm"]),
-                Paragraph(f"{shannon_v:.4f}", S["body_sm"]),
-                _interp_bar(shannon_v, 5.0, '#1D9E75'),
-                Paragraph(
-                    "Alta diversidad" if shannon_v > 3 else ("Moderada" if shannon_v > 1.5 else "Baja diversidad"),
-                    S["body_sm"],
-                ),
-            ],
-            [
-                Paragraph("Simpson D", S["body_sm"]),
-                Paragraph(f"{simpson_v:.4f}", S["body_sm"]),
-                _interp_bar(simpson_v, 1.0, '#BA7517'),
-                Paragraph(
-                    "Buena equidad" if simpson_v > 0.7 else ("Moderada" if simpson_v > 0.4 else "Dominancia marcada"),
-                    S["body_sm"],
-                ),
-            ],
-            [
-                Paragraph("Equitatividad (J')", S["body_sm"]),
-                Paragraph(f"{equit_v:.4f}", S["body_sm"]),
-                _interp_bar(equit_v, 1.0, '#6B4E9E'),
-                Paragraph(
-                    "Comunidad equilibrada" if equit_v > 0.7 else ("Distribución media" if equit_v > 0.4 else "Dominancia fuerte"),
-                    S["body_sm"],
-                ),
-            ],
+            [Paragraph("<b>Métrica</b>",        S["th"]),
+             Paragraph("<b>Valor</b>",           S["th"]),
+             Paragraph("<b>Escala</b>",          S["th"]),
+             Paragraph("<b>Interpretación</b>",  S["th"])],
+            [Paragraph("Riqueza de taxa (S)",    S["body_sm"]),
+             Paragraph(str(riqueza_v),            S["body_sm"]),
+             _interp_bar(riqueza_v, max(riqueza_v, 1), '#185FA5'),
+             Paragraph("Alta >100 · Moderada >30 · Baja ≤30", S["body_sm"])],
+            [Paragraph("Shannon H'",             S["body_sm"]),
+             Paragraph(f"{shannon_v:.4f}",        S["body_sm"]),
+             _interp_bar(shannon_v, 5.0, _shannon_color(shannon_v)),
+             Paragraph(
+                "Alta (H'≥3)" if shannon_v >= 3 else
+                "Media-alta (2≤H'<3)" if shannon_v >= 2 else
+                "Media-baja (1≤H'<2)" if shannon_v >= 1 else "Baja (H'<1)",
+                S["body_sm"])],
+            [Paragraph("Simpson (1-D)",          S["body_sm"]),
+             Paragraph(f"{simpson_v:.4f}",        S["body_sm"]),
+             _interp_bar(simpson_v, 1.0, '#6B4E9E'),
+             Paragraph(
+                "Buena equidad >0.7 · Moderada >0.4 · Dominancia marcada",
+                S["body_sm"])],
+            [Paragraph("Equitatividad Pielou J'",S["body_sm"]),
+             Paragraph(f"{equit_v:.4f}",          S["body_sm"]),
+             _interp_bar(equit_v, 1.0, '#BA7517'),
+             Paragraph(
+                "Equilibrada >0.7 · Media >0.4 · Dominancia fuerte",
+                S["body_sm"])],
         ]
-        col_div = [ancho_util * 0.28, 60, ancho_util * 0.30, ancho_util * 0.28]
+        col_div = [ancho_util * 0.28, 58, ancho_util * 0.28, ancho_util * 0.30]
         t_div = Table(div_rows, colWidths=col_div, repeatRows=1)
         t_div.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), _C_SECONDARY),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, _C_LIGHT]),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND',    (0, 0), (-1, 0),  _C_PRIMARY),
+            ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor('#f8faf9')]),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+            ('BOX',           (0, 0), (-1, -1), 1,   _C_BORDER),
+            ('TOPPADDING',    (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         contenido.append(t_div)
         contenido.append(Spacer(1, 12))
 
-        if shannon_v > 3:
-            div_concl = "La comunidad microbiana presenta alta diversidad alfa, lo que indica un ecosistema de suelo equilibrado y resiliente."
-        elif shannon_v > 1.5:
-            div_concl = "Se observa diversidad alfa moderada. La comunidad microbiana es funcional aunque puede beneficiarse de prácticas de mejora del suelo."
+        if shannon_v >= 3.0:
+            div_concl = "La comunidad microbiana presenta alta diversidad alfa (H'≥3), indicando un ecosistema de suelo equilibrado, resiliente y funcionalmente diverso."
+        elif shannon_v >= 2.0:
+            div_concl = "Se observa diversidad alfa media-alta (2≤H'<3). La comunidad microbiana es funcional y bien distribuida; puede beneficiarse de prácticas agroecológicas de mantenimiento."
+        elif shannon_v >= 1.0:
+            div_concl = "La diversidad alfa es media-baja (1≤H'<2), con distribución irregular entre taxa. Se recomienda monitorear evolución y evaluar prácticas de mejora del suelo."
         else:
-            div_concl = "La diversidad alfa es baja, sugiriendo posible dominancia de pocos taxa o condiciones de estrés edáfico."
-        contenido.append(Paragraph(div_concl, S["body"]))
+            div_concl = "La diversidad alfa es baja (H'<1), sugiriendo dominancia marcada de pocos taxa o condiciones de estrés edáfico. Se recomienda intervención agronómica."
+
+        t_concl = Table([[Paragraph(div_concl, S["body"])]], colWidths=[ancho_util])
+        t_concl.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, -1), colors.HexColor('#f0fdf4')),
+            ('BOX',           (0, 0), (-1, -1), 1, colors.HexColor('#86efac')),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 10),
+            ('TOPPADDING',    (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        contenido.append(t_concl)
 
         contenido.append(PageBreak())
 
-        # ----------------------------------------------------------------
-        # Página 5 — Perfil Funcional
-        # ----------------------------------------------------------------
-        contenido.append(Paragraph("Perfil Funcional de la Comunidad Microbiana", S["h2"]))
-        contenido.append(HRFlowable(width=ancho_util, thickness=1, color=_C_SECONDARY))
-        contenido.append(Spacer(1, 10))
+        # ================================================================
+        # PÁGINA 5 — Perfil Funcional
+        # ================================================================
+        contenido.append(_seccion_hdr("PERFIL FUNCIONAL DE LA COMUNIDAD MICROBIANA", ancho_util, S, numero=4))
+        contenido.append(Spacer(1, 14))
 
-        # Resumen de 4 números grandes
-        summ_data = [[
-            Paragraph(f"<font color='#16a34a'><b>{totales_clas.get('benefico', 0)}</b><br/><font size='8'>Benéficos</font></font>", S["center"]),
-            Paragraph(f"<font color='#dc2626'><b>{totales_clas.get('fitopatogeno', 0)}</b><br/><font size='8'>Fitopatógenos</font></font>", S["center"]),
-            Paragraph(f"<font color='#64748b'><b>{totales_clas.get('neutral', 0)}</b><br/><font size='8'>Neutrales</font></font>", S["center"]),
-            Paragraph(f"<font color='#94a3b8'><b>{totales_clas.get('sin_clasificar', 0)}</b><br/><font size='8'>Sin Catalogar</font></font>", S["center"]),
-        ]]
-        t_summ = Table(summ_data, colWidths=[ancho_util / 4] * 4)
-        t_summ.setStyle(TableStyle([
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        contenido.append(t_summ)
+        # KPI tiles funcionales
+        contenido.append(_kpi_tiles([
+            {"val": str(totales_clas.get("benefico", 0)),      "lbl": "Benéficos",     "color": "#16A34A", "sub": "Promotores de crecimiento"},
+            {"val": str(totales_clas.get("fitopatogeno", 0)),  "lbl": "Fitopatógenos", "color": "#DC2626", "sub": "Riesgo fitosanitario"},
+            {"val": str(totales_clas.get("neutral", 0)),       "lbl": "Neutrales",     "color": "#64748b", "sub": "Sin función definida"},
+            {"val": str(totales_clas.get("sin_clasificar", 0)),"lbl": "Sin catalogar", "color": "#94A3B8", "sub": "No en catálogo"},
+        ], ancho_util, S))
         contenido.append(Spacer(1, 12))
 
-        # Tabla organismos benéficos (hasta 20)
+        # Tabla organismos benéficos
         beneficos = detalle_clas.get("benefico", [])[:20]
         if beneficos:
             contenido.append(Paragraph("Organismos Benéficos", S["h3"]))
             ben_rows = [[
-                Paragraph("<b>Taxón</b>", S["th"]),
-                Paragraph("<b>Abundancia %</b>", S["th"]),
-                Paragraph("<b>Rol Agronómico</b>", S["th"]),
-                Paragraph("<b>Referencia</b>", S["th"]),
+                Paragraph("<b>Taxón</b>",          S["th"]),
+                Paragraph("<b>Abundancia %</b>",   S["th"]),
+                Paragraph("<b>Función agronómica</b>", S["th"]),
+                Paragraph("<b>Referencia</b>",     S["th"]),
             ]]
             for item in beneficos:
                 ben_rows.append([
-                    Paragraph(str(item.get("nombre", "")), S["body_sm"]),
+                    Paragraph(f"<i>{item.get('nombre','')}</i>", S["body_sm"]),
                     Paragraph(f"{item.get('porcentaje', 0):.2f}%", S["body_sm"]),
-                    Paragraph(str(item.get("descripcion", ""))[:120], S["body_sm"]),
+                    Paragraph(str(item.get("descripcion", ""))[:130], S["body_sm"]),
                     Paragraph(str(item.get("referencia", ""))[:80], S["body_sm"]),
                 ])
-            col_ben = [ancho_util * 0.28, 70, ancho_util * 0.35, ancho_util * 0.22]
+            col_ben = [ancho_util * 0.26, 65, ancho_util * 0.37, ancho_util * 0.23]
             t_ben = Table(ben_rows, colWidths=col_ben, repeatRows=1)
             t_ben.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), _C_BEN),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdf4')]),
-                ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-                ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BACKGROUND',    (0, 0), (-1, 0),  _C_BEN),
+                ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdf4')]),
+                ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+                ('BOX',           (0, 0), (-1, -1), 1,   _C_BORDER),
+                ('TOPPADDING',    (0, 0), (-1, -1), 3),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                ('LEFTPADDING', (0, 0), (-1, -1), 5),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING',   (0, 0), (-1, -1), 5),
+                ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
             ]))
             contenido.append(t_ben)
             contenido.append(Spacer(1, 10))
 
-        # Tabla fitopatógenos (hasta 15)
+        # Tabla fitopatógenos
         fitopatogenos = detalle_clas.get("fitopatogeno", [])[:15]
         if fitopatogenos:
             contenido.append(Paragraph("Fitopatógenos Potenciales", S["h3"]))
             fito_rows = [[
-                Paragraph("<b>Taxón</b>", S["th"]),
+                Paragraph("<b>Taxón</b>",        S["th"]),
                 Paragraph("<b>Abundancia %</b>", S["th"]),
-                Paragraph("<b>Riesgo</b>", S["th"]),
-                Paragraph("<b>Referencia</b>", S["th"]),
+                Paragraph("<b>Riesgo</b>",       S["th"]),
+                Paragraph("<b>Referencia</b>",   S["th"]),
             ]]
             for item in fitopatogenos:
                 fito_rows.append([
-                    Paragraph(str(item.get("nombre", "")), S["body_sm"]),
+                    Paragraph(f"<i>{item.get('nombre','')}</i>", S["body_sm"]),
                     Paragraph(f"{item.get('porcentaje', 0):.2f}%", S["body_sm"]),
-                    Paragraph(str(item.get("descripcion", ""))[:120], S["body_sm"]),
+                    Paragraph(str(item.get("descripcion", ""))[:130], S["body_sm"]),
                     Paragraph(str(item.get("referencia", ""))[:80], S["body_sm"]),
                 ])
-            col_fito = [ancho_util * 0.28, 70, ancho_util * 0.35, ancho_util * 0.22]
+            col_fito = [ancho_util * 0.26, 65, ancho_util * 0.37, ancho_util * 0.23]
             t_fito = Table(fito_rows, colWidths=col_fito, repeatRows=1)
             t_fito.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), _C_FITO),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fff1f2')]),
-                ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-                ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BACKGROUND',    (0, 0), (-1, 0),  _C_FITO),
+                ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor('#fff1f2')]),
+                ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+                ('BOX',           (0, 0), (-1, -1), 1,   _C_BORDER),
+                ('TOPPADDING',    (0, 0), (-1, -1), 3),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                ('LEFTPADDING', (0, 0), (-1, -1), 5),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING',   (0, 0), (-1, -1), 5),
+                ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
             ]))
             contenido.append(t_fito)
             contenido.append(Spacer(1, 10))
 
-        # Neutrales (lista hasta 30)
+        # Neutrales como lista legible
         neutrales = detalle_clas.get("neutral", [])[:30]
         if neutrales:
             contenido.append(Paragraph("Organismos Neutrales", S["h3"]))
-            noms = ", ".join(str(n.get("nombre", "?")) for n in neutrales)
+            noms = ", ".join(f"<i>{n.get('nombre','?')}</i>" for n in neutrales)
             contenido.append(Paragraph(noms, S["body_sm"]))
 
         contenido.append(PageBreak())
 
-        # ----------------------------------------------------------------
-        # Página 6 — Trazabilidad
-        # ----------------------------------------------------------------
-        contenido.append(Paragraph("Trazabilidad y Nota Metodológica", S["h2"]))
-        contenido.append(HRFlowable(width=ancho_util, thickness=1, color=_C_SECONDARY))
-        contenido.append(Spacer(1, 10))
+        # ================================================================
+        # PÁGINA 6 — Trazabilidad
+        # ================================================================
+        contenido.append(_seccion_hdr("TRAZABILIDAD Y NOTA METODOLÓGICA", ancho_util, S, numero=5))
+        contenido.append(Spacer(1, 12))
 
         obs = _safe(muestra, "observaciones", "")
         if obs and obs != "N/A":
-            contenido.append(Paragraph("<b>Observaciones de la muestra:</b>", S["body"]))
-            contenido.append(Paragraph(obs, S["body_sm"]))
-            contenido.append(Spacer(1, 8))
+            t_obs = Table([[Paragraph(f"<b>Observaciones:</b> {obs}", S["body_sm"])]], colWidths=[ancho_util])
+            t_obs.setStyle(TableStyle([
+                ('BACKGROUND',    (0, 0), (-1, -1), colors.HexColor('#fefce8')),
+                ('BOX',           (0, 0), (-1, -1), 0.5, colors.HexColor('#fde68a')),
+                ('LEFTPADDING',   (0, 0), (-1, -1), 10),
+                ('TOPPADDING',    (0, 0), (-1, -1), 7),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+            ]))
+            contenido.append(t_obs)
+            contenido.append(Spacer(1, 10))
 
         marcador_txt = "16S rRNA" if tipo == "16S" else "ITS (Internal Transcribed Spacer)"
+        total_cat    = totales_clas.get('benefico',0) + totales_clas.get('fitopatogeno',0) + totales_clas.get('neutral',0)
         nota_meto = (
-            f"El presente análisis utiliza el marcador molecular <b>{marcador_txt}</b> a nivel taxonómico de "
-            f"<b>{nivel}</b>. Se detectaron <b>{len(todos_taxa)}</b> taxa únicos mediante el pipeline bioinformático "
-            f"de BioSuelo. La diversidad alfa fue calculada usando los índices de Shannon-Wiener (H') y "
-            f"Simpson (D). El Índice de Salud del Suelo integra la proporción funcional de la comunidad (70%) y "
-            f"la diversidad normalizada Shannon/3.5 (30%). La cobertura del catálogo funcional corresponde a "
-            f"<b>{totales_clas.get('benefico', 0) + totales_clas.get('fitopatogeno', 0) + totales_clas.get('neutral', 0)}</b> "
-            f"taxa catalogados de un total de <b>{len(todos_taxa)}</b> detectados. "
-            f"Plataforma: BioSuelo — {fecha_gen}."
+            f"Marcador molecular: <b>{marcador_txt}</b> · Nivel: <b>{nivel}</b> · "
+            f"Taxa únicos detectados: <b>{len(todos_taxa)}</b> · "
+            f"Taxa catalogados: <b>{total_cat}</b> de {len(todos_taxa)}.<br/><br/>"
+            f"La diversidad alfa se calculó con Shannon-Wiener (H') y Simpson (1–D). "
+            f"El Índice de Salud del Suelo integra la proporción benéfico/fitopatógeno (70%) y "
+            f"la diversidad normalizada Shannon/3.5 (30%). "
+            f"Plataforma: TerraBioLab UTC — {fecha_gen}."
         )
-        contenido.append(Paragraph(nota_meto, S["body"]))
+        t_nota = Table([[Paragraph(nota_meto, S["body_sm"])]], colWidths=[ancho_util])
+        t_nota.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, -1), _C_LIGHT),
+            ('BOX',           (0, 0), (-1, -1), 0.5, _C_BORDER),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 12),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 12),
+            ('TOPPADDING',    (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ]))
+        contenido.append(t_nota)
         contenido.append(Spacer(1, 14))
 
         contenido.append(Paragraph(
-            "<i>Este documento es un reporte técnico automatizado generado por BioSuelo. "
+            "<i>Reporte técnico automatizado — TerraBioLab UTC. "
             "Los resultados deben ser interpretados por un profesional calificado en microbiología de suelos. "
-            "Universidad Técnica de Cotopaxi — Laboratorio de Bioinformática de Suelos.</i>",
+            "Universidad Técnica de Cotopaxi · Laboratorio de Bioinformática de Suelos.</i>",
             S["italic"],
         ))
 
@@ -799,128 +1187,146 @@ class ExportService:
         analista   = str(usuario) if usuario else "Sistema"
         marcador_lbl = "BACTERIA 16S" if tipo == "16S" else "HONGOS ITS"
 
-        # ----------------------------------------------------------------
-        # Página 1 — Portada comparativa
-        # ----------------------------------------------------------------
-        header_data = [[
-            Paragraph(
-                "<font color='#ffffff'><b>BioSuelo</b><br/>"
-                "<font size='9'>Universidad Técnica de Cotopaxi — Laboratorio de Bioinformática de Suelos</font></font>",
-                S["body"],
-            )
-        ]]
-        t_header = Table(header_data, colWidths=[ancho_util])
-        t_header.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), _C_PRIMARY),
-            ('TOPPADDING', (0, 0), (-1, -1), 14),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 14),
-            ('LEFTPADDING', (0, 0), (-1, -1), 16),
+        # ================================================================
+        # PORTADA — Comparativo
+        # ================================================================
+        # Banda superior oscura
+        t_banner = Table([[Paragraph(
+            "<font color='#ffffff'><b>TerraBioLab UTC</b></font>",
+            S["titulo"],
+        )]], colWidths=[ancho_util])
+        t_banner.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, -1), _C_PRIMARY),
+            ('TOPPADDING',    (0, 0), (-1, -1), 16),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 16),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 16),
         ]))
-        contenido.append(t_header)
-        contenido.append(Spacer(1, 18))
+        contenido.append(t_banner)
 
-        contenido.append(Paragraph("ANÁLISIS COMPARATIVO DE PERFILES MICROBIOLÓGICOS", S["titulo"]))
-        contenido.append(Paragraph(f"Marcador: <b>{marcador_lbl}</b> — {len(muestras)} muestras", S["body"]))
-        contenido.append(Spacer(1, 12))
+        # Franja tipo comparativo
+        t_franja = Table([[Paragraph(
+            f"<font color='#ffffff'>Análisis Comparativo  ·  {marcador_lbl}  ·  {len(muestras)} muestras</font>",
+            S["h2"],
+        )]], colWidths=[ancho_util])
+        t_franja.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, -1), colors.HexColor('#0d7a5f')),
+            ('TOPPADDING',    (0, 0), (-1, -1), 7),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 16),
+        ]))
+        contenido.append(t_franja)
+        contenido.append(Spacer(1, 16))
+
+        contenido.append(Paragraph(
+            "REPORTE COMPARATIVO DE COMUNIDADES MICROBIANAS DE SUELO",
+            S["titulo"],
+        ))
+        contenido.append(Paragraph(
+            "Universidad Técnica de Cotopaxi — Laboratorio de Bioinformática de Suelos",
+            S["subtitle"],
+        ))
+        contenido.append(Spacer(1, 20))
 
         # Tabla de muestras incluidas
         muestras_hdr = [[
-            Paragraph("<b>Código</b>", S["th"]),
-            Paragraph("<b>Cultivo</b>", S["th"]),
-            Paragraph("<b>Variedad</b>", S["th"]),
-            Paragraph("<b>Localidad</b>", S["th"]),
-            Paragraph("<b>Finca</b>", S["th"]),
-            Paragraph("<b>Altitud</b>", S["th"]),
+            Paragraph("<b>Código</b>",   S["th_dark"]),
+            Paragraph("<b>Cultivo</b>",  S["th_dark"]),
+            Paragraph("<b>Variedad</b>", S["th_dark"]),
+            Paragraph("<b>Localidad</b>",S["th_dark"]),
+            Paragraph("<b>Finca/Lote</b>",S["th_dark"]),
+            Paragraph("<b>Altitud</b>",  S["th_dark"]),
         ]]
-        for m in muestras:
+        for i, m in enumerate(muestras):
             cult = m.cultivo.nombre if getattr(m, 'cultivo', None) else "N/A"
             var  = m.variedad_clon.nombre if getattr(m, 'variedad_clon', None) else "N/A"
+            bg_row = colors.white if i % 2 == 0 else colors.HexColor('#f0fdf4')
             muestras_hdr.append([
                 Paragraph(str(m.codigo), S["body_sm"]),
-                Paragraph(cult, S["body_sm"]),
-                Paragraph(var, S["body_sm"]),
-                Paragraph(str(getattr(m, 'localidad', 'N/A') or 'N/A'), S["body_sm"]),
-                Paragraph(str(getattr(m, 'finca_lote', 'N/A') or 'N/A'), S["body_sm"]),
-                Paragraph(str(getattr(m, 'altitud', 'N/A') or 'N/A'), S["body_sm"]),
+                Paragraph(cult,          S["body_sm"]),
+                Paragraph(var,           S["body_sm"]),
+                Paragraph(str(getattr(m, 'localidad',   'N/A') or 'N/A'), S["body_sm"]),
+                Paragraph(str(getattr(m, 'finca_lote',  'N/A') or 'N/A'), S["body_sm"]),
+                Paragraph(str(getattr(m, 'altitud',     'N/A') or 'N/A'), S["body_sm"]),
             ])
-        col_m = [80, 80, 80, ancho_util * 0.22, ancho_util * 0.18, 55]
+        col_m = [80, 80, 80, ancho_util * 0.22, ancho_util * 0.18, 50]
         t_muestras = Table(muestras_hdr, colWidths=col_m, repeatRows=1)
         t_muestras.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), _C_SECONDARY),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, _C_LIGHT]),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND',    (0, 0), (-1, 0),  _C_PRIMARY),
+            ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdf4')]),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+            ('BOX',           (0, 0), (-1, -1), 1,   _C_BORDER),
+            ('TOPPADDING',    (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         contenido.append(t_muestras)
-        contenido.append(Spacer(1, 10))
+        contenido.append(Spacer(1, 14))
 
-        gen_rows = [[
-            Paragraph("<b>Fecha:</b>", S["body_sm"]), Paragraph(fecha_gen, S["body_sm"]),
-            Paragraph("<b>Analista:</b>", S["body_sm"]), Paragraph(analista, S["body_sm"]),
-            Paragraph("<b>Nivel:</b>", S["body_sm"]), Paragraph(nivel.capitalize(), S["body_sm"]),
-        ]]
-        col_gen = [60, 100, 60, 100, 50, 80]
-        t_gen = Table(gen_rows, colWidths=col_gen)
-        t_gen.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), _C_LIGHT),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        # Barra de metadatos (4 celdas)
+        meta_bar = Table([[
+            Table([[Paragraph("Analista",  S["kpi_lbl"])], [Paragraph(analista,          S["label"])]], colWidths=[(ancho_util/4)-2]),
+            Table([[Paragraph("Marcador",  S["kpi_lbl"])], [Paragraph(marcador_lbl,       S["label"])]], colWidths=[(ancho_util/4)-2]),
+            Table([[Paragraph("Nivel",     S["kpi_lbl"])], [Paragraph(nivel.capitalize(), S["label"])]], colWidths=[(ancho_util/4)-2]),
+            Table([[Paragraph("Generado",  S["kpi_lbl"])], [Paragraph(fecha_gen,          S["label"])]], colWidths=[(ancho_util/4)-2]),
+        ]], colWidths=[ancho_util/4] * 4)
+        meta_bar.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, -1), colors.HexColor('#f1f5f9')),
+            ('BOX',           (0, 0), (-1, -1), 0.5, _C_BORDER),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.5, _C_INNER),
+            ('TOPPADDING',    (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 12),
+            ('ALIGN',         (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
         ]))
-        contenido.append(t_gen)
+        contenido.append(meta_bar)
 
         contenido.append(PageBreak())
 
-        # ----------------------------------------------------------------
-        # Página 2 — Cuadro comparativo
-        # ----------------------------------------------------------------
-        contenido.append(Paragraph("Cuadro Comparativo de Salud del Suelo", S["h2"]))
-        contenido.append(HRFlowable(width=ancho_util, thickness=1, color=_C_SECONDARY))
-        contenido.append(Spacer(1, 10))
+        # ================================================================
+        # PÁGINA 2 — Cuadro comparativo de salud
+        # ================================================================
+        contenido.append(_seccion_hdr("CUADRO COMPARATIVO DE SALUD DEL SUELO", ancho_util, S, numero=1))
+        contenido.append(Spacer(1, 14))
 
         # Ordenar por indice_salud desc
         sorted_dpm = sorted(datos_por_muestra, key=lambda x: x.get("indice_salud", 0), reverse=True)
 
         comp_hdr = [[
-            Paragraph("<b>Muestra</b>", S["th"]),
-            Paragraph("<b>Índice Salud</b>", S["th"]),
-            Paragraph("<b>Nivel</b>", S["th"]),
-            Paragraph("<b>Taxa</b>", S["th"]),
-            Paragraph("<b>Shannon</b>", S["th"]),
-            Paragraph("<b>Benéficos</b>", S["th"]),
-            Paragraph("<b>Fitopatógenos</b>", S["th"]),
+            Paragraph("<b>Muestra</b>",       S["th_dark"]),
+            Paragraph("<b>Índice Salud</b>",  S["th_dark"]),
+            Paragraph("<b>Nivel</b>",          S["th_dark"]),
+            Paragraph("<b>Taxa</b>",           S["th_dark"]),
+            Paragraph("<b>Shannon H'</b>",     S["th_dark"]),
+            Paragraph("<b>Benéficos</b>",      S["th_dark"]),
+            Paragraph("<b>Fitopatógenos</b>",  S["th_dark"]),
         ]]
         for d in sorted_dpm:
-            m = d["muestra"]
-            tc = d.get("totales_clas", {})
+            m    = d["muestra"]
+            tc   = d.get("totales_clas", {})
             shan = float(d.get("diversidad", {}).get("shannon", 0) or 0)
-            n_taxa = len(d.get("top_taxa", []))
             comp_hdr.append([
-                Paragraph(str(m.codigo), S["body_sm"]),
-                Paragraph(str(d.get("indice_salud", 0)), S["body_sm"]),
-                Paragraph(str(d.get("nivel_salud", "N/A")), S["body_sm"]),
-                Paragraph(str(n_taxa), S["body_sm"]),
-                Paragraph(f"{shan:.3f}", S["body_sm"]),
-                Paragraph(str(tc.get("benefico", 0)), S["body_sm"]),
-                Paragraph(str(tc.get("fitopatogeno", 0)), S["body_sm"]),
+                Paragraph(str(m.codigo),                   S["body_sm"]),
+                Paragraph(str(d.get("indice_salud", 0)),   S["body_sm"]),
+                Paragraph(str(d.get("nivel_salud", "N/A")),S["body_sm"]),
+                Paragraph(str(len(d.get("top_taxa", []))), S["body_sm"]),
+                Paragraph(f"{shan:.3f}",                   S["body_sm"]),
+                Paragraph(str(tc.get("benefico", 0)),      S["body_sm"]),
+                Paragraph(str(tc.get("fitopatogeno", 0)),  S["body_sm"]),
             ])
-        col_comp = [80, 70, 75, 50, 65, 65, 70]
+        col_comp = [80, 68, 72, 48, 65, 65, 70]
         t_comp = Table(comp_hdr, colWidths=col_comp, repeatRows=1)
         t_comp.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), _C_SECONDARY),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, _C_LIGHT]),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND',    (0, 0), (-1, 0),  _C_PRIMARY),
+            ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor('#f8faf9')]),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+            ('BOX',           (0, 0), (-1, -1), 1,   _C_BORDER),
+            ('TOPPADDING',    (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN',         (1, 1), (3, -1),  'RIGHT'),
         ]))
         contenido.append(t_comp)
         contenido.append(Spacer(1, 14))
@@ -929,182 +1335,206 @@ class ExportService:
         chart_comp = ExportService._chart_comparativo_shannon(sorted_dpm, width_pt=ancho_util, height_pt=160)
         if chart_comp:
             contenido.append(chart_comp)
+            contenido.append(Paragraph(
+                "Figura 1. Comparación de Shannon H' (izq.) e Índice de Salud del Suelo (der.) entre muestras. "
+                "Colores Shannon: verde H'≥3 · amarillo 2-3 · naranja 1-2 · rojo <1.",
+                S["caption"],
+            ))
 
         contenido.append(PageBreak())
 
-        # ----------------------------------------------------------------
-        # Página 3 — Composición global (Top N)
-        # ----------------------------------------------------------------
-        contenido.append(Paragraph("Composición Global por Muestra", S["h2"]))
-        contenido.append(HRFlowable(width=ancho_util, thickness=1, color=_C_SECONDARY))
-        contenido.append(Spacer(1, 10))
+        # ================================================================
+        # PÁGINA 3 — Composición global (Top N)
+        # ================================================================
+        contenido.append(_seccion_hdr("COMPOSICIÓN GLOBAL POR MUESTRA", ancho_util, S, numero=2))
+        contenido.append(Spacer(1, 14))
+
+        # Gráfica rankeada global
+        chart_ranked_g = ExportService._chart_ranked_bar_taxa(
+            top_taxa, width_pt=ancho_util,
+            titulo=f"Perfil de Abundancia Relativa — Top {datos.get('top_n', len(top_taxa))} {nivel.capitalize()} (acumulado comparativo)",
+            subtitulo=f"Marcador {tipo} · {len(muestras)} muestras · Ordenado de mayor a menor abundancia relativa global",
+        )
+        if chart_ranked_g:
+            contenido.append(chart_ranked_g)
+            contenido.append(Paragraph(
+                f"Figura 2. Abundancia relativa acumulada de los principales {nivel} en el conjunto comparativo ({len(muestras)} muestras, marcador {tipo}). "
+                "Color: verde = benéfico · rojo = fitopatógeno · gris = neutral · gris claro = sin catalogar.",
+                S["caption"],
+            ))
+            contenido.append(Spacer(1, 8))
 
         # Tabla top taxa global
+        _clas_clr = {"benefico": "#16a34a", "fitopatogeno": "#dc2626", "neutral": "#64748b"}
         g_rows = [[
-            Paragraph("<b>#</b>", S["th"]),
-            Paragraph("<b>Taxón</b>", S["th"]),
-            Paragraph("<b>Total Hits</b>", S["th"]),
-            Paragraph("<b>Abundancia %</b>", S["th"]),
-            Paragraph("<b>Clasificación</b>", S["th"]),
+            Paragraph("<b>#</b>",             S["th_dark"]),
+            Paragraph("<b>Taxón</b>",          S["th_dark"]),
+            Paragraph("<b>Total reads</b>",    S["th_dark"]),
+            Paragraph("<b>Abundancia %</b>",   S["th_dark"]),
+            Paragraph("<b>Rol funcional</b>",  S["th_dark"]),
         ]]
         for i, r in enumerate(top_taxa, 1):
             clas = r.get("clasificacion", "sin_clasificar")
-            if clas == "benefico":     clas_txt = "Benéfico"
-            elif clas == "fitopatogeno": clas_txt = "Fitopatógeno"
-            elif clas == "neutral":    clas_txt = "Neutral"
-            else:                      clas_txt = "Sin clas."
+            clas_color = _clas_clr.get(clas, "#94a3b8")
+            clas_txt   = {"benefico": "Benéfico", "fitopatogeno": "Fitopatógeno",
+                          "neutral": "Neutral"}.get(clas, "Sin clas.")
             g_rows.append([
                 Paragraph(str(i), S["body_sm"]),
-                Paragraph(str(r.get("taxonomia", "?")), S["body_sm"]),
+                Paragraph(f"<i>{r.get('taxonomia', '?')}</i>", S["body_sm"]),
                 Paragraph(str(r.get("total_hits", 0)), S["body_sm"]),
                 Paragraph(f"{r.get('total_porcentaje', 0):.2f}%", S["body_sm"]),
-                Paragraph(clas_txt, S["body_sm"]),
+                Paragraph(f"<font color='{clas_color}'>{clas_txt}</font>", S["body_sm"]),
             ])
-        col_g = [30, ancho_util * 0.42, 70, 80, 90]
+        col_g = [26, ancho_util * 0.42, 65, 75, 90]
         t_g = Table(g_rows, colWidths=col_g, repeatRows=1)
         t_g.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), _C_SECONDARY),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, _C_LIGHT]),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND',    (0, 0), (-1, 0),  _C_PRIMARY),
+            ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor('#f8faf9')]),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+            ('BOX',           (0, 0), (-1, -1), 1,   _C_BORDER),
+            ('TOPPADDING',    (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN',         (0, 0), (0, -1),  'CENTER'),
+            ('ALIGN',         (2, 1), (3, -1),  'RIGHT'),
         ]))
         contenido.append(t_g)
-        contenido.append(Spacer(1, 10))
-
-        # Donut global
-        chart_donut_g = ExportService._chart_donut_taxa(top_taxa, width_pt=220, height_pt=180)
-        if chart_donut_g:
-            contenido.append(chart_donut_g)
 
         contenido.append(PageBreak())
 
-        # ----------------------------------------------------------------
-        # Página 4 — Perfil funcional comparativo
-        # ----------------------------------------------------------------
-        contenido.append(Paragraph("Perfil Funcional Comparativo", S["h2"]))
-        contenido.append(HRFlowable(width=ancho_util, thickness=1, color=_C_SECONDARY))
-        contenido.append(Spacer(1, 10))
+        # ================================================================
+        # PÁGINA 4 — Perfil funcional comparativo
+        # ================================================================
+        contenido.append(_seccion_hdr("PERFIL FUNCIONAL COMPARATIVO", ancho_util, S, numero=3))
+        contenido.append(Spacer(1, 14))
 
-        # Resumen global de clasificación
-        summ_g = [[
-            Paragraph(f"<font color='#16a34a'><b>{totales_clas.get('benefico', 0)}</b><br/><font size='8'>Benéficos</font></font>", S["center"]),
-            Paragraph(f"<font color='#dc2626'><b>{totales_clas.get('fitopatogeno', 0)}</b><br/><font size='8'>Fitopatógenos</font></font>", S["center"]),
-            Paragraph(f"<font color='#64748b'><b>{totales_clas.get('neutral', 0)}</b><br/><font size='8'>Neutrales</font></font>", S["center"]),
-            Paragraph(f"<font color='#94a3b8'><b>{totales_clas.get('sin_clasificar', 0)}</b><br/><font size='8'>Sin Catalogar</font></font>", S["center"]),
-        ]]
-        t_summ_g = Table(summ_g, colWidths=[ancho_util / 4] * 4)
-        t_summ_g.setStyle(TableStyle([
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        contenido.append(t_summ_g)
-        contenido.append(Spacer(1, 10))
+        # KPI tiles globales
+        contenido.append(_kpi_tiles([
+            {"val": str(totales_clas.get("benefico", 0)),      "lbl": "Benéficos",     "color": "#16A34A", "sub": "Global acumulado"},
+            {"val": str(totales_clas.get("fitopatogeno", 0)),  "lbl": "Fitopatógenos", "color": "#DC2626", "sub": "Global acumulado"},
+            {"val": str(totales_clas.get("neutral", 0)),       "lbl": "Neutrales",     "color": "#64748b", "sub": "Global acumulado"},
+            {"val": str(totales_clas.get("sin_clasificar", 0)),"lbl": "Sin catalogar", "color": "#94A3B8", "sub": "Global acumulado"},
+        ], ancho_util, S))
+        contenido.append(Spacer(1, 12))
 
-        # Gráfica barras global
-        chart_clas_g = ExportService._chart_barras_clas(totales_clas, width_pt=220, height_pt=130)
-        if chart_clas_g:
-            contenido.append(chart_clas_g)
-        contenido.append(Spacer(1, 10))
+        # Gráfica agrupada por muestra
+        chart_agrupada = ExportService._chart_barras_agrupadas_funcional(
+            datos_por_muestra, width_pt=ancho_util, height_pt=175,
+            titulo="Composición Funcional Comparativa por Muestra",
+            subtitulo=f"N.° de taxa por categoría funcional en cada muestra · Marcador {tipo} · Nivel {nivel}",
+        )
+        if chart_agrupada:
+            contenido.append(chart_agrupada)
+            contenido.append(Paragraph(
+                f"Figura 3. Número de taxa por categoría funcional en cada una de las {len(muestras)} muestras analizadas. "
+                "Permite comparar el balance benéfico/fitopatógeno entre localidades o tratamientos.",
+                S["caption"],
+            ))
+            contenido.append(Spacer(1, 10))
 
-        # Tabla por muestra: Muestra | Benéficos | Fitopatógenos | Neutrales | Sin catalogar
+        # Tabla por muestra
         por_m_hdr = [[
-            Paragraph("<b>Muestra</b>", S["th"]),
-            Paragraph("<b>Benéficos</b>", S["th"]),
-            Paragraph("<b>Fitopatógenos</b>", S["th"]),
-            Paragraph("<b>Neutrales</b>", S["th"]),
-            Paragraph("<b>Sin catalogar</b>", S["th"]),
+            Paragraph("<b>Muestra</b>",        S["th_dark"]),
+            Paragraph("<b>Benéficos</b>",      S["th_dark"]),
+            Paragraph("<b>Fitopatógenos</b>",  S["th_dark"]),
+            Paragraph("<b>Neutrales</b>",      S["th_dark"]),
+            Paragraph("<b>Sin catalogar</b>",  S["th_dark"]),
         ]]
         for d in datos_por_muestra:
             tc = d.get("totales_clas", {})
             por_m_hdr.append([
-                Paragraph(str(d["muestra"].codigo), S["body_sm"]),
-                Paragraph(str(tc.get("benefico", 0)), S["body_sm"]),
+                Paragraph(str(d["muestra"].codigo),       S["body_sm"]),
+                Paragraph(str(tc.get("benefico", 0)),     S["body_sm"]),
                 Paragraph(str(tc.get("fitopatogeno", 0)), S["body_sm"]),
-                Paragraph(str(tc.get("neutral", 0)), S["body_sm"]),
-                Paragraph(str(tc.get("sin_clasificar", 0)), S["body_sm"]),
+                Paragraph(str(tc.get("neutral", 0)),      S["body_sm"]),
+                Paragraph(str(tc.get("sin_clasificar",0)),S["body_sm"]),
             ])
         col_pm = [ancho_util * 0.30, 80, 90, 80, 80]
         t_pm = Table(por_m_hdr, colWidths=col_pm, repeatRows=1)
         t_pm.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), _C_SECONDARY),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, _C_LIGHT]),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND',    (0, 0), (-1, 0),  _C_PRIMARY),
+            ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor('#f8faf9')]),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+            ('BOX',           (0, 0), (-1, -1), 1,   _C_BORDER),
+            ('TOPPADDING',    (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN',         (1, 1), (-1, -1), 'RIGHT'),
         ]))
         contenido.append(t_pm)
 
         contenido.append(PageBreak())
 
-        # ----------------------------------------------------------------
-        # Página 5 — Trazabilidad
-        # ----------------------------------------------------------------
-        contenido.append(Paragraph("Trazabilidad y Nota Metodológica", S["h2"]))
-        contenido.append(HRFlowable(width=ancho_util, thickness=1, color=_C_SECONDARY))
-        contenido.append(Spacer(1, 10))
+        # ================================================================
+        # PÁGINA 5 — Trazabilidad
+        # ================================================================
+        contenido.append(_seccion_hdr("TRAZABILIDAD Y NOTA METODOLÓGICA", ancho_util, S, numero=4))
+        contenido.append(Spacer(1, 12))
 
-        # Tabla metadata de muestras
+        # Tabla completa de metadatos por muestra
         meta_hdr = [[
-            Paragraph("<b>Código</b>", S["th"]),
-            Paragraph("<b>Cultivo</b>", S["th"]),
-            Paragraph("<b>Variedad</b>", S["th"]),
-            Paragraph("<b>Localidad</b>", S["th"]),
-            Paragraph("<b>Finca/Lote</b>", S["th"]),
-            Paragraph("<b>Altitud</b>", S["th"]),
-            Paragraph("<b>Fecha</b>", S["th"]),
+            Paragraph("<b>Código</b>",    S["th_dark"]),
+            Paragraph("<b>Cultivo</b>",   S["th_dark"]),
+            Paragraph("<b>Variedad</b>",  S["th_dark"]),
+            Paragraph("<b>Localidad</b>", S["th_dark"]),
+            Paragraph("<b>Finca/Lote</b>",S["th_dark"]),
+            Paragraph("<b>Altitud</b>",   S["th_dark"]),
+            Paragraph("<b>Fecha</b>",     S["th_dark"]),
         ]]
         for m in muestras:
             cult = m.cultivo.nombre if getattr(m, 'cultivo', None) else "N/A"
             var  = m.variedad_clon.nombre if getattr(m, 'variedad_clon', None) else "N/A"
             meta_hdr.append([
-                Paragraph(str(m.codigo), S["body_sm"]),
-                Paragraph(cult, S["body_sm"]),
-                Paragraph(var, S["body_sm"]),
-                Paragraph(str(getattr(m, 'localidad', 'N/A') or 'N/A'), S["body_sm"]),
-                Paragraph(str(getattr(m, 'finca_lote', 'N/A') or 'N/A'), S["body_sm"]),
-                Paragraph(str(getattr(m, 'altitud', 'N/A') or 'N/A'), S["body_sm"]),
-                Paragraph(str(getattr(m, 'fecha_registro', 'N/A') or 'N/A'), S["body_sm"]),
+                Paragraph(str(m.codigo),                               S["body_sm"]),
+                Paragraph(cult,                                         S["body_sm"]),
+                Paragraph(var,                                          S["body_sm"]),
+                Paragraph(str(getattr(m, 'localidad',     'N/A') or 'N/A'), S["body_sm"]),
+                Paragraph(str(getattr(m, 'finca_lote',    'N/A') or 'N/A'), S["body_sm"]),
+                Paragraph(str(getattr(m, 'altitud',       'N/A') or 'N/A'), S["body_sm"]),
+                Paragraph(str(getattr(m, 'fecha_registro','N/A') or 'N/A'), S["body_sm"]),
             ])
-        col_meta = [65, 65, 65, ancho_util * 0.18, ancho_util * 0.15, 45, 60]
+        col_meta = [62, 62, 65, ancho_util * 0.18, ancho_util * 0.15, 44, 58]
         t_meta = Table(meta_hdr, colWidths=col_meta, repeatRows=1)
         t_meta.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), _C_SECONDARY),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, _C_LIGHT]),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, _C_INNER),
-            ('BOX', (0, 0), (-1, -1), 1, _C_BORDER),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND',    (0, 0), (-1, 0),  _C_PRIMARY),
+            ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor('#f8faf9')]),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+            ('BOX',           (0, 0), (-1, -1), 1,   _C_BORDER),
+            ('TOPPADDING',    (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 5),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         contenido.append(t_meta)
-        contenido.append(Spacer(1, 12))
+        contenido.append(Spacer(1, 14))
 
         marcador_txt = "16S rRNA" if tipo == "16S" else "ITS (Internal Transcribed Spacer)"
-        shannon_g = float(diversidad.get("shannon", 0) or 0)
-        riqueza_g = diversidad.get("riqueza", len(top_taxa))
+        shannon_g    = float(diversidad.get("shannon", 0) or 0)
+        riqueza_g    = diversidad.get("riqueza", len(top_taxa))
         nota_meto = (
-            f"Análisis comparativo de <b>{len(muestras)}</b> muestras con marcador <b>{marcador_txt}</b> "
-            f"a nivel <b>{nivel}</b>. Se detectaron en total <b>{riqueza_g}</b> taxa únicos. "
-            f"Shannon H' global: <b>{shannon_g:.3f}</b>. "
-            f"El Índice de Salud del Suelo integra la proporción funcional (70%) y diversidad Shannon/3.5 (30%). "
-            f"Plataforma: BioSuelo — {fecha_gen}."
+            f"Análisis comparativo de <b>{len(muestras)}</b> muestras · Marcador: <b>{marcador_txt}</b> "
+            f"· Nivel: <b>{nivel}</b>.<br/>"
+            f"Taxa únicos detectados: <b>{riqueza_g}</b> · Shannon H' global: <b>{shannon_g:.3f}</b>.<br/><br/>"
+            f"El Índice de Salud del Suelo integra la proporción benéfico/fitopatógeno (70%) y la diversidad "
+            f"normalizada Shannon/3.5 (30%). Plataforma: TerraBioLab UTC — {fecha_gen}."
         )
-        contenido.append(Paragraph(nota_meto, S["body"]))
+        t_nota = Table([[Paragraph(nota_meto, S["body_sm"])]], colWidths=[ancho_util])
+        t_nota.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, -1), _C_LIGHT),
+            ('BOX',           (0, 0), (-1, -1), 0.5, _C_BORDER),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 12),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 12),
+            ('TOPPADDING',    (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ]))
+        contenido.append(t_nota)
         contenido.append(Spacer(1, 14))
         contenido.append(Paragraph(
-            "<i>Reporte técnico automatizado — BioSuelo. "
-            "Interpretación a cargo de profesionales en microbiología de suelos.</i>",
+            "<i>Reporte técnico automatizado — TerraBioLab UTC. "
+            "Los resultados deben ser interpretados por un profesional calificado en microbiología de suelos. "
+            "Universidad Técnica de Cotopaxi · Laboratorio de Bioinformática de Suelos.</i>",
             S["italic"],
         ))
 
@@ -1947,58 +2377,81 @@ class ExportService:
                 # ─────────────────────────────────────────────────────
                 # H-03  DIVERSIDAD ALFA DETALLADA POR MUESTRA
                 # ─────────────────────────────────────────────────────
+                def _interp_shannon_nivel(v):
+                    v = float(v or 0)
+                    if v >= 3.0: return "Alta (H'≥3)"
+                    if v >= 2.0: return "Media-alta (2≤H'<3)"
+                    if v >= 1.0: return "Media-baja (1≤H'<2)"
+                    return "Baja (H'<1)"
+
                 alfa_rec = []
                 for dpm in datos_por_muestra:
                     div = dpm.get("diversidad") or {}
+                    shan = round(_div_valor(div, "shannon"), 4)
                     alfa_rec.append({
-                        "Muestra":          str(dpm["muestra"].codigo),
-                        "Riqueza":          int(_div_valor(div, "riqueza")),
-                        "Shannon_H'":       round(_div_valor(div, "shannon"), 4),
-                        "Simpson_D":        round(_div_valor(div, "simpson"), 4),
-                        "Equitatividad_J'": round(_div_valor(div, "equitatividad"), 4),
+                        "Muestra":                str(dpm["muestra"].codigo),
+                        "Riqueza":                int(_div_valor(div, "riqueza")),
+                        "Shannon_H'":             shan,
+                        "Nivel_Diversidad":       _interp_shannon_nivel(shan),
+                        "Simpson_D":              round(_div_valor(div, "simpson"), 4),
+                        "Equitatividad_J'":       round(_div_valor(div, "equitatividad"), 4),
                     })
                 # Fila promedio al final
                 if alfa_rec:
+                    n_r = len(alfa_rec)
+                    prom_shan = round(sum(r["Shannon_H'"] for r in alfa_rec) / n_r, 4)
                     alfa_rec.append({
-                        "Muestra": "PROMEDIO",
-                        "Riqueza": round(sum(r["Riqueza"] for r in alfa_rec) / len(alfa_rec), 1),
-                        "Shannon_H'": round(sum(r["Shannon_H'"] for r in alfa_rec) / len(alfa_rec), 4),
-                        "Simpson_D":  round(sum(r["Simpson_D"] for r in alfa_rec) / len(alfa_rec), 4),
-                        "Equitatividad_J'": round(
-                            sum(r["Equitatividad_J'"] for r in alfa_rec) / len(alfa_rec), 4),
+                        "Muestra":          "PROMEDIO",
+                        "Riqueza":          round(sum(r["Riqueza"] for r in alfa_rec) / n_r, 1),
+                        "Shannon_H'":       prom_shan,
+                        "Nivel_Diversidad": _interp_shannon_nivel(prom_shan),
+                        "Simpson_D":        round(sum(r["Simpson_D"]       for r in alfa_rec) / n_r, 4),
+                        "Equitatividad_J'": round(sum(r["Equitatividad_J'"] for r in alfa_rec) / n_r, 4),
                     })
 
                 df_alfa = (pd.DataFrame(alfa_rec) if alfa_rec
                            else pd.DataFrame(columns=["Muestra","Riqueza","Shannon_H'",
-                                                      "Simpson_D","Equitatividad_J'"]))
+                                                      "Nivel_Diversidad","Simpson_D",
+                                                      "Equitatividad_J'"]))
                 df_alfa.to_excel(writer, index=False, sheet_name="Diversidad_Alfa")
                 ws_alfa = writer.sheets["Diversidad_Alfa"]
-                _hdr(ws_alfa, 5, fill=fill_azul)
+                _hdr(ws_alfa, 6, fill=fill_azul)
                 _datos_filas(ws_alfa, 2, len(df_alfa) + 1, alin=al_c)
                 # Fila promedio en negrita
                 if alfa_rec:
-                    for c in range(1, 6):
+                    for c in range(1, 7):
                         ws_alfa.cell(row=len(df_alfa) + 1, column=c).font = fnt_bold
                 _aplicar_tabla(ws_alfa, df_alfa, "TablaDivAlfa", "TableStyleMedium2")
-                _ajustar_cols(ws_alfa, {"A": 18, "B": 12, "C": 14, "D": 12, "E": 18})
+                _ajustar_cols(ws_alfa, {"A": 18, "B": 12, "C": 14, "D": 22, "E": 12, "F": 18})
                 _wrap(ws_alfa, h=24)
 
-                # Gráfico Shannon por muestra (sin fila promedio)
-                n_data = len(alfa_rec) - 1 if alfa_rec else 0  # excluye promedio
+                # Gráfico Shannon por muestra — colores por umbral absoluto
+                # (<1 rojo, 1-2 naranja, 2-3 amarillo, ≥3 verde)
+                from openpyxl.chart.series import DataPoint as XLDataPoint
+                n_data = len(alfa_rec) - 1 if alfa_rec else 0  # excluye fila PROMEDIO
                 if n_data > 0:
-                    _titulo_celda(ws_alfa, "G2", "Shannon H' por Muestra", CAZUL)
+                    _titulo_celda(ws_alfa, "H2", "Shannon H' por Muestra (colores por umbral)", CAZUL)
                     ch_sh = BarChart()
                     ch_sh.type = "col"; ch_sh.grouping = "clustered"
                     ch_sh.title = None; ch_sh.y_axis.title = "Shannon H'"
-                    ch_sh.style = 2; ch_sh.width = 18; ch_sh.height = 12
+                    ch_sh.style = 10; ch_sh.width = 20; ch_sh.height = 14
                     sh_dat = Reference(ws_alfa, min_col=3, max_col=3,
                                        min_row=1, max_row=n_data + 1)
                     sh_cat = Reference(ws_alfa, min_col=1, max_col=1,
                                        min_row=2, max_row=n_data + 1)
                     ch_sh.add_data(sh_dat, titles_from_data=True)
                     ch_sh.set_categories(sh_cat)
-                    ch_sh.series[0].graphicalProperties.solidFill = CAZUL
-                    ws_alfa.add_chart(ch_sh, "G3")
+                    # Color por umbral Shannon en cada barra (<1 rojo, 1-2 naranja, 2-3 amarillo, ≥3 verde)
+                    for idx, row_data in enumerate(alfa_rec[:n_data]):
+                        sv = float(row_data.get("Shannon_H'", 0) or 0)
+                        if sv >= 3.0:   fill_c = "16A34A"
+                        elif sv >= 2.0: fill_c = "EAB308"
+                        elif sv >= 1.0: fill_c = "F97316"
+                        else:           fill_c = "DC2626"
+                        dp = XLDataPoint(idx=idx)
+                        dp.graphicalProperties.solidFill = fill_c
+                        ch_sh.series[0].dPt.append(dp)
+                    ws_alfa.add_chart(ch_sh, "H3")
 
                 # ─────────────────────────────────────────────────────
                 # H-04  DIVERSIDAD BETA

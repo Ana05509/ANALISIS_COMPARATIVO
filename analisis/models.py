@@ -140,10 +140,20 @@ class CatalogoMicroorganismo(models.Model):
         ("ITS", "Hongo"),
     ]
 
+    NIVEL_CHOICES = [
+        ("genus",   "Género"),
+        ("species", "Especie"),
+        ("family",  "Familia"),
+        ("order",   "Orden"),
+        ("class",   "Clase"),
+        ("phylum",  "Filo"),
+    ]
+
     nombre = models.CharField(max_length=255, db_index=True, verbose_name="Nombre Científico",
                               help_text="Ej: Bacillus")
-    nivel = models.CharField(max_length=50, db_index=True, verbose_name="Nivel Taxonómico",
-                             help_text="Ej: genus, species")
+    nivel = models.CharField(max_length=50, db_index=True, choices=NIVEL_CHOICES,
+                             verbose_name="Nivel Taxonómico",
+                             help_text="Nivel taxonómico canónico del organismo")
     clasificacion = models.CharField(max_length=30, choices=CLASIFICACIONES, db_index=True,
                                      verbose_name="Rol Funcional")
     descripcion = models.TextField(blank=True, verbose_name="Descripción Agronómica")

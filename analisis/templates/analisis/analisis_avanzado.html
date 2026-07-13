@@ -15,6 +15,46 @@
 .av-row.oculta { display:none; }
 .av-row.marcador-oculta { display:none; }
 .chart-desc { font-size:12.5px; color:var(--text-hint); margin:0 0 0.75rem; line-height:1.55; }
+
+/* ── Grid tabla+donut responsive ── */
+.av-2col {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+    margin-bottom: 1.5rem;
+}
+@media (max-width: 900px) {
+    .av-2col { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Plotly containers: no overflow ── */
+.av-chart-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+/* ── Card title sin desbordamiento ── */
+.card-title {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+/* ── Tabla Top-N responsive ── */
+.av-top-table {
+    table-layout: fixed;
+    width: 100%;
+}
+.av-top-table th:nth-child(1) { width: 40px; }
+.av-top-table th:nth-child(2) { width: 28%; }
+.av-top-table th:nth-child(3) { width: auto; }
+.av-top-table th:nth-child(4) { width: 130px; }
+.av-top-table td {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    vertical-align: middle;
+}
 </style>
 {% endblock %}
 
@@ -26,18 +66,18 @@
         <!-- Fila 1: controles compactos + botón -->
         <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:10px;">
             <div>
-                <label class="form-label">Marcador</label>
+                <label class="form-label">Marcador Molecular</label>
                 <select name="tipo" id="av-tipo-select" class="form-control">
-                    {% for m in marcadores_disponibles %}
-                    <option value="{{ m }}" {% if tipo_actual == m %}selected{% endif %}>{{ m }}</option>
+                    {% for val, label in marcadores_choices %}
+                    <option value="{{ val }}" {% if tipo_actual == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div>
                 <label class="form-label">Nivel Taxonómico</label>
                 <select name="nivel" class="form-control">
-                    {% for n in niveles_taxonomicos %}
-                    <option value="{{ n|lower }}" {% if nivel_actual == n|lower %}selected{% endif %}>{{ n }}</option>
+                    {% for val, label in niveles_choices %}
+                    <option value="{{ val }}" {% if nivel_actual == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -73,12 +113,12 @@
             <select name="muestra_id" id="av-select-hidden" multiple style="display:none;">
                 {% for m in muestras %}
                 <option value="{{ m.id }}"
-                    data-tipo="{% with arch=m.archivos_moleculares.first %}{{ arch.tipo_analisis|default:'' }}{% endwith %}"
                     {% if m.id in muestra_ids_seleccionados %}selected{% endif %}>
                     {{ m.codigo }}{% if m.cultivo %} · {{ m.cultivo.nombre }}{% endif %}{% if m.variedad_clon %} ({{ m.variedad_clon.nombre }}){% endif %}
                 </option>
                 {% endfor %}
             </select>
+            <script>var TIPOS_POR_MUESTRA_AV = {{ tipos_por_muestra_json|safe }};</script>
         </div>
     </form>
 </div>
@@ -91,51 +131,121 @@
 </div>
 {% else %}
 
-<!-- DIVERSIDAD ALFA (métricas) -->
-{% if diversidad %}
-<div class="metrics-grid" style="margin-bottom: 0.5rem;">
-    <div class="metric-card verde">
-        <div class="metric-label">Riqueza Específica (S)</div>
-        <div class="metric-value td-mono">{{ diversidad.riqueza|default:0 }}</div>
-        <div class="metric-sub">Taxa únicos por muestra</div>
+<!-- DIVERSIDAD BETA -->
+{% if diversidad_beta %}
+<div class="card card-sm" style="margin-bottom: 1.25rem;">
+    <div class="card-title"><i class="ti ti-arrows-diff"></i> Diversidad Beta — Disimilitud entre Muestras</div>
+    <p style="font-size:12.5px; color:var(--text-hint); margin:0.2rem 0 0.9rem;">Mide qué tan diferentes son las comunidades microbianas entre las {{ diversidad_beta.n_muestras }} muestras seleccionadas ({{ diversidad_beta.n_pares }} par{{ diversidad_beta.n_pares|pluralize:"es" }} comparado{{ diversidad_beta.n_pares|pluralize:"s" }}).</p>
+    <div class="metrics-grid" style="margin-bottom:0.75rem;">
+        <div class="metric-card">
+            <div class="metric-label">Bray-Curtis (prom.)</div>
+            <div class="metric-value td-mono">{{ diversidad_beta.bc_promedio }}</div>
+            <div class="metric-sub">Disimilitud de abundancias (0–1)</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Jaccard (prom.)</div>
+            <div class="metric-value td-mono">{{ diversidad_beta.jaccard_promedio }}</div>
+            <div class="metric-sub">Similitud de presencia/ausencia (0–1)</div>
+        </div>
+        <div class="metric-card verde">
+            <div class="metric-label">Taxa del Core</div>
+            <div class="metric-value td-mono">{{ diversidad_beta.n_core }}</div>
+            <div class="metric-sub">Presentes en todas las muestras</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Taxa Únicos</div>
+            <div class="metric-value td-mono">{{ diversidad_beta.n_unicos }}</div>
+            <div class="metric-sub">Exclusivos de una sola muestra</div>
+        </div>
     </div>
-    <div class="metric-card">
-        <div class="metric-label">Índice Shannon (H')</div>
-        <div class="metric-value td-mono">{{ diversidad.shannon|default:0 }}</div>
-        <div class="metric-sub">Heterogeneidad de la comunidad</div>
-    </div>
-    <div class="metric-card">
-        <div class="metric-label">Dominancia Simpson (D)</div>
-        <div class="metric-value td-mono">{{ diversidad.simpson|default:0 }}</div>
-        <div class="metric-sub">Probabilidad de similitud</div>
-    </div>
-    <div class="metric-card">
-        <div class="metric-label">Equitatividad Pielou (J')</div>
-        <div class="metric-value td-mono">{{ diversidad.equitatividad|default:0 }}</div>
-        <div class="metric-sub">Regularidad de abundancias</div>
+    <div style="padding:0.65rem 1rem; border-radius:var(--radius); font-size:13px; background:var(--gris-light); color:var(--text-muted); border-left:3px solid var(--gris-border);">
+        <i class="ti ti-info-circle"></i> {{ diversidad_beta.interpretacion }}
     </div>
 </div>
-{% if diversidad.n_muestras %}
-<p style="font-size: 12px; color: var(--text-hint); margin-bottom: 1.5rem;">
-    <i class="ti ti-info-circle"></i>
-    Promedio de <strong>{{ diversidad.n_muestras }}</strong> muestra{{ diversidad.n_muestras|pluralize:"s" }} · calculado sobre el perfil taxonómico completo (todos los taxones)
-</p>
-{% else %}
-<div style="margin-bottom: 1.5rem;"></div>
 {% endif %}
+
+<!-- DIVERSIDAD GAMMA -->
+{% if diversidad_gamma %}
+<div class="card card-sm" style="margin-bottom: 1.25rem;">
+    <div class="card-title"><i class="ti ti-planet"></i> Diversidad Gamma — Metacomunidad</div>
+    <p style="font-size:12.5px; color:var(--text-hint); margin:0.2rem 0 0.9rem;">Diversidad de la metacomunidad: unión de todos los taxa de las {{ diversidad_gamma.n_muestras }} muestras seleccionadas combinadas en un solo pool.</p>
+    <div class="metrics-grid" style="margin-bottom:0;">
+        <div class="metric-card">
+            <div class="metric-label">Riqueza γ (S)</div>
+            <div class="metric-value td-mono">{{ diversidad_gamma.riqueza_gamma }}</div>
+            <div class="metric-sub">Taxa totales en el pool</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Shannon γ (H')</div>
+            <div class="metric-value td-mono">{{ diversidad_gamma.shannon_gamma }}</div>
+            <div class="metric-sub">Diversidad global</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Simpson γ (D)</div>
+            <div class="metric-value td-mono">{{ diversidad_gamma.simpson_gamma }}</div>
+            <div class="metric-sub">Dominancia global</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Equitatividad γ (J')</div>
+            <div class="metric-value td-mono">{{ diversidad_gamma.equitatividad_gamma }}</div>
+            <div class="metric-sub">Regularidad global</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- PERMANOVA -->
+{% if permanova %}
+<div class="card card-sm" style="margin-bottom: 1.25rem;">
+    <div class="card-title"><i class="ti ti-test-pipe-2"></i> PERMANOVA — Análisis Multivariante de Permutaciones</div>
+    {% if permanova.ejecutado %}
+    <div class="metrics-grid" style="margin-bottom:0.75rem;">
+        <div class="metric-card {% if permanova.significativo %}verde{% endif %}">
+            <div class="metric-label">Pseudo-F</div>
+            <div class="metric-value td-mono">{{ permanova.pseudo_f }}</div>
+            <div class="metric-sub">Estadístico de prueba</div>
+        </div>
+        <div class="metric-card {% if permanova.significativo %}verde{% endif %}">
+            <div class="metric-label">p-valor</div>
+            <div class="metric-value td-mono">{{ permanova.p_value }}</div>
+            <div class="metric-sub">{{ permanova.n_permutaciones }} permutaciones</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">R² (%)</div>
+            <div class="metric-value td-mono">{{ permanova.r2_pct }}%</div>
+            <div class="metric-sub">Variación explicada por grupos</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Agrupación</div>
+            <div class="metric-value td-mono">{{ permanova.n_grupos }}</div>
+            <div class="metric-sub">grupos por {{ permanova.nivel_agrupacion }}</div>
+        </div>
+    </div>
+    <div style="padding:0.75rem 1rem; border-radius:var(--radius); font-size:13px; line-height:1.6;
+        {% if permanova.significativo %}background:var(--verde-light); color:var(--verde-dark); border-left:3px solid var(--verde);
+        {% else %}background:var(--gris-light); color:var(--text-muted); border-left:3px solid var(--gris-border);{% endif %}">
+        <i class="ti ti-{% if permanova.significativo %}circle-check{% else %}info-circle{% endif %}"></i>
+        {{ permanova.interpretacion }}
+    </div>
+    {% else %}
+    <div style="padding:0.75rem 1rem; border-radius:var(--radius); font-size:13px; background:var(--gris-light); color:var(--text-muted); border-left:3px solid var(--gris-border);">
+        <i class="ti ti-info-circle"></i> {{ permanova.razon }}
+    </div>
+    {% endif %}
+</div>
 {% endif %}
 
 <!-- TABLA TOP MICROORGANISMOS Y DONUT -->
 {% if top_microorganismos %}
-<div style="display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.5rem; align-items: start; margin-bottom: 1.5rem;">
+<div class="av-2col">
 
     <div class="card" style="margin-bottom: 0;">
         <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>Top {{ top_n_actual }} por {{ nivel_actual|capfirst }} — Comunidad Microbiana</span>
+            <span>Top {{ top_n_actual }} por {{ nivel_actual_label }} — Comunidad Microbiana</span>
             <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual }}</span>
         </div>
         <div class="table-wrap" style="margin-top: 1rem;">
-            <table>
+            <table class="av-top-table">
                 <thead>
                     <tr>
                         <th style="width: 50px;">#</th>
@@ -177,9 +287,47 @@
 
     <div class="card" style="margin-bottom: 0;">
         <div class="card-title">Distribución Porcentual</div>
-        <div style="position: relative; height: 320px; width: 100%; margin-top: 1rem;">
+        <div style="position: relative; height: 300px; width: 100%; margin-top: 1rem;">
             <canvas id="chart-donut"></canvas>
         </div>
+
+        {% if diversidad %}
+        <div style="margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--gris-border);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase;
+                        letter-spacing: 0.06em; color: var(--text-hint); margin-bottom: 0.75rem;">
+                Diversidad Alfa
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+                <div class="metric-card verde" style="padding: 0.65rem 0.85rem;">
+                    <div class="metric-label" style="font-size: 10.5px;">Riqueza (S)</div>
+                    <div class="metric-value td-mono" style="font-size: 1.35rem;">{{ diversidad.riqueza|default:0 }}</div>
+                    <div class="metric-sub" style="font-size: 10px;">Taxa únicos</div>
+                </div>
+                <div class="metric-card" style="padding: 0.65rem 0.85rem;">
+                    <div class="metric-label" style="font-size: 10.5px;">Shannon (H')</div>
+                    <div class="metric-value td-mono" style="font-size: 1.35rem;">{{ diversidad.shannon|default:0 }}</div>
+                    <div class="metric-sub" style="font-size: 10px;">Heterogeneidad</div>
+                </div>
+                <div class="metric-card" style="padding: 0.65rem 0.85rem;">
+                    <div class="metric-label" style="font-size: 10.5px;">Simpson (D)</div>
+                    <div class="metric-value td-mono" style="font-size: 1.35rem;">{{ diversidad.simpson|default:0 }}</div>
+                    <div class="metric-sub" style="font-size: 10px;">Dominancia</div>
+                </div>
+                <div class="metric-card" style="padding: 0.65rem 0.85rem;">
+                    <div class="metric-label" style="font-size: 10.5px;">Pielou (J')</div>
+                    <div class="metric-value td-mono" style="font-size: 1.35rem;">{{ diversidad.equitatividad|default:0 }}</div>
+                    <div class="metric-sub" style="font-size: 10px;">Equitatividad</div>
+                </div>
+            </div>
+            {% if diversidad.n_muestras %}
+            <p style="font-size: 11px; color: var(--text-hint); margin: 0.65rem 0 0; line-height: 1.5;">
+                <i class="ti ti-info-circle"></i>
+                Promedio de <strong>{{ diversidad.n_muestras }}</strong>
+                muestra{{ diversidad.n_muestras|pluralize:"s" }} · perfil taxonómico completo
+            </p>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -198,7 +346,7 @@
                 <i class="ti ti-chart-bar"></i> Composición de la Comunidad Microbiana (Barras Apiladas)
             </h4>
             <p class="chart-desc">Muestra la proporción relativa de cada taxón en cada muestra. Las barras suman 100 %, permitiendo comparar la estructura de la comunidad entre muestras incluso cuando los volúmenes de secuenciación difieren. "Otros" agrupa todos los taxones fuera del Top N seleccionado.</p>
-            <div id="grafico-barras-apiladas" style="height: 450px; width: 100%;"></div>
+            <div class="av-chart-wrap"><div id="grafico-barras-apiladas" style="min-height: 540px;"></div></div>
         </div>
         {% endif %}
 
@@ -209,7 +357,7 @@
                 <i class="ti ti-grid-dots"></i> Mapa de Calor — Patrones de Abundancia
             </h4>
             <p class="chart-desc">Representación matricial donde cada celda indica la abundancia de un taxón (fila) en una muestra (columna). Los colores más intensos revelan mayor presencia. Útil para identificar taxones dominantes consistentes y patrones diferenciales entre muestras.</p>
-            <div id="grafico-heatmap" style="width: 100%; min-height: 420px;"></div>
+            <div class="av-chart-wrap"><div id="grafico-heatmap" style="min-height: 420px;"></div></div>
         </div>
         {% endif %}
 
@@ -220,7 +368,7 @@
                 <i class="ti ti-radar"></i> PCoA — Beta Diversidad (Bray-Curtis)
             </h4>
             <p class="chart-desc">Ordenación multivariante basada en distancias de Bray-Curtis, la métrica estándar de disimilitud microbiana. Muestras cercanas en el plano comparten una composición microbiana similar; las distantes tienen comunidades distintas. Requiere ≥ 3 muestras para calcular la matriz de distancias.</p>
-            <div id="grafico-pca" style="height: 450px; width: 100%;"></div>
+            <div class="av-chart-wrap"><div id="grafico-pca" style="min-height: 560px;"></div></div>
         </div>
         {% elif graficos_avanzados.error_pca %}
         <div style="font-size: 13px; color: var(--text-muted); padding: 0.75rem 1rem; background: var(--bg-subtle,#f8f9fa); border-radius: var(--radius); border-left: 3px solid var(--border-color,#e2e8f0);">
@@ -232,10 +380,10 @@
         {% if graficos_avanzados.grafico_boxplot %}
         <div>
             <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.25rem;">
-                <i class="ti ti-chart-bar"></i> Índice de Diversidad Shannon H' por Muestra
+                <i class="ti ti-chart-bar"></i> Shannon H' por Muestra
             </h4>
-            <p class="chart-desc">Cuantifica la diversidad alfa de cada muestra de forma individual, calculado sobre el perfil taxonómico completo (sin truncar al Top N). Valores altos indican comunidades más diversas y equilibradas; valores bajos sugieren dominancia de pocos taxones.</p>
-            <div id="grafico-boxplot" style="height: 400px; width: 100%;"></div>
+            <p class="chart-desc">Diversidad alfa individual calculada sobre el perfil taxonómico completo (sin truncar al Top N). Ordenado de mayor a menor. Color: <span style="color:#DC2626;font-weight:600;">■</span> &lt;1 baja · <span style="color:#F97316;font-weight:600;">■</span> 1–2 · <span style="color:#EAB308;font-weight:600;">■</span> 2–3 · <span style="color:#16A34A;font-weight:600;">■</span> ≥3 alta.</p>
+            <div class="av-chart-wrap"><div id="grafico-boxplot" style="min-height: 460px;"></div></div>
         </div>
         {% endif %}
 
@@ -320,10 +468,10 @@
     }
 
     Array.from(sel.options).forEach(function (opt, i) {
-        var tipo = opt.dataset.tipo || '';
+        var tipos = (typeof TIPOS_POR_MUESTRA_AV !== 'undefined' && TIPOS_POR_MUESTRA_AV[parseInt(opt.value)]) || [];
         var row = document.createElement('div');
         row.className = 'av-row' + (opt.selected ? ' activa' : '');
-        row.dataset.tipo = tipo;
+        row.dataset.tipos = tipos.join(' ');
 
         var lbl = document.createElement('label');
         lbl.htmlFor = 'avcb_' + i;
@@ -344,13 +492,13 @@
         lbl.appendChild(cb);
         lbl.appendChild(txt);
 
-        if (tipo) {
+        tipos.forEach(function(t) {
             var pill = document.createElement('span');
-            pill.className = tipo === '16S' ? 'pill-16s' : 'pill-its';
-            pill.style.cssText = 'font-size:10px;padding:1px 6px;margin-left:8px;flex-shrink:0;white-space:nowrap;';
-            pill.textContent = tipo === '16S' ? '16S · Bacteria' : 'ITS · Hongo';
+            pill.className = t === '16S' ? 'pill-16s' : 'pill-its';
+            pill.style.cssText = 'font-size:10px;padding:1px 6px;margin-left:4px;flex-shrink:0;white-space:nowrap;';
+            pill.textContent = t === '16S' ? '16S · Bacteria' : 'ITS · Hongo';
             lbl.appendChild(pill);
-        }
+        });
 
         row.appendChild(lbl);
         listDiv.appendChild(row);
@@ -358,8 +506,8 @@
 
     function filtrarPorMarcador(marcador) {
         listDiv.querySelectorAll('.av-row').forEach(function (row) {
-            var rowTipo = row.dataset.tipo;
-            var visible = !rowTipo || rowTipo === marcador;
+            var rowTipos = row.dataset.tipos || '';
+            var visible = !rowTipos || rowTipos.indexOf(marcador) !== -1;
             row.classList.toggle('marcador-oculta', !visible);
             if (!visible) {
                 var cb = row.querySelector('input');
