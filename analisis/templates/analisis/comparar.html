@@ -160,25 +160,50 @@
 .taxa-panel.excl .taxa-panel-count { color: #d97706; }
 .taxa-panel.excl .taxa-item-dot    { background: #d97706; }
 .taxa-panel.excl                   { border-top: 3px solid #d97706; }
+@keyframes ctxOut {
+    from { opacity:1; max-height:300px; margin-bottom:1.5rem; padding-top:14px; padding-bottom:14px; border-width:1px; }
+    to   { opacity:0; max-height:0;     margin-bottom:0;      padding-top:0;    padding-bottom:0;    border-width:0; }
+}
 </style>
 {% endblock %}
 
 {% block content %}
+
+<!-- Banner de contexto -->
+<div class="ctx-banner" style="display:flex;align-items:flex-start;gap:14px;background:#EBF4FF;border:1px solid #BFDBFE;border-radius:var(--radius);padding:14px 18px;margin-bottom:1.5rem;overflow:hidden;animation:ctxOut .6s ease 5s forwards;">
+    <div style="width:38px;height:38px;border-radius:10px;background:#2563EB;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="ti ti-arrows-diff" style="color:#fff;font-size:19px;"></i>
+    </div>
+    <div>
+        <div style="font-size:13.5px;font-weight:700;color:#1E3A8A;margin-bottom:3px;">¿En qué se diferencian estas muestras entre sí?</div>
+        <div style="font-size:12.5px;color:#3B5EA6;line-height:1.6;">
+            Este módulo compara la composición microbiana <strong>entre 2 o más muestras</strong>. Identifica qué taxa son compartidos, cuáles son exclusivos de cada muestra y si las diferencias son estadísticamente significativas (PERMANOVA).
+            <span style="display:inline-flex;align-items:center;gap:14px;margin-top:6px;flex-wrap:wrap;">
+                <span><i class="ti ti-share-3" style="font-size:12px;"></i> Taxa compartidos y exclusivos</span>
+                <span><i class="ti ti-chart-dots" style="font-size:12px;"></i> Diversidad alfa, beta y gamma</span>
+                <span><i class="ti ti-math-function" style="font-size:12px;"></i> PERMANOVA</span>
+            </span>
+        </div>
+    </div>
+    <a href="{% url 'analisis:analisis_avanzado' %}" style="margin-left:auto;flex-shrink:0;font-size:12px;color:#2563EB;text-decoration:none;white-space:nowrap;display:flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid #BFDBFE;border-radius:8px;background:#fff;transition:background .2s;" title="Ir a Análisis Avanzado">
+        <i class="ti ti-microscope" style="font-size:14px;"></i> Análisis Avanzado
+    </a>
+</div>
 
 <div class="card" style="margin-bottom: 1.5rem;">
     <div class="card-title">Parámetros de comparación</div>
     <form method="get">
         <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:10px;">
             <div>
-                <label class="form-label">Marcador Molecular</label>
+                <label class="form-label"><span class="bs-tip" data-tip="<strong>Marcador Molecular</strong> — región del ADN analizada. <strong>16S rRNA</strong>: identifica bacterias y arqueas · <strong>ITS</strong>: identifica hongos. Solo se muestran muestras con el marcador seleccionado.">Marcador Molecular <i class="ti ti-help-circle bs-tip-ico"></i></span></label>
                 {{ form.marcador }}
             </div>
             <div>
-                <label class="form-label">Nivel Taxonómico</label>
+                <label class="form-label"><span class="bs-tip" data-tip="<strong>Nivel Taxonómico</strong> — resolución de la clasificación. Filo → Clase → Orden → Familia → Género → Especie. A nivel de Especie se obtiene mayor detalle pero menos taxa con abundancia suficiente.">Nivel Taxonómico <i class="ti ti-help-circle bs-tip-ico"></i></span></label>
                 {{ form.nivel }}
             </div>
             <div>
-                <label class="form-label">Top N taxa</label>
+                <label class="form-label"><span class="bs-tip" data-tip="<strong>Top N taxa</strong> — cuántos microorganismos mostrar en la tabla comparativa, ordenados por abundancia total. Usar un número más alto muestra más diversidad pero puede dificultar la lectura.">Top N taxa <i class="ti ti-help-circle bs-tip-ico"></i></span></label>
                 {{ form.top_n }}
             </div>
             <button type="submit" id="btn-comparar" class="btn btn-primary" style="height:38px;">
@@ -410,10 +435,10 @@
             <thead>
                 <tr>
                     <th>Muestra</th>
-                    <th style="text-align:right;">Riqueza (S)</th>
-                    <th style="text-align:right;">Shannon H'</th>
-                    <th style="text-align:right;">Simpson D</th>
-                    <th style="text-align:right;">Equitatividad J'</th>
+                    <th style="text-align:right;"><span class="bs-tip" data-tip="<strong>Riqueza (S)</strong> — número total de taxa distintos encontrados en la muestra. Más taxa = mayor riqueza.">Riqueza (S) <i class="ti ti-help-circle bs-tip-ico"></i></span></th>
+                    <th style="text-align:right;"><span class="bs-tip" data-tip="<strong>Shannon H'</strong> — mide diversidad considerando riqueza y equitatividad. H' &lt; 1 = muy baja · 1–2 = baja · 2–3 = moderada · &gt; 3 = alta diversidad.">Shannon H' <i class="ti ti-help-circle bs-tip-ico"></i></span></th>
+                    <th style="text-align:right;"><span class="bs-tip" data-tip="<strong>Simpson (1-D)</strong> — probabilidad de que dos individuos elegidos al azar pertenezcan a especies distintas. Valores cerca de 1 indican alta diversidad.">Simpson D <i class="ti ti-help-circle bs-tip-ico"></i></span></th>
+                    <th style="text-align:right;"><span class="bs-tip" data-tip="<strong>Equitatividad J' (Pielou)</strong> — qué tan uniformemente distribuida está la abundancia entre los taxa. 0 = dominancia total · 1 = distribución perfectamente uniforme.">Equitatividad J' <i class="ti ti-help-circle bs-tip-ico"></i></span></th>
                 </tr>
             </thead>
             <tbody>
@@ -474,17 +499,17 @@
 
     {% if diversidad_gamma %}
     <div class="card" style="margin-bottom:0;">
-        <div class="card-title"><i class="ti ti-planet"></i> Diversidad Gamma</div>
+        <div class="card-title"><i class="ti ti-planet"></i> <span class="bs-tip" data-tip="<strong>Diversidad Gamma (γ)</strong> — diversidad total del conjunto de muestras tratadas como una sola comunidad unificada (metacomunidad). Refleja cuántos taxa existen en todo el sistema estudiado.">Diversidad Gamma <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
         <p style="font-size:12px; color:var(--text-hint); margin:0.2rem 0 0.85rem;">
             Metacomunidad — {{ diversidad_gamma.n_muestras }} muestras combinadas en un pool.
         </p>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem;">
             <div class="metric-card" style="padding:0.6rem;">
-                <div class="metric-label" style="font-size:10px;">Riqueza γ (S)</div>
+                <div class="metric-label" style="font-size:10px;"><span class="bs-tip" data-tip="<strong>Riqueza gamma (S)</strong> — número total de taxa únicos en todas las muestras combinadas.">Riqueza γ (S) <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
                 <div class="metric-value td-mono" style="font-size:22px;">{{ diversidad_gamma.riqueza_gamma }}</div>
             </div>
             <div class="metric-card" style="padding:0.6rem;">
-                <div class="metric-label" style="font-size:10px;">Shannon γ (H')</div>
+                <div class="metric-label" style="font-size:10px;"><span class="bs-tip" data-tip="<strong>Shannon gamma (H')</strong> — índice de Shannon aplicado a la metacomunidad completa.">Shannon γ (H') <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
                 <div class="metric-value td-mono" style="font-size:22px;">{{ diversidad_gamma.shannon_gamma }}</div>
             </div>
             <div class="metric-card" style="padding:0.6rem;">
@@ -501,19 +526,19 @@
 
     {% if permanova %}
     <div class="card" style="margin-bottom:0;">
-        <div class="card-title"><i class="ti ti-test-pipe-2"></i> PERMANOVA</div>
+        <div class="card-title"><i class="ti ti-test-pipe-2"></i> <span class="bs-tip" data-tip="<strong>PERMANOVA</strong> — Análisis Multivariado de Permutaciones. Prueba estadística que compara la composición de comunidades entre grupos. Si p &lt; 0.05, las comunidades son significativamente distintas.">PERMANOVA <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
         {% if permanova.ejecutado %}
         <div class="permanova-metrics">
             <div class="metric-card {% if permanova.significativo %}verde{% endif %}" style="padding:0.5rem;">
-                <div class="metric-label" style="font-size:10px;">Pseudo-F</div>
+                <div class="metric-label" style="font-size:10px;"><span class="bs-tip" data-tip="<strong>Pseudo-F</strong> — estadístico de la prueba. Valores más altos indican mayor diferencia entre grupos en relación a la variación dentro de cada grupo.">Pseudo-F <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
                 <div class="metric-value td-mono" style="font-size:18px;">{{ permanova.pseudo_f }}</div>
             </div>
             <div class="metric-card {% if permanova.significativo %}verde{% endif %}" style="padding:0.5rem;">
-                <div class="metric-label" style="font-size:10px;">p-valor</div>
+                <div class="metric-label" style="font-size:10px;"><span class="bs-tip" data-tip="<strong>p-valor</strong> — probabilidad de obtener estas diferencias por azar. p &lt; 0.05: diferencias significativas · p ≥ 0.05: diferencias no significativas.">p-valor <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
                 <div class="metric-value td-mono" style="font-size:18px;">{{ permanova.p_value }}</div>
             </div>
             <div class="metric-card" style="padding:0.5rem;">
-                <div class="metric-label" style="font-size:10px;">R² (%)</div>
+                <div class="metric-label" style="font-size:10px;"><span class="bs-tip" data-tip="<strong>R² (%)</strong> — porcentaje de la variación total explicado por la agrupación. Mayor R² = las diferencias entre grupos explican más de la variabilidad observada.">R² (%) <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
                 <div class="metric-value td-mono" style="font-size:18px;">{{ permanova.r2_pct }}%</div>
             </div>
             <div class="metric-card" style="padding:0.5rem;">

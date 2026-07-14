@@ -49,6 +49,11 @@
             <a href="{% url 'bioquimica:subir_pdf' %}" class="nav-link {% block nav_subir_pdf %}{% endblock %}">
                 <i class="ti ti-file-upload" aria-hidden="true"></i> Subir PDF
             </a>
+
+            <div class="nav-section-label">Soporte</div>
+            <a href="{% url 'analisis:ayuda' %}" class="nav-link {% block nav_ayuda %}{% endblock %}">
+                <i class="ti ti-help-circle" aria-hidden="true"></i> Manual de Ayuda
+            </a>
         </nav>
 
         <div class="marker-tabs">
@@ -186,6 +191,12 @@
                                 <i class="ti ti-key" aria-hidden="true"></i>
                                 Cambiar contraseña
                             </a>
+                            <button class="tu-drop-item" role="menuitem" type="button"
+                                    onclick="closeUserDropdown();BioTour.reset();BioTour.start();"
+                                    style="width:100%;text-align:left;background:none;border:none;cursor:pointer;">
+                                <i class="ti ti-route" aria-hidden="true"></i>
+                                Recorrer la plataforma
+                            </button>
                         </div>
                         <div class="tu-drop-divider"></div>
                         <div style="padding: 6px 0;">
@@ -269,11 +280,14 @@
         tuDropdown.setAttribute('aria-hidden', 'false');
     }
     function closeUserDropdown() {
+        if(!tuBtn||!tuDropdown)return;
         tuBtn.classList.remove('open');
         tuDropdown.classList.remove('open');
         tuBtn.setAttribute('aria-expanded', 'false');
         tuDropdown.setAttribute('aria-hidden', 'true');
     }
+
+    window.closeUserDropdown = closeUserDropdown;
 
     if (tuBtn) {
         tuBtn.addEventListener('click', function () {
@@ -302,6 +316,131 @@
             }
         }
     });
+})();
+</script>
+
+<!-- ── TOUR GUIADO ──────────────────────────────────── -->
+<style>
+.tour-overlay{position:fixed;inset:0;z-index:9980;background:rgba(0,0,0,.55);display:none;pointer-events:none;}
+.tour-overlay.show{display:block;}
+.tour-hl{position:fixed;z-index:9981;border-radius:10px;border:2px solid #1D9E75;
+    box-shadow:0 0 0 9999px rgba(0,0,0,.55),0 0 0 5px rgba(29,158,117,.18);
+    pointer-events:none;display:none;transition:top .22s,left .22s,width .22s,height .22s;}
+.tour-hl.show{display:block;}
+.tour-pop{position:fixed;z-index:9982;width:300px;background:#fff;border-radius:14px;
+    box-shadow:0 12px 40px rgba(0,0,0,.28);padding:1.1rem 1.2rem 1rem;display:none;}
+.tour-pop.show{display:block;animation:tourIn .2s ease;}
+@keyframes tourIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+.tour-ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:.55rem;}
+.tour-lbl{font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;}
+.tour-skip{background:none;border:none;font-size:12px;color:#9ca3af;cursor:pointer;padding:2px 4px;border-radius:4px;}
+.tour-skip:hover{color:#6b7280;}
+.tour-title{font-size:15.5px;font-weight:700;color:#0f1923;margin-bottom:.4rem;line-height:1.3;}
+.tour-text{font-size:13px;color:#4b5563;line-height:1.6;margin-bottom:.85rem;}
+.tour-foot{display:flex;justify-content:space-between;align-items:center;}
+.tour-dots{display:flex;gap:5px;align-items:center;}
+.tour-dot{width:6px;height:6px;border-radius:50%;background:#e5e7eb;transition:background .2s,width .2s;}
+.tour-dot.active{background:#1D9E75;width:18px;border-radius:3px;}
+.tour-nav{display:flex;gap:7px;}
+.tour-prev{background:none;border:1px solid #e5e7eb;color:#6b7280;font-size:12.5px;
+    font-weight:500;padding:6px 11px;border-radius:8px;cursor:pointer;transition:border-color .15s,color .15s;}
+.tour-prev:hover{border-color:#1D9E75;color:#1D9E75;}
+.tour-next{background:#1D9E75;border:none;color:#fff;font-size:12.5px;
+    font-weight:600;padding:6px 13px;border-radius:8px;cursor:pointer;transition:background .15s;}
+.tour-next:hover{background:#179067;}
+</style>
+
+<div class="tour-overlay" id="tourOverlay"></div>
+<div class="tour-hl" id="tourHl"></div>
+<div class="tour-pop" id="tourPop"></div>
+
+<script>
+window.BioTour=(function(){
+var SK='biosuelo_tour_v1';
+var STEPS=[
+{sel:null,title:'¡Bienvenido/a a BioSuelo!',text:'En los próximos pasos te mostramos los elementos principales de la plataforma. Puedes saltar el recorrido en cualquier momento.'},
+{sel:'.sidebar-brand',title:'Tu plataforma de análisis',text:'BioSuelo procesa y visualiza resultados de secuenciación molecular de suelo: <strong>16S rRNA</strong> para bacterias y arqueas, <strong>ITS</strong> para hongos.',pos:'right'},
+{sel:'.sidebar-nav a[href*="subir"]',title:'Cargar Muestra',text:'Primer paso: aquí ingresas los datos de cada muestra y subes el archivo de resultados taxonómicos generado por el laboratorio de secuenciación.',pos:'right'},
+{sel:'.sidebar-nav a[href*="comparar"]',title:'Comparar Perfiles',text:'Contrasta la diversidad microbiana entre dos o más muestras. Incluye índices alfa, diversidad gamma y prueba estadística PERMANOVA.',pos:'right'},
+{sel:'.sidebar-nav a[href*="analisis-avanzado"]',title:'Análisis Avanzado',text:'Explora la composición interna con gráficas interactivas: treemap, heatmap, Top N microorganismos y diversidad beta (Bray-Curtis, Jaccard).',pos:'right'},
+{sel:'.sidebar-nav a[href*="historial"]',title:'Historial',text:'Consulta todos tus análisis anteriores con sus parámetros exactos. Útil para comparar resultados a lo largo del tiempo.',pos:'right'},
+{sel:'.sidebar-nav a[href*="ayuda"]',title:'Manual de Ayuda',text:'Guía rápida, descripción de módulos y glosario completo. También puedes relanzar este recorrido desde ahí cuando quieras.',pos:'right'},
+{sel:null,title:'¡Ya estás listo/a!',text:'Cualquier término con el ícono <i class="ti ti-help-circle" style="color:#1D9E75;font-size:13px;"></i> tiene su explicación al pasar el cursor. ¡Éxito en tu análisis!'}
+];
+var cur=0,ov,hl,pop;
+
+function _init(){
+    ov=document.getElementById('tourOverlay');
+    hl=document.getElementById('tourHl');
+    pop=document.getElementById('tourPop');
+}
+
+function _posHl(el){
+    if(!el){hl.classList.remove('show');return;}
+    var p=8,r=el.getBoundingClientRect();
+    hl.style.top=(r.top-p)+'px'; hl.style.left=(r.left-p)+'px';
+    hl.style.width=(r.width+p*2)+'px'; hl.style.height=(r.height+p*2)+'px';
+    hl.classList.add('show');
+}
+
+function _posPop(el,pos){
+    var vw=window.innerWidth,vh=window.innerHeight;
+    var pw=pop.offsetWidth||300,ph=pop.offsetHeight||220;
+    var top,left;
+    if(!el||!pos){
+        top=(vh-ph)/2; left=(vw-pw)/2;
+    } else if(pos==='right'){
+        var r=el.getBoundingClientRect();
+        top=r.top+r.height/2-ph/2;
+        left=r.right+18;
+        if(left+pw>vw-10){left=r.left-pw-18;}
+    }
+    pop.style.top=Math.max(10,Math.min(top,vh-ph-10))+'px';
+    pop.style.left=Math.max(10,Math.min(left,vw-pw-10))+'px';
+}
+
+function _render(idx){
+    var s=STEPS[idx],tot=STEPS.length;
+    var el=s.sel?document.querySelector(s.sel):null;
+    var last=(idx===tot-1),first=(idx===0);
+    if(!el){ov.classList.add('show');hl.classList.remove('show');}
+    else{ov.classList.remove('show');_posHl(el);}
+    var dots='';
+    for(var i=0;i<tot;i++) dots+='<span class="tour-dot'+(i===idx?' active':'')+'"></span>';
+    pop.innerHTML=
+        '<div class="tour-ph"><span class="tour-lbl">Paso '+(idx+1)+' de '+tot+'</span>'+
+        '<button class="tour-skip" onclick="BioTour.end()">Omitir ✕</button></div>'+
+        '<div class="tour-title">'+s.title+'</div>'+
+        '<div class="tour-text">'+s.text+'</div>'+
+        '<div class="tour-foot"><div class="tour-dots">'+dots+'</div>'+
+        '<div class="tour-nav">'+
+        (!first?'<button class="tour-prev" onclick="BioTour.prev()">← Atrás</button>':'')+
+        '<button class="tour-next" onclick="'+(last?'BioTour.end()':'BioTour.next()')+'">'+
+        (last?'Finalizar ✓':'Siguiente →')+'</button></div></div>';
+    pop.classList.remove('show');
+    pop.offsetHeight;
+    pop.classList.add('show');
+    requestAnimationFrame(function(){_posPop(el,s.pos);});
+}
+
+function start(){_init();cur=0;_render(cur);}
+function next(){if(cur<STEPS.length-1){cur++;_render(cur);}}
+function prev(){if(cur>0){cur--;_render(cur);}}
+function end(){
+    localStorage.setItem(SK,'1');
+    if(ov)ov.classList.remove('show');
+    if(hl)hl.classList.remove('show');
+    if(pop)pop.classList.remove('show');
+}
+function reset(){localStorage.removeItem(SK);}
+
+document.addEventListener('DOMContentLoaded',function(){
+    if(window.location.pathname.indexOf('/dashboard/')!==-1&&!localStorage.getItem(SK)){
+        setTimeout(start,900);
+    }
+});
+
+return{start:start,next:next,prev:prev,end:end,reset:reset};
 })();
 </script>
 

@@ -41,6 +41,10 @@
     word-break: break-word;
     overflow-wrap: anywhere;
 }
+@keyframes ctxOut {
+    from { opacity:1; max-height:300px; margin-bottom:1.5rem; padding-top:14px; padding-bottom:14px; border-width:1px; }
+    to   { opacity:0; max-height:0;     margin-bottom:0;      padding-top:0;    padding-bottom:0;    border-width:0; }
+}
 
 /* ── Tabla Top-N responsive ── */
 .av-top-table {
@@ -61,13 +65,34 @@
 
 {% block content %}
 
+<!-- Banner de contexto -->
+<div style="display:flex;align-items:flex-start;gap:14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:var(--radius);padding:14px 18px;margin-bottom:1.5rem;overflow:hidden;animation:ctxOut .6s ease 5s forwards;">
+    <div style="width:38px;height:38px;border-radius:10px;background:#D97706;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="ti ti-microscope" style="color:#fff;font-size:19px;"></i>
+    </div>
+    <div>
+        <div style="font-size:13.5px;font-weight:700;color:#78350F;margin-bottom:3px;">¿Qué hay dentro de estas muestras?</div>
+        <div style="font-size:12.5px;color:#92400E;line-height:1.6;">
+            Este módulo analiza la composición interna de <strong>1 o más muestras</strong>. Muestra los microorganismos más abundantes, su distribución taxonómica y métricas de diversidad ecológica. Con una sola muestra, incluye análisis diferencial contra la base de datos completa.
+            <span style="display:inline-flex;align-items:center;gap:14px;margin-top:6px;flex-wrap:wrap;">
+                <span><i class="ti ti-chart-treemap" style="font-size:12px;"></i> Treemap y heatmap taxonómico</span>
+                <span><i class="ti ti-chart-bar" style="font-size:12px;"></i> Top N microorganismos</span>
+                <span><i class="ti ti-git-compare" style="font-size:12px;"></i> Análisis diferencial (1 muestra)</span>
+            </span>
+        </div>
+    </div>
+    <a href="{% url 'analisis:comparar' %}" style="margin-left:auto;flex-shrink:0;font-size:12px;color:#D97706;text-decoration:none;white-space:nowrap;display:flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid #FDE68A;border-radius:8px;background:#fff;transition:background .2s;" title="Ir a Comparar Perfiles">
+        <i class="ti ti-arrows-diff" style="font-size:14px;"></i> Comparar Perfiles
+    </a>
+</div>
+
 <!-- FILTROS -->
 <div class="card card-sm" style="margin-bottom: 1.5rem;">
     <form method="get">
         <!-- Fila 1: controles compactos + botón -->
         <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:10px;">
             <div>
-                <label class="form-label">Marcador Molecular</label>
+                <label class="form-label"><span class="bs-tip" data-tip="<strong>Marcador Molecular</strong> — región del ADN analizada. <strong>16S rRNA</strong>: identifica bacterias y arqueas · <strong>ITS</strong>: identifica hongos (Internal Transcribed Spacer).">Marcador Molecular <i class="ti ti-help-circle bs-tip-ico"></i></span></label>
                 <select name="tipo" id="av-tipo-select" class="form-control">
                     {% for val, label in marcadores_choices %}
                     <option value="{{ val }}" {% if tipo_actual == val %}selected{% endif %}>{{ label }}</option>
@@ -75,7 +100,7 @@
                 </select>
             </div>
             <div>
-                <label class="form-label">Nivel Taxonómico</label>
+                <label class="form-label"><span class="bs-tip" data-tip="<strong>Nivel Taxonómico</strong> — resolución de la clasificación. De menor a mayor resolución: Filo → Clase → Orden → Familia → Género → Especie. A mayor resolución, más específico el resultado.">Nivel Taxonómico <i class="ti ti-help-circle bs-tip-ico"></i></span></label>
                 <select name="nivel" class="form-control">
                     {% for val, label in niveles_choices %}
                     <option value="{{ val }}" {% if nivel_actual == val %}selected{% endif %}>{{ label }}</option>
@@ -83,7 +108,7 @@
                 </select>
             </div>
             <div>
-                <label class="form-label">Profundidad (Top N)</label>
+                <label class="form-label"><span class="bs-tip" data-tip="<strong>Top N</strong> — cuántos taxa mostrar en las gráficas y tablas, ordenados de mayor a menor abundancia relativa. Recomendado: Top 10–20 para una vista clara.">Profundidad (Top N) <i class="ti ti-help-circle bs-tip-ico"></i></span></label>
                 <select name="top_n" class="form-control">
                     {% for opt in opciones_top_n %}
                     <option value="{{ opt }}" {% if top_n_actual == opt %}selected{% endif %}>Top {{ opt }}</option>
@@ -135,21 +160,21 @@
 <!-- DIVERSIDAD BETA -->
 {% if diversidad_beta %}
 <div class="card card-sm" style="margin-bottom: 1.25rem;">
-    <div class="card-title"><i class="ti ti-arrows-diff"></i> Diversidad Beta — Disimilitud entre Muestras</div>
+    <div class="card-title"><i class="ti ti-arrows-diff"></i> <span class="bs-tip" data-tip="<strong>Diversidad Beta (β)</strong> — mide qué tan distintas son las comunidades entre muestras. Alta beta = comunidades muy diferentes entre sí · Baja beta = comunidades similares.">Diversidad Beta — Disimilitud entre Muestras <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
     <p style="font-size:12.5px; color:var(--text-hint); margin:0.2rem 0 0.9rem;">Mide qué tan diferentes son las comunidades microbianas entre las {{ diversidad_beta.n_muestras }} muestras seleccionadas ({{ diversidad_beta.n_pares }} par{{ diversidad_beta.n_pares|pluralize:"es" }} comparado{{ diversidad_beta.n_pares|pluralize:"s" }}).</p>
     <div class="metrics-grid" style="margin-bottom:0.75rem;">
         <div class="metric-card">
-            <div class="metric-label">Bray-Curtis (prom.)</div>
+            <div class="metric-label"><span class="bs-tip" data-tip="<strong>Bray-Curtis</strong> — disimilitud basada en abundancias relativas. 0 = comunidades idénticas · 1 = sin taxa en común. Muy usado en ecología microbiana.">Bray-Curtis (prom.) <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
             <div class="metric-value td-mono">{{ diversidad_beta.bc_promedio }}</div>
             <div class="metric-sub">Disimilitud de abundancias (0–1)</div>
         </div>
         <div class="metric-card">
-            <div class="metric-label">Jaccard (prom.)</div>
+            <div class="metric-label"><span class="bs-tip" data-tip="<strong>Jaccard</strong> — similitud basada en presencia/ausencia de taxa (ignora abundancias). 0 = sin taxa compartidos · 1 = todos los taxa compartidos.">Jaccard (prom.) <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
             <div class="metric-value td-mono">{{ diversidad_beta.jaccard_promedio }}</div>
             <div class="metric-sub">Similitud de presencia/ausencia (0–1)</div>
         </div>
         <div class="metric-card verde">
-            <div class="metric-label">Taxa del Core</div>
+            <div class="metric-label"><span class="bs-tip" data-tip="<strong>Taxa del Core</strong> — microorganismos presentes en el 100% de las muestras seleccionadas. Representan la comunidad estable y constante del sistema.">Taxa del Core <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
             <div class="metric-value td-mono">{{ diversidad_beta.n_core }}</div>
             <div class="metric-sub">Presentes en todas las muestras</div>
         </div>
@@ -168,11 +193,11 @@
 <!-- DIVERSIDAD GAMMA -->
 {% if diversidad_gamma %}
 <div class="card card-sm" style="margin-bottom: 1.25rem;">
-    <div class="card-title"><i class="ti ti-planet"></i> Diversidad Gamma — Metacomunidad</div>
+    <div class="card-title"><i class="ti ti-planet"></i> <span class="bs-tip" data-tip="<strong>Diversidad Gamma (γ)</strong> — diversidad total del sistema completo: todas las muestras unidas en una sola comunidad (metacomunidad). Siempre mayor o igual que la diversidad alfa de cualquier muestra individual.">Diversidad Gamma — Metacomunidad <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
     <p style="font-size:12.5px; color:var(--text-hint); margin:0.2rem 0 0.9rem;">Diversidad de la metacomunidad: unión de todos los taxa de las {{ diversidad_gamma.n_muestras }} muestras seleccionadas combinadas en un solo pool.</p>
     <div class="metrics-grid" style="margin-bottom:0;">
         <div class="metric-card">
-            <div class="metric-label">Riqueza γ (S)</div>
+            <div class="metric-label"><span class="bs-tip" data-tip="<strong>Riqueza gamma (S)</strong> — número total de taxa únicos encontrados en todas las muestras combinadas.">Riqueza γ (S) <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
             <div class="metric-value td-mono">{{ diversidad_gamma.riqueza_gamma }}</div>
             <div class="metric-sub">Taxa totales en el pool</div>
         </div>
@@ -198,21 +223,21 @@
 <!-- PERMANOVA -->
 {% if permanova %}
 <div class="card card-sm" style="margin-bottom: 1.25rem;">
-    <div class="card-title"><i class="ti ti-test-pipe-2"></i> PERMANOVA — Análisis Multivariante de Permutaciones</div>
+    <div class="card-title"><i class="ti ti-test-pipe-2"></i> <span class="bs-tip" data-tip="<strong>PERMANOVA</strong> — Análisis Multivariado de Permutaciones. Prueba estadística no paramétrica que evalúa si las comunidades microbianas difieren significativamente entre grupos. Requiere ≥2 grupos con ≥2 réplicas en al menos uno.">PERMANOVA — Análisis Multivariante de Permutaciones <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
     {% if permanova.ejecutado %}
     <div class="metrics-grid" style="margin-bottom:0.75rem;">
         <div class="metric-card {% if permanova.significativo %}verde{% endif %}">
-            <div class="metric-label">Pseudo-F</div>
+            <div class="metric-label"><span class="bs-tip" data-tip="<strong>Pseudo-F</strong> — estadístico de la prueba. Razón entre la variación entre grupos y la variación dentro de grupos. Valores más altos indican diferencias más marcadas.">Pseudo-F <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
             <div class="metric-value td-mono">{{ permanova.pseudo_f }}</div>
             <div class="metric-sub">Estadístico de prueba</div>
         </div>
         <div class="metric-card {% if permanova.significativo %}verde{% endif %}">
-            <div class="metric-label">p-valor</div>
+            <div class="metric-label"><span class="bs-tip" data-tip="<strong>p-valor</strong> — probabilidad de obtener estas diferencias solo por azar. p &lt; 0.05: diferencias estadísticamente significativas entre grupos.">p-valor <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
             <div class="metric-value td-mono">{{ permanova.p_value }}</div>
             <div class="metric-sub">{{ permanova.n_permutaciones }} permutaciones</div>
         </div>
         <div class="metric-card">
-            <div class="metric-label">R² (%)</div>
+            <div class="metric-label"><span class="bs-tip" data-tip="<strong>R²</strong> — proporción de la varianza total explicada por la agrupación de muestras. Ejemplo: R²=35% significa que el grupo (cultivo/variedad) explica el 35% de las diferencias observadas.">R² (%) <i class="ti ti-help-circle bs-tip-ico"></i></span></div>
             <div class="metric-value td-mono">{{ permanova.r2_pct }}%</div>
             <div class="metric-sub">Variación explicada por grupos</div>
         </div>

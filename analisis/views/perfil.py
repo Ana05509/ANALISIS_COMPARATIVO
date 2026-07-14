@@ -65,3 +65,8 @@ def perfil_usuario(request):
             return redirect('analisis:perfil')
 
     return render(request, 'analisis/perfil.html')
+
+
+@login_required
+def ayuda(request):
+    return render(request, 'analisis/ayuda.html')

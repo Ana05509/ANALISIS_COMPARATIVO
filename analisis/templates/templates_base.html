@@ -1,9 +1,11 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}BioSuelo{% endblock %} — Análisis Microbiano</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -1426,5 +1428,109 @@
     </script>
 
     {% block toast_messages %}{% endblock %}
+
+    <!-- ══════════════════════════════════════════════════════
+         SISTEMA DE TOOLTIPS CONTEXTUALES — bs-tip
+         Uso: <span class="bs-tip" data-tip="Texto explicativo">término <i class="ti ti-help-circle bs-tip-ico"></i></span>
+    ══════════════════════════════════════════════════════ -->
+    <style>
+    .bs-tip { position:relative; display:inline-flex; align-items:center; gap:3px; cursor:default; }
+    .bs-tip-ico {
+        font-size:13px; color:var(--text-hint); vertical-align:middle;
+        transition:color .15s; flex-shrink:0; cursor:help;
+    }
+    .bs-tip:hover .bs-tip-ico, .bs-tip.active .bs-tip-ico { color:var(--verde); }
+
+    /* Burbuja */
+    .bs-tip-bubble {
+        position:fixed; z-index:9999;
+        max-width:280px; min-width:180px;
+        background:var(--text-primary,#17171a); color:#fff;
+        font-size:12.5px; line-height:1.6; font-weight:400;
+        padding:10px 14px; border-radius:10px;
+        box-shadow:0 8px 24px rgba(0,0,0,.22);
+        pointer-events:none; opacity:0;
+        transform:translateY(4px);
+        transition:opacity .18s ease, transform .18s ease;
+        font-family:'Outfit',sans-serif;
+    }
+    .bs-tip-bubble.show { opacity:1; transform:translateY(0); }
+    .bs-tip-bubble strong { color:var(--verde-light,#b2d8c5); }
+    /* Flechita */
+    .bs-tip-bubble::before {
+        content:''; position:absolute;
+        border:6px solid transparent;
+        border-bottom-color:var(--text-primary,#17171a);
+        top:-12px; left:50%; transform:translateX(-50%);
+    }
+    .bs-tip-bubble.arrow-down::before {
+        border-bottom-color:transparent;
+        border-top-color:var(--text-primary,#17171a);
+        top:auto; bottom:-12px;
+    }
+    </style>
+    <div class="bs-tip-bubble" id="bsTipBubble" role="tooltip" aria-live="polite"></div>
+    <script>
+    (function(){
+        var bubble = document.getElementById('bsTipBubble');
+        var active = null;
+
+        function show(el) {
+            var text = el.dataset.tip;
+            if (!text) return;
+            bubble.innerHTML = text;
+            bubble.classList.add('show');
+            bubble.classList.remove('arrow-down');
+            el.classList.add('active');
+            active = el;
+            position(el);
+        }
+        function hide() {
+            bubble.classList.remove('show');
+            if (active) { active.classList.remove('active'); active = null; }
+        }
+        function position(el) {
+            var r  = el.getBoundingClientRect();
+            var bw = bubble.offsetWidth  || 260;
+            var bh = bubble.offsetHeight || 80;
+            var vw = window.innerWidth;
+            var vh = window.innerHeight;
+            var spaceBelow = vh - r.bottom;
+            var spaceAbove = r.top;
+
+            var top, arrowDown = false;
+            if (spaceBelow >= bh + 16 || spaceBelow >= spaceAbove) {
+                top = r.bottom + 10;
+            } else {
+                top = r.top - bh - 10;
+                arrowDown = true;
+            }
+            bubble.classList.toggle('arrow-down', arrowDown);
+
+            var left = r.left + r.width / 2 - bw / 2;
+            left = Math.max(10, Math.min(left, vw - bw - 10));
+            bubble.style.left = left + 'px';
+            bubble.style.top  = top  + 'px';
+        }
+
+        /* Eventos: hover en desktop, click en móvil */
+        document.addEventListener('mouseover', function(e) {
+            var tip = e.target.closest('.bs-tip');
+            if (tip) { show(tip); } else { hide(); }
+        });
+        document.addEventListener('click', function(e) {
+            var tip = e.target.closest('.bs-tip');
+            if (tip) {
+                if (active === tip) { hide(); } else { show(tip); }
+                e.stopPropagation();
+            } else { hide(); }
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') hide();
+        });
+        window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+        window.addEventListener('resize', function(){ if(active) position(active); });
+    })();
+    </script>
 </body>
 </html>

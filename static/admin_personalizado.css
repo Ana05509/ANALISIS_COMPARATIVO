@@ -5,14 +5,29 @@
 /* ─── ESCALA DE FUENTE GLOBAL (texto más legible al 100% zoom) ─── */
 html {
     font-size: 106.25% !important; /* 17px base: text-sm → ~15px, text-xs → ~13px */
-    overflow-x: hidden !important;
+    /* overflow-x:clip en lugar de hidden: evita scroll horizontal sin crear
+       un bloque contenedor para position:fixed (overflow:hidden lo rompería) */
+    overflow-x: clip !important;
     max-width: 100vw !important;
 }
 
 body {
     line-height: 1.6 !important;
-    overflow-x: hidden !important;
+    overflow-x: clip !important;
     max-width: 100vw !important;
+}
+
+/* ─── SIDEBAR FIJO — solo barra de scroll visual ───────────────── */
+/* La lógica de posicionamiento la gestiona admin_sidebar_fijo.js   */
+#nav-sidebar {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(29,158,117,.35) transparent !important;
+}
+#nav-sidebar::-webkit-scrollbar       { width: 4px !important; }
+#nav-sidebar::-webkit-scrollbar-track { background: transparent !important; }
+#nav-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(29,158,117,.35) !important;
+    border-radius: 4px !important;
 }
 
 /*
@@ -77,8 +92,9 @@ body {
 }
 
 /* ─── ENCABEZADOS DE TABLA ─── */
-thead th,
-th {
+/* Solo thead th: evita que <th scope="row"> en tbody (ej. email en Usuarios)
+   quede en mayúsculas. Django admin usa th scope="row" para el campo enlazado. */
+thead th {
     font-family: 'Outfit', sans-serif !important;
     font-size: 11px !important;
     font-weight: 500 !important;
@@ -86,6 +102,52 @@ th {
     letter-spacing: 0.6px !important;
     color: var(--tb-hint) !important;
     background-color: var(--tb-gris-light) !important;
+}
+
+/* ─── CELDAS DE DATOS — base ─── */
+/* nowrap como base: cada columna mide su contenido real, no el encabezado.
+   El contenedor de Unfold ya tiene overflow-x:auto, así que la tabla
+   puede ser más ancha que la pantalla y el usuario hace scroll. */
+tbody td,
+tbody th {
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+}
+
+/* ─── COLUMNAS DE TEXTO LARGO: permiten envolver ─── */
+/* Solo las columnas donde mostrar el texto completo requeriría columnas
+   excesivamente anchas. Se añade min-width para que no colapsen. */
+tbody td.field-descripcion_corta {
+    white-space: normal !important;
+    word-break: break-word !important;
+    min-width: 200px !important;
+    max-width: 340px !important;
+}
+tbody td.field-genus,
+tbody td.field-species {
+    white-space: normal !important;
+    word-break: break-word !important;
+    min-width: 160px !important;
+    max-width: 260px !important;
+    font-style: italic !important;
+}
+tbody td.field-archivo {
+    white-space: normal !important;
+    word-break: break-all !important;
+    min-width: 160px !important;
+    max-width: 280px !important;
+}
+
+/* ─── FILTROS LATERALES ─── */
+#changelist-filter {
+    white-space: normal !important;
+    word-break: break-word !important;
+}
+#changelist-filter li,
+#changelist-filter a {
+    white-space: normal !important;
+    word-break: break-word !important;
+    display: block !important;
 }
 
 /* ─── FILAS CON HOVER ACENTO IZQUIERDO ─── */

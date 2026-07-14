@@ -9,6 +9,18 @@ from simple_history.models import HistoricalRecords
 class Cultivo(models.Model):
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Cultivo")
     descripcion = models.TextField(blank=True, verbose_name="Descripción")
+    imagen = models.ImageField(
+        upload_to='cultivos/',
+        blank=True, null=True,
+        verbose_name="Imagen / Fotografía",
+        help_text="Sube un archivo JPG, PNG o WEBP desde tu computadora."
+    )
+    imagen_url = models.URLField(
+        max_length=500,
+        blank=True, null=True,
+        verbose_name="URL de imagen externa",
+        help_text="Pega el enlace directo a una imagen en línea (https://...). Se usa si no hay archivo subido."
+    )
 
     history = HistoricalRecords()
 

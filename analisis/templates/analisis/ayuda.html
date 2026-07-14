@@ -1,0 +1,368 @@
+{% extends "analisis/base.html" %}
+
+{% block title %}Manual de Ayuda{% endblock %}
+{% block nav_ayuda %}active{% endblock %}
+{% block topbar_title %}Manual de Ayuda{% endblock %}
+
+{% block extra_css %}
+<style>
+.ayuda-hero {
+    background: linear-gradient(135deg, var(--verde-dark, #1a5c42) 0%, var(--verde, #1D9E75) 100%);
+    border-radius: var(--radius-lg, 16px);
+    padding: 2rem 2.25rem;
+    margin-bottom: 1.75rem;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+.ayuda-hero-icon {
+    width: 56px; height: 56px; flex-shrink: 0;
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+}
+.ayuda-hero h1 { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
+.ayuda-hero p  { margin: 0; font-size: 14px; opacity: .85; line-height: 1.5; }
+
+.ayuda-section { margin-bottom: 1.75rem; }
+.ayuda-section-title {
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--text-hint);
+    margin: 0 0 .85rem; padding-bottom: .45rem;
+    border-bottom: 1px solid var(--gris-border);
+    display: flex; align-items: center; gap: 7px;
+}
+.ayuda-section-title i { font-size: 15px; color: var(--verde); }
+
+/* Pasos */
+.steps-list { display: flex; flex-direction: column; gap: .6rem; }
+.step {
+    display: flex; gap: 1rem; align-items: flex-start;
+    background: var(--gris-light); border-radius: var(--radius);
+    padding: .85rem 1rem;
+}
+.step-num {
+    width: 30px; height: 30px; flex-shrink: 0;
+    background: var(--verde); color: #fff;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+}
+.step-body h4 { margin: 0 0 3px; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.step-body p  { margin: 0; font-size: 13px; color: var(--text-muted); line-height: 1.55; }
+
+/* Módulos */
+.modules-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+@media (max-width: 700px) { .modules-grid { grid-template-columns: 1fr; } }
+
+.module-card {
+    border-radius: var(--radius);
+    padding: 1.1rem 1.15rem;
+    border: 1px solid;
+}
+.module-card.azul  { background: #EBF4FF; border-color: #BFDBFE; }
+.module-card.ambar { background: #FFFBEB; border-color: #FDE68A; }
+.module-card-head {
+    display: flex; align-items: center; gap: 9px;
+    margin-bottom: .65rem;
+}
+.module-card-head i { font-size: 18px; }
+.module-card.azul  .module-card-head i { color: #2563EB; }
+.module-card.ambar .module-card-head i { color: #D97706; }
+.module-card-head strong { font-size: 14.5px; font-weight: 700; color: var(--text-primary); }
+.module-card p { margin: 0 0 .6rem; font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+.module-card ul { margin: 0; padding-left: 1.1rem; }
+.module-card ul li { font-size: 13px; color: var(--text-muted); line-height: 1.7; }
+.module-card a {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-top: .65rem; font-size: 12.5px; font-weight: 600;
+    text-decoration: none; padding: 5px 10px; border-radius: 8px;
+    transition: opacity .15s;
+}
+.module-card.azul  a { background: #DBEAFE; color: #1D4ED8; }
+.module-card.ambar a { background: #FEF3C7; color: #92400E; }
+.module-card a:hover { opacity: .8; }
+
+/* Glosario */
+.glosario-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: .75rem;
+}
+.glosario-item {
+    background: var(--gris-light);
+    border-radius: var(--radius);
+    padding: .85rem 1rem;
+    border-left: 3px solid var(--verde);
+}
+.glosario-item dt {
+    font-size: 13.5px; font-weight: 700; color: var(--text-primary);
+    margin-bottom: 4px;
+}
+.glosario-item dd {
+    margin: 0; font-size: 12.5px; color: var(--text-muted); line-height: 1.6;
+}
+.glosario-item dd strong { color: var(--verde-dark, #1a5c42); }
+
+/* Consejos */
+.tips-list { display: flex; flex-direction: column; gap: .55rem; }
+.tip-item {
+    display: flex; gap: .75rem; align-items: flex-start;
+    font-size: 13px; color: var(--text-muted); line-height: 1.6;
+}
+.tip-item i { color: var(--verde); font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<div class="ayuda-hero">
+    <div class="ayuda-hero-icon"><i class="ti ti-help-circle"></i></div>
+    <div style="flex:1;">
+        <h1>Manual de Ayuda — BioSuelo</h1>
+        <p>Guía rápida de inicio, descripción de módulos y glosario de términos técnicos.</p>
+    </div>
+    <button onclick="BioTour.reset(); BioTour.start();"
+            style="flex-shrink:0;display:inline-flex;align-items:center;gap:7px;
+                   background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);
+                   color:#fff;font-size:13px;font-weight:600;padding:9px 16px;
+                   border-radius:10px;cursor:pointer;transition:background .15s;white-space:nowrap;"
+            onmouseover="this.style.background='rgba(255,255,255,.28)'"
+            onmouseout="this.style.background='rgba(255,255,255,.18)'">
+        <i class="ti ti-route" style="font-size:16px;"></i> Iniciar recorrido guiado
+    </button>
+</div>
+
+<!-- 1. GUÍA RÁPIDA -->
+<div class="card ayuda-section">
+    <div class="ayuda-section-title">
+        <i class="ti ti-rocket"></i> Guía rápida de inicio
+    </div>
+    <div class="steps-list">
+        <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">
+                <h4>Carga tus datos</h4>
+                <p>Ve a <strong>Cargar Muestra</strong> en el menú lateral. Ingresa los datos de la muestra (cultivo, variedad/clon, fecha) y sube el archivo de resultados taxonómicos generado por el laboratorio de secuenciación.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">
+                <h4>Elige el marcador molecular</h4>
+                <p>Selecciona <strong>16S rRNA</strong> si analizas bacterias/arqueas, o <strong>ITS</strong> si analizas hongos. El sistema filtrará automáticamente las muestras compatibles.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">
+                <h4>Selecciona el módulo de análisis</h4>
+                <p>Usa <strong>Comparar Perfiles</strong> para contrastar varias muestras entre sí. Usa <strong>Análisis Avanzado</strong> para explorar en profundidad la composición interna de una o más muestras con gráficas interactivas.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">
+                <h4>Elige las muestras y el nivel taxonómico</h4>
+                <p>Marca las muestras que quieres incluir y selecciona el nivel taxonómico (Familia, Género, Especie). A mayor resolución los resultados son más específicos pero pueden tener menor abundancia.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">5</div>
+            <div class="step-body">
+                <h4>Interpreta los resultados</h4>
+                <p>Pasa el cursor sobre cualquier término con el ícono <i class="ti ti-help-circle" style="font-size:13px; color:var(--verde);"></i> para ver su explicación. Los valores en verde indican resultados significativos o positivos.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">6</div>
+            <div class="step-body">
+                <h4>Genera un reporte</h4>
+                <p>Ve a <strong>Reportes</strong> para exportar los resultados en PDF o tabla. El historial guarda todos tus análisis anteriores para que puedas consultarlos cuando necesites.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. MÓDULOS -->
+<div class="card ayuda-section">
+    <div class="ayuda-section-title">
+        <i class="ti ti-layout-grid"></i> Módulos de análisis
+    </div>
+    <div class="modules-grid">
+        <div class="module-card azul">
+            <div class="module-card-head">
+                <i class="ti ti-arrows-diff"></i>
+                <strong>Comparar Perfiles</strong>
+            </div>
+            <p><strong>¿Qué hace?</strong> Contrasta la composición microbiana entre dos o más muestras para identificar diferencias y similitudes.</p>
+            <p><strong>¿Cuándo usarlo?</strong> Cuando quieres saber si muestras de distintos cultivos, variedades o fechas tienen comunidades microbianas diferentes.</p>
+            <ul>
+                <li>Tabla comparativa de taxa</li>
+                <li>Diversidad alfa por muestra (Shannon, Riqueza, Simpson, Equitatividad)</li>
+                <li>Diversidad gamma del conjunto</li>
+                <li>PERMANOVA — prueba si las diferencias son estadísticamente significativas</li>
+                <li>Taxa compartidos, dominantes y exclusivos</li>
+            </ul>
+            <a href="{% url 'analisis:comparar' %}"><i class="ti ti-arrow-right"></i> Ir a Comparar Perfiles</a>
+        </div>
+        <div class="module-card ambar">
+            <div class="module-card-head">
+                <i class="ti ti-chart-dots"></i>
+                <strong>Análisis Avanzado</strong>
+            </div>
+            <p><strong>¿Qué hace?</strong> Explora en profundidad la composición interna de las muestras con visualizaciones interactivas.</p>
+            <p><strong>¿Cuándo usarlo?</strong> Cuando quieres ver qué microorganismos dominan, cómo se distribuyen las abundancias, o comparar visualmente la diversidad beta entre muestras.</p>
+            <ul>
+                <li>Treemap y heatmap taxonómico interactivo</li>
+                <li>Top N microorganismos por abundancia</li>
+                <li>Diversidad beta (Bray-Curtis, Jaccard, Core, Únicos)</li>
+                <li>Diversidad gamma y PERMANOVA</li>
+            </ul>
+            <a href="{% url 'analisis:analisis_avanzado' %}"><i class="ti ti-arrow-right"></i> Ir a Análisis Avanzado</a>
+        </div>
+    </div>
+</div>
+
+<!-- 3. GLOSARIO -->
+<div class="card ayuda-section">
+    <div class="ayuda-section-title">
+        <i class="ti ti-book-2"></i> Glosario de términos técnicos
+    </div>
+    <dl class="glosario-grid">
+
+        <div class="glosario-item">
+            <dt>16S rRNA</dt>
+            <dd>Gen presente en bacterias y arqueas usado como marcador para identificarlos. La secuenciación de esta región permite saber qué bacterias hay y en qué proporción.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>ITS (Internal Transcribed Spacer)</dt>
+            <dd>Región del ADN de los hongos usada como marcador para identificarlos. Equivalente al 16S pero para el reino Fungi.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Nivel Taxonómico</dt>
+            <dd>Resolución de la clasificación biológica. De menor a mayor detalle: <strong>Filo → Clase → Orden → Familia → Género → Especie</strong>. A mayor resolución hay más taxa pero con menor abundancia individual.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Riqueza (S)</dt>
+            <dd>Número total de taxa distintos encontrados en una muestra. No considera abundancias — solo cuenta cuántos tipos distintos hay. Más taxa = mayor riqueza.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Shannon H'</dt>
+            <dd>Índice que combina riqueza y equitatividad. <strong>H' &lt; 1</strong>: muy baja diversidad · <strong>1–2</strong>: baja · <strong>2–3</strong>: moderada · <strong>&gt; 3</strong>: alta diversidad. Penaliza cuando un taxa domina sobre los demás.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Simpson (1-D)</dt>
+            <dd>Probabilidad de que dos individuos elegidos al azar pertenezcan a especies distintas. Valores cerca de <strong>1</strong> = alta diversidad. Sensible a las especies dominantes.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Equitatividad J' (Pielou)</dt>
+            <dd>Qué tan uniformemente distribuida está la abundancia entre los taxa. <strong>0</strong> = un solo taxa domina todo · <strong>1</strong> = todos los taxa tienen la misma abundancia.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Diversidad Alfa (α)</dt>
+            <dd>Diversidad <em>dentro</em> de una muestra individual. Se mide con Shannon, Simpson, Riqueza y Equitatividad aplicados a cada muestra por separado.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Diversidad Beta (β)</dt>
+            <dd>Diversidad <em>entre</em> muestras — qué tan diferentes son sus comunidades. Alta beta = muestras muy distintas entre sí. Se mide con Bray-Curtis y Jaccard.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Diversidad Gamma (γ)</dt>
+            <dd>Diversidad <em>total</em> del sistema: todas las muestras unidas en una sola metacomunidad. Siempre mayor o igual que la alfa de cualquier muestra individual.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Bray-Curtis</dt>
+            <dd>Índice de disimilitud basado en abundancias. <strong>0</strong> = comunidades idénticas · <strong>1</strong> = sin taxa en común. Muy usado en ecología microbiana de suelo.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Jaccard</dt>
+            <dd>Índice de similitud basado solo en presencia/ausencia de taxa (ignora abundancias). <strong>0</strong> = sin taxa compartidos · <strong>1</strong> = todos los taxa compartidos.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Taxa del Core</dt>
+            <dd>Microorganismos presentes en <strong>todas</strong> las muestras seleccionadas. Representan la comunidad estable y constante del sistema independientemente de las condiciones.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>PERMANOVA</dt>
+            <dd>Análisis Multivariado de Permutaciones. Prueba estadística no paramétrica que evalúa si las comunidades microbianas difieren significativamente entre grupos. Requiere ≥2 grupos con ≥2 réplicas en al menos uno.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Pseudo-F</dt>
+            <dd>Estadístico de la prueba PERMANOVA. Razón entre la variación entre grupos y la variación dentro de grupos. Valores más altos indican diferencias más marcadas entre comunidades.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>p-valor</dt>
+            <dd>Probabilidad de obtener las diferencias observadas solo por azar. <strong>p &lt; 0.05</strong>: diferencias estadísticamente significativas · <strong>p ≥ 0.05</strong>: no hay evidencia suficiente de diferencia real.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>R² (PERMANOVA)</dt>
+            <dd>Proporción de la varianza total explicada por la agrupación (cultivo, variedad, etc.). Ejemplo: R² = 35% significa que el grupo explica el 35% de las diferencias observadas entre muestras.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>UFC/g (Unidades Formadoras de Colonias)</dt>
+            <dd>Medida usada en Microbiología Clásica que indica la cantidad de microorganismos viables por gramo de suelo. Se obtiene por recuento en placa, no por secuenciación.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Top N</dt>
+            <dd>Número de taxa a mostrar en gráficas y tablas, ordenados de mayor a menor abundancia relativa. Un Top 10 muestra los 10 microorganismos más abundantes del conjunto analizado.</dd>
+        </div>
+
+    </dl>
+</div>
+
+<!-- 4. CONSEJOS -->
+<div class="card ayuda-section" style="margin-bottom: 0;">
+    <div class="ayuda-section-title">
+        <i class="ti ti-bulb"></i> Consejos de uso
+    </div>
+    <div class="tips-list">
+        <div class="tip-item">
+            <i class="ti ti-check"></i>
+            <span>Compara siempre muestras del <strong>mismo marcador molecular</strong>. No tiene sentido comparar 16S con ITS.</span>
+        </div>
+        <div class="tip-item">
+            <i class="ti ti-check"></i>
+            <span>Para PERMANOVA necesitas al menos <strong>2 grupos distintos</strong> (por cultivo o variedad) y que uno de ellos tenga <strong>2 o más réplicas</strong>.</span>
+        </div>
+        <div class="tip-item">
+            <i class="ti ti-check"></i>
+            <span>El nivel <strong>Familia o Género</strong> es el mejor punto de partida — da suficiente detalle sin perder abundancia estadística.</span>
+        </div>
+        <div class="tip-item">
+            <i class="ti ti-check"></i>
+            <span>Los términos técnicos en las páginas de análisis tienen el ícono <i class="ti ti-help-circle" style="font-size:13px; color:var(--verde);"></i> — pasa el cursor para ver la explicación sin salir de la página.</span>
+        </div>
+        <div class="tip-item">
+            <i class="ti ti-check"></i>
+            <span>Si un resultado te parece inesperado, revisa el <strong>Historial</strong> — allí puedes ver los parámetros exactos usados en análisis anteriores.</span>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

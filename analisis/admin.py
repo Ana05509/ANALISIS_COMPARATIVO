@@ -66,9 +66,31 @@ class CultivoAdmin(SimpleHistoryAdmin, BotonEditarMixin, ModelAdmin):
             "description": "Registre el cultivo agrícola principal. El nombre debe ser único.",
             "fields": ("nombre", "descripcion"),
         }),
+        ("Imagen representativa", {
+            "description": "Elige una opción: sube un archivo desde tu computadora O pega un enlace externo. Si hay archivo subido, tiene prioridad sobre la URL.",
+            "fields": ("imagen", "imagen_url"),
+        }),
     )
 
     def save_model(self, request, obj, form, change):
+        # Si el admin pegó una URL y no hay archivo subido, descargamos la imagen
+        # al servidor para que todos los usuarios la reciban desde aquí mismo.
+        if obj.imagen_url and not obj.imagen:
+            import urllib.request as _ur
+            from django.core.files.base import ContentFile
+            from urllib.parse import urlparse
+            import os
+            try:
+                with _ur.urlopen(obj.imagen_url, timeout=10) as resp:
+                    content = resp.read()
+                raw_name = os.path.basename(urlparse(obj.imagen_url).path)
+                filename = raw_name if raw_name else f"cultivo_{obj.nombre}.jpg"
+                obj.imagen.save(filename, ContentFile(content), save=False)
+                obj.imagen_url = None   # ya no necesitamos la URL externa
+                messages.success(request, f"Imagen de '{obj.nombre}' descargada y guardada en el servidor.")
+            except Exception as e:
+                messages.warning(request, f"No se pudo descargar la imagen desde la URL: {e}. Se guardará sólo el enlace.")
+
         super().save_model(request, obj, form, change)
         if change:
             messages.info(request, f"Cultivo '{obj.nombre}' actualizado correctamente.")

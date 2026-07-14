@@ -329,54 +329,7 @@
     animation: skelShimmer 1.5s ease-in-out infinite;
 }
 
-/* ─ Taxa card ──────────────────────────────────── */
-.taxa-card {
-    background: var(--surface);
-    border: 1px solid var(--gris-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    overflow: hidden;
-    margin-bottom: 1.75rem;
-    transition: box-shadow .25s;
-}
-.taxa-card:hover { box-shadow: var(--shadow-md); }
-.taxa-card-hdr {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--gris-light);
-    background: linear-gradient(to right, var(--surface), var(--gris-light));
-}
-.taxa-card-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13.5px;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-.taxa-card-title i { font-size: 18px; color: var(--verde); }
-
-/* Pct bar — animates via JS */
-.pct-bar-wrap  { display:flex; align-items:center; gap:8px; min-width:130px; }
-.pct-bar-track { flex:1; height:5px; background:var(--gris-light); border-radius:6px; overflow:hidden; }
-.pct-bar-fill  {
-    height: 100%;
-    border-radius: 6px;
-    background: linear-gradient(90deg, #1D9E75, #38d9a9);
-    width: 0;
-    transition: width 1.1s cubic-bezier(.22,1,.36,1);
-}
-.pct-bar-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 11.5px;
-    color: var(--text-hint);
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-}
-
-/* ─ Cultivos ────────────────────────────────────── */
+/* ─ Cultivos cards ──────────────────────────────── */
 .cultivos-card {
     background: var(--surface);
     border: 1px solid var(--gris-border);
@@ -384,46 +337,53 @@
     padding: 1.25rem 1.5rem;
     box-shadow: var(--shadow-card);
 }
-.cultivos-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: .75rem;
+.cultivos-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 12px;
+    margin-top: .85rem;
 }
-.cultivo-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    background: var(--gris-light);
+.cultivo-card {
     border: 1px solid var(--gris-border);
-    border-radius: 24px;
-    padding: .4rem .9rem .4rem .75rem;
+    border-radius: var(--radius);
+    overflow: hidden;
     transition: all .22s ease;
     cursor: default;
+    background: var(--surface);
 }
-.cultivo-pill:hover {
+.cultivo-card:hover {
     border-color: var(--verde);
-    background: var(--verde-light);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 14px rgba(29,158,117,.18);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 22px rgba(29,158,117,.18);
 }
-.cultivo-pill:hover .cultivo-name  { color: var(--verde-dark); }
-.cultivo-pill:hover .cultivo-count { background:rgba(29,158,117,.18); color:var(--verde-dark); }
-.cultivo-pill:hover .cultivo-icon  { color: var(--verde); }
-.cultivo-icon  { font-size:14px; color:var(--text-hint); transition:color .22s; }
-.cultivo-name  { font-size:13.5px; font-weight:500; color:var(--text-primary); transition:color .22s; }
-.cultivo-count {
-    background: rgba(0,0,0,.08);
-    color: var(--text-hint);
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 1px 8px;
-    border-radius: 20px;
-    min-width: 22px;
-    text-align: center;
-    transition: all .22s;
-    font-variant-numeric: tabular-nums;
+.cultivo-card-img {
+    width: 100%; aspect-ratio: 1/1;
+    overflow: hidden; position: relative;
+    background: var(--gris-light);
+    display: flex; align-items: center; justify-content: center;
+}
+.cultivo-card-img img {
+    width: 100%; height: 100%; object-fit: cover;
+    transition: transform .3s ease;
+}
+.cultivo-card:hover .cultivo-card-img img { transform: scale(1.07); }
+.cultivo-card-placeholder {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; color: var(--text-hint);
+}
+.cultivo-card-placeholder i { font-size: 26px; color: var(--gris-border); }
+.cultivo-card-placeholder span { font-size: 10px; }
+.cultivo-card-body { padding: .6rem .55rem .55rem; text-align: center; }
+.cultivo-card-name {
+    font-size: 12px; font-weight: 600; color: var(--text-primary);
+    line-height: 1.3; margin-bottom: 2px;
+    display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
+}
+.cultivo-card-count {
+    font-size: 11px; color: var(--text-hint);
+    font-family: 'DM Mono', monospace; font-variant-numeric: tabular-nums;
 }
 
 /* ─ Responsive ──────────────────────────────────── */
@@ -576,69 +536,6 @@
 </div>
 {% endif %}
 
-{# ══ TAXA TABLE ══ #}
-<div class="taxa-card dash-reveal" style="transition-delay:.08s">
-    <div class="taxa-card-hdr">
-        <div class="taxa-card-title">
-            <i class="ti ti-microscope"></i>
-            Últimos Taxa Identificados en el Sistema
-        </div>
-        {% if analisis_recientes %}
-        <span style="font-size:12px;color:var(--text-hint);">Resultados recientes</span>
-        {% endif %}
-    </div>
-
-    {% if analisis_recientes %}
-    <div class="table-wrap" style="border:none;border-radius:0;box-shadow:none;">
-        <table>
-            <thead>
-                <tr>
-                    <th>Género</th>
-                    <th>Especie</th>
-                    <th>Código Muestra</th>
-                    <th>% Abundancia Relativa</th>
-                    <th>Núm. Hits</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for a in analisis_recientes %}
-                <tr>
-                    <td><strong style="color:var(--text-primary);">{{ a.genus|default:"—" }}</strong></td>
-                    <td style="font-size:13px;color:var(--text-muted);font-style:italic;">{{ a.species|default:"—" }}</td>
-                    <td class="td-mono">
-                        <a href="{% url 'analisis:ver_producto' a.archivo.muestra.id %}"
-                           style="color:var(--verde-dark);text-decoration:none;font-weight:500;
-                                  display:inline-flex;align-items:center;gap:4px;">
-                            <i class="ti ti-folder-open" style="font-size:14px;"></i>
-                            {{ a.archivo.muestra.codigo }}
-                        </a>
-                    </td>
-                    <td>
-                        <div class="pct-bar-wrap">
-                            <div class="pct-bar-track">
-                                <div class="pct-bar-fill" data-pct="{{ a.porcentaje_hits|floatformat:2 }}"></div>
-                            </div>
-                            <span class="pct-bar-label">{{ a.porcentaje_hits|floatformat:4 }}%</span>
-                        </div>
-                    </td>
-                    <td class="td-mono" style="color:var(--text-muted);font-variant-numeric:tabular-nums;">{{ a.num_hits }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div class="empty-state">
-        <i class="ti ti-flask-2" aria-hidden="true"></i>
-        <strong>Sin análisis ejecutados</strong>
-        <p>No se registran lecturas en la base de datos para este tipo de secuenciación.</p>
-        <a href="{% url 'analisis:subir_datos' %}" class="btn btn-primary" style="margin-top:1rem;">
-            <i class="ti ti-upload" aria-hidden="true"></i> Cargar Primer Archivo
-        </a>
-    </div>
-    {% endif %}
-</div>
-
 {# ══ CULTIVOS ══ #}
 {% if productos_por_variedad %}
 <div class="cultivos-card dash-reveal" style="transition-delay:.14s">
@@ -651,12 +548,25 @@
             {{ productos_por_variedad|length }} cultivo{% if productos_por_variedad|length != 1 %}s{% endif %}
         </span>
     </div>
-    <div class="cultivos-grid">
+    <div class="cultivos-cards-grid">
         {% for v in productos_por_variedad %}
-        <div class="cultivo-pill">
-            <i class="ti ti-plant-2 cultivo-icon" aria-hidden="true"></i>
-            <span class="cultivo-name">{{ v.nombre_variedad }}</span>
-            <span class="cultivo-count">{{ v.total }}</span>
+        <div class="cultivo-card">
+            <div class="cultivo-card-img">
+                {% if v.imagen_cultivo %}
+                <img src="{{ v.imagen_cultivo|as_media_url }}" alt="{{ v.nombre_variedad }}" loading="lazy">
+                {% elif v.imagen_url_cultivo %}
+                <img src="{{ v.imagen_url_cultivo }}" alt="{{ v.nombre_variedad }}" loading="lazy">
+                {% else %}
+                <div class="cultivo-card-placeholder">
+                    <i class="ti ti-plant-2"></i>
+                    <span>Sin foto</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="cultivo-card-body">
+                <div class="cultivo-card-name">{{ v.nombre_variedad }}</div>
+                <div class="cultivo-card-count">{{ v.total }} muestra{{ v.total|pluralize:"s" }}</div>
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -815,9 +725,9 @@ var io = new IntersectionObserver(function(entries){
             countUp(num, val, 1300);
         });
 
-        /* Pct bars */
-        el.querySelectorAll('.pct-bar-fill[data-pct]').forEach(function(bar){
-            setTimeout(function(){ bar.style.width = bar.dataset.pct + '%'; }, 150);
+        /* Pct bars — taxa section y otras */
+        el.querySelectorAll('.pct-bar-fill[data-pct], .taxa-pct-bar-fill[data-pct]').forEach(function(bar){
+            setTimeout(function(){ bar.style.width = Math.min(parseFloat(bar.dataset.pct)||0, 100) + '%'; }, 150);
         });
 
         io.unobserve(el);

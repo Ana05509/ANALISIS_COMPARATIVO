@@ -44,7 +44,11 @@ def dashboard(request):
 
         muestras_por_variedad = list(
             muestras.exclude(cultivo__isnull=True)
-            .values(nombre_variedad=F("cultivo__nombre"))
+            .values(
+                nombre_variedad=F("cultivo__nombre"),
+                imagen_cultivo=F("cultivo__imagen"),
+                imagen_url_cultivo=F("cultivo__imagen_url"),
+            )
             .annotate(total=Count("id"))
             .order_by("-total")
         )
@@ -75,9 +79,6 @@ def dashboard(request):
             else:
                 total_sin_clasificacion += hits
 
-        analisis_recientes = ResultadoTaxonomico.objects.filter(
-            archivo__tipo_analisis=tipo
-        ).select_related("archivo__muestra").order_by("-id")[:5]
 
         # Diversidad alfa — por muestra individual, sobre todos los taxa
         contexto_estadisticas = obtener_diversidad(tipo=tipo) or {}
@@ -129,7 +130,6 @@ def dashboard(request):
 
     return render(request, "analisis/dashboard.html", {
         "analisis": analisis,
-        "analisis_recientes": analisis_recientes,
         "productos": muestras,
         "total_analisis": total_analisis,
         "total_productos": total_muestras,

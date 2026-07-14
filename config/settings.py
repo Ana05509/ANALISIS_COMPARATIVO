@@ -3,8 +3,10 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from django.templatetags.static import static
 from django.urls import reverse_lazy
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 # ---------------------------
 # SEGURIDAD
@@ -242,6 +244,9 @@ UNFOLD = {
     "STYLES": [
         lambda request: static("admin_personalizado.css"),
     ],
+    "SCRIPTS": [
+        lambda request: static("admin_sidebar_fijo.js"),
+    ],
 
     "COLORS": {
         "primary": {
@@ -332,6 +337,17 @@ UNFOLD = {
                     },
                 ],
             },
+            {
+                "title": "Ayuda",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Manual del Administrador",
+                        "icon": "menu_book",
+                        "link": reverse_lazy("admin-manual"),
+                    },
+                ],
+            },
         ],
     },
 
@@ -343,14 +359,17 @@ UNFOLD = {
 # ---------------------------
 # CONFIGURACIÓN DE CORREO ELECTRÓNICO
 # ---------------------------
-# Desarrollo: muestra los correos en la terminal
-# Producción: cambiar a smtp.EmailBackend con las credenciales reales
-EMAIL_BACKEND   = 'django.core.mail.backends.console.EmailBackend'
 EMAIL_HOST      = 'smtp.gmail.com'
 EMAIL_PORT      = 587
 EMAIL_USE_TLS   = True
 EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL  = 'BioSoil Analytics <terraBioLab@gmail.com>'
+DEFAULT_FROM_EMAIL  = 'BioSuelo <{}>'.format(os.environ.get('EMAIL_HOST_USER', 'noreply@biosuelo.ec'))
+
+# Si hay credenciales en .env usa SMTP real; si no, imprime en consola
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 USE_DJANGO_JQUERY = True

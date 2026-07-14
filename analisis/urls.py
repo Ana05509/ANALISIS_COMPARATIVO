@@ -36,7 +36,10 @@ urlpatterns = [
     path("catalogo/importar/", views.importar_catalogo, name="importar_catalogo"),
     path("catalogo/<int:pk>/reclasificar/", views.actualizar_clasificacion, name="reclasificar"),
 
-    # 5. REPORTES
+    # 5. AYUDA
+    path("ayuda/", views.ayuda, name="ayuda"),
+
+    # 6. REPORTES
     path("reportes/", views.reportes, name="reportes"),
     path("reportes/generar/", views.generar_reporte, name="generar_reporte"),
     path("reportes/<int:reporte_id>/", views.detalle_reporte, name="detalle_reporte"),
