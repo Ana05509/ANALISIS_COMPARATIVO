@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.admin.models import LogEntry
 from django.utils.html import format_html, mark_safe
 from django.db import transaction
 from django.contrib import messages
@@ -20,7 +21,7 @@ from simple_history.admin import SimpleHistoryAdmin
 # Importaciones de tu app
 from .models import (
     Cultivo, VariedadClon, MuestraSuelo, ArchivoMolecular,
-    ResultadoTaxonomico, CatalogoMicroorganismo, Usuario,
+    ResultadoTaxonomico, CatalogoMicroorganismo, Usuario, EventoAcceso,
 )
 from analisis.services.processing.pipeline import PipelineProcesamiento
 
@@ -501,9 +502,37 @@ class UsuarioAdmin(SimpleHistoryAdmin, BaseUserAdmin, BotonEditarMixin, ModelAdm
         fieldsets = list(super().get_fieldsets(request, obj) or [])
         fieldsets.append((
             "Rol en BioSuelo",
-            {"fields": ("rol",), "description": "Asigne el rol para determinar los permisos de visualización."}
+            {
+                "fields": ("rol",),
+                "description": (
+                    "Asigne el rol para determinar los permisos de visualización. "
+                    "Al guardar, el sistema sincroniza automáticamente el acceso al panel de administración: "
+                    "rol Administrador → activa acceso al admin · rol Docente / Estudiante → desactiva acceso al admin."
+                ),
+            }
         ))
         return fieldsets
+
+    def save_model(self, request, obj, form, change):
+        # Sincronizar is_staff con el rol de BioSuelo para que el acceso
+        # al panel /admin/ quede consistente con el rol asignado.
+        if obj.rol == "admin":
+            obj.is_staff = True
+            obj.is_superuser = True
+        else:
+            obj.is_staff = False
+            obj.is_superuser = False
+        super().save_model(request, obj, form, change)
+        if obj.rol == "admin":
+            messages.success(
+                request,
+                f"✔ {obj.email} tiene ahora acceso al panel de administración (/admin/)."
+            )
+        elif change:
+            messages.info(
+                request,
+                f"Acceso al panel de administración actualizado para {obj.email}."
+            )
 
 
 # =========================================================
@@ -594,6 +623,23 @@ def dashboard_callback(request, context):
             "msg": f"Almacenamiento alto: {pct}% utilizado",
         })
 
+    # Auditoría: intentos de acceso fallidos en las últimas 24h
+    fallidos_24h = EventoAcceso.objects.filter(
+        tipo="login_fallido", fecha__gte=timezone.now() - timedelta(hours=24)
+    ).count()
+    if fallidos_24h >= 10:
+        notifs.append({
+            "tipo": "error",
+            "icono": "shield-exclamation",
+            "msg": f"{fallidos_24h} intentos de acceso fallidos en las últimas 24h — revisar Auditoría › Eventos de Acceso",
+        })
+    elif fallidos_24h >= 5:
+        notifs.append({
+            "tipo": "warning",
+            "icono": "shield-exclamation",
+            "msg": f"{fallidos_24h} intentos de acceso fallidos en las últimas 24h",
+        })
+
     if not notifs:
         notifs.append({
             "tipo": "success",
@@ -603,3 +649,100 @@ def dashboard_callback(request, context):
 
     context["notifications"] = notifs
     return context
+
+
+# =========================================================
+# AUDITORÍA — Eventos de Acceso (login / logout / fallidos)
+# =========================================================
+@admin.register(EventoAcceso)
+class EventoAccesoAdmin(ModelAdmin):
+    """
+    Bitácora de solo lectura. No se puede crear, editar ni borrar desde el
+    admin: los registros de auditoría solo tienen valor si son inmutables —
+    si cualquiera con sesión abierta pudiera editarlos o borrarlos, dejarían
+    de servir como evidencia ante un incidente. Se llenan solos vía señales
+    (ver AnalisisConfig.ready() en apps.py).
+    """
+    list_display  = ("tipo_badge", "usuario_o_intento", "ip_address", "user_agent_corto", "fecha")
+    list_filter   = ("tipo", "fecha")
+    search_fields = ("usuario__username", "usuario__email", "username_intentado", "ip_address")
+    date_hierarchy = "fecha"
+    ordering       = ("-fecha",)
+    list_per_page  = 30
+    list_fullwidth = True
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Evento")
+    def tipo_badge(self, obj):
+        colores = {
+            "login_ok":      ("#E1F5EE", "#085041"),
+            "login_fallido": ("#FCEBEB", "#A32D2D"),
+            "logout":        ("#F1EFE8", "#5F5E5A"),
+        }
+        bg, color = colores.get(obj.tipo, ("#F1EFE8", "#5F5E5A"))
+        return format_html(
+            '<span style="background:{};color:{};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;">{}</span>',
+            bg, color, obj.get_tipo_display()
+        )
+
+    @admin.display(description="Usuario")
+    def usuario_o_intento(self, obj):
+        if obj.usuario_id:
+            return obj.usuario.username
+        return format_html('<em style="color:#A32D2D;">{}</em>', obj.username_intentado or "—")
+
+    @admin.display(description="Dispositivo")
+    def user_agent_corto(self, obj):
+        ua = obj.user_agent or "—"
+        return ua[:60] + "…" if len(ua) > 60 else ua
+
+
+# =========================================================
+# AUDITORÍA — Registro de Acciones del Admin (LogEntry nativo)
+# =========================================================
+@admin.register(LogEntry)
+class LogEntryAdmin(ModelAdmin):
+    """
+    Django genera un LogEntry cada vez que alguien crea, edita o borra algo
+    desde el admin — pero no lo registra en el admin por defecto, así que
+    ese historial existía pero nadie podía verlo. Igual que EventoAcceso,
+    es de solo lectura.
+    """
+    list_display  = ("accion_badge", "user", "content_type", "object_repr", "change_message", "action_time")
+    list_filter   = ("action_flag", "content_type", "action_time")
+    search_fields = ("object_repr", "change_message", "user__username")
+    date_hierarchy = "action_time"
+    ordering       = ("-action_time",)
+    list_per_page  = 30
+    list_fullwidth = True
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Acción")
+    def accion_badge(self, obj):
+        # action_flag: 1=alta, 2=cambio, 3=baja
+        mapa = {
+            1: ("Creó", "#E1F5EE", "#085041"),
+            2: ("Editó", "#E6F1FB", "#0C447C"),
+            3: ("Eliminó", "#FCEBEB", "#A32D2D"),
+        }
+        texto, bg, color = mapa.get(obj.action_flag, ("—", "#F1EFE8", "#5F5E5A"))
+        return format_html(
+            '<span style="background:{};color:{};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;">{}</span>',
+            bg, color, texto
+        )

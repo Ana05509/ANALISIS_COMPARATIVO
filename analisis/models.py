@@ -239,3 +239,49 @@ class Usuario(AbstractUser):
     def __str__(self):
         rol_display = dict(self.ROLES).get(self.rol, self.rol)
         return f"{self.username} ({rol_display})"
+
+
+# ---------------------------------
+# Auditoría — Eventos de Acceso
+# ---------------------------------
+
+class EventoAcceso(models.Model):
+    """
+    Bitácora de autenticación: quién entró, quién intentó entrar y falló,
+    y quién salió — con IP y user-agent. Se completa sola vía señales de
+    Django/allauth (ver Usuario.apps.AnalisisConfig.ready()), nunca a mano.
+
+    Es intencionalmente de solo lectura desde el admin (ver EventoAccesoAdmin):
+    un registro de auditoría que se puede editar o borrar deja de servir como
+    evidencia — si alguna vez hace falta purgar historial viejo, debe ser por
+    un comando de gestión con su propio registro, no por el botón "eliminar"
+    de cualquier admin con sesión abierta.
+    """
+    TIPOS = (
+        ("login_ok", "Inicio de sesión exitoso"),
+        ("login_fallido", "Intento de inicio de sesión fallido"),
+        ("logout", "Cierre de sesión"),
+    )
+
+    tipo = models.CharField(max_length=20, choices=TIPOS, db_index=True, verbose_name="Tipo de Evento")
+    usuario = models.ForeignKey(
+        Usuario, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="eventos_acceso", verbose_name="Usuario",
+        help_text="Vacío en login_fallido cuando el usuario/correo ingresado no existe."
+    )
+    username_intentado = models.CharField(
+        max_length=150, blank=True, verbose_name="Usuario/correo ingresado",
+        help_text="Tal como se escribió en el formulario; útil para login_fallido."
+    )
+    ip_address = models.GenericIPAddressField(null=True, blank=True, db_index=True, verbose_name="Dirección IP")
+    user_agent = models.CharField(max_length=255, blank=True, verbose_name="Navegador / Dispositivo")
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Fecha y Hora")
+
+    class Meta:
+        verbose_name = "Evento de Acceso"
+        verbose_name_plural = "Eventos de Acceso"
+        ordering = ["-fecha"]
+
+    def __str__(self):
+        quien = self.usuario.username if self.usuario_id else (self.username_intentado or "desconocido")
+        return f"{self.get_tipo_display()} — {quien} — {self.fecha:%Y-%m-%d %H:%M}"

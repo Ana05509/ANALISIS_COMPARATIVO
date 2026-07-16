@@ -338,6 +338,22 @@ UNFOLD = {
                 ],
             },
             {
+                "title": "Auditoría",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Eventos de Acceso",
+                        "icon": "shield_lock",
+                        "link": reverse_lazy("admin:analisis_eventoacceso_changelist"),
+                    },
+                    {
+                        "title": "Registro de Acciones",
+                        "icon": "history",
+                        "link": reverse_lazy("admin:admin_logentry_changelist"),
+                    },
+                ],
+            },
+            {
                 "title": "Ayuda",
                 "separator": True,
                 "items": [

@@ -5,7 +5,7 @@
 
 {% block content %}
 
-<div style="max-width:900px;margin:30px auto;">
+<div style="max-width:900px;margin:30px auto;padding:0 16px;box-sizing:border-box;">
 
     <h1 style="font-size:30px;font-weight:bold;margin-bottom:10px;">
         📥 Importar Catálogo de Microorganismos
@@ -80,7 +80,8 @@
             📋 Formato esperado del archivo
         </div>
 
-        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <div style="overflow-x:auto;">
+        <table style="width:100%;min-width:520px;border-collapse:collapse;font-size:14px;">
 
             <thead style="background:#F9FAFB;">
 
@@ -160,6 +161,7 @@
             </tbody>
 
         </table>
+        </div>
 
     </div>
 
@@ -239,7 +241,7 @@ Fusarium oxysporum,species,ITS,fitopatogeno,Hongo causante de marchitez,Libro XX
 
         </div>
 
-        <div style="display:flex;gap:15px;">
+        <div style="display:flex;flex-wrap:wrap;gap:15px;">
 
             <button
                 id="btn-importar"
