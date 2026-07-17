@@ -1,0 +1,101 @@
+{% extends "analisis/base.html" %}
+
+{% block title %}Bioquímica — TerraBioLab{% endblock %}
+{% block nav_ensayos %}active{% endblock %}
+{% block topbar_title %}Microbiología Bioquímica{% endblock %}
+
+{% block topbar_actions %}
+    <a href="{% url 'bioquimica:subir_pdf' %}" class="btn btn-primary btn-sm">
+        <i class="ti ti-file-upload" aria-hidden="true"></i> Subir PDF
+    </a>
+    {% if request.user.is_staff or request.user.rol == 'docente' %}
+    <a href="/admin/bioquimica/ensayomicrobiologico/add/" class="btn btn-outline btn-sm">
+        <i class="ti ti-plus" aria-hidden="true"></i> Manual
+    </a>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="metrics-grid" style="margin-bottom: 1.5rem;">
+    <a href="?tipo=" class="metric-card {% if not tipo_filtro %}verde{% endif %}" style="text-decoration:none;">
+        <div class="metric-label">Todos los Ensayos</div>
+        <div class="metric-value">{{ total_recuento|add:total_aislamiento }}</div>
+        <div class="metric-sub">Registros disponibles</div>
+    </a>
+    <a href="?tipo=recuento" class="metric-card {% if tipo_filtro == 'recuento' %}verde{% endif %}" style="text-decoration:none;">
+        <div class="metric-label">📊 Recuentos UFC/g</div>
+        <div class="metric-value">{{ total_recuento }}</div>
+        <div class="metric-sub">Recuento en placa</div>
+    </a>
+    <a href="?tipo=aislamiento" class="metric-card {% if tipo_filtro == 'aislamiento' %}verde{% endif %}" style="text-decoration:none;">
+        <div class="metric-label">🔬 Aislamientos</div>
+        <div class="metric-value">{{ total_aislamiento }}</div>
+        <div class="metric-sub">Identificación bioquímica</div>
+    </a>
+</div>
+
+{% if ensayos %}
+<div class="card" style="padding:0; overflow:hidden;">
+    <div class="table-wrap cards-mobile">
+        <table class="table-inner" style="margin:0;">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Tipo</th>
+                    <th>Muestra</th>
+                    <th>Fecha reporte</th>
+                    <th>Organismos</th>
+                    <th class="td-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ensayo in ensayos %}
+                <tr>
+                    <td data-label="Código" class="td-mono" style="color:var(--verde-dark); font-weight:600;">{{ ensayo.codigo }}</td>
+                    <td data-label="Tipo">
+                        {% if ensayo.tipo == 'recuento' %}
+                        <span class="badge badge-recuento">📊 Recuento</span>
+                        {% else %}
+                        <span class="badge badge-sin-clas">🔬 Aislamiento</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Muestra" style="font-size:13px;">{{ ensayo.nombre_muestra }}</td>
+                    <td data-label="Fecha" class="td-mono" style="font-size:13px; color:var(--text-muted);">{{ ensayo.fecha_reporte|date:"d/m/Y" }}</td>
+                    <td data-label="Organismos" class="td-mono" style="color:var(--verde-dark); font-weight:600;">{{ ensayo.total_organismos }}</td>
+                    <td class="td-center">
+                        <a href="{% url 'bioquimica:detalle' ensayo.pk %}" class="btn btn-primary btn-sm">
+                            <i class="ti ti-eye"></i> Ver
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <i class="ti ti-flask-off" aria-hidden="true"></i>
+    <strong>
+        {% if tipo_filtro %}
+            Sin ensayos de tipo "{{ tipo_filtro }}"
+        {% else %}
+            Sin ensayos registrados
+        {% endif %}
+    </strong>
+    <p>
+        {% if tipo_filtro %}
+            No hay ensayos de este tipo. <a href="?tipo=">Ver todos los tipos</a>
+        {% else %}
+            Aún no hay ensayos bioquímicos en el sistema.
+        {% endif %}
+    </p>
+    {% if request.user.is_staff or request.user.rol == 'docente' %}
+    <a href="/admin/bioquimica/ensayomicrobiologico/add/" class="btn btn-primary btn-sm" style="margin-top:0.75rem;">
+        <i class="ti ti-plus"></i> Registrar primer ensayo
+    </a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

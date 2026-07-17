@@ -11,6 +11,7 @@
     
     <style>
         :root {
+<<<<<<< Updated upstream
             --primary: #2a4538;
             --primary-light: #3b604e;
             --admin-gold: #b45309; 
@@ -21,6 +22,36 @@
             --text-muted: #4b5563;
             --border-light: rgba(255, 255, 255, 0.6);
             --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+=======
+            /* Mismo verde de marca BioSuelo que el resto del admin (la
+               escala OKLCH declarada como UNFOLD["COLORS"]["primary"] en
+               settings.py) — antes esta pantalla usaba un verde "de planta"
+               genérico que no coincidía con el verde real de la marca. */
+            --verde-raiz:    oklch(28% 0.080 165); /* 900 — profundo */
+            --verde-hoja:    oklch(46% 0.120 165); /* 700 */
+            --verde-tallo:   oklch(54% 0.130 165); /* 600 */
+            --verde-brote:   oklch(62% 0.136 165); /* 500 — verde principal #1D9E75 */
+            --verde-palido:  oklch(97% 0.020 165); /* 50 */
+            --verde-menta:   oklch(90% 0.072 165); /* 200 */
+
+            /* Texto — siempre negro o casi negro */
+            --negro:         #0A0A0A;
+            --gris-oscuro:   #1F1F1F;
+            --gris-texto:    #2D2D2D;
+            --gris-apoyo:    #4A4A4A;
+
+            /* Errores */
+            --rojo:          #B71C1C;
+            --rojo-fondo:    #FFEBEE;
+
+            /* Panel formulario: blanco limpio */
+            --panel-fondo:   #f9fdf9; /* ligerísimo tinte verde/blanco */
+
+            /* Overlay del video: 30 % opacidad → video visible al 70 % */
+            --overlay:       rgba(215, 242, 218, 0.30);
+
+            --ease: cubic-bezier(0.4, 0, 0.2, 1);
+>>>>>>> Stashed changes
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }

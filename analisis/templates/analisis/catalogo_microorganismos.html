@@ -144,7 +144,23 @@
 
 <div class="card">
     {% if microorganismos %}
+<<<<<<< Updated upstream
     <div class="table-wrap">
+=======
+
+    <!-- Búsqueda instantánea + contador -->
+    <div style="display:flex; gap:10px; align-items:center; padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid var(--gris-border, #e2e8f0); flex-wrap:wrap;">
+        <div class="busq-wrap">
+            <i class="ti ti-search busq-icon" aria-hidden="true"></i>
+            <input id="busq-rapida" type="text"
+                   placeholder="Filtro instantáneo — nombre, descripción…"
+                   autocomplete="off">
+        </div>
+        <span id="result-count"></span>
+    </div>
+
+    <div class="table-wrap cards-mobile" style="margin:0;">
+>>>>>>> Stashed changes
         <table id="tabla-catalogo">
             <thead>
                 <tr>
@@ -160,6 +176,7 @@
             </thead>
             <tbody>
                 {% for m in microorganismos %}
+<<<<<<< Updated upstream
                 <tr>
                     <td>
                         <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
@@ -168,16 +185,53 @@
                     </td>
                     <td style="font-size: 12px; color: var(--text-muted); text-transform: capitalize;">{{ m.nivel }}</td>
                     <td>
+=======
+                <tr data-search="{{ m.nombre|lower }} {{ m.nivel|lower }} {{ m.descripcion|lower }} {{ m.clasificacion }}"
+                    data-clas="{{ m.clasificacion }}">
+
+                    <td data-label="Organismo">
+                        <em class="taxon-name">{{ m.nombre }}</em>
+                    </td>
+
+                    <td data-label="Nivel">
+                        <span class="nivel-chip nivel-{{ m.nivel }}">{{ m.get_nivel_display }}</span>
+                    </td>
+
+                    <td data-label="Marcador">
+>>>>>>> Stashed changes
                         {% if m.marcador == '16S' %}
                         <span class="pill-16s" title="Bacteria — Marcador 16S">🦠 Bacteria</span>
                         {% else %}
                         <span class="pill-its" title="Hongo — Marcador ITS">🍄 Hongo</span>
                         {% endif %}
                     </td>
+<<<<<<< Updated upstream
                     <td style="font-size: 13px; color: var(--text-muted); max-width: 280px; white-space: normal;">
                         {{ m.descripcion|default:"—"|truncatechars:100 }}
                     </td>
                     <td style="padding-left: 2rem;">
+=======
+
+                    <td data-label="Descripción">
+                        {% if m.descripcion %}
+                            <span class="desc-short">{{ m.descripcion|truncatechars:85 }}</span>
+                            {% if m.descripcion|length > 85 %}
+                            <button class="btn-expand" type="button">ver más</button>
+                            <span class="desc-full"><span class="desc-full-text">{{ m.descripcion }}</span></span>
+                            {% endif %}
+                        {% else %}
+                            <span style="color:var(--text-hint);">—</span>
+                        {% endif %}
+                        {% if m.referencia %}
+                        <span class="referencia-line">
+                            <i class="ti ti-book-2" aria-hidden="true"></i>
+                            <span title="{{ m.referencia }}">{{ m.referencia|truncatechars:65 }}</span>
+                        </span>
+                        {% endif %}
+                    </td>
+
+                    <td data-label="Clasificación">
+>>>>>>> Stashed changes
                         {% if m.clasificacion == 'benefico' %}
                             <span class="badge badge-benefico"><i class="ti ti-shield-check" aria-hidden="true"></i> Benéfico</span>
                         {% elif m.clasificacion == 'fitopatogeno' %}

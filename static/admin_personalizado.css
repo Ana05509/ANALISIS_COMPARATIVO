@@ -1,0 +1,636 @@
+<<<<<<< Updated upstream
+=======
+
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,500&family=Outfit:wght@300;400;500;600&display=swap');
+
+/* ─── ÍCONOS DEL ADMIN (Material Symbols) SIN PARPADEO ───────────
+   Unfold declara su propio @font-face para "Material Symbols Outlined"
+   sin font-display, así que el navegador oculta el glifo (hasta ~3s)
+   en cada navegación mientras la fuente carga — el logo/botón del
+   sidebar se ve como un cuadro de color vacío hasta entonces. No se
+   puede tocar la plantilla de Unfold (vive en venv/), así que se
+   redeclara la misma familia acá, cargada después, con
+   font-display:swap: el navegador usa un glifo de reserva instantáneo
+   y lo reemplaza en cuanto la fuente real esté lista. */
+@font-face {
+    font-family: 'Material Symbols Outlined';
+    font-style: normal;
+    font-weight: 400;
+    src: url('/static/unfold/fonts/material-symbols/Material-Symbols-Outlined.woff2') format('woff2');
+    font-display: swap;
+}
+
+/* ─── ESCALA DE FUENTE GLOBAL (texto más legible al 100% zoom) ─── */
+html {
+    font-size: 106.25% !important; /* 17px base: text-sm → ~15px, text-xs → ~13px */
+    /* overflow-x:clip en lugar de hidden: evita scroll horizontal sin crear
+       un bloque contenedor para position:fixed (overflow:hidden lo rompería) */
+    overflow-x: clip !important;
+    max-width: 100vw !important;
+}
+
+body {
+    line-height: 1.6 !important;
+    overflow-x: clip !important;
+    max-width: 100vw !important;
+}
+
+/* ─── ZOOM VISUAL AL 90% — REVERTIDO ─────────────────────────────
+   Se probó `zoom:0.9` en <html> para que la interfaz se viera un 10%
+   más compacta. Verificado con Playwright (Chromium real, no solo
+   lectura de CSS): con zoom:0.9, <html> renderizaba solo 1229px de
+   ancho en una ventana de 1366px (1229 ≈ 1366×0.9) — el navegador NO
+   reclama el espacio que libera al achicar todo, a diferencia del zoom
+   real del navegador (Ctrl+rueda), que sí reacomoda el viewport. Esa
+   franja sin reclamar era la causa real del "espacio a la derecha" que
+   se reportó de forma persistente en TODAS las pantallas del admin,
+   no los contenedores/tablas que se habían estado ajustando. Se
+   revirtió por completo — si se quiere una interfaz más compacta, la
+   única forma confiable es que cada usuario use el zoom nativo del
+   navegador (Ctrl + rueda / Ctrl+-), que sí funciona sin este problema. */
+
+/* ─── SIDEBAR FIJO — solo barra de scroll visual ───────────────── */
+/* La lógica de posicionamiento la gestiona admin_sidebar_fijo.js   */
+#nav-sidebar {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(29,158,117,.35) transparent !important;
+}
+#nav-sidebar::-webkit-scrollbar       { width: 4px !important; }
+#nav-sidebar::-webkit-scrollbar-track { background: transparent !important; }
+#nav-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(29,158,117,.35) !important;
+    border-radius: 4px !important;
+}
+
+/* ─── SIDEBAR COMPACTO — que todos los ítems entren sin scroll ───
+   Unfold reserva bastante aire entre secciones/ítems por defecto (cada
+   ítem mide 38px, cada separador suma ~16px de margen, el encabezado
+   mide 89px con su margen...). Con 6 secciones y 12 ítems en total eso
+   suma más de 1000px, más de lo que entra en la mayoría de pantallas de
+   laptop. Se recorta cada nivel para que el conjunto quepa completo. */
+#nav-sidebar-inner [class*="h-[65px]"] {
+    height: 50px !important;
+}
+#nav-sidebar-inner .mb-6 {
+    margin-bottom: 10px !important;
+}
+#nav-sidebar-inner .mb-2\.5 {
+    margin-bottom: 6px !important;
+}
+#nav-sidebar-inner h2 {
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
+    margin-bottom: 0 !important;
+}
+#nav-sidebar-inner hr {
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+}
+/* Altura fija + texto en una sola línea con "…": con la compactación de
+   arriba, un ítem de dos palabras (ej. "Archivos Moleculares") ya no
+   entra en 30px si el texto intenta envolver — se veía superpuesto con
+   el ítem siguiente. Se trunca en vez de envolver. */
+#nav-sidebar-inner ol li a[class*="h-[38px]"] {
+    height: 30px !important;
+    overflow: hidden !important;
+}
+#nav-sidebar-inner ol li a[class*="h-[38px]"] > span:not(.material-symbols-outlined) {
+    flex: 1 !important;
+    min-width: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+#nav-sidebar-inner ol.gap-0\.5 {
+    gap: 1px !important;
+}
+#nav-sidebar-inner .mb-1\.5 {
+    margin-bottom: 2px !important;
+}
+#nav-sidebar-inner [class*="min-h-\[64px\]"] {
+    min-height: 46px !important;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+}
+
+/* Botón para colapsar el sidebar en escritorio ("dock_to_right", visible
+   solo ≥1280px): en este panel el sidebar queda siempre abierto en
+   escritorio (forzado por admin_sidebar_fijo.js), así que ese botón no
+   tiene función — se oculta directamente en vez de pelear contra su
+   estado con JS.
+   IMPORTANTE: no ocultar nada con "sidebarMobileOpen" — Unfold oculta el
+   sidebar por completo (display:none) por debajo de 1280px de ancho y
+   SOLO el botón de hamburguesa (topbar) y el botón "✕" (dentro del propio
+   sidebar) — ambos con ese atributo — pueden volver a mostrarlo. Ocultar
+   esos botones deja el menú inaccesible en cualquier laptop/tablet con
+   menos de 1280px de ancho de ventana, exactamente el escenario que este
+   panel debe cubrir (ver requisito de "colapsable en pantallas pequeñas"). */
+[x-on\:click*="sidebarDesktopOpen"] {
+    display: none !important;
+}
+/* Divisor vertical que queda pegado al botón de escritorio recién oculto */
+span.cursor-pointer:has([x-on\:click*="sidebarDesktopOpen"]) + span {
+    display: none !important;
+}
+
+/* ─── SIDEBAR VISIBLE DESDE 1024px (no solo desde 1280px) ───────────
+   Unfold solo muestra el sidebar de forma automática por encima de su
+   breakpoint "xl" (1280px, min-width:80rem) — por debajo de eso el
+   wrapper que lo contiene es display:none y solo el botón de
+   hamburguesa lo revela manualmente. 1280px es más ancho que muchas
+   laptops reales (ventana no maximizada, escalado de Windows, zoom del
+   navegador), así que en la práctica el menú "fijo" no aparecía en la
+   mayoría de pantallas de este panel. Se fuerza visible desde 1024px
+   (umbral típico de "laptop" en este proyecto, ver @media 1024px en
+   templates_base.html) — por debajo de eso se mantiene el
+   comportamiento original de Unfold (oculto + botón de hamburguesa).
+
+   Selector: el wrapper con "fixed hidden xl:relative xl:block" no
+   tiene id propio; se ubica por relación estructural con #nav-sidebar
+   (su nieto) en vez de depender de esas clases de Tailwind, que podrían
+   cambiar entre versiones de Unfold. */
+@media (min-width: 1024px) {
+    div:has(> div > #nav-sidebar) {
+        display: block !important;
+        position: relative !important;
+    }
+}
+
+/*
+ * Unfold envuelve las tablas del changelist en su propio contenedor con
+ * scroll horizontal (overflow-x-auto + simplebar), así que una tabla ancha
+ * NUNCA debería ensanchar la página completa. El hueco está un nivel más
+ * arriba: el <div class="@container px-4 pb-4 grow"> que envuelve #content
+ * es hijo flex de #main (flex-col) pero no trae min-width:0 de Tailwind,
+ * así que el contenido ancho de sus descendientes puede "empujar" el ancho
+ * mínimo de ese contenedor y, con él, el de toda la página. Forzamos
+ * min-width:0 para que el desbordamiento se quede contenido en la tabla
+ * (que sí tiene su propia barra) en vez de en la página entera.
+ */
+#main > div.\@container {
+    min-width: 0 !important;
+}
+
+/*
+ * Unfold centra el contenido con una clase "container" de Tailwind
+ * (max-width fijo por breakpoint, ej. 1280px en xl, con mx-auto) en
+ * cualquier vista que NO sea un changelist con list_fullwidth=True — acá
+ * eso incluye el dashboard (admin/index.html) y los formularios de
+ * alta/edición, dejando una franja sin usar a los lados en monitores
+ * anchos. Todos los ModelAdmin de este panel ya usan
+ * list_fullwidth=True; se extiende el mismo criterio de "ancho completo"
+ * a esas vistas restantes en vez de perseguir el flag en cada una.
+ */
+#main .container {
+    max-width: none !important;
+}
+
+/*
+ * Unfold envuelve la tabla del changelist (#result_list) en un
+ * contenedor manejado por SimpleBar (data-simplebar) para el scroll
+ * horizontal — pero simplebar.css declara su .simplebar-content-wrapper
+ * con "width:auto" + "overflow:auto", lo que en CSS estándar produce un
+ * ancho "shrink-to-fit" (se ajusta al contenido) en vez de "llenar el
+ * espacio disponible". Como nuestra tabla ya fuerza table-layout:fixed +
+ * width:100% (ver más abajo, regla de #result_list) precisamente para
+ * NUNCA necesitar ese scroll horizontal, este wrapper nunca debería
+ * angostarse — se fuerza a ocupar el 100% del espacio real disponible,
+ * que es lo que dejaba esa franja vacía a la derecha de cualquier tabla
+ * con pocas columnas (ej. Cultivos). Acotado a #changelist para no tocar
+ * otros usos de SimpleBar en el admin (ej. el propio menú lateral).
+ */
+#changelist [data-simplebar] .simplebar-content-wrapper {
+    width: 100% !important;
+}
+
+/*
+ * Refuerzo directo de ancho (no solo max-width:none) sobre los
+ * contenedores dentro de #main, por si alguno se estuviera quedando
+ * corto por algo no cubierto por las reglas de arriba. #main mismo
+ * queda afuera a propósito: es hijo flex de #page (fila, junto al
+ * sidebar) y ya crece solo con flex-grow — forzarle un width:100%
+ * ahí competiría con el ancho reservado del sidebar en vez de
+ * respetarlo. Los de acá adentro son hijos de una columna (flex-col)
+ * o bloques normales, donde width:100% es seguro y no compite con
+ * ningún hermano por espacio.
+ */
+#main > div.\@container,
+#content,
+#content-main {
+    width: 100% !important;
+}
+
+/* ─── TOKENS SEMÁNTICOS PROPIOS ─── */
+:root {
+    --tb-verde:        #1D9E75;
+    --tb-verde-light:  #E1F5EE;
+    --tb-verde-dark:   #085041;
+    --tb-amber:        #BA7517;
+    --tb-amber-light:  #FAEEDA;
+    --tb-amber-dark:   #5a3000;
+    --tb-rojo:         #A32D2D;
+    --tb-rojo-light:   #FCEBEB;
+    --tb-rojo-dark:    #6b1212;
+    --tb-azul:         #1565C0;
+    --tb-azul-light:   #E3F2FD;
+    --tb-azul-dark:    #0D3E8C;
+    --tb-morado:       #6A4C93;
+    --tb-morado-light: #EEE8F5;
+    --tb-bg:           #F7F6F2;
+    --tb-surface:      #FFFFFF;
+    --tb-border:       #D3D1C7;
+    --tb-text:         #1a1a18;
+    --tb-muted:        #5F5E5A;
+    --tb-hint:         #888780;
+    --tb-gris-light:   #F1EFE8;
+}
+
+/* ─── TIPOGRAFÍA ─── */
+html, body,
+button, input, select, textarea,
+[class*="font-sans"] {
+    font-family: 'Outfit', sans-serif !important;
+}
+
+h1, h2, h3,
+#site-name a,
+.site-name,
+[class*="text-2xl"],
+[class*="text-xl"][class*="font-semibold"] {
+    font-family: 'Fraunces', serif !important;
+    letter-spacing: -0.3px !important;
+    font-weight: 500 !important;
+}
+
+code, pre, kbd, samp,
+[class*="font-mono"],
+[class*="tabular-nums"] {
+    font-family: 'DM Mono', monospace !important;
+}
+
+/* ─── FONDO CÁLIDO ─── */
+body {
+    background-color: var(--tb-bg) !important;
+}
+
+/* ─── ENCABEZADOS DE TABLA ─── */
+/* Solo thead th: evita que <th scope="row"> en tbody (ej. email en Usuarios)
+   quede en mayúsculas. Django admin usa th scope="row" para el campo enlazado. */
+thead th {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.6px !important;
+    color: var(--tb-hint) !important;
+    background-color: var(--tb-gris-light) !important;
+}
+
+/* ─── ANCHO DE TABLA FIJO (solo en modo tabla de escritorio) ───
+   Con table-layout:auto (el default), max-width en un <td> es solo una
+   sugerencia: si la tabla vive dentro de un contenedor con overflow-x:
+   auto, el navegador prefiere agrandar la columna y mostrar barra de
+   desplazamiento antes que respetar ese máximo — por eso el salto de
+   línea no se estaba aplicando de verdad. table-layout:fixed lo vuelve
+   una regla dura: la tabla nunca puede superar el 100% del contenedor,
+   así que el contenido SÍ tiene que partirse en líneas para entrar.
+
+   #result_list trae "block lg:table" de Unfold: por debajo de 1024px
+   (breakpoint lg) la tabla completa cambia a un modo "tarjetas" propio
+   (cada <td> se vuelve un bloque apilado de ancho completo, con su
+   etiqueta antes del valor). Los anchos fijos de columna (34/60/84px)
+   solo tienen sentido en el modo tabla — aplicados también en el modo
+   tarjetas, angostaban esas celdas a un puñado de píxeles en vez de
+   ocupar el ancho completo de la tarjeta, dejando el resto de la fila
+   vacío (fondo oscuro visible sin contenido). Se acotan a ≥1024px para
+   no interferir con el modo móvil de Unfold. */
+#result_list {
+    width: 100% !important;
+}
+@media (min-width: 1024px) {
+    #result_list {
+        table-layout: fixed !important;
+    }
+    #result_list th.action-checkbox-column,
+    #result_list td.action-checkbox-column {
+        width: 34px !important;
+    }
+    #result_list th.field-acciones,
+    #result_list td.field-acciones {
+        width: 84px !important;
+    }
+    #result_list th.field-id,
+    #result_list td.field-id {
+        width: 60px !important;
+    }
+}
+
+/* ─── CELDAS DE DATOS — base ───
+   Con la tabla ya acotada a table-layout:fixed, el salto de línea
+   (word-break/overflow-wrap) sí tiene efecto real: el contenido corto
+   sigue viéndose en una sola línea de forma natural (no hace falta
+   declararlo celda por celda) y el contenido largo se parte para entrar
+   en el espacio que le tocó, en vez de forzar scroll horizontal. */
+tbody td,
+tbody th,
+thead td,
+thead th {
+    vertical-align: middle !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+}
+tbody td,
+tbody th {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+}
+/* Encabezados: también parten en varias líneas en vez de nowrap. Si no,
+   un título largo (ej. "Resultados procesados") obliga a toda la columna
+   a ser tan ancha como el título aunque el dato real sea corto ("22
+   registros"): el contenido, no el encabezado, debe mandar en el ancho. */
+thead td,
+thead th {
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.3 !important;
+}
+
+/* Género / especie: nombres científicos, en cursiva por convención. */
+tbody td.field-genus,
+tbody td.field-species {
+    font-style: italic !important;
+}
+
+/* Descripción: es texto libre y el campo con más probabilidad de ser
+   largo — se le da un poco más de aire que al máximo general. */
+tbody td.field-descripcion_corta {
+    max-width: 340px !important;
+}
+
+/* ─── ENCABEZADO FIJO AL HACER SCROLL ─── */
+thead th, thead td {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 5 !important;
+}
+
+/* ─── FILAS ALTERNADAS (cebra) ─── */
+tbody tr:nth-child(even) {
+    background-color: var(--tb-bg) !important;
+}
+
+/* ─── COLUMNA DE ACCIONES (Ver/Editar/Eliminar) ───
+   Íconos explícitos además de que la fila ya es clickeable — más
+   intuitivo para un administrador con poca experiencia técnica. */
+tbody td.field-acciones {
+    white-space: nowrap !important;
+    max-width: none !important;
+}
+.tb-acciones {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.tb-accion-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    text-decoration: none !important;
+    transition: background-color 0.15s;
+}
+.tb-accion-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+.tb-accion-ver {
+    background: var(--tb-verde-light);
+}
+.tb-accion-ver .material-symbols-outlined {
+    color: var(--tb-verde-dark);
+}
+.tb-accion-ver:hover {
+    background: var(--tb-verde);
+}
+.tb-accion-ver:hover .material-symbols-outlined {
+    color: #ffffff;
+}
+.tb-accion-borrar {
+    background: var(--tb-rojo-light);
+}
+.tb-accion-borrar .material-symbols-outlined {
+    color: var(--tb-rojo);
+}
+.tb-accion-borrar:hover {
+    background: var(--tb-rojo);
+}
+.tb-accion-borrar:hover .material-symbols-outlined {
+    color: #ffffff;
+}
+
+/* ─── FILTROS LATERALES ─── */
+#changelist-filter {
+    white-space: normal !important;
+    word-break: break-word !important;
+}
+#changelist-filter li,
+#changelist-filter a {
+    white-space: normal !important;
+    word-break: break-word !important;
+    display: block !important;
+}
+
+/* ─── FILAS CON HOVER ACENTO IZQUIERDO ─── */
+/* box-shadow inset no altera el layout de la tabla (a diferencia de border-left) */
+tbody tr {
+    transition: background-color 0.12s !important;
+}
+
+tbody tr:hover td:first-child {
+    box-shadow: inset 3px 0 0 var(--tb-verde) !important;
+}
+
+tbody tr:hover {
+    background-color: var(--tb-verde-light) !important;
+}
+
+/* ─── INPUTS Y FORMULARIOS ─── */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="url"],
+input[type="search"],
+textarea,
+select {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 14px !important;
+    border-color: var(--tb-border) !important;
+    border-radius: 8px !important;
+    color: var(--tb-text) !important;
+    background-color: var(--tb-surface) !important;
+    transition: border-color 0.15s, box-shadow 0.15s !important;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="search"]:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--tb-verde) !important;
+    box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.12) !important;
+    outline: none !important;
+}
+
+/* ─── FIELDSETS COMO TARJETAS ─── */
+fieldset.module,
+.module.aligned {
+    background: var(--tb-surface) !important;
+    border: 1px solid var(--tb-border) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+    overflow: hidden !important;
+    margin-bottom: 18px !important;
+}
+
+fieldset.module h2,
+.module h2 {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.9px !important;
+    color: var(--tb-muted) !important;
+    background-color: var(--tb-gris-light) !important;
+    border-bottom: 1px solid var(--tb-border) !important;
+    padding: 10px 16px !important;
+    margin: 0 !important;
+}
+
+/* ─── FILTROS LATERALES ─── */
+#changelist-filter h2,
+#changelist-filter h3 {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    color: var(--tb-hint) !important;
+    font-weight: 500 !important;
+}
+
+/* ─── BREADCRUMBS ─── */
+#breadcrumbs,
+[class*="breadcrumb"] {
+    font-size: 12px !important;
+    color: var(--tb-muted) !important;
+}
+
+/* ─── MENSAJES (success / error / warning) ─── */
+.messagelist .success,
+li.success {
+    background: var(--tb-verde-light) !important;
+    color: var(--tb-verde-dark) !important;
+    border-left: 3px solid var(--tb-verde) !important;
+}
+
+.messagelist .error,
+li.error,
+.errornote {
+    background: var(--tb-rojo-light) !important;
+    color: var(--tb-rojo) !important;
+    border-left: 3px solid var(--tb-rojo) !important;
+}
+
+.messagelist .warning,
+li.warning {
+    background: var(--tb-amber-light) !important;
+    color: #5a3a00 !important;
+    border-left: 3px solid var(--tb-amber) !important;
+}
+
+/* ─── PAGINACIÓN ─── */
+.paginator a,
+[class*="paginator"] a {
+    font-family: 'DM Mono', monospace !important;
+    font-size: 13px !important;
+    border-radius: 6px !important;
+}
+
+/* ─── BOTÓN DE IMPORTAR CSV ─── */
+.tb-btn-import {
+    background-color: var(--tb-verde) !important;
+    border-color: var(--tb-verde) !important;
+    color: #ffffff !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 8px 16px !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+    text-decoration: none !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08) !important;
+    transition: background-color 0.15s !important;
+}
+
+.tb-btn-import:hover {
+    background-color: var(--tb-verde-dark) !important;
+    border-color: var(--tb-verde-dark) !important;
+}
+
+/* ─── DARK MODE ─── */
+.dark body {
+    background-color: #111110 !important;
+}
+
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="number"],
+.dark input[type="search"],
+.dark textarea,
+.dark select {
+    background-color: #1e1e1c !important;
+    border-color: #333330 !important;
+    color: #e5e5e0 !important;
+}
+
+.dark input[type="text"]:focus,
+.dark textarea:focus,
+.dark select:focus {
+    border-color: var(--tb-verde) !important;
+    box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.15) !important;
+}
+
+.dark thead th {
+    background-color: #1a1a18 !important;
+    color: #666663 !important;
+}
+
+.dark tbody tr:hover {
+    background-color: rgba(29, 158, 117, 0.08) !important;
+}
+
+.dark tbody tr:hover td:first-child {
+    box-shadow: inset 3px 0 0 var(--tb-verde) !important;
+}
+
+.dark fieldset.module,
+.dark .module.aligned {
+    background-color: #1a1a18 !important;
+    border-color: #333330 !important;
+}
+
+.dark fieldset.module h2,
+.dark .module h2 {
+    background-color: #111110 !important;
+    border-bottom-color: #333330 !important;
+    color: #666663 !important;
+}
+>>>>>>> Stashed changes

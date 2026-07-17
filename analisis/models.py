@@ -194,4 +194,103 @@ class Usuario(AbstractUser):
 
     def __str__(self):
         rol_display = dict(self.ROLES).get(self.rol, self.rol)
+<<<<<<< Updated upstream
         return f"{self.username} ({rol_display})"
+=======
+        return f"{self.username} ({rol_display})"
+
+
+# ---------------------------------
+# Auditoría — Eventos de Acceso
+# ---------------------------------
+
+def _parsear_user_agent(ua):
+    """
+    Identifica navegador y sistema operativo a partir del User-Agent.
+    Parser propio y liviano (sin dependencia externa) para los casos más
+    comunes — no pretende cubrir cada variante existente, solo lo suficiente
+    para que la bitácora de auditoría sea legible para una persona.
+    """
+    if not ua:
+        return "Desconocido", "Desconocido"
+
+    ua_l = ua.lower()
+
+    if "edg/" in ua_l:
+        navegador = "Edge"
+    elif "opr/" in ua_l or "opera" in ua_l:
+        navegador = "Opera"
+    elif "firefox/" in ua_l:
+        navegador = "Firefox"
+    elif "chrome/" in ua_l:
+        navegador = "Chrome"
+    elif "safari/" in ua_l:
+        navegador = "Safari"
+    else:
+        navegador = "Otro"
+
+    if "windows nt" in ua_l:
+        so = "Windows"
+    elif "android" in ua_l:
+        so = "Android"
+    elif "iphone" in ua_l or "ipad" in ua_l:
+        so = "iOS"
+    elif "mac os x" in ua_l:
+        so = "macOS"
+    elif "linux" in ua_l:
+        so = "Linux"
+    else:
+        so = "Otro"
+
+    return navegador, so
+
+
+class EventoAcceso(models.Model):
+    """
+    Bitácora de autenticación: quién entró, quién intentó entrar y falló,
+    y quién salió — con IP y user-agent. Se completa sola vía señales de
+    Django/allauth (ver Usuario.apps.AnalisisConfig.ready()), nunca a mano.
+
+    Es intencionalmente de solo lectura desde el admin (ver EventoAccesoAdmin):
+    un registro de auditoría que se puede editar o borrar deja de servir como
+    evidencia — si alguna vez hace falta purgar historial viejo, debe ser por
+    un comando de gestión con su propio registro, no por el botón "eliminar"
+    de cualquier admin con sesión abierta.
+    """
+    TIPOS = (
+        ("login_ok", "Inicio de sesión exitoso"),
+        ("login_fallido", "Intento de inicio de sesión fallido"),
+        ("logout", "Cierre de sesión"),
+    )
+
+    tipo = models.CharField(max_length=20, choices=TIPOS, db_index=True, verbose_name="Tipo de Evento")
+    usuario = models.ForeignKey(
+        Usuario, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="eventos_acceso", verbose_name="Usuario",
+        help_text="Vacío en login_fallido cuando el usuario/correo ingresado no existe."
+    )
+    username_intentado = models.CharField(
+        max_length=150, blank=True, verbose_name="Usuario/correo ingresado",
+        help_text="Tal como se escribió en el formulario; útil para login_fallido."
+    )
+    ip_address = models.GenericIPAddressField(null=True, blank=True, db_index=True, verbose_name="Dirección IP")
+    user_agent = models.CharField(max_length=255, blank=True, verbose_name="Navegador / Dispositivo")
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Fecha y Hora")
+
+    class Meta:
+        verbose_name = "Evento de Acceso"
+        verbose_name_plural = "Eventos de Acceso"
+        ordering = ["-fecha"]
+
+    def __str__(self):
+        quien = self.usuario.username if self.usuario_id else (self.username_intentado or "desconocido")
+        return f"{self.get_tipo_display()} — {quien} — {self.fecha:%Y-%m-%d %H:%M}"
+
+    @property
+    def navegador(self):
+        return _parsear_user_agent(self.user_agent)[0]
+
+    @property
+    def sistema_operativo(self):
+        return _parsear_user_agent(self.user_agent)[1]
+>>>>>>> Stashed changes

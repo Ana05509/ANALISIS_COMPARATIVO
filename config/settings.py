@@ -187,6 +187,24 @@ SOCIALACCOUNT_PROVIDERS = {
 # ---------------------------
 # CONFIGURACIÓN INTERFAZ UNFOLD
 # ---------------------------
+def _static_con_version(nombre_relativo):
+    """
+    static("admin_personalizado.css") + "?v=<mtime>": sin esto, el
+    navegador puede quedarse sirviendo una versión vieja del CSS/JS desde
+    caché aunque el archivo en el servidor ya haya cambiado, y un
+    Ctrl+Shift+R no siempre alcanza para forzarlo. Al cambiar la fecha de
+    modificación del archivo, cambia la URL completa, así que el
+    navegador SIEMPRE la trata como un recurso nuevo.
+    """
+    ruta = BASE_DIR / "static" / nombre_relativo
+    try:
+        version = int(os.path.getmtime(ruta))
+    except OSError:
+        version = 0
+    url_base = static(nombre_relativo)
+    return f"{url_base}?v={version}"
+
+
 UNFOLD = {
     "SITE_TITLE": "TerraBioLab",
     "SITE_HEADER": "TerraBioLab UTC",
@@ -195,10 +213,16 @@ UNFOLD = {
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
     "DASHBOARD_CALLBACK": "analisis.admin.dashboard_callback",
-    
+
     "STYLES": [
-        lambda request: static("admin_personalizado.css"),
+        lambda request: _static_con_version("admin_personalizado.css"),
     ],
+<<<<<<< Updated upstream
+=======
+    "SCRIPTS": [
+        lambda request: _static_con_version("admin_sidebar_fijo.js"),
+    ],
+>>>>>>> Stashed changes
 
     "COLORS": {
         "primary": {
@@ -217,7 +241,7 @@ UNFOLD = {
     },
 
     "SIDEBAR": {
-        "show_search": True,
+        "show_search": False,
         "show_all_applications": False,
         "navigation": [
             {

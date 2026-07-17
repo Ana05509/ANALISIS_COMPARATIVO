@@ -1,0 +1,278 @@
+{% extends "analisis/base.html" %}
+{% load custom_filters %}
+
+{% block title %}{{ ensayo.codigo }} — TerraBioLab{% endblock %}
+{% block nav_ensayos %}active{% endblock %}
+{% block topbar_title %}{{ ensayo.codigo }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'bioquimica:lista' %}" class="btn btn-outline btn-sm">
+    <i class="ti ti-arrow-left"></i> Volver
+</a>
+{% if request.user.is_staff or request.user.rol == 'docente' %}
+<a href="/admin/bioquimica/ensayomicrobiologico/{{ ensayo.pk }}/change/"
+   class="btn btn-primary btn-sm">
+    <i class="ti ti-edit"></i> Editar
+</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{# ── Cabecera del ensayo ── #}
+<div class="card" style="margin-bottom:1.25rem;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+        <div>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                <span style="font-size:20px; font-weight:700; color:var(--text-primary);">{{ ensayo.codigo }}</span>
+                {% if ensayo.tipo == 'recuento' %}
+                <span class="badge" style="background:#E6F1FB; color:#0C447C;">
+                    <i class="ti ti-chart-bar"></i> Recuento UFC/g
+                </span>
+                {% else %}
+                <span class="badge badge-sin-clas">
+                    <i class="ti ti-microscope"></i> Aislamiento e Identificación
+                </span>
+                {% endif %}
+            </div>
+            <div style="font-size:14px; color:var(--text-muted);">
+                <strong>Muestra:</strong> {{ ensayo.nombre_muestra }}
+                {% if ensayo.etiqueta %}
+                <span style="margin-left:12px; font-size:12px; color:var(--text-hint); white-space:pre-line;">{{ ensayo.etiqueta }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div style="display:flex; gap:1.5rem; flex-wrap:wrap; font-size:13px;">
+            <div>
+                <div class="metric-label">Recepción</div>
+                <div class="td-mono" style="font-size:14px; font-weight:600; color:var(--text-primary);">{{ ensayo.fecha_recepcion|date:"d/m/Y" }}</div>
+            </div>
+            <div>
+                <div class="metric-label">Ejecución</div>
+                <div class="td-mono" style="font-size:14px; font-weight:600; color:var(--text-primary);">{{ ensayo.fecha_ejecucion|date:"d/m/Y" }}</div>
+            </div>
+            <div>
+                <div class="metric-label">Reporte</div>
+                <div class="td-mono" style="font-size:14px; font-weight:600; color:var(--text-primary);">{{ ensayo.fecha_reporte|date:"d/m/Y" }}</div>
+            </div>
+            {% if ensayo.temp_ambiental %}
+            <div>
+                <div class="metric-label">Temperatura</div>
+                <div class="td-mono" style="font-size:14px; font-weight:600; color:var(--text-primary);">{{ ensayo.temp_ambiental }} °C</div>
+            </div>
+            {% endif %}
+            {% if ensayo.humedad_ambiental %}
+            <div>
+                <div class="metric-label">Humedad</div>
+                <div class="td-mono" style="font-size:14px; font-weight:600; color:var(--text-primary);">{{ ensayo.humedad_ambiental }} %</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if ensayo.tipo == 'recuento' %}
+
+{% if grafico_recuento_json %}
+<div class="card" style="margin-bottom:1.25rem;">
+    <div class="card-title">
+        <i class="ti ti-chart-bar"></i> UFC/g por microorganismo
+        <span style="font-size:12px; font-weight:400; color:var(--text-hint); margin-left:8px;">escala logarítmica</span>
+    </div>
+    <div id="grafico-recuento"></div>
+</div>
+{% endif %}
+
+<div style="display:flex; flex-direction:column; gap:1.25rem; margin-bottom:1.25rem;">
+
+    {% if recuentos_bacterias %}
+    <div class="card">
+        <div class="card-title" style="color:var(--verde-dark);">🦠 Bacterias</div>
+        <div style="margin-top:0.6rem; overflow-x:visible;">
+            <table class="table-inner" style="min-width:0; width:100%;">
+                <thead>
+                    <tr>
+                        <th>Microorganismo</th>
+                        <th class="td-right" style="white-space:nowrap; width:110px;">UFC/g</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in recuentos_bacterias %}
+                    <tr>
+                        <td style="font-style:italic; word-break:break-word;">{{ r.nombre }}</td>
+                        <td class="td-mono td-right" style="color:var(--verde-dark); font-weight:600; white-space:nowrap;">{{ r.valor_display }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if recuentos_hongos %}
+    <div class="card">
+        <div class="card-title" style="color:#5a3a00;">🍄 Hongos</div>
+        <div style="margin-top:0.6rem; overflow-x:visible;">
+            <table class="table-inner" style="min-width:0; width:100%;">
+                <thead>
+                    <tr>
+                        <th>Microorganismo</th>
+                        <th class="td-right" style="white-space:nowrap; width:110px;">UFC/g</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in recuentos_hongos %}
+                    <tr>
+                        <td style="font-style:italic; word-break:break-word;">{{ r.nombre }}</td>
+                        <td class="td-mono td-right" style="color:#5a3a00; font-weight:600; white-space:nowrap;">{{ r.valor_display }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+{% elif ensayo.tipo == 'aislamiento' %}
+
+{% if grafico_heatmap_json %}
+<div class="card" style="margin-bottom:1.25rem;">
+    <div class="card-title">
+        <i class="ti ti-table"></i> Mapa de Pruebas Bioquímicas
+        <span style="font-size:12px; font-weight:400; color:var(--text-hint); margin-left:8px;">verde = positivo · naranja = negativo</span>
+    </div>
+    <div id="grafico-heatmap"></div>
+</div>
+{% endif %}
+
+{% if aislados_sin_pruebas %}
+<div class="card" style="margin-bottom:1.25rem;">
+    <div class="card-title">Organismos Aislados</div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:0.75rem;">
+        {% for org in aislados_sin_pruebas %}
+        <span class="badge {% if org.tipo == 'hongo' %}tipo-hongo{% else %}tipo-bacteria{% endif %}"
+              style="font-style:italic; font-size:13px; padding:4px 14px;">
+            {{ org.nombre_cientifico }}
+            {% if org.clasificacion_catalogo == 'benefico' %}
+            <span class="badge badge-benefico" style="font-style:normal; font-size:11px; margin-left:4px;">Benéfico</span>
+            {% elif org.clasificacion_catalogo == 'fitopatogeno' %}
+            <span class="badge badge-fitopatogeno" style="font-style:normal; font-size:11px; margin-left:4px;">Fitopatógeno</span>
+            {% elif org.clasificacion_catalogo == 'neutral' %}
+            <span class="badge badge-neutral" style="font-style:normal; font-size:11px; margin-left:4px;">Neutral</span>
+            {% endif %}
+        </span>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% for org in aislados_con_pruebas %}
+<div class="card" style="margin-bottom:1.25rem;">
+
+    {# — Cabecera: nombre + badges — #}
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:0.75rem;">
+        <h3 style="font-size:16px; font-weight:700; margin:0; font-style:italic; color:var(--text-primary);">
+            {{ org.nombre_cientifico }}
+        </h3>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+            <span class="badge {% if org.tipo == 'hongo' %}tipo-hongo{% else %}tipo-bacteria{% endif %}">
+                {% if org.tipo == 'hongo' %}🍄 Hongo{% else %}🦠 Bacteria{% endif %}
+            </span>
+            {% if org.clasificacion_catalogo == 'benefico' %}
+            <span class="badge badge-benefico"><i class="ti ti-shield-check"></i> Benéfico</span>
+            {% elif org.clasificacion_catalogo == 'fitopatogeno' %}
+            <span class="badge badge-fitopatogeno"><i class="ti ti-alert-triangle"></i> Fitopatógeno</span>
+            {% elif org.clasificacion_catalogo == 'neutral' %}
+            <span class="badge badge-neutral">— Neutral</span>
+            {% else %}
+            <span class="badge badge-sin-clas">Sin clasificar</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {# — Taxonomía como franja de píldoras horizontales — #}
+    {% if org.tiene_taxonomia %}
+    <div style="display:flex; flex-wrap:wrap; gap:6px 16px; padding:8px 10px; background:var(--gris-light); border-radius:6px; margin-bottom:1rem; font-size:12px; color:var(--text-muted);">
+        {% if org.dominio %}<span><strong>Dominio:</strong> {{ org.dominio }}</span>{% endif %}
+        {% if org.filo %}<span><strong>Filo:</strong> {{ org.filo }}</span>{% endif %}
+        {% if org.clase %}<span><strong>Clase:</strong> {{ org.clase }}</span>{% endif %}
+        {% if org.orden_taxonomico %}<span><strong>Orden:</strong> {{ org.orden_taxonomico }}</span>{% endif %}
+        {% if org.familia %}<span><strong>Familia:</strong> {{ org.familia }}</span>{% endif %}
+        {% if org.genero %}<span><strong>Género:</strong> <em>{{ org.genero }}</em></span>{% endif %}
+        {% if org.especie %}<span><strong>Especie:</strong> <em>{{ org.especie }}</em></span>{% endif %}
+    </div>
+    {% endif %}
+
+    {# — Tabla de pruebas bioquímicas — #}
+    {% if org.pruebas.all %}
+    <div class="table-wrap cards-mobile">
+        <table class="table-inner">
+            <thead>
+                <tr>
+                    <th style="width:44px;">N°</th>
+                    <th>Prueba bioquímica</th>
+                    <th class="td-center" style="width:110px;">Resultado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in org.pruebas.all %}
+                <tr>
+                    <td data-label="N°" class="td-mono" style="color:var(--text-hint); font-size:12px;">{{ p.numero }}</td>
+                    <td data-label="Prueba">{{ p.nombre_prueba }}</td>
+                    <td data-label="Resultado" class="td-center">
+                        <span class="badge {% if p.resultado_clase == 'positivo' %}badge-positivo{% elif p.resultado_clase == 'negativo' %}badge-negativo{% else %}badge-sin-clas{% endif %}">
+                            {{ p.resultado }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2" style="color:var(--text-hint); font-size:12px;">
+                        Metodología: Pruebas bioquímicas en medios selectivos
+                    </td>
+                    <td class="td-center" style="font-size:12px; font-weight:600; color:var(--verde-dark);">
+                        <em>{{ org.nombre_cientifico }}</em>
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% endif %}
+
+</div>
+{% endfor %}
+
+{% endif %}
+
+{# ── Observaciones ── #}
+{% if ensayo.observaciones %}
+<div class="card card-sm" style="background:var(--gris-light);">
+    <strong style="font-size:13px; color:var(--text-muted);">Observaciones:</strong>
+    <p style="margin:6px 0 0; font-size:13px; color:var(--text-hint);">{{ ensayo.observaciones }}</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script>
+{% if grafico_recuento_json %}
+(function(){
+    var data = {{ grafico_recuento_json|json_embed }};
+    Plotly.newPlot('grafico-recuento', data.data, data.layout, {responsive: true, displayModeBar: false});
+})();
+{% endif %}
+{% if grafico_heatmap_json %}
+(function(){
+    var data = {{ grafico_heatmap_json|json_embed }};
+    Plotly.newPlot('grafico-heatmap', data.data, data.layout, {responsive: true, displayModeBar: false});
+})();
+{% endif %}
+</script>
+{% endblock extra_js %}

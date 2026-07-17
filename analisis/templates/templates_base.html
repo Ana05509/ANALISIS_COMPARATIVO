@@ -371,6 +371,68 @@
             font-size: 14px;
         }
 
+<<<<<<< Updated upstream
+=======
+        /* Igual que en .table-inner: sin un mínimo, el navegador aprieta las
+           columnas en vez de dejar que .table-wrap la haga scrollable. Tablas
+           puntuales (ids con su propio min-width, como #tabla-historial)
+           siguen ganando por especificidad si necesitan otro valor. */
+        .table-wrap table { min-width: 560px; }
+
+        /* ── TABLAS → TARJETAS EN MÓVIL ────────────────────────────────── */
+        @media (max-width: 640px) {
+            .table-wrap.cards-mobile { overflow-x: visible; border: none; box-shadow: none; }
+            .table-wrap.cards-mobile table {
+                /* !important: algunas tablas fijan su propio min-width por id
+                   (ej. #tabla-historial) con más especificidad que esta regla;
+                   en modo tarjetas ese mínimo ya no debe aplicar. */
+                min-width: 0 !important;
+                display: block;
+            }
+            .table-wrap.cards-mobile thead { display: none; }
+            .table-wrap.cards-mobile tbody,
+            .table-wrap.cards-mobile tfoot { display: block; }
+            .table-wrap.cards-mobile tfoot td { display: block; text-align: left !important; }
+            .table-wrap.cards-mobile tfoot td::before { content: none; }
+            .table-wrap.cards-mobile tr {
+                display: block;
+                background: var(--surface);
+                border: 1px solid var(--gris-border);
+                border-radius: var(--radius);
+                box-shadow: var(--shadow-card);
+                padding: 10px 14px;
+                margin-bottom: 10px;
+            }
+            .table-wrap.cards-mobile tr:last-child { margin-bottom: 0; }
+            .table-wrap.cards-mobile td {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 7px 0;
+                border-bottom: 1px solid var(--gris-light);
+                text-align: right;
+                white-space: normal;
+            }
+            .table-wrap.cards-mobile td:last-child { border-bottom: none; }
+            .table-wrap.cards-mobile td:empty,
+            .table-wrap.cards-mobile td[data-label=""] { display: none; }
+            .table-wrap.cards-mobile td::before {
+                content: attr(data-label);
+                font-size: 10.5px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: .05em;
+                color: var(--text-hint);
+                text-align: left;
+                flex-shrink: 0;
+                margin-right: auto;
+            }
+            /* Celdas sin data-label (ej. acciones) no llevan etiqueta encima */
+            .table-wrap.cards-mobile td:not([data-label])::before { content: none; }
+        }
+
+>>>>>>> Stashed changes
         thead th {
             background: var(--gris-light);
             font-size: 11px;

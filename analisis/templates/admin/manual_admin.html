@@ -1,0 +1,314 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Manual del Administrador — BioSuelo{% endblock %}
+
+{% block content %}
+<style>
+  .man-wrap      { margin: 32px auto; padding: 0 16px 60px; font-family: 'Outfit', sans-serif; }
+  /* El texto en párrafo sí conserva un ancho de lectura cómodo (líneas muy
+     largas son difíciles de leer); las tarjetas/hero sí usan el ancho
+     completo del contenedor. */
+  .man-sec-body p { max-width: 78ch; }
+  .man-hero      { background: linear-gradient(135deg,#085041 0%,#1D9E75 100%); color:#fff; border-radius:12px; padding:36px 40px; margin-bottom:32px; }
+  .man-hero h1   { margin:0 0 8px; font-size:28px; font-weight:600; letter-spacing:-.3px; }
+  .man-hero p    { margin:0; opacity:.85; font-size:15px; line-height:1.6; }
+  .man-toc       { background:#F7F6F2; border:1px solid #D3D1C7; border-radius:10px; padding:22px 28px; margin-bottom:36px; }
+  .man-toc h2    { margin:0 0 14px; font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#888780; font-weight:500; }
+  .man-toc ol    { margin:0; padding-left:22px; columns:2; column-gap:32px; }
+  .man-toc li    { margin-bottom:6px; break-inside:avoid; }
+  .man-toc a     { color:#1D9E75; text-decoration:none; font-size:14px; }
+  .man-toc a:hover { text-decoration:underline; }
+  .man-sec       { margin-bottom:36px; border:1px solid #D3D1C7; border-radius:10px; overflow:hidden; }
+  .man-sec-head  { display:flex; align-items:center; gap:12px; background:#1D9E75; color:#fff; padding:16px 22px; }
+  .man-sec-icon  { font-size:22px; flex-shrink:0; }
+  .man-sec-title { font-size:17px; font-weight:600; margin:0; }
+  .man-sec-body  { padding:22px 26px; background:#fff; }
+  .man-sec-body p { margin:0 0 12px; line-height:1.7; font-size:14.5px; color:#1a1a18; }
+  .man-sec-body p:last-child { margin-bottom:0; }
+  .man-steps     { counter-reset:step; list-style:none; padding:0; margin:14px 0 0; }
+  .man-steps li  { display:flex; gap:14px; margin-bottom:14px; font-size:14px; line-height:1.6; color:#1a1a18; }
+  .man-steps li::before { counter-increment:step; content:counter(step); background:#1D9E75; color:#fff; border-radius:50%; min-width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; flex-shrink:0; margin-top:1px; }
+  .man-tip       { background:#E1F5EE; border-left:3px solid #1D9E75; border-radius:0 8px 8px 0; padding:12px 16px; margin:14px 0 0; font-size:13.5px; color:#085041; line-height:1.6; }
+  .man-warn      { background:#FAEEDA; border-left:3px solid #BA7517; border-radius:0 8px 8px 0; padding:12px 16px; margin:14px 0 0; font-size:13.5px; color:#5a3a00; line-height:1.6; }
+  .man-roles     { width:100%; border-collapse:collapse; font-size:14px; margin:14px 0 0; }
+  .man-roles th  { background:#F1EFE8; padding:10px 14px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#888780; font-weight:500; border-bottom:1px solid #D3D1C7; }
+  .man-roles td  { padding:10px 14px; border-bottom:1px solid #F1EFE8; vertical-align:top; line-height:1.55; }
+  .man-roles tr:last-child td { border-bottom:none; }
+  .badge         { display:inline-block; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:500; }
+  .badge-green   { background:#E1F5EE; color:#085041; }
+  .badge-amber   { background:#FAEEDA; color:#5a3a00; }
+  .badge-gray    { background:#F1EFE8; color:#5F5E5A; }
+  .man-divider   { border:none; border-top:1px solid #D3D1C7; margin:10px 0 16px; }
+  @media(max-width:640px){ .man-toc ol{ columns:1; } .man-hero{ padding:24px 20px; } .man-sec-body{ padding:16px 18px; } }
+</style>
+
+<div class="man-wrap">
+
+  <!-- HÉROE -->
+  <div class="man-hero">
+    <h1>Manual del Administrador — BioSuelo</h1>
+    <p>Guía completa de todas las funciones disponibles en el panel de administración. Léala una vez y tendrá el control total del sistema.</p>
+  </div>
+
+  <!-- TABLA DE CONTENIDOS -->
+  <div class="man-toc">
+    <h2>Contenido</h2>
+    <ol>
+      <li><a href="#sec-sistema">¿Qué es BioSuelo?</a></li>
+      <li><a href="#sec-cultivos">Cultivos</a></li>
+      <li><a href="#sec-variedades">Variedades / Clones</a></li>
+      <li><a href="#sec-muestras">Muestras de Suelo</a></li>
+      <li><a href="#sec-archivos">Archivos Moleculares</a></li>
+      <li><a href="#sec-resultados">Resultados Taxonómicos</a></li>
+      <li><a href="#sec-catalogo">Catálogo de Microorganismos</a></li>
+      <li><a href="#sec-ensayos">Ensayos Microbiológicos</a></li>
+      <li><a href="#sec-aislados">Microorganismos Aislados</a></li>
+      <li><a href="#sec-usuarios">Usuarios</a></li>
+      <li><a href="#sec-herramientas">Herramientas generales</a></li>
+    </ol>
+  </div>
+
+  <!-- 1. QUÉ ES BIOSUELO -->
+  <div class="man-sec" id="sec-sistema">
+    <div class="man-sec-head">
+      <span class="man-sec-icon material-symbols-outlined">info</span>
+      <h2 class="man-sec-title">1. ¿Qué es BioSuelo?</h2>
+    </div>
+    <div class="man-sec-body">
+      <p>BioSuelo es un sistema web de procesamiento y visualización de resultados microbiológicos de suelos agrícolas. Permite gestionar muestras de campo, cargar archivos de secuenciación molecular (16S rRNA para bacterias, ITS para hongos), procesar automáticamente los resultados y consultar el catálogo de microorganismos identificados.</p>
+      <p>Como <strong>administrador</strong> usted tiene acceso completo: puede crear, editar y eliminar cualquier registro del sistema, gestionar los usuarios y sus roles, y monitorear todo el flujo de trabajo desde la toma de muestras hasta los resultados taxonómicos.</p>
+      <div class="man-tip">El panel de control del sistema (<strong>Dashboard</strong>) muestra un resumen en tiempo real: muestras recientes, últimas cargas moleculares y los taxa más abundantes identificados.</div>
+    </div>
+  </div>
+
+  <!-- 2. CULTIVOS -->
+  <div class="man-sec" id="sec-cultivos">
+    <div class="man-sec-head">
+      <span class="man-sec-icon material-symbols-outlined">agriculture</span>
+      <h2 class="man-sec-title">2. Cultivos</h2>
+    </div>
+    <div class="man-sec-body">
+      <p>Los <strong>Cultivos</strong> son los tipos de plantas agrícolas que se estudian (cacao, banano, maíz, etc.). Cada cultivo puede tener múltiples variedades o clones asociados.</p>
+      <hr class="man-divider">
+      <strong>Para crear un cultivo:</strong>
+      <ol class="man-steps">
+        <li>En el menú lateral, haga clic en <strong>Muestras de Campo → Cultivos</strong>.</li>
+        <li>Presione el botón <strong>+ Agregar Cultivo</strong> (esquina superior derecha).</li>
+        <li>Ingrese el <strong>Nombre</strong> (único en el sistema) y una <strong>Descripción</strong> opcional.</li>
+        <li>Suba una <strong>fotografía</strong> desde su computadora (JPG, PNG, WEBP) <em>o</em> pegue un enlace externo en el campo <em>URL de imagen</em>. Si pega una URL, el sistema descarga la imagen automáticamente al servidor.</li>
+        <li>Presione <strong>Guardar</strong>.</li>
+      </ol>
+      <div class="man-tip">Si sube tanto archivo como URL, el archivo tiene prioridad. La imagen descargada queda almacenada en el servidor y es visible para todos los usuarios sin depender de sitios externos.</div>
+    </div>
+  </div>
+
+  <!-- 3. VARIEDADES -->
+  <div class="man-sec" id="sec-variedades">
+    <div class="man-sec-head">
+      <span class="man-sec-icon material-symbols-outlined">eco</span>
+      <h2 class="man-sec-title">3. Variedades / Clones</h2>
+    </div>
+    <div class="man-sec-body">
+      <p>Cada cultivo puede tener varias <strong>Variedades o Clones</strong> (ej.: Cacao → CCN-51, Nacional). Deben existir antes de registrar una muestra de suelo.</p>
+      <ol class="man-steps">
+        <li>Vaya a <strong>Muestras de Campo → Variedades / Clones</strong>.</li>
+        <li>Presione <strong>+ Agregar</strong>.</li>
+        <li>Seleccione el <strong>Cultivo</strong> al que pertenece.</li>
+        <li>Escriba el <strong>Nombre</strong> de la variedad o clon y una descripción opcional.</li>
+        <li>Presione <strong>Guardar</strong>.</li>
+      </ol>
+      <div class="man-tip">Puede filtrar la lista por cultivo usando el panel de filtros de la derecha para encontrar rápidamente las variedades de un cultivo específico.</div>
+    </div>
+  </div>
+
+  <!-- 4. MUESTRAS DE SUELO -->
+  <div class="man-sec" id="sec-muestras">
+    <div class="man-sec-head">
+      <span class="man-sec-icon material-symbols-outlined">landscape</span>
+      <h2 class="man-sec-title">4. Muestras de Suelo</h2>
+    </div>
+    <div class="man-sec-body">
+      <p>Las <strong>Muestras de Suelo</strong> son el punto de partida de todo el análisis. Cada muestra tiene un código único, una ubicación geográfica y está vinculada a un cultivo y variedad específicos.</p>
+      <ol class="man-steps">
+        <li>Vaya a <strong>Muestras de Campo → Muestras de Suelo</strong>.</li>
+        <li>Presione <strong>+ Agregar Muestra de Suelo</strong>.</li>
+        <li>Escriba un <strong>Código</strong> único e identificable (ej.: <code>SUELO-CACAO-001</code>).</li>
+        <li>Seleccione el <strong>Cultivo</strong>. El selector de variedad/clon se actualizará automáticamente para mostrar solo las variedades de ese cultivo.</li>
+        <li>Indique la <strong>Localidad</strong>, <strong>Finca / Lote</strong> y <strong>Altitud</strong> (msnm).</li>
+        <li>Ingrese el <strong>Tipo de muestra</strong> (ej.: Suelo, Suelo Rizosférico).</li>
+        <li>Presione <strong>Guardar</strong>.</li>
+      </ol>
+      <div class="man-tip">Puede ver el historial completo de cambios de cada muestra haciendo clic en el botón <strong>Historial</strong> dentro del formulario de edición.</div>
+      <div class="man-warn">El código de muestra <strong>no puede repetirse</strong>. Defina una convención desde el inicio (ej.: TIPO-CULTIVO-NÚMERO) para mantener el orden a largo plazo.</div>
+    </div>
+  </div>
+
+  <!-- 5. ARCHIVOS MOLECULARES -->
+  <div class="man-sec" id="sec-archivos">
+    <div class="man-sec-head">
+      <span class="man-sec-icon material-symbols-outlined">upload_file</span>
+      <h2 class="man-sec-title">5. Archivos Moleculares</h2>
+    </div>
+    <div class="man-sec-body">
+      <p>Los <strong>Archivos Moleculares</strong> son los resultados crudos de la secuenciación (archivos CSV o Excel con datos taxonómicos). Al guardar un archivo, el sistema ejecuta automáticamente el <strong>pipeline de procesamiento</strong> y genera los resultados taxonómicos.</p>
+      <ol class="man-steps">
+        <li>Vaya a <strong>Secuenciación Molecular → Archivos Moleculares</strong>.</li>
+        <li>Presione <strong>+ Agregar Archivo Molecular</strong>.</li>
+        <li>Seleccione la <strong>Muestra de Suelo</strong> a la que pertenece el archivo.</li>
+        <li>Elija el <strong>Tipo de análisis</strong>: <span class="badge badge-green">16S</span> para bacterias o <span class="badge badge-amber">ITS</span> para hongos.</li>
+        <li>Suba el <strong>archivo</strong> (CSV, TSV, XLSX, XLS).</li>
+        <li>Presione <strong>Guardar</strong>. El pipeline se ejecutará al instante.</li>
+      </ol>
+      <div class="man-tip">Si vuelve a subir un archivo para una muestra ya procesada, el sistema <strong>elimina los resultados anteriores</strong> y vuelve a procesar. Esto permite corregir errores sin duplicar datos.</div>
+      <div class="man-warn">El archivo debe tener columnas taxonómicas reconocibles (kingdom, phylum, class, order, family, genus, species, num_hits). Si el formato no es compatible, el sistema lo indicará con un mensaje de error.</div>
+    </div>
+  </div>
+
+  <!-- 6. RESULTADOS TAXONÓMICOS -->
+  <div class="man-sec" id="sec-resultados">
+    <div class="man-sec-head">
+      <span class="man-sec-icon material-symbols-outlined">science</span>
+      <h2 class="man-sec-title">6. Resultados Taxonómicos</h2>
+    </div>
+    <div class="man-sec-body">
+      <p>Los <strong>Resultados Taxonómicos</strong> son generados automáticamente por el pipeline al cargar un archivo molecular. Esta sección es principalmente de <strong>consulta</strong>; no se recomienda editar registros individuales manualmente.</p>
+      <p>Cada resultado contiene la clasificación completa del microorganismo identificado: reino, filo, clase, orden, familia, género, especie, número de lecturas (hits) y porcentaje de abundancia relativa.</p>
+      <div class="man-tip">Use la barra de <strong>búsqueda</strong> para encontrar un género o especie específica en todos los archivos. Use los <strong>filtros</strong> de la derecha para ver solo los resultados de un tipo de análisis (16S o ITS).</div>
+    </div>
+  </div>
+
+  <!-- 7. CATÁLOGO DE MICROORGANISMOS -->
+  <div class="man-sec" id="sec-catalogo">
+    <div class="man-sec-head">
+      <span class="man-sec-icon material-symbols-outlined">menu_book</span>
+      <h2 class="man-sec-title">7. Catálogo de Microorganismos</h2>
+    </div>
+    <div class="man-sec-body">
+      <p>El <strong>Catálogo</strong> es la base de referencia del sistema. Contiene microorganismos con su nivel taxonómico, marcador molecular, clasificación funcional y referencias bibliográficas. Se usa para contextualizar e interpretar los resultados.</p>
+      <hr class="man-divider">
+      <strong>Agregar un microorganismo manualmente:</strong>
+      <ol class="man-steps">
+        <li>Vaya a <strong>Secuenciación Molecular → Catálogo de Microorganismos</strong>.</li>
+        <li>Presione <strong>+ Agregar</strong>.</li>
+        <li>Ingrese el <strong>nombre científico</strong>, el <strong>nivel taxonómico</strong>, el <strong>marcador</strong> (16S / ITS) y la <strong>clasificación</strong> funcional.</li>
+        <li>Presione <strong>Guardar</strong>.</li>
+      </ol>
+      <hr class="man-divider">
+      <strong>Importar masivamente desde CSV / Excel:</strong>
+      <ol class="man-steps">
+        <li>En la lista del catálogo, presione el botón verde <strong>Importar CSV / Excel</strong>.</li>
+        <li>Suba un archivo con las columnas: <code>nombre</code>, <code>nivel</code>, <code>marcador</code>, <code>clasificacion</code> (obligatorias) y <code>descripcion</code>, <code>referencia</code> (opcionales).</li>
+        <li>El sistema creará los registros nuevos y actualizará los existentes automáticamente.</li>
+      </ol>
+      <div class="man-tip">Los valores permitidos para <strong>clasificacion</strong> son: <code>benefico</code>, <code>fitopatogeno</code>, <code>neutral</code>, <code>sin_clasificar</code>. Para <strong>marcador</strong>: <code>16S</code> o <code>ITS</code>.</div>
+    </div>
+  </div>
+
+  <!-- 8. ENSAYOS MICROBIOLÓGICOS -->
+  <div class="man-sec" id="sec-ensayos">
+    <div class="man-sec-head">
+      <span class="man-sec-icon material-symbols-outlined">science</span>
+      <h2 class="man-sec-title">8. Ensayos Microbiológicos</h2>
+    </div>
+    <div class="man-sec-body">
+      <p>Los <strong>Ensayos Microbiológicos</strong> (módulo de Microbiología Clásica) registran experimentos de recuento o aislamiento de microorganismos realizados en laboratorio sobre muestras de suelo. A diferencia de la secuenciación molecular, estos datos provienen de cultivos en placas y medios selectivos.</p>
+      <ol class="man-steps">
+        <li>Vaya a <strong>Microbiología Clásica → Ensayos (Recuento / Aislamiento)</strong>.</li>
+        <li>Presione <strong>+ Agregar</strong>.</li>
+        <li>Seleccione la <strong>Muestra de Suelo</strong> relacionada.</li>
+        <li>Ingrese el <strong>tipo de ensayo</strong>, la <strong>fecha</strong> y los parámetros del experimento.</li>
+        <li>Presione <strong>Guardar</strong>.</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- 9. MICROORGANISMOS AISLADOS -->
+  <div class="man-sec" id="sec-aislados">
+    <div class="man-sec-head">
+      <span class="man-sec-icon material-symbols-outlined">biotech</span>
+      <h2 class="man-sec-title">9. Microorganismos Aislados</h2>
+    </div>
+    <div class="man-sec-body">
+      <p>Los <strong>Microorganismos Aislados</strong> son los organismos identificados individualmente durante un ensayo microbiológico. Cada aislado está vinculado a un ensayo y puede tener información sobre su morfología, características bioquímicas y clasificación tentativa.</p>
+      <ol class="man-steps">
+        <li>Vaya a <strong>Microbiología Clásica → Microorganismos Aislados</strong>.</li>
+        <li>Presione <strong>+ Agregar</strong>.</li>
+        <li>Seleccione el <strong>Ensayo</strong> del que proviene el aislado.</li>
+        <li>Complete los campos de identificación y características.</li>
+        <li>Presione <strong>Guardar</strong>.</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- 10. USUARIOS -->
+  <div class="man-sec" id="sec-usuarios">
+    <div class="man-sec-head">
+      <span class="man-sec-icon material-symbols-outlined">group</span>
+      <h2 class="man-sec-title">10. Usuarios</h2>
+    </div>
+    <div class="man-sec-body">
+      <p>En <strong>Gestión → Usuarios</strong> puede ver, crear, editar y desactivar las cuentas de todos los usuarios del sistema. Los roles determinan qué secciones puede ver cada usuario.</p>
+      <hr class="man-divider">
+      <strong>Roles del sistema:</strong>
+      <table class="man-roles">
+        <thead>
+          <tr>
+            <th>Rol</th>
+            <th>Acceso en la plataforma</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="badge badge-green">Administrador</span></td>
+            <td>Acceso completo al admin y a todas las secciones del sistema.</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-amber">Docente</span></td>
+            <td>Acceso al dashboard, análisis, comparación e historial. Puede ver y comparar todos los resultados.</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-gray">Estudiante</span></td>
+            <td>Acceso al dashboard y consulta básica. No puede cargar ni modificar datos.</td>
+          </tr>
+        </tbody>
+      </table>
+      <hr class="man-divider">
+      <strong>Crear un usuario nuevo:</strong>
+      <ol class="man-steps">
+        <li>Presione <strong>+ Agregar Usuario</strong>.</li>
+        <li>Ingrese el <strong>correo electrónico</strong> (será el nombre de usuario).</li>
+        <li>Asigne una contraseña temporal.</li>
+        <li>Presione <strong>Guardar y continuar editando</strong> para asignar el <strong>Rol</strong> y nombre completo.</li>
+      </ol>
+      <hr class="man-divider">
+      <strong>Restablecer contraseña de un usuario:</strong>
+      <ol class="man-steps">
+        <li>Abra el usuario desde la lista.</li>
+        <li>Haga clic en el enlace <strong>«Cambiar contraseña»</strong> que aparece en la parte superior del formulario.</li>
+        <li>Ingrese y confirme la nueva contraseña.</li>
+        <li>Presione <strong>Cambiar contraseña</strong>.</li>
+      </ol>
+      <div class="man-warn">Para desactivar un usuario <strong>sin eliminarlo</strong> (recomendado), desmarque la casilla <strong>Activo</strong>. El usuario no podrá iniciar sesión pero su historial de datos se conserva.</div>
+    </div>
+  </div>
+
+  <!-- 11. HERRAMIENTAS GENERALES -->
+  <div class="man-sec" id="sec-herramientas">
+    <div class="man-sec-head">
+      <span class="man-sec-icon material-symbols-outlined">build</span>
+      <h2 class="man-sec-title">11. Herramientas generales del administrador</h2>
+    </div>
+    <div class="man-sec-body">
+      <p><strong>Búsqueda:</strong> En cada sección, use la barra de búsqueda superior para encontrar registros por nombre, código, correo o cualquier campo clave.</p>
+      <p><strong>Filtros:</strong> El panel lateral derecho en cada listado permite filtrar por fecha, tipo, cultivo, rol u otros atributos. Los filtros se pueden combinar.</p>
+      <p><strong>Historial de cambios:</strong> Dentro de cualquier registro que tenga pestaña <em>Historial</em>, puede ver quién hizo cada cambio, cuándo y qué valores tenía antes. Esto incluye Cultivos, Muestras de Suelo, Catálogo de Microorganismos y Usuarios.</p>
+      <p><strong>Ordenar columnas:</strong> Haga clic en el encabezado de cualquier columna en los listados para ordenar ascendente o descendente.</p>
+      <p><strong>Selección múltiple:</strong> Marque las casillas de la izquierda en varios registros y use el menú <em>Acción</em> para eliminarlos o exportarlos en lote.</p>
+      <div class="man-tip">Si tiene dudas sobre un campo en el formulario, posicione el cursor sobre el ícono de ayuda (<strong>?</strong>) junto al campo — algunos muestran instrucciones de ejemplo.</div>
+      <div class="man-warn">La acción <strong>Eliminar seleccionados</strong> es permanente y puede borrar datos relacionados en cascada. Desactive registros en lugar de eliminarlos cuando sea posible.</div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

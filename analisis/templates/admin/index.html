@@ -1,0 +1,578 @@
+{% extends 'admin/base.html' %}
+{% load i18n %}
+
+{% block extrahead %}
+{{ block.super }}
+<!-- Los íconos de este dashboard usan Material Symbols, la misma fuente
+     que ya carga Unfold en todo el admin (logo, menú lateral, botones) —
+     no hace falta un CDN de íconos aparte. -->
+<style>
+    /* ════════════════════════════════════════
+       DASHBOARD ADMIN — BioSuelo
+       Fuentes: Outfit, Fraunces, DM Mono
+       (cargadas desde admin_personalizado.css)
+       ════════════════════════════════════════ */
+
+    .tb-dash {
+        font-family: 'Outfit', sans-serif;
+        font-size: 16px;
+        color: var(--tb-text);
+    }
+
+    /* ── ENCABEZADO DEL DASHBOARD ── */
+    .tb-dash-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.75rem;
+        flex-wrap: wrap;
+    }
+    .tb-dash-title {
+        font-family: 'Fraunces', serif;
+        font-size: 1.7rem;
+        font-weight: 600;
+        color: var(--tb-text);
+        letter-spacing: -0.3px;
+        line-height: 1.2;
+    }
+    .tb-dash-subtitle {
+        font-size: 0.85rem;
+        color: var(--tb-muted);
+        margin-top: 3px;
+        font-family: 'DM Mono', monospace;
+    }
+    .tb-dash-date {
+        font-family: 'DM Mono', monospace;
+        font-size: 0.75rem;
+        color: var(--tb-hint);
+        text-align: right;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    /* ── GRID DE ESTADÍSTICAS ──
+       auto-fit + minmax (no "repeat(4, 1fr)" a secas): con 1fr solo, cada
+       columna no puede achicarse más allá del contenido de la tarjeta
+       (ícono + etiqueta sin salto de línea), así que si las 4 no entraban
+       en el ancho real disponible, la grid se salía del contenedor en vez
+       de reacomodarse — se veía "cortada" a la derecha. Con minmax(0,1fr)
+       cada columna sí puede achicarse, y auto-fit decide solo cuántas
+       columnas entran (4, 2 o 1) sin necesitar adivinar breakpoints. */
+    .tb-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    /* Tarjeta de estadística — ícono a la izquierda, texto a la derecha */
+    .tb-stat-card {
+        background: var(--tb-surface);
+        border: 1px solid var(--tb-border);
+        border-radius: 18px;
+        padding: 20px;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: inherit;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        box-shadow: 0 1px 3px rgba(20,20,15,0.04);
+    }
+    .tb-stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 14px 30px -8px rgba(20,20,15,0.14);
+        border-color: var(--acento);
+        text-decoration: none;
+        color: inherit;
+    }
+    .tb-stat-icon {
+        width: 56px;
+        height: 56px;
+        min-width: 56px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--icon-bg);
+    }
+    .tb-stat-icon .material-symbols-outlined {
+        font-size: 24px;
+        color: var(--acento);
+    }
+    .tb-stat-body { min-width: 0; }
+    .tb-stat-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: .6px;
+        text-transform: uppercase;
+        color: var(--tb-hint);
+        line-height: 1.3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .tb-stat-value {
+        font-family: 'Fraunces', serif;
+        font-size: 1.9rem;
+        font-weight: 600;
+        color: var(--tb-text);
+        line-height: 1.25;
+    }
+    .tb-stat-desc {
+        font-size: 0.72rem;
+        color: var(--tb-hint);
+        margin-top: 1px;
+        font-weight: 400;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .tb-stat-desc.alerta { color: #C56A00; font-weight: 700; }
+
+    /* Variantes de color por tarjeta — todas dentro de la paleta verde/tierra de BioSuelo */
+    .card-verde   { --acento: var(--tb-verde);  --icon-bg: var(--tb-verde-light); }
+    .card-azul    { --acento: var(--tb-azul);   --icon-bg: var(--tb-azul-light); }
+    .card-amber   { --acento: var(--tb-amber);  --icon-bg: var(--tb-amber-light); }
+    .card-morado  { --acento: var(--tb-morado); --icon-bg: var(--tb-morado-light); }
+
+    /* ── FILA: GRÁFICO + TOP CULTIVOS ── */
+    .tb-row-2col {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+        align-items: stretch;
+    }
+
+    .tb-panel {
+        background: var(--tb-surface);
+        border: 1px solid var(--tb-border);
+        border-radius: 18px;
+        padding: 22px 24px;
+        box-shadow: 0 1px 3px rgba(20,20,15,0.04);
+        min-width: 0;
+        overflow: hidden;
+    }
+    #tb-chart-catalogo {
+        width: 100%;
+        max-width: 320px;
+        min-width: 0;
+        margin: 0 auto;
+    }
+    .tb-panel-title {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--tb-text);
+        margin-bottom: 4px;
+    }
+    .tb-panel-title .material-symbols-outlined { font-size: 19px; color: var(--tb-verde); }
+    .tb-panel-sub {
+        font-size: 0.72rem;
+        color: var(--tb-hint);
+        margin-bottom: 14px;
+    }
+
+    /* Gráfico dona: centrar contenido vacío si no hay datos */
+    .tb-chart-empty {
+        text-align: center;
+        color: var(--tb-hint);
+        font-size: 0.8rem;
+        padding: 60px 0;
+    }
+
+    /* Leyenda propia (HTML/CSS) del gráfico de dona: reemplaza la leyenda
+       nativa de Plotly, que no envuelve a varias líneas y termina
+       superponiendo las etiquetas cuando el panel es angosto. */
+    .tb-donut-legend {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px 16px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #EEECE4;
+    }
+    .tb-donut-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 0.78rem;
+        color: #4a4944;
+    }
+    .tb-donut-legend-dot {
+        width: 10px; height: 10px; min-width: 10px;
+        border-radius: 50%;
+    }
+    .tb-donut-legend-pct {
+        color: var(--tb-hint);
+        font-size: 0.72rem;
+    }
+
+    /* ── TOP CULTIVOS (equivalente a "Top Scorer") ── */
+    .tb-top-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .tb-top-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: var(--rango-bg);
+        color: #ffffff;
+    }
+    .tb-top-medal {
+        width: 34px; height: 34px; min-width: 34px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.22);
+        display: flex; align-items: center; justify-content: center;
+        font-family: 'DM Mono', monospace;
+        font-weight: 700;
+        font-size: 0.85rem;
+        border: 1.5px solid rgba(255,255,255,0.4);
+    }
+    .tb-top-body { min-width: 0; flex: 1; }
+    .tb-top-name {
+        font-weight: 600;
+        font-size: 0.88rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .tb-top-sub {
+        font-size: 0.7rem;
+        opacity: 0.85;
+    }
+    .tb-top-value {
+        font-family: 'Fraunces', serif;
+        font-size: 1.3rem;
+        font-weight: 600;
+        flex-shrink: 0;
+    }
+    .tb-top-empty {
+        text-align: center;
+        color: var(--tb-hint);
+        font-size: 0.8rem;
+        padding: 40px 0;
+    }
+
+    /* ── BARRA DE ALMACENAMIENTO ── */
+    .tb-storage-card {
+        background: var(--tb-surface);
+        border: 1px solid var(--tb-border);
+        border-radius: 18px;
+        padding: 22px 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 3px rgba(20,20,15,0.04);
+    }
+    .tb-storage-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .tb-storage-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--tb-text);
+    }
+    .tb-storage-title .material-symbols-outlined {
+        font-size: 20px;
+        color: var(--tb-verde);
+    }
+    .tb-storage-nums {
+        font-family: 'DM Mono', monospace;
+        font-size: 0.75rem;
+        color: var(--tb-muted);
+    }
+    .tb-progress-track {
+        background: var(--tb-gris-light);
+        border-radius: 99px;
+        height: 10px;
+        overflow: hidden;
+        margin-bottom: 6px;
+    }
+    .tb-progress-bar {
+        height: 100%;
+        border-radius: 99px;
+        transition: width 0.6s ease;
+    }
+    .bar-ok      { background: linear-gradient(90deg, var(--tb-verde), #25c490); }
+    .bar-warning { background: linear-gradient(90deg, var(--tb-amber), #e0951c); }
+    .bar-danger  { background: linear-gradient(90deg, var(--tb-rojo), #c44040); }
+    .tb-progress-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.72rem;
+        color: var(--tb-hint);
+    }
+    .tb-progress-pct {
+        font-weight: 700;
+    }
+    .pct-ok      { color: var(--tb-verde); }
+    .pct-warning { color: var(--tb-amber); }
+    .pct-danger  { color: var(--tb-rojo); }
+
+    /* ── NOTIFICACIONES ── */
+    .tb-notif-card {
+        background: var(--tb-surface);
+        border: 1px solid var(--tb-border);
+        border-radius: 18px;
+        padding: 22px 24px;
+        box-shadow: 0 1px 3px rgba(20,20,15,0.04);
+    }
+    .tb-notif-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--tb-text);
+        margin-bottom: 16px;
+    }
+    .tb-notif-title .material-symbols-outlined {
+        font-size: 20px;
+        color: var(--tb-verde);
+    }
+    .tb-notif-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .tb-notif-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 11px 14px;
+        border-radius: 12px;
+        border-left: 4px solid transparent;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        font-weight: 500;
+    }
+    .tb-notif-item .material-symbols-outlined {
+        font-size: 18px;
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+    .notif-success { background: var(--tb-verde-light); border-color: var(--tb-verde); color: var(--tb-verde-dark); }
+    .notif-success .material-symbols-outlined { color: var(--tb-verde); }
+    .notif-info    { background: var(--tb-azul-light); border-color: var(--tb-azul); color: var(--tb-azul-dark); }
+    .notif-info .material-symbols-outlined  { color: var(--tb-azul); }
+    .notif-warning { background: var(--tb-amber-light); border-color: var(--tb-amber); color: var(--tb-amber-dark); }
+    .notif-warning .material-symbols-outlined { color: var(--tb-amber); }
+    .notif-error   { background: var(--tb-rojo-light); border-color: var(--tb-rojo); color: var(--tb-rojo-dark); }
+    .notif-error .material-symbols-outlined { color: var(--tb-rojo); }
+
+    .tb-notif-empty {
+        text-align: center;
+        padding: 24px 0;
+        color: var(--tb-hint);
+        font-size: 0.85rem;
+    }
+
+    /* ── RESPONSIVE ──
+       .tb-stats-grid ya se reacomoda sola (auto-fit arriba); acá solo
+       queda lo que auto-fit no puede decidir por sí solo. */
+    @media (max-width: 1100px) {
+        .tb-row-2col { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 600px) {
+        .tb-stat-value { font-size: 1.6rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tb-dash">
+
+    <!-- ── Encabezado ── -->
+    <div class="tb-dash-header">
+        <div>
+            <div class="tb-dash-title">Panel de Control Microbiológico</div>
+            <div class="tb-dash-subtitle">BioSuelo · Procesamiento y visualización de resultados microbiológicos</div>
+        </div>
+        <div class="tb-dash-date">
+            <span class="material-symbols-outlined" style="font-size:16px;">calendar_month</span>
+            {% now "l, d \d\e F \d\e Y" %}
+        </div>
+    </div>
+
+    <!-- ── Fila 1: Tarjetas de estadísticas ── -->
+    <div class="tb-stats-grid">
+
+        <!-- Muestras de suelo -->
+        <a class="tb-stat-card card-verde"
+           href="{% url 'admin:analisis_muestrasuelo_changelist' %}">
+            <div class="tb-stat-icon"><span class="material-symbols-outlined">eco</span></div>
+            <div class="tb-stat-body">
+                <div class="tb-stat-label">Muestras de Suelo</div>
+                <div class="tb-stat-value">{{ stats.muestras|default:"—" }}</div>
+                <div class="tb-stat-desc">Registradas en el sistema</div>
+            </div>
+        </a>
+
+        <!-- Archivos moleculares -->
+        <a class="tb-stat-card card-azul"
+           href="{% url 'admin:analisis_archivomolecular_changelist' %}">
+            <div class="tb-stat-icon"><span class="material-symbols-outlined">biotech</span></div>
+            <div class="tb-stat-body">
+                <div class="tb-stat-label">Archivos Moleculares</div>
+                <div class="tb-stat-value">{{ stats.archivos|default:"—" }}</div>
+                <div class="tb-stat-desc {% if stats.sin_procesar %}alerta{% endif %}">
+                    {% if stats.sin_procesar %}{{ stats.sin_procesar }} sin procesar{% else %}Todos procesados{% endif %}
+                </div>
+            </div>
+        </a>
+
+        <!-- Catálogo maestro -->
+        <a class="tb-stat-card card-amber"
+           href="{% url 'admin:analisis_catalogomicroorganismo_changelist' %}">
+            <div class="tb-stat-icon"><span class="material-symbols-outlined">menu_book</span></div>
+            <div class="tb-stat-body">
+                <div class="tb-stat-label">Catálogo Maestro</div>
+                <div class="tb-stat-value">{{ stats.catalogo|default:"—" }}</div>
+                <div class="tb-stat-desc">Especies catalogadas</div>
+            </div>
+        </a>
+
+        <!-- Usuarios -->
+        <a class="tb-stat-card card-morado"
+           href="{% url 'admin:analisis_usuario_changelist' %}">
+            <div class="tb-stat-icon"><span class="material-symbols-outlined">group</span></div>
+            <div class="tb-stat-body">
+                <div class="tb-stat-label">Usuarios</div>
+                <div class="tb-stat-value">{{ stats.usuarios|default:"—" }}</div>
+                <div class="tb-stat-desc">Docentes y estudiantes</div>
+            </div>
+        </a>
+
+    </div>
+
+    <!-- ── Fila 2: Distribución del catálogo + Top Cultivos ── -->
+    <div class="tb-row-2col">
+
+        <div class="tb-panel">
+            <div class="tb-panel-title"><span class="material-symbols-outlined">donut_large</span> Distribución del Catálogo</div>
+            <div class="tb-panel-sub">Rol funcional de los microorganismos clasificados</div>
+            <div id="tb-chart-catalogo"></div>
+            {% if catalogo_legend %}
+            <div class="tb-donut-legend">
+                {% for item in catalogo_legend %}
+                <div class="tb-donut-legend-item">
+                    <span class="tb-donut-legend-dot" style="background:{{ item.color }};"></span>
+                    {{ item.label }}
+                    <span class="tb-donut-legend-pct">{{ item.pct }}%</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="tb-panel">
+            <div class="tb-panel-title"><span class="material-symbols-outlined">emoji_events</span> Top Cultivos</div>
+            <div class="tb-panel-sub">Con más muestras de suelo registradas</div>
+            <div class="tb-top-list">
+                {% for item in top_cultivos %}
+                <div class="tb-top-item" style="--rango-bg:{{ item.color }};">
+                    <div class="tb-top-medal">{{ item.rango }}°</div>
+                    <div class="tb-top-body">
+                        <div class="tb-top-name">{{ item.cultivo.nombre }}</div>
+                        <div class="tb-top-sub">Cultivo agrícola</div>
+                    </div>
+                    <div class="tb-top-value">{{ item.cultivo.total_muestras }}</div>
+                </div>
+                {% empty %}
+                <div class="tb-top-empty">
+                    <span class="material-symbols-outlined" style="font-size:22px;color:#c8c6bd;">eco</span><br>
+                    Aún no hay muestras registradas por cultivo.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── Fila 3: Almacenamiento del servidor ── -->
+    <div class="tb-storage-card">
+        <div class="tb-storage-header">
+            <div class="tb-storage-title">
+                <span class="material-symbols-outlined">storage</span>
+                Almacenamiento del Servidor
+            </div>
+            <span class="tb-storage-nums">
+                {{ storage.usado|default:"—" }} GB usados
+                &nbsp;/&nbsp;
+                {{ storage.total|default:"—" }} GB totales
+                &nbsp;·&nbsp;
+                <strong>{{ storage.libre|default:"—" }} GB libres</strong>
+            </span>
+        </div>
+
+        <div class="tb-progress-track">
+            <div class="tb-progress-bar bar-{{ storage.nivel }}" style="width:{{ storage.pct }}%;"></div>
+        </div>
+
+        <div class="tb-progress-labels">
+            <span>0 GB</span>
+            <span class="tb-progress-pct pct-{{ storage.nivel }}">
+                {{ storage.pct|default:"0" }}% utilizado
+            </span>
+            <span>{{ storage.total|default:"—" }} GB</span>
+        </div>
+    </div>
+
+    <!-- ── Fila 4: Notificaciones ── -->
+    <div class="tb-notif-card">
+        <div class="tb-notif-title">
+            <span class="material-symbols-outlined">notifications_active</span>
+            Notificaciones del Sistema
+        </div>
+
+        <div class="tb-notif-list">
+            {% for n in notifications %}
+                <div class="tb-notif-item notif-{{ n.tipo }}">
+                    <span class="material-symbols-outlined">{{ n.icono }}</span>
+                    <span>{{ n.msg }}</span>
+                </div>
+            {% empty %}
+                <div class="tb-notif-empty">
+                    <span class="material-symbols-outlined" style="font-size:24px;color:#1D9E75;">check_circle</span><br>
+                    Sin notificaciones pendientes
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js" defer></script>
+<script>
+(function () {
+    function dibujar() {
+        if (typeof Plotly === 'undefined') { setTimeout(dibujar, 100); return; }
+        var datos = {{ chart_catalogo_json|default:"null"|safe }};
+        var el = document.getElementById('tb-chart-catalogo');
+        if (datos && datos.data && datos.data.length) {
+            Plotly.newPlot(el, datos.data, datos.layout, {responsive: true, displayModeBar: false});
+        } else {
+            el.innerHTML = '<p class="tb-chart-empty">Aún no hay microorganismos clasificados en el catálogo.</p>';
+        }
+    }
+    dibujar();
+})();
+</script>
+{% endblock %}

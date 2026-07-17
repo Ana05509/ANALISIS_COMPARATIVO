@@ -1,0 +1,137 @@
+{% load i18n %}
+<style>
+    .aud-dash { margin-bottom: 1.5rem; font-family: 'Outfit', sans-serif; }
+
+    .aud-toolbar {
+        display: flex; align-items: center; justify-content: flex-end;
+        gap: 10px; margin-bottom: 14px;
+    }
+    .aud-btn-export {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 16px; border-radius: 8px;
+        font-size: 13px; font-weight: 600; text-decoration: none;
+        transition: opacity .15s;
+    }
+    .aud-btn-export:hover { opacity: .85; }
+    .aud-btn-excel { background: var(--tb-verde); color: #fff; }
+    .aud-btn-pdf   { background: var(--tb-rojo); color: #fff; }
+
+    /* auto-fit + minmax (no "repeat(4, 1fr)"): así cada tarjeta puede
+       achicarse de verdad y la grid decide sola cuántas caben, en vez de
+       desbordar el panel cuando el ancho real es menor al esperado. */
+    .aud-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 14px;
+        margin-bottom: 16px;
+    }
+
+    .aud-stat-card {
+        background: #fff; border: 1px solid var(--tb-border); border-radius: 14px;
+        padding: 16px 18px; position: relative; overflow: hidden;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .aud-stat-card::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        background: var(--aud-color);
+    }
+    .aud-stat-label {
+        font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
+        color: var(--tb-hint); margin-bottom: 6px;
+    }
+    .aud-stat-value {
+        font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 600;
+        color: var(--aud-color); line-height: 1;
+    }
+    .aud-stat-total    { --aud-color: var(--tb-azul); }
+    .aud-stat-exitosos { --aud-color: var(--tb-verde); }
+    .aud-stat-fallidos { --aud-color: var(--tb-rojo); }
+    .aud-stat-usuarios { --aud-color: var(--tb-morado); }
+
+    .aud-charts-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+        gap: 14px;
+        margin-bottom: 4px;
+    }
+    @media (max-width: 1300px) { .aud-charts-grid { grid-template-columns: minmax(0, 1fr); } }
+
+    .aud-chart-card {
+        background: #fff; border: 1px solid var(--tb-border); border-radius: 14px;
+        padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .aud-chart-title {
+        font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+        color: var(--tb-muted); margin-bottom: 8px;
+    }
+    .aud-chart-empty {
+        color: var(--tb-hint); font-size: 13px; text-align: center; padding: 40px 0;
+    }
+</style>
+
+<div class="aud-dash">
+    <div class="aud-toolbar">
+        <a class="aud-btn-export aud-btn-excel" href="exportar/excel/?{{ request.GET.urlencode }}">
+            <span class="material-symbols-outlined" style="font-size:16px;">grid_on</span>
+            Exportar Excel
+        </a>
+        <a class="aud-btn-export aud-btn-pdf" href="exportar/pdf/?{{ request.GET.urlencode }}">
+            <span class="material-symbols-outlined" style="font-size:16px;">picture_as_pdf</span>
+            Exportar PDF
+        </a>
+    </div>
+
+    <div class="aud-stats-grid">
+        <div class="aud-stat-card aud-stat-total">
+            <div class="aud-stat-label">Total de eventos</div>
+            <div class="aud-stat-value">{{ auditoria_stats.total }}</div>
+        </div>
+        <div class="aud-stat-card aud-stat-exitosos">
+            <div class="aud-stat-label">Inicios exitosos</div>
+            <div class="aud-stat-value">{{ auditoria_stats.exitosos }}</div>
+        </div>
+        <div class="aud-stat-card aud-stat-fallidos">
+            <div class="aud-stat-label">Intentos fallidos</div>
+            <div class="aud-stat-value">{{ auditoria_stats.fallidos }}</div>
+        </div>
+        <div class="aud-stat-card aud-stat-usuarios">
+            <div class="aud-stat-label">Usuarios activos</div>
+            <div class="aud-stat-value">{{ auditoria_stats.usuarios_activos }}</div>
+        </div>
+    </div>
+
+    <div class="aud-charts-grid">
+        <div class="aud-chart-card">
+            <div class="aud-chart-title">Eventos por día (últimos 14 días)</div>
+            <div id="aud-grafico-dias"></div>
+        </div>
+        <div class="aud-chart-card">
+            <div class="aud-chart-title">Intentos fallidos por usuario (top 10)</div>
+            <div id="aud-grafico-fallidos"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js" defer></script>
+<script>
+(function () {
+    function dibujar() {
+        if (typeof Plotly === 'undefined') { setTimeout(dibujar, 100); return; }
+
+        var dias = {{ grafico_eventos_json|default:"null"|safe }};
+        if (dias && dias.data && dias.data.length) {
+            Plotly.newPlot('aud-grafico-dias', dias.data, dias.layout, {responsive: true, displayModeBar: false});
+        } else {
+            document.getElementById('aud-grafico-dias').innerHTML = '<p class="aud-chart-empty">Sin eventos en los últimos 14 días.</p>';
+        }
+
+        var fallidos = {{ grafico_fallidos_json|default:"null"|safe }};
+        if (fallidos && fallidos.data && fallidos.data.length) {
+            Plotly.newPlot('aud-grafico-fallidos', fallidos.data, fallidos.layout, {responsive: true, displayModeBar: false});
+        } else {
+            document.getElementById('aud-grafico-fallidos').innerHTML = '<p class="aud-chart-empty">Sin intentos fallidos registrados.</p>';
+        }
+    }
+    dibujar();
+})();
+</script>

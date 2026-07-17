@@ -3,7 +3,148 @@
 
 {% block title %}Importar Catálogo de Microorganismos{% endblock %}
 
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .imp-wrap {
+        margin: 30px auto;
+        padding: 0 16px;
+        box-sizing: border-box;
+        font-family: 'Outfit', sans-serif;
+    }
+    .imp-title {
+        font-family: 'Fraunces', serif;
+        font-size: 1.7rem;
+        font-weight: 600;
+        color: #0A0A0A;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    .imp-title .material-symbols-outlined { font-size: 26px; color: var(--tb-verde); }
+    .imp-desc {
+        font-size: 15px;
+        color: var(--tb-muted, #5F5E5A);
+        line-height: 1.6;
+    }
+    .imp-card {
+        margin-top: 22px;
+        border-radius: 18px;
+        border: 1px solid var(--tb-border, #D3D1C7);
+        background: var(--tb-surface, #ffffff);
+        box-shadow: 0 1px 3px rgba(20,20,15,0.04);
+        overflow: hidden;
+    }
+    .imp-card-body { padding: 20px 22px; }
+    .imp-card-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin: 0 0 10px 0;
+    }
+    .imp-card-title .material-symbols-outlined { font-size: 20px; }
+    .imp-card-info { background: var(--tb-verde-light, #E1F5EE); border-color: var(--tb-verde, #1D9E75); }
+    .imp-card-info .imp-card-title { color: var(--tb-verde-dark, #085041); }
+    .imp-card-info .imp-card-title .material-symbols-outlined { color: var(--tb-verde, #1D9E75); }
+    .imp-card-warning { background: var(--tb-amber-light, #FAEEDA); border-color: var(--tb-amber, #BA7517); }
+    .imp-card-warning .imp-card-title { color: #5a3000; }
+    .imp-card-warning .imp-card-title .material-symbols-outlined { color: var(--tb-amber, #BA7517); }
+    .imp-list {
+        margin: 0;
+        padding-left: 0;
+        list-style: none;
+        line-height: 1.9;
+        font-size: 0.9rem;
+    }
+    .imp-list.imp-list-check li { display: flex; align-items: flex-start; gap: 8px; }
+    .imp-list.imp-list-check .material-symbols-outlined { font-size: 17px; color: var(--tb-verde, #1D9E75); margin-top: 2px; flex-shrink: 0; }
+    .imp-list.imp-list-plain li { padding-left: 14px; position: relative; }
+    .imp-list.imp-list-plain li::before { content: '–'; position: absolute; left: 0; color: #92400E; }
+
+    .imp-card-header {
+        background: var(--tb-verde, #1D9E75);
+        color: #ffffff;
+        padding: 12px 22px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .imp-card-header .material-symbols-outlined { font-size: 19px; }
+    .imp-table-scroll { overflow-x: auto; }
+    .imp-table {
+        width: 100%;
+        min-width: 520px;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    .imp-table thead { background: #F9F8F4; }
+    .imp-table th, .imp-table td {
+        padding: 12px;
+        border-bottom: 1px solid var(--tb-border, #D3D1C7);
+        text-align: left;
+    }
+    .imp-table .material-symbols-outlined { color: var(--tb-verde, #1D9E75); font-size: 18px; }
+
+    .imp-pre {
+        background: #F9F8F4;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid var(--tb-border, #D3D1C7);
+        overflow: auto;
+        font-family: 'DM Mono', monospace;
+        font-size: 0.82rem;
+    }
+
+    .imp-field-label {
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+    }
+    .imp-field-label .material-symbols-outlined { font-size: 19px; color: var(--tb-verde, #1D9E75); }
+    .imp-hint { margin-top: 8px; color: #6B7280; font-size: 13px; }
+    .imp-error { color: var(--tb-rojo, #A32D2D); margin-top: 10px; font-weight: 700; }
+
+    .imp-actions { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 4px; }
+    .imp-btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--tb-verde, #1D9E75);
+        color: #ffffff;
+        border: none;
+        padding: 12px 25px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 15px;
+        font-weight: 700;
+        font-family: 'Outfit', sans-serif;
+        transition: background-color 0.15s;
+    }
+    .imp-btn-primary:hover { background: var(--tb-verde-dark, #085041); }
+    .imp-btn-primary:disabled { opacity: 0.7; cursor: default; }
+    .imp-btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        padding: 12px 25px;
+        border: 1px solid var(--tb-border, #D3D1C7);
+        border-radius: 10px;
+        text-decoration: none;
+        color: #374151;
+        background: #ffffff;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
+<<<<<<< Updated upstream
 <div style="max-width:660px;margin:2rem auto;">
     <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;">
         📥 Importar Catálogo de Microorganismos
@@ -66,6 +207,179 @@
                 Cancelar
             </a>
         </div>
+=======
+
+<div class="imp-wrap">
+
+    <h1 class="imp-title">
+        <span class="material-symbols-outlined">upload</span>
+        Importar Catálogo de Microorganismos
+    </h1>
+
+    <p class="imp-desc">
+        Importe un archivo <strong>CSV</strong> o <strong>Excel (.xlsx)</strong> con la información del catálogo
+        maestro de microorganismos. El sistema verificará cada registro automáticamente.
+    </p>
+
+    <!-- Información general -->
+    <div class="imp-card imp-card-info">
+        <div class="imp-card-body">
+            <h3 class="imp-card-title">
+                <span class="material-symbols-outlined">info</span>
+                ¿Qué realiza la importación?
+            </h3>
+            <ul class="imp-list imp-list-check">
+                <li><span class="material-symbols-outlined">check_circle</span> Valida que el archivo tenga el formato correcto.</li>
+                <li><span class="material-symbols-outlined">check_circle</span> Comprueba que existan todas las columnas requeridas.</li>
+                <li><span class="material-symbols-outlined">check_circle</span> Crea microorganismos nuevos.</li>
+                <li><span class="material-symbols-outlined">check_circle</span> Actualiza microorganismos existentes (mismo nombre + nivel taxonómico).</li>
+                <li><span class="material-symbols-outlined">check_circle</span> Conserva la integridad del catálogo maestro.</li>
+                <li><span class="material-symbols-outlined">check_circle</span> Al finalizar mostrará un resumen de la importación.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Advertencias -->
+    <div class="imp-card imp-card-warning">
+        <div class="imp-card-body">
+            <h3 class="imp-card-title">
+                <span class="material-symbols-outlined">warning</span>
+                Recomendaciones importantes
+            </h3>
+            <ul class="imp-list imp-list-plain">
+                <li>No modifique el nombre de las columnas.</li>
+                <li>No elimine columnas obligatorias.</li>
+                <li>Utilice únicamente los valores permitidos.</li>
+                <li>Revise que los nombres científicos estén correctamente escritos.</li>
+                <li>Los registros duplicados serán actualizados automáticamente.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Formato -->
+    <div class="imp-card">
+        <div class="imp-card-header">
+            <span class="material-symbols-outlined">table_chart</span>
+            Formato esperado del archivo
+        </div>
+        <div class="imp-table-scroll">
+        <table class="imp-table">
+            <thead>
+            <tr>
+                <th>Columna</th>
+                <th>Obligatoria</th>
+                <th>Ejemplo</th>
+                <th>Descripción</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td><code>nombre</code></td>
+                <td><span class="material-symbols-outlined">check_circle</span></td>
+                <td><i>Bacillus</i></td>
+                <td>Nombre científico del microorganismo.</td>
+            </tr>
+            <tr>
+                <td><code>nivel</code></td>
+                <td><span class="material-symbols-outlined">check_circle</span></td>
+                <td>genus</td>
+                <td>Nivel taxonómico.</td>
+            </tr>
+            <tr>
+                <td><code>marcador</code></td>
+                <td><span class="material-symbols-outlined">check_circle</span></td>
+                <td>16S</td>
+                <td>16S (Bacterias) o ITS (Hongos).</td>
+            </tr>
+            <tr>
+                <td><code>clasificacion</code></td>
+                <td><span class="material-symbols-outlined">check_circle</span></td>
+                <td>benefico</td>
+                <td>
+                    benefico<br>
+                    fitopatogeno<br>
+                    neutral<br>
+                    sin_clasificar
+                </td>
+            </tr>
+            <tr>
+                <td><code>descripcion</code></td>
+                <td>No</td>
+                <td>Bacteria promotora del crecimiento vegetal.</td>
+                <td>Descripción general.</td>
+            </tr>
+            <tr>
+                <td><code>referencia</code></td>
+                <td>No</td>
+                <td>Artículo científico, DOI, libro.</td>
+                <td>Fuente bibliográfica.</td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+    <!-- Ejemplo -->
+    <div class="imp-card">
+        <div class="imp-card-body">
+            <h3 class="imp-card-title">
+                <span class="material-symbols-outlined">biotech</span>
+                Ejemplo de registros
+            </h3>
+            <pre class="imp-pre">nombre,nivel,marcador,clasificacion,descripcion,referencia
+Bacillus,genus,16S,benefico,Bacteria promotora del crecimiento,DOI:10.xxx
+Fusarium oxysporum,species,ITS,fitopatogeno,Hongo causante de marchitez,Libro XXX</pre>
+        </div>
+    </div>
+
+    <!-- Formulario -->
+    <form method="post" enctype="multipart/form-data" id="form-importar" class="imp-card">
+        <div class="imp-card-body">
+            {% csrf_token %}
+
+            <div style="margin-bottom:20px;">
+                <label class="imp-field-label">
+                    <span class="material-symbols-outlined">upload_file</span>
+                    Seleccione un archivo
+                </label>
+
+                {{ form.archivo }}
+
+                <p class="imp-hint">
+                    Formatos permitidos:
+                    <strong>.csv</strong>,
+                    <strong>.xlsx</strong>,
+                    <strong>.xls</strong>
+                </p>
+
+                {% if form.archivo.errors %}
+                    <div class="imp-error">{{ form.archivo.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="imp-actions">
+                <button id="btn-importar" type="submit" class="imp-btn-primary">
+                    <span class="material-symbols-outlined">upload</span>
+                    <span id="btn-importar-label">Importar Catálogo</span>
+                </button>
+
+                <a href="../" class="imp-btn-secondary">Cancelar</a>
+            </div>
+        </div>
+>>>>>>> Stashed changes
     </form>
 </div>
+<<<<<<< Updated upstream
+=======
+
+<script>
+document.getElementById("form-importar").addEventListener("submit", function(){
+    const boton = document.getElementById("btn-importar");
+    const etiqueta = document.getElementById("btn-importar-label");
+    boton.disabled = true;
+    etiqueta.textContent = "Importando registros...";
+});
+</script>
+
+>>>>>>> Stashed changes
 {% endblock %}
