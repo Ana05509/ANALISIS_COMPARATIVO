@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.admin.models import LogEntry
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html, mark_safe
 from django.db import transaction
@@ -14,10 +15,13 @@ import io
 from unfold.admin import ModelAdmin
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
+# Historial de cambios (Cultivo, MuestraSuelo, CatalogoMicroorganismo, Usuario)
+from simple_history.admin import SimpleHistoryAdmin
+
 # Importaciones de tu app
 from .models import (
     Cultivo, VariedadClon, MuestraSuelo, ArchivoMolecular,
-    ResultadoTaxonomico, CatalogoMicroorganismo, Usuario,
+    ResultadoTaxonomico, CatalogoMicroorganismo, Usuario, EventoAcceso,
 )
 from analisis.services.processing.pipeline import PipelineProcesamiento
 
@@ -49,16 +53,6 @@ class AccionesColumnaMixin:
         return super().get_list_display(request)
 
     @admin.display(description="Acciones")
-<<<<<<< Updated upstream
-    def acciones_columna(self, obj):
-        url = f"./{obj.pk}/change/"
-        return format_html(
-            '<a href="{}" style="background-color: #3b82f6; color: white; padding: 5px 14px; '
-            'border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; '
-            'display: inline-block; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">✏️ Editar</a>',
-            url
-        )
-=======
     def acciones(self, obj):
         request = getattr(self, "_request_acciones", None)
         if request is None:
@@ -87,20 +81,14 @@ class AccionesColumnaMixin:
             ))
 
         return mark_safe(f'<span class="tb-acciones">{"".join(botones)}</span>')
->>>>>>> Stashed changes
 
 
 # =========================================================
 # CULTIVOS
 # =========================================================
 @admin.register(Cultivo)
-<<<<<<< Updated upstream
-class CultivoAdmin(BotonEditarMixin, ModelAdmin):
-    list_display  = ("id", "nombre", "descripcion", "acciones_columna")
-=======
 class CultivoAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, ModelAdmin):
     list_display  = ("id", "nombre", "descripcion", "acciones")
->>>>>>> Stashed changes
     list_display_links = ("id", "nombre")
     search_fields = ("nombre", "descripcion")
     ordering      = ("nombre",)
@@ -162,11 +150,7 @@ class MuestraSueloForm(forms.ModelForm):
 
 
 @admin.register(MuestraSuelo)
-<<<<<<< Updated upstream
-class MuestraSueloAdmin(BotonEditarMixin, ModelAdmin):
-=======
 class MuestraSueloAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, ModelAdmin):
->>>>>>> Stashed changes
     form = MuestraSueloForm  # 🌟 Acoplamos el formulario con guías de texto
 
     list_display = ("codigo", "cultivo", "variedad_clon", "localidad", "altitud_display", "tipo_muestra", "fecha_registro_corta", "acciones")
@@ -348,11 +332,7 @@ class CatalogoImportAdminForm(forms.Form):
 # CATÁLOGO MICROORGANISMOS
 # =========================================================
 @admin.register(CatalogoMicroorganismo)
-<<<<<<< Updated upstream
-class CatalogoMicroorganismoAdmin(BotonEditarMixin, ModelAdmin):
-=======
 class CatalogoMicroorganismoAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, ModelAdmin):
->>>>>>> Stashed changes
     change_list_template = "admin/analisis/catalogomicroorganismo/change_list.html"
 
     list_display  = ("nombre", "nivel", "marcador_badge", "clasificacion_badge", "descripcion_corta", "acciones")
@@ -475,22 +455,13 @@ class CustomUserChangeForm(UserChangeForm):
 # USUARIOS
 # =========================================================
 @admin.register(Usuario)
-<<<<<<< Updated upstream
-class UsuarioAdmin(BaseUserAdmin, BotonEditarMixin, ModelAdmin):
-=======
 class UsuarioAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, BaseUserAdmin, ModelAdmin):
->>>>>>> Stashed changes
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
     change_password_form = AdminPasswordChangeForm
 
-<<<<<<< Updated upstream
-    list_display  = ("username", "email", "nombre_completo", "rol_badge", "is_active", "is_staff", "date_joined", "acciones_columna")
-    list_display_links = ("username", "email")
-=======
     list_display  = ("email", "nombre_completo", "rol_badge", "is_active", "is_staff", "date_joined_corta", "acciones")
     list_display_links = ("email",)
->>>>>>> Stashed changes
     list_filter   = ("rol", "is_staff", "is_active")
     search_fields = ("username", "email", "first_name", "last_name")
     ordering      = ("username",)
@@ -524,9 +495,6 @@ class UsuarioAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, BaseUserAdmin, Mode
             "Rol en TerraBioLab UTC",
             {"fields": ("rol",), "description": "Asigne el rol para determinar los permisos de visualización."}
         ))
-<<<<<<< Updated upstream
-        return fieldsets
-=======
         return fieldsets
 
     def save_model(self, request, obj, form, change):
@@ -1095,4 +1063,3 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
             '<span style="background:{};color:{};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;">{}</span>',
             bg, color, texto
         )
->>>>>>> Stashed changes

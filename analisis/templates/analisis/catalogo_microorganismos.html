@@ -144,9 +144,6 @@
 
 <div class="card">
     {% if microorganismos %}
-<<<<<<< Updated upstream
-    <div class="table-wrap">
-=======
 
     <!-- Búsqueda instantánea + contador -->
     <div style="display:flex; gap:10px; align-items:center; padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid var(--gris-border, #e2e8f0); flex-wrap:wrap;">
@@ -160,7 +157,6 @@
     </div>
 
     <div class="table-wrap cards-mobile" style="margin:0;">
->>>>>>> Stashed changes
         <table id="tabla-catalogo">
             <thead>
                 <tr>
@@ -176,16 +172,6 @@
             </thead>
             <tbody>
                 {% for m in microorganismos %}
-<<<<<<< Updated upstream
-                <tr>
-                    <td>
-                        <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
-                            {{ m.nombre }}
-                        </strong>
-                    </td>
-                    <td style="font-size: 12px; color: var(--text-muted); text-transform: capitalize;">{{ m.nivel }}</td>
-                    <td>
-=======
                 <tr data-search="{{ m.nombre|lower }} {{ m.nivel|lower }} {{ m.descripcion|lower }} {{ m.clasificacion }}"
                     data-clas="{{ m.clasificacion }}">
 
@@ -198,19 +184,12 @@
                     </td>
 
                     <td data-label="Marcador">
->>>>>>> Stashed changes
                         {% if m.marcador == '16S' %}
                         <span class="pill-16s" title="Bacteria — Marcador 16S">🦠 Bacteria</span>
                         {% else %}
                         <span class="pill-its" title="Hongo — Marcador ITS">🍄 Hongo</span>
                         {% endif %}
                     </td>
-<<<<<<< Updated upstream
-                    <td style="font-size: 13px; color: var(--text-muted); max-width: 280px; white-space: normal;">
-                        {{ m.descripcion|default:"—"|truncatechars:100 }}
-                    </td>
-                    <td style="padding-left: 2rem;">
-=======
 
                     <td data-label="Descripción">
                         {% if m.descripcion %}
@@ -231,7 +210,6 @@
                     </td>
 
                     <td data-label="Clasificación">
->>>>>>> Stashed changes
                         {% if m.clasificacion == 'benefico' %}
                             <span class="badge badge-benefico"><i class="ti ti-shield-check" aria-hidden="true"></i> Benéfico</span>
                         {% elif m.clasificacion == 'fitopatogeno' %}

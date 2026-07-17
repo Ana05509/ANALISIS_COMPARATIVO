@@ -100,13 +100,8 @@
     </div>
 
     {% if analisis %}
-<<<<<<< Updated upstream
-    <div class="table-wrap" style="margin-top: 1rem;">
-        <table>
-=======
     <div class="table-wrap cards-mobile" style="margin-top: 1rem;">
         <table class="table-inner">
->>>>>>> Stashed changes
             <thead>
                 <tr>
                     <th style="width: 60px;">#</th>
@@ -120,36 +115,19 @@
             <tbody>
                 {% for a in analisis %}
                 <tr>
-<<<<<<< Updated upstream
-                    <td class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
-                    <td>
-                        <strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">
-                            {{ a.genus|default:"Desconocido" }}
-                        </strong>
-=======
                     <td data-label="#" class="td-mono td-muted">{{ forloop.counter }}</td>
                     <td data-label="Taxonomía">
                         <strong class="td-taxonomy">{{ a.genus|default:"Desconocido" }}</strong>
->>>>>>> Stashed changes
                         {% if a.species and a.species != 'Unclassified' %}
                         <span style="color: var(--text-muted); font-size: 13px; font-style: italic;">{{ a.species }}</span>
                         {% endif %}
                     </td>
-<<<<<<< Updated upstream
-                    <td style="font-size: 12px; color: var(--text-muted); text-transform: capitalize;">Género</td>
-                    <td class="td-mono" style="color: var(--text-primary);">{{ a.num_hits|default:"0" }}</td>
-                    <td>
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
-                                <div style="height: 100%; background: var(--verde); border-radius: 4px; width: {{ a.porcentaje_hits|default:0|floatformat:2 }}%;"></div>
-=======
                     <td data-label="Nivel" class="td-muted td-capitalize">Género</td>
                     <td data-label="Núm. Hits" class="td-mono">{{ a.num_hits|default:"0" }}</td>
                     <td data-label="% Abundancia">
                         <div class="pct-bar-wrap">
                             <div class="pct-bar-track">
                                 <div class="pct-bar-fill" style="width:{{ a.porcentaje_hits|default:0|stringformat:'.2f' }}%;"></div>
->>>>>>> Stashed changes
                             </div>
                             <span class="td-mono" style="font-weight: 500; min-width: 75px; text-align: right;">
                                 {{ a.porcentaje_hits|default:0|floatformat:4 }}%

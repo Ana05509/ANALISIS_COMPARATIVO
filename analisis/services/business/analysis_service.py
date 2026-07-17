@@ -3,6 +3,7 @@ from django.db.models import F, Sum, Avg
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo, VariedadClon
 from analisis.services.processing.diversity import DiversityService # CORRECCIÓN IMPORT
 from analisis.services.processing.abundance import comparar_abundancias
+from analisis.constants import NIVEL_ALIASES, normalizar_nombre_catalogo
 
 MAPA_NIVELES = {
     "kingdom": "kingdom", "phylum": "phylum", "class": "tax_class",
@@ -11,6 +12,38 @@ MAPA_NIVELES = {
 NIVELES_VALIDOS    = list(MAPA_NIVELES.keys())
 MARCADORES_VALIDOS = ("16S", "ITS")
 OPCIONES_TOP_N     = [5, 10, 25, 50]
+
+
+def _filtrar_catalogo_por_nivel(qs, nivel: str):
+    """
+    Aplica el filtro de nivel al queryset de CatalogoMicroorganismo aceptando
+    tanto nombres en inglés ('species') como en español ('especie', 'género', etc.).
+    Si ningún alias devuelve resultados hace fallback al queryset sin filtro.
+    """
+    from django.db.models import Q
+    aliases = NIVEL_ALIASES.get(nivel, [nivel])
+    q = Q()
+    for alias in aliases:
+        q |= Q(nivel__iexact=alias)
+    qs_nivel = qs.filter(q)
+    return qs_nivel if qs_nivel.exists() else qs
+
+
+def obtener_lookup_catalogo(tipo, nivel=None):
+    """
+    Dict {nombre_normalizado: clasificacion}.
+    Normaliza nombres del catálogo (elimina accesiones GenBank, _ → espacio) para
+    que coincidan con los nombres limpios que produce el pipeline de importación.
+    Filtra por marcador y nivel (acepta español e inglés); fallback a solo marcador.
+    """
+    qs = CatalogoMicroorganismo.objects.filter(marcador=tipo)
+    if nivel:
+        qs = _filtrar_catalogo_por_nivel(qs, nivel)
+    return {
+        normalizar_nombre_catalogo(obj.nombre): obj.clasificacion
+        for obj in qs
+    }
+
 
 def _base_queryset(tipo, variedad_id=None, muestra_id=None, muestra_ids=None):
     qs = ResultadoTaxonomico.objects.filter(

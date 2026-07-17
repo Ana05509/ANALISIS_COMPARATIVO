@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from simple_history.models import HistoricalRecords
 import os
 
 # -------------------------------
@@ -9,6 +10,19 @@ import os
 class Cultivo(models.Model):
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Cultivo")
     descripcion = models.TextField(blank=True, verbose_name="Descripción")
+    imagen = models.ImageField(
+        upload_to='cultivos/',
+        blank=True, null=True,
+        verbose_name="Imagen / Fotografía",
+        help_text="Sube un archivo JPG, PNG o WEBP desde tu computadora."
+    )
+    imagen_url = models.URLField(
+        max_length=500,
+        blank=True, null=True,
+        verbose_name="URL de imagen externa",
+        help_text="Pega el enlace directo a una imagen en línea (https://...). Se usa si no hay archivo subido."
+    )
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Cultivo"
@@ -60,6 +74,7 @@ class MuestraSuelo(models.Model):
     localidad = models.CharField(max_length=100, db_index=True, verbose_name="Localidad")
     finca_lote = models.CharField(max_length=150, verbose_name="Finca / Lote")
     altitud = models.IntegerField(null=True, blank=True, db_index=True, verbose_name="Altitud (msnm)")
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Muestra de Suelo"
@@ -141,10 +156,20 @@ class CatalogoMicroorganismo(models.Model):
         ("ITS", "Hongo"),
     ]
 
+    NIVEL_CHOICES = [
+        ("genus",   "Género"),
+        ("species", "Especie"),
+        ("family",  "Familia"),
+        ("order",   "Orden"),
+        ("class",   "Clase"),
+        ("phylum",  "Filo"),
+    ]
+
     nombre = models.CharField(max_length=255, db_index=True, verbose_name="Nombre Científico",
                               help_text="Ej: Bacillus")
-    nivel = models.CharField(max_length=50, db_index=True, verbose_name="Nivel Taxonómico",
-                             help_text="Ej: genus, species")
+    nivel = models.CharField(max_length=50, db_index=True, choices=NIVEL_CHOICES,
+                             verbose_name="Nivel Taxonómico",
+                             help_text="Nivel taxonómico canónico del organismo")
     clasificacion = models.CharField(max_length=30, choices=CLASIFICACIONES, db_index=True,
                                      verbose_name="Rol Funcional")
     descripcion = models.TextField(blank=True, verbose_name="Descripción Agronómica")
@@ -159,6 +184,7 @@ class CatalogoMicroorganismo(models.Model):
         verbose_name="Marcador Molecular",
         help_text="Región genética usada para identificación (16S o ITS)"
     )
+    history = HistoricalRecords()
 
     class Meta:
         constraints = [
@@ -187,6 +213,13 @@ class Usuario(AbstractUser):
         default='estudiante',
         verbose_name="Rol en la Plataforma"
     )
+    avatar = models.ImageField(
+        upload_to='avatars/',
+        blank=True,
+        null=True,
+        verbose_name="Foto de perfil"
+    )
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Usuario"
@@ -194,9 +227,6 @@ class Usuario(AbstractUser):
 
     def __str__(self):
         rol_display = dict(self.ROLES).get(self.rol, self.rol)
-<<<<<<< Updated upstream
-        return f"{self.username} ({rol_display})"
-=======
         return f"{self.username} ({rol_display})"
 
 
@@ -293,4 +323,3 @@ class EventoAcceso(models.Model):
     @property
     def sistema_operativo(self):
         return _parsear_user_agent(self.user_agent)[1]
->>>>>>> Stashed changes

@@ -3,6 +3,11 @@ from django.contrib.auth import views as auth_views
 from . import views
 from .views.auth import CustomLoginView, CustomLogoutView
 from .views.analysis import exportar_analisis, resultado_analisis
+from .views.api import (
+    api_muestras, api_muestra_detalle,
+    api_catalogo, api_catalogo_entrada,
+    api_estadisticas,
+)
 
 app_name = "analisis"
 
@@ -27,7 +32,9 @@ urlpatterns = [
     ), name="password_reset_complete"),
 
     # 2. DASHBOARD Y CARGA
-    path("", views.dashboard, name="dashboard"),
+    path("dashboard/", views.dashboard, name="dashboard"),
+    path("perfil/", views.perfil_usuario, name="perfil"),
+    path("ayuda/", views.ayuda, name="ayuda"),
     path("subir/", views.subir_datos, name="subir_datos"),
     path("cargar-variedades/", views.cargar_variedades, name="cargar_variedades"),
 
@@ -49,4 +56,11 @@ urlpatterns = [
     path("reportes/", views.reportes, name="reportes"),
     path("reportes/generar/", views.generar_reporte, name="generar_reporte"),
     path("reportes/<int:reporte_id>/", views.detalle_reporte, name="detalle_reporte"),
+
+    # 6. API REST v1 — Solo lectura, respuestas JSON
+    path("api/v1/muestras/",                    api_muestras,          name="api_muestras"),
+    path("api/v1/muestras/<int:pk>/",           api_muestra_detalle,   name="api_muestra_detalle"),
+    path("api/v1/catalogo/",                    api_catalogo,          name="api_catalogo"),
+    path("api/v1/catalogo/<str:nombre>/",       api_catalogo_entrada,  name="api_catalogo_entrada"),
+    path("api/v1/estadisticas/",                api_estadisticas,      name="api_estadisticas"),
 ]

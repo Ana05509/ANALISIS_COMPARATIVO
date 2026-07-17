@@ -26,12 +26,6 @@
     </form>
 </div>
 
-<<<<<<< Updated upstream
-<div class="card">
-    {% if muestras %}
-    <div class="table-wrap">
-        <table>
-=======
 <!-- BARRA DE ESTADO -->
 <div class="hist-bar">
     <span>
@@ -57,7 +51,6 @@
 
     <div class="hist-table-wrap table-wrap cards-mobile">
         <table id="tabla-historial">
->>>>>>> Stashed changes
             <thead>
                 <tr>
                     <th>Código Muestra</th>
@@ -70,24 +63,6 @@
             <tbody>
                 {% for p in muestras %}
                 <tr>
-<<<<<<< Updated upstream
-                    <td><strong>{{ p.codigo|default:"Sin código" }}</strong></td>
-                    <td style="color:var(--text-muted); font-size:13px;">
-                        {{ p.cultivo.nombre|default:"—" }} / {{ p.variedad_clon.nombre|default:"—" }}
-                    </td>
-                    <td>
-                        {% with primer_archivo=p.archivos_moleculares.first %}
-                        <span class="{% if primer_archivo.tipo_analisis == '16S' %}pill-16s{% else %}pill-its{% endif %}">
-                            {{ primer_archivo.tipo_analisis|default:"N/A" }}
-                        </span>
-                        {% endwith %}
-                    </td>
-                    <td class="td-mono">{{ p.total_analisis|default:"0" }}</td>
-                    <td>
-                        <div style="display:flex; gap:6px;">
-                            <a href="{% url 'analisis:ver_producto' p.id %}" class="btn btn-outline btn-sm">
-                                <i class="ti ti-eye" aria-hidden="true"></i> Ver
-=======
                     <!-- Código -->
                     <td data-label="Código">
                         <div class="hist-codigo">{{ m.codigo }}</div>
@@ -145,7 +120,6 @@
                                class="btn btn-outline btn-sm"
                                title="Ver detalle de la muestra">
                                 <i class="ti ti-eye"></i>
->>>>>>> Stashed changes
                             </a>
                             <a href="{% url 'analisis:analisis_avanzado' %}?producto_id={{ p.id }}&tipo={{ tipo_actual }}" class="btn btn-outline btn-sm">
                                 <i class="ti ti-chart-dots" aria-hidden="true"></i> Analizar

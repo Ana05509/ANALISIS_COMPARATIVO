@@ -21,7 +21,8 @@ ALLOWED_HOSTS = os.environ.get(
 # ---------------------------
 INSTALLED_APPS = [
     'unfold',  # Interfaz avanzada para el administrador
-    
+    'unfold.contrib.simple_history',  # Plantillas de Unfold para la pestaña "Historial"
+
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -37,8 +38,10 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',  # Proveedor específico de Google
+    'simple_history',  # Historial de cambios (Cultivo, MuestraSuelo, Catálogo, Usuario)
     'analisis',
     'bioquimica',
+    'portal',
 
 ]
 
@@ -54,9 +57,12 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    
+
     # Middleware requerido por allauth para gestionar sesiones de cuentas sociales
     'allauth.account.middleware.AccountMiddleware',
+
+    # Registra automáticamente qué usuario hizo cada cambio en el historial
+    'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
 # ---------------------------
@@ -150,8 +156,8 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10_000
 SITE_ID = 1
 
 AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',             # Autenticación tradicional
-    'allauth.account.auth_backends.AuthenticationBackend',   # Autenticación vía Google/Social
+    'analisis.backends.EmailOrUsernameBackend',              # username o email → funciona para admin y usuarios nuevos
+    'allauth.account.auth_backends.AuthenticationBackend',   # Google / Social
 ]
 
 # URLs de redirección unificadas utilizando nombres de rutas mutuas con namespace
@@ -217,12 +223,9 @@ UNFOLD = {
     "STYLES": [
         lambda request: _static_con_version("admin_personalizado.css"),
     ],
-<<<<<<< Updated upstream
-=======
     "SCRIPTS": [
         lambda request: _static_con_version("admin_sidebar_fijo.js"),
     ],
->>>>>>> Stashed changes
 
     "COLORS": {
         "primary": {
