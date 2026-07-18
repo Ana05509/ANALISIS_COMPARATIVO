@@ -76,8 +76,6 @@ class MuestraSuelo(models.Model):
     altitud = models.IntegerField(null=True, blank=True, db_index=True, verbose_name="Altitud (msnm)")
     history = HistoricalRecords()
 
-    history = HistoricalRecords()
-
     class Meta:
         verbose_name = "Muestra de Suelo"
         verbose_name_plural = "Muestras de Suelo"
@@ -188,8 +186,6 @@ class CatalogoMicroorganismo(models.Model):
     )
     history = HistoricalRecords()
 
-    history = HistoricalRecords()
-
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['nombre', 'nivel'], name='unique_nombre_nivel')
@@ -223,15 +219,6 @@ class Usuario(AbstractUser):
         null=True,
         verbose_name="Foto de perfil"
     )
-    history = HistoricalRecords()
-
-    avatar = models.ImageField(
-        upload_to='avatars/',
-        blank=True,
-        null=True,
-        verbose_name="Foto de perfil"
-    )
-
     history = HistoricalRecords()
 
     class Meta:
