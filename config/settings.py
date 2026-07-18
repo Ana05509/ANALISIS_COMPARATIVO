@@ -16,6 +16,34 @@ ALLOWED_HOSTS = os.environ.get(
     '127.0.0.1,localhost'
 ).split(',')
 
+# Railway inyecta el dominio público asignado en esta variable — se agrega
+# solo si existe, así el mismo settings.py sirve para local y para Railway
+# sin tener que copiar el dominio a mano en ALLOWED_HOSTS cada vez que
+# Railway lo regenera.
+_railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+if _railway_domain:
+    ALLOWED_HOSTS.append(_railway_domain)
+
+# Django exige CSRF_TRUSTED_ORIGINS con esquema explícito (https://) para
+# aceptar POST desde un dominio distinto al de desarrollo — sin esto, el
+# login y cualquier formulario fallan con "CSRF verification failed" en
+# producción aunque ALLOWED_HOSTS esté bien.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()
+]
+if _railway_domain:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{_railway_domain}')
+
+# HTTPS/HSTS solo con DEBUG=False: en local (DEBUG=True) el servidor de
+# desarrollo no habla HTTPS, así que forzar el redirect rompería
+# runserver. Railway sí sirve todo detrás de HTTPS.
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True'
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
+
 # ---------------------------
 # APLICACIONES
 # ---------------------------
@@ -50,6 +78,12 @@ INSTALLED_APPS = [
 # ---------------------------
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+
+    # Sirve los estáticos directamente desde la app en producción (Railway
+    # no tiene un servidor web aparte tipo nginx delante) — debe ir
+    # inmediatamente después de SecurityMiddleware, antes de cualquier otro.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -94,16 +128,29 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # ---------------------------
 # DATABASE (PostgreSQL)
 # ---------------------------
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'Proyect',
-        'USER': 'postgres',
-        'PASSWORD': 'ABCDE',  
-        'HOST': 'localhost',
-        'PORT': '5432',
+# Railway (y la mayoría de hosts) inyectan la conexión completa en
+# DATABASE_URL cuando se agrega un plugin de Postgres — si existe, se usa
+# esa; si no (desarrollo local), se cae a las credenciales de siempre.
+if os.environ.get('DATABASE_URL'):
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.config(
+            env='DATABASE_URL',
+            conn_max_age=600,
+            ssl_require=not DEBUG,
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME', 'Proyect'),
+            'USER': os.environ.get('DB_USER', 'postgres'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', 'ABCDE'),
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+        }
+    }
 
 # ---------------------------
 # PASSWORDS VALIDATORS
@@ -133,6 +180,25 @@ LOCALE_PATHS = [
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# WhiteNoise sirve STATIC_ROOT directamente desde la app (sin nginx
+# delante) con hash en el nombre de archivo + cache larga — mismo efecto
+# que el cache-busting manual que ya hace UNFOLD["STYLES"]/["SCRIPTS"]
+# vía _static_con_version(), pero para TODO estático, no solo esos dos
+# archivos. Solo en producción: en local, collectstatic no siempre se ha
+# corrido, y Django ya sirve estáticos directo con runserver.
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": (
+            "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            if not DEBUG else
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+        ),
+    },
+}
 
 # ---------------------------
 # MEDIA FILES (Cargas de archivos 16S e ITS)
