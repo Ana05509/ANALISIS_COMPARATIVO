@@ -7,15 +7,9 @@ from django.http import HttpResponse
 from collections import deque
 
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo
+from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, OPCIONES_TOP_N, MAPA_NIVELES
 
-MARCADORES_VALIDOS = ("16S", "ITS")
-FORMATOS_VALIDOS   = ("pdf", "excel")
-NIVELES_VALIDOS    = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
-OPCIONES_TOP_N     = [5, 10, 25, 50]
-MAPA_NIVELES = {
-    "kingdom": "kingdom", "phylum": "phylum", "class": "tax_class",
-    "order": "order", "family": "family", "genus": "genus", "species": "species"
-}
+FORMATOS_VALIDOS = ("pdf", "excel")
 
 _historial_reportes = deque(maxlen=200)
 

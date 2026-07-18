@@ -20,7 +20,11 @@ class VisualizationService:
             return None
         try:
             fig = px.bar(df, x=x, y=y, title=titulo, template="plotly_white")
-            fig.update_layout(xaxis_tickangle=-45, height=500)
+            fig.update_layout(
+                xaxis=dict(tickangle=-45, automargin=True, tickfont=dict(size=10)),
+                margin=dict(b=160, t=60, l=60, r=20),
+                height=500,
+            )
             return str(fig.to_json())
         except Exception as e:
             print(f"Error en gráfico de barras: {e}")
@@ -55,7 +59,8 @@ class VisualizationService:
             fig.update_layout(
                 barmode='group',
                 title=f"Comparación: {muestra_1_nombre} vs {muestra_2_nombre} (Top {top_n})",
-                xaxis_tickangle=-45
+                xaxis=dict(tickangle=-45, automargin=True, tickfont=dict(size=10)),
+                margin=dict(b=160, t=60, l=60, r=20),
             )
             return str(fig.to_json())
         except Exception as e:
@@ -100,8 +105,10 @@ class VisualizationService:
             df_top = df_ordenado.head(top_n).copy()
             df_resto = df_ordenado.iloc[top_n:]
 
+            n_otros = len(df_resto)
             if not df_resto.empty:
-                fila_otros = {nivel: "Otros microorganismos (< abundancia)"}
+                label_otros = f"Otros ({n_otros} taxa agrupados)"
+                fila_otros = {nivel: label_otros}
                 for col in columnas_muestras:
                     fila_otros[col] = df_resto[col].sum()
                 df_top = pd.concat([df_top, pd.DataFrame([fila_otros])], ignore_index=True)
@@ -121,24 +128,49 @@ class VisualizationService:
             idx = 0
             for taxon in taxa_ordenados:
                 if taxon and 'otros' in str(taxon).lower():
-                    color_map[taxon] = '#B0B8C1'   # gris neutro
+                    color_map[taxon] = '#B0B8C1'
                 else:
                     color_map[taxon] = PALETA[idx % len(PALETA)]
                     idx += 1
 
+            # Margen derecho adaptativo según longitud del nombre más largo en la leyenda
+            max_len = max((len(str(t)) for t in taxa_ordenados), default=10)
+            r_margin = max(min(max_len * 6 + 50, 300), 140)
+
             fig_barras = px.bar(
                 df_formato_largo, x="Muestra", y="Abundancia", color=nivel,
                 color_discrete_map=color_map,
-                title=f"Composición de la Comunidad Microbiana (Top {top_n} — {nivel.capitalize()})",
-                template="plotly_white"
+                title=f"Top {top_n} {nivel.capitalize()} — Abundancia Relativa por Muestra (%)",
+                template="plotly_white",
+            )
+            fig_barras.update_traces(
+                hovertemplate=(
+                    "<b>%{fullData.name}</b><br>"
+                    "Muestra: %{x}<br>"
+                    "Abundancia: <b>%{y:.2f} %</b>"
+                    "<extra></extra>"
+                )
             )
             fig_barras.update_layout(
                 barmode="stack", barnorm="percent",
-                yaxis_title="Abundancia Relativa (%)", xaxis_title="Muestras Evaluadas",
-                height=520, legend_title=nivel.capitalize()
+                yaxis=dict(title="Abundancia Relativa (%)", range=[0, 103]),
+                xaxis=dict(title="Muestras Evaluadas", automargin=True, tickfont=dict(size=11)),
+                height=540,
+                legend=dict(
+                    title=dict(text=nivel.capitalize(), font=dict(size=11)),
+                    orientation='v',
+                    x=1.01, y=1,
+                    xanchor='left', yanchor='top',
+                    bgcolor='rgba(255,255,255,0.9)',
+                    bordercolor='rgba(200,200,200,0.5)',
+                    borderwidth=1,
+                    font=dict(size=10),
+                    itemsizing='constant',
+                ),
+                margin=dict(b=80, t=60, l=60, r=r_margin),
             )
             
-            paquete_graficos["grafico_barras_apiladas"] = json.loads(fig_barras.to_json())
+            paquete_graficos["grafico_barras_apiladas"] = json.loads(fig_barras.to_json() or "{}")
             
         except Exception as e:
             paquete_graficos["error_barras"] = f"Error en barras apiladas: {str(e)}"
@@ -178,21 +210,15 @@ class VisualizationService:
 
         # -----------------------------------------------------------------
         # 3. ANÁLISIS DE COORDENADAS PRINCIPALES – PCoA (Bray-Curtis)
-        # Reemplaza PCA: la distancia de Bray-Curtis es la métrica estándar
-        # para beta-diversidad microbiana en ecología molecular.
         # -----------------------------------------------------------------
         try:
             n_muestras = len(columnas_muestras)
             if n_muestras >= 3:
-                # Matriz abundancias: filas=taxones (todos), columnas=muestras
-                matriz = df_analisis[columnas_muestras].values.T  # shape (n_muestras, n_taxones)
-
-                # Normalizar filas para que sumen 1 (proporciones)
+                matriz = df_analisis[columnas_muestras].values.T
                 sumas = matriz.sum(axis=1, keepdims=True)
                 sumas[sumas == 0] = 1
                 matriz_norm = matriz / sumas
 
-                # Calcular matriz de disimilitud Bray-Curtis
                 dist_matrix = np.zeros((n_muestras, n_muestras))
                 for i in range(n_muestras):
                     for j in range(i + 1, n_muestras):
@@ -203,21 +229,105 @@ class VisualizationService:
                 mds = MDS(n_components=2, dissimilarity='precomputed', random_state=42)
                 coords = mds.fit_transform(dist_matrix)
 
-                df_pcoa = pd.DataFrame(
-                    coords, columns=['PCo1', 'PCo2'], index=columnas_muestras
-                ).reset_index().rename(columns={'index': 'Muestra'})
+                # Centroide y distancias al centroide
+                cx = float(np.mean(coords[:, 0]))
+                cy = float(np.mean(coords[:, 1]))
+                dist_cent = np.sqrt((coords[:, 0] - cx) ** 2 + (coords[:, 1] - cy) ** 2)
 
-                fig_pcoa = px.scatter(
-                    df_pcoa, x='PCo1', y='PCo2', text='Muestra',
-                    title='PCoA – Bray-Curtis Beta Diversidad (todos los taxones)',
-                    template='plotly_white'
+                # Calidad del estrés MDS
+                stress = round(float(mds.stress_), 4)
+                stress_label = (
+                    "Excelente" if stress < 0.05 else
+                    "Bueno"     if stress < 0.10 else
+                    "Aceptable" if stress < 0.20 else
+                    "Pobre"
                 )
-                fig_pcoa.update_traces(
-                    textposition='top center',
-                    marker=dict(size=13, symbol="diamond-open", color='DarkSlateGrey')
-                )
+
+                # Hover enriquecido con disimilitudes Bray-Curtis reales
+                hover_texts = []
+                for i, m_i in enumerate(columnas_muestras):
+                    bc_lines = "<br>".join(
+                        f"&nbsp;&nbsp;vs {columnas_muestras[j]}: {dist_matrix[i, j]:.3f}"
+                        for j in range(n_muestras) if i != j
+                    )
+                    hover_texts.append(
+                        f"<b>{m_i}</b><br>"
+                        f"PCo1: {coords[i, 0]:.4f}  |  PCo2: {coords[i, 1]:.4f}<br>"
+                        f"Dist. al centroide: {dist_cent[i]:.4f}<br>"
+                        f"── Bray-Curtis ──<br>{bc_lines}"
+                    )
+
+                PALETTE_PCOA = [
+                    '#1D9E75', '#E07B39', '#264653', '#9B2226', '#457B9D',
+                    '#E9C46A', '#6D6875', '#FFBA08', '#3A86FF', '#8338EC',
+                    '#FB5607', '#2A9D8F', '#B5838D', '#F4A261', '#A8DADC',
+                ]
+                colors_pcoa = [PALETTE_PCOA[i % len(PALETTE_PCOA)] for i in range(n_muestras)]
+
+                fig_pcoa = go.Figure()
+
+                # Líneas de referencia en el origen (cuadrantes)
+                fig_pcoa.add_hline(y=0, line=dict(dash='dot', color='rgba(160,160,160,0.35)', width=1))
+                fig_pcoa.add_vline(x=0, line=dict(dash='dot', color='rgba(160,160,160,0.35)', width=1))
+
+                # Centroide de la comunidad
+                fig_pcoa.add_trace(go.Scatter(
+                    x=[cx], y=[cy],
+                    mode='markers',
+                    name='Centroide',
+                    marker=dict(size=12, color='rgba(100,100,100,0.55)',
+                                symbol='cross', line=dict(color='#555', width=2)),
+                    hovertemplate=f"<b>Centroide</b><br>PCo1: {cx:.4f}<br>PCo2: {cy:.4f}<extra></extra>",
+                    showlegend=True,
+                ))
+
+                # Un trace por muestra → color + leyenda individuales
+                for i, muestra_i in enumerate(columnas_muestras):
+                    fig_pcoa.add_trace(go.Scatter(
+                        x=[coords[i, 0]],
+                        y=[coords[i, 1]],
+                        mode='markers+text',
+                        name=muestra_i,
+                        text=[muestra_i],
+                        textposition='top center',
+                        textfont=dict(size=11, color=colors_pcoa[i]),
+                        marker=dict(
+                            size=18,
+                            color=colors_pcoa[i],
+                            line=dict(color='white', width=2),
+                            symbol='circle',
+                        ),
+                        customdata=[[hover_texts[i]]],
+                        hovertemplate='%{customdata[0]}<extra></extra>',
+                        showlegend=True,
+                    ))
+
                 fig_pcoa.update_layout(
-                    xaxis_title="PCo1", yaxis_title="PCo2", height=500
+                    title=dict(text='PCoA — Disimilitud Bray-Curtis', font=dict(size=14),
+                               x=0.5, xanchor='center'),
+                    xaxis=dict(title='PCo1', zeroline=False,
+                               gridcolor='rgba(220,220,220,0.5)', automargin=True),
+                    yaxis=dict(title='PCo2', zeroline=False,
+                               gridcolor='rgba(220,220,220,0.5)', automargin=True),
+                    template='plotly_white',
+                    height=560,
+                    legend=dict(
+                        title=dict(text='Muestras', font=dict(size=11)),
+                        orientation='v', x=1.02, y=1,
+                        bgcolor='rgba(255,255,255,0.9)',
+                        bordercolor='rgba(200,200,200,0.6)', borderwidth=1,
+                    ),
+                    margin=dict(b=60, t=80, l=60, r=170),
+                    annotations=[dict(
+                        x=0.0, y=-0.07,
+                        xref='paper', yref='paper',
+                        text=(f"Estrés MDS: <b>{stress}</b> ({stress_label})"
+                              f"  ·  < 0.10 = representación confiable  ·  "
+                              f"< 0.20 = aceptable"),
+                        showarrow=False,
+                        font=dict(size=9, color='gray'),
+                        align='left',
+                    )],
                 )
 
                 paquete_graficos["grafico_pca"] = json.loads(str(fig_pcoa.to_json()))

@@ -1,7 +1,7 @@
 import io
 import unicodedata
 import pandas as pd
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo
 
 TAXONOMIC_STOPWORDS = {
@@ -97,9 +97,33 @@ class CatalogService:
 
     @staticmethod
     def _quitar_tildes(texto: str) -> str:
-        """Convierte 'Benéfico' → 'benefico', 'Fitopatógeno' → 'fitopatogeno'."""
         nfkd = unicodedata.normalize('NFD', texto)
         return ''.join(c for c in nfkd if unicodedata.category(c) != 'Mn')
+
+    @classmethod
+    def _normalizar_nivel(cls, valor: str) -> str:
+        """
+        Acepta variantes en español e inglés (con/sin tilde, mayúsculas, abreviaturas)
+        y retorna el valor canónico: genus | species | family | order | class | phylum.
+        Si no reconoce el valor devuelve 'genus' como fallback seguro.
+        """
+        clave = cls._quitar_tildes(str(valor).strip().lower())
+        MAPA = {
+            # genus
+            'genus': 'genus', 'genero': 'genus', 'gen': 'genus', 'g': 'genus',
+            # species
+            'species': 'species', 'especie': 'species', 'specie': 'species',
+            'sp': 'species', 'spp': 'species',
+            # family
+            'family': 'family', 'familia': 'family', 'fam': 'family',
+            # order
+            'order': 'order', 'orden': 'order', 'ord': 'order',
+            # class
+            'class': 'class', 'clase': 'class', 'cls': 'class',
+            # phylum
+            'phylum': 'phylum', 'filo': 'phylum', 'division': 'phylum',
+        }
+        return MAPA.get(clave, 'genus')
 
     @classmethod
     def _normalizar_clasificacion(cls, valor: str) -> str:
@@ -175,7 +199,7 @@ class CatalogService:
 
         for _, row in df.iterrows():
             nombre = str(row.get('nombre', '')).strip()
-            nivel  = str(row.get('nivel', '')).strip().lower()
+            nivel  = CatalogService._normalizar_nivel(row.get('nivel', 'genus'))
 
             if not nombre or nombre.lower() in _nan:
                 errores += 1
@@ -232,7 +256,9 @@ class CatalogService:
     @staticmethod
     def reclasificar_microorganismo(pk, nueva_clasificacion, descripcion):
         try:
-            res = ResultadoTaxonomico.objects.get(pk=pk)
+            res = ResultadoTaxonomico.objects.select_related('archivo').get(pk=pk)
+            marcador = res.archivo.tipo_analisis  # "16S" o "ITS"
+
             genus_limpio = CatalogService._limpiar(res.genus)
             species_limpio = CatalogService._limpiar(res.species)
 
@@ -246,6 +272,7 @@ class CatalogService:
             obj = CatalogoMicroorganismo.objects.filter(
                 nombre__iexact=nombre,
                 nivel__iexact=nivel,
+                marcador=marcador,
             ).first()
             if obj:
                 obj.clasificacion = nueva_clasificacion
@@ -255,6 +282,7 @@ class CatalogService:
                 CatalogoMicroorganismo.objects.create(
                     nombre=nombre,
                     nivel=nivel,
+                    marcador=marcador,
                     clasificacion=nueva_clasificacion,
                     descripcion=descripcion,
                 )

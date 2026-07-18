@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from simple_history.models import HistoricalRecords
-import os
 
 # -------------------------------
 # Modelos de Catálogo Agronómico
@@ -22,6 +21,7 @@ class Cultivo(models.Model):
         verbose_name="URL de imagen externa",
         help_text="Pega el enlace directo a una imagen en línea (https://...). Se usa si no hay archivo subido."
     )
+
     history = HistoricalRecords()
 
     class Meta:
@@ -74,6 +74,8 @@ class MuestraSuelo(models.Model):
     localidad = models.CharField(max_length=100, db_index=True, verbose_name="Localidad")
     finca_lote = models.CharField(max_length=150, verbose_name="Finca / Lote")
     altitud = models.IntegerField(null=True, blank=True, db_index=True, verbose_name="Altitud (msnm)")
+    history = HistoricalRecords()
+
     history = HistoricalRecords()
 
     class Meta:
@@ -186,6 +188,8 @@ class CatalogoMicroorganismo(models.Model):
     )
     history = HistoricalRecords()
 
+    history = HistoricalRecords()
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['nombre', 'nivel'], name='unique_nombre_nivel')
@@ -221,9 +225,25 @@ class Usuario(AbstractUser):
     )
     history = HistoricalRecords()
 
+    avatar = models.ImageField(
+        upload_to='avatars/',
+        blank=True,
+        null=True,
+        verbose_name="Foto de perfil"
+    )
+
+    history = HistoricalRecords()
+
     class Meta:
         verbose_name = "Usuario"
         verbose_name_plural = "Usuarios"
+
+    def save(self, *args, **kwargs):
+        if self.first_name:
+            self.first_name = self.first_name.strip().title()
+        if self.last_name:
+            self.last_name = self.last_name.strip().title()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         rol_display = dict(self.ROLES).get(self.rol, self.rol)

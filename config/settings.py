@@ -1,14 +1,18 @@
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 from django.templatetags.static import static
 from django.urls import reverse_lazy
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 # ---------------------------
 # SEGURIDAD
 # ---------------------------
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key')
+_INSECURE_SECRET_KEY = 'django-insecure-dev-key'
+SECRET_KEY = os.environ.get('SECRET_KEY', _INSECURE_SECRET_KEY)
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.environ.get(
@@ -45,6 +49,32 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
 
 # ---------------------------
+# ENDURECIMIENTO PARA PRODUCCIÓN
+# Todo esto queda inactivo con DEBUG=True para no romper el entorno local
+# (cookies "secure" y redirección HTTPS no funcionan sobre http://localhost).
+# ---------------------------
+if not DEBUG:
+    if SECRET_KEY == _INSECURE_SECRET_KEY:
+        raise ImproperlyConfigured(
+            "SECRET_KEY sigue en su valor de desarrollo con DEBUG=False. "
+            "Define la variable de entorno SECRET_KEY antes de desplegar "
+            "(python -c \"from django.core.management.utils import get_random_secret_key; "
+            "print(get_random_secret_key())\")."
+        )
+
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True'
+    # Necesario cuando Django corre detrás de un proxy (nginx, etc.) que termina el TLS:
+    # así sabe que el request original fue HTTPS aunque le llegue como HTTP interno.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', 31536000))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+# ---------------------------
 # APLICACIONES
 # ---------------------------
 INSTALLED_APPS = [
@@ -66,7 +96,11 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',  # Proveedor específico de Google
-    'simple_history',  # Historial de cambios (Cultivo, MuestraSuelo, Catálogo, Usuario)
+    # Historial de cambios (Cultivo, MuestraSuelo, Catálogo, Usuario).
+    # unfold.contrib.simple_history (arriba) debe ir antes que simple_history
+    # para que sus plantillas (tema Unfold) tengan prioridad sobre las de simple_history.
+    'simple_history',
+
     'analisis',
     'bioquimica',
     'portal',
@@ -95,7 +129,8 @@ MIDDLEWARE = [
     # Middleware requerido por allauth para gestionar sesiones de cuentas sociales
     'allauth.account.middleware.AccountMiddleware',
 
-    # Registra automáticamente qué usuario hizo cada cambio en el historial
+    # Auditoría: adjunta el usuario autenticado a cada registro histórico,
+    # sin importar si el cambio vino del admin, de una vista o de la API
     'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
@@ -232,17 +267,20 @@ LOGIN_REDIRECT_URL = 'analisis:dashboard'  # Redirige al dashboard de tu app tra
 LOGOUT_REDIRECT_URL = 'analisis:login'
 
 ACCOUNT_LOGOUT_REDIRECT_URL = 'analisis:login'
-ACCOUNT_AUTHENTICATED_LOGIN_REDIRECTS = True    # Redirige al login al salir
+ACCOUNT_AUTHENTICATED_LOGIN_REDIRECTS = True
 ACCOUNT_SIGNUP_FORM_CLASS = 'analisis.signup_form.CustomSignupForm'
 ACCOUNT_ADAPTER = 'analisis.adapter.CustomAccountAdapter'
 ACCOUNT_PREVENT_ENUMERATION = False
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']  # sin username; email=username
+ACCOUNT_LOGIN_METHODS = {'email'}                               # login con correo (username = email auto)
+ACCOUNT_UNIQUE_EMAIL = True         # un correo = una cuenta
 
 # Configuración del proveedor de Google OAuth2
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'APP': {
-            'client_id': 'TU_CLIENT_ID_DE_GOOGLE_CLOUD.apps.googleusercontent.com',
-            'secret': 'TU_SECRET_KEY_DE_GOOGLE_CLOUD',
+            'client_id': os.environ.get('GOOGLE_CLIENT_ID', ''),
+            'secret': os.environ.get('GOOGLE_CLIENT_SECRET', ''),
             'key': ''
         },
         'SCOPE': [
@@ -278,9 +316,9 @@ def _static_con_version(nombre_relativo):
 
 
 UNFOLD = {
-    "SITE_TITLE": "TerraBioLab",
-    "SITE_HEADER": "TerraBioLab UTC",
-    "SITE_SUBHEADER": "Sistema Inteligente de Análisis Microbiológico",
+    "SITE_TITLE": "BioSuelo",
+    "SITE_HEADER": "BioSuelo",
+    "SITE_SUBHEADER": "Procesamiento y visualización de resultados microbiológicos",
     "SITE_SYMBOL": "biotech",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
@@ -382,6 +420,33 @@ UNFOLD = {
                     },
                 ],
             },
+            {
+                "title": "Auditoría",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Eventos de Acceso",
+                        "icon": "shield_lock",
+                        "link": reverse_lazy("admin:analisis_eventoacceso_changelist"),
+                    },
+                    {
+                        "title": "Registro de Acciones",
+                        "icon": "history",
+                        "link": reverse_lazy("admin:admin_logentry_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Ayuda",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Manual del Administrador",
+                        "icon": "menu_book",
+                        "link": reverse_lazy("admin-manual"),
+                    },
+                ],
+            },
         ],
     },
 
@@ -393,6 +458,17 @@ UNFOLD = {
 # ---------------------------
 # CONFIGURACIÓN DE CORREO ELECTRÓNICO
 # ---------------------------
-# Muestra los correos en la consola/terminal para pruebas de desarrollo
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST      = 'smtp.gmail.com'
+EMAIL_PORT      = 587
+EMAIL_USE_TLS   = True
+EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL  = 'BioSuelo <{}>'.format(os.environ.get('EMAIL_HOST_USER', 'noreply@biosuelo.ec'))
+
+# Si hay credenciales en .env usa SMTP real; si no, imprime en consola
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
 USE_DJANGO_JQUERY = True

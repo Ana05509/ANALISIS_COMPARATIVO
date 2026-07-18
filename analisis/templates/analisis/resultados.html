@@ -11,19 +11,16 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Composición Taxonómica</h1>
-    <p>
-        Muestra ID: <span class="td-mono" style="font-weight: 600; color: var(--text-primary);">#{{ muestra_id|default:"-" }}</span> —
-        <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span>
-    </p>
-</div>
+<p class="page-subtitle">
+    Muestra ID: <span class="td-mono fw-600">#{{ muestra_id|default:"-" }}</span> —
+    <span class="{% if tipo_actual == '16S' %}pill-16s{% else %}pill-its{% endif %}">{{ tipo_actual|default:"-" }}</span>
+</p>
 
 <div class="card card-sm" style="margin-bottom: 1.25rem;">
-    <form method="get" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+    <form method="get" class="form-row">
         <div>
             <label class="form-label">Nivel taxonómico</label>
-            <select name="nivel" class="form-control" style="width:130px;">
+            <select name="nivel" class="form-control">
                 {% for n in niveles_disponibles %}
                 <option value="{{ n }}" {% if nivel_actual == n %}selected{% endif %}>{{ n|capfirst }}</option>
                 {% endfor %}
@@ -34,13 +31,13 @@
                 Top N
                 <span style="font-size:10px; color:var(--text-hint); font-weight:400;">(solo visualización)</span>
             </label>
-            <select name="top_n" class="form-control" style="width:100px;">
+            <select name="top_n" class="form-control">
                 {% for opt in opciones_top_n %}
                 <option value="{{ opt }}" {% if top_actual == opt %}selected{% endif %}>Top {{ opt }}</option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="btn btn-outline btn-sm" style="height:38px;">
+        <button type="submit" class="btn btn-outline btn-sm">
             <i class="ti ti-refresh" aria-hidden="true"></i> Aplicar
         </button>
     </form>
@@ -73,7 +70,7 @@
 <div class="card">
     <div class="card-title">
         Top {{ top_actual }} por {{ nivel_actual|default:"-"|capfirst }}
-        <span style="font-size:11px; font-weight:400; color:var(--text-hint); margin-left:6px;">(visualización — perfil completo en BD)</span>
+        <span class="card-title-note">(visualización — perfil completo en BD)</span>
     </div>
 
     <div class="table-wrap cards-mobile" style="margin-top: 1rem;">
@@ -100,9 +97,7 @@
                             <div class="pct-bar-track">
                                 <div class="pct-bar-fill" style="width:{{ item.total_porcentaje|default:0|stringformat:'.2f' }}%;"></div>
                             </div>
-                            <span class="td-mono" style="font-weight: 500; min-width: 75px; text-align: right;">
-                                {{ item.total_porcentaje|default:0|floatformat:4 }}%
-                            </span>
+                            <span class="pct-bar-label">{{ item.total_porcentaje|default:0|floatformat:4 }}%</span>
                         </div>
                     </td>
                     <td data-label="Clasificación">

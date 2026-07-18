@@ -2,7 +2,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo
+from analisis.models import CatalogoMicroorganismo
 from analisis.services.business.catalog_service import CatalogService
 from analisis.forms import CatalogoImportarForm
 
@@ -45,13 +45,15 @@ def catalogo_microorganismos(request):
         "total_sin_clas":    conteos.get('sin_clasificar', 0),
     }
 
-    # Niveles distintos presentes en el catálogo (dinámico)
-    niveles_taxonomicos = (
-        CatalogoMicroorganismo.objects
-        .values_list('nivel', flat=True)
-        .distinct()
-        .order_by('nivel')
+    # Niveles con etiqueta en español — solo los que tienen registros
+    niveles_existentes = set(
+        CatalogoMicroorganismo.objects.values_list('nivel', flat=True).distinct()
     )
+    niveles_taxonomicos = [
+        (val, label)
+        for val, label in CatalogoMicroorganismo.NIVEL_CHOICES
+        if val in niveles_existentes
+    ]
 
     clasificaciones_disponibles = [
         ("benefico",      "Benéfico"),
@@ -73,26 +75,17 @@ def catalogo_microorganismos(request):
     })
 
 
-# =========================================================================
-# FUNCIONES REQUERIDAS POR EL __init__.py (No eliminar para evitar ImportError)
-# =========================================================================
-
-def detalle_microorganismo(request, pk):
-    """
-    Vista para el desglose detallado de un microorganismo específico.
-    """
-    microorganismo = get_object_or_404(ResultadoTaxonomico, pk=pk)
-    context = {
-        "microorganismo": microorganismo
-    }
-    return render(request, "analisis/detalle_producto.html", context)
-
-
 @login_required
 def actualizar_clasificacion(request, pk):
     """
     Vista para reescribir o corregir manualmente un rol en el catálogo.
+    Solo staff: reclasificar afecta el catálogo compartido que usan todos
+    los análisis y reportes del sistema, no solo la muestra que se ve.
     """
+    if not request.user.is_staff:
+        messages.error(request, "No tiene permisos para realizar esta acción.")
+        return redirect('analisis:catalogo')
+
     if request.method == "POST":
         nueva_clasificacion = request.POST.get("clasificacion")
         microorganismo = get_object_or_404(CatalogoMicroorganismo, pk=pk)

@@ -9,8 +9,7 @@ import numpy as np
 
 from ..models import CatalogoMicroorganismo, MuestraSuelo, ResultadoTaxonomico
 from ..services.business.analysis_service import obtener_diversidad
-
-MARCADORES_VALIDOS = ("16S", "ITS")
+from analisis.constants import MARCADORES_VALIDOS
 
 def convertir_a_serializable(obj):
     """Convierte objetos no serializables (ej. ndarray) a tipos Python nativos."""
@@ -45,7 +44,11 @@ def dashboard(request):
 
         muestras_por_variedad = list(
             muestras.exclude(cultivo__isnull=True)
-            .values(nombre_variedad=F("cultivo__nombre"))
+            .values(
+                nombre_variedad=F("cultivo__nombre"),
+                imagen_cultivo=F("cultivo__imagen"),
+                imagen_url_cultivo=F("cultivo__imagen_url"),
+            )
             .annotate(total=Count("id"))
             .order_by("-total")
         )
@@ -76,9 +79,6 @@ def dashboard(request):
             else:
                 total_sin_clasificacion += hits
 
-        analisis_recientes = ResultadoTaxonomico.objects.filter(
-            archivo__tipo_analisis=tipo
-        ).select_related("archivo__muestra").order_by("-id")[:5]
 
         # Diversidad alfa — por muestra individual, sobre todos los taxa
         contexto_estadisticas = obtener_diversidad(tipo=tipo) or {}
@@ -107,7 +107,11 @@ def dashboard(request):
                 title=f'Top 15 Géneros - {tipo}',
                 labels={'taxonomia': 'Género', 'porcentaje': 'Abundancia relativa (%)'},
             )
-            fig_bar.update_layout(xaxis_tickangle=-45, height=400)
+            fig_bar.update_layout(
+                xaxis=dict(tickangle=-45, automargin=True, tickfont=dict(size=10)),
+                margin=dict(b=160, t=60, l=60, r=20),
+                height=480,
+            )
 
             fig_pie = px.pie(
                 df_genera, names='taxonomia', values='porcentaje',
@@ -126,7 +130,6 @@ def dashboard(request):
 
     return render(request, "analisis/dashboard.html", {
         "analisis": analisis,
-        "analisis_recientes": analisis_recientes,
         "productos": muestras,
         "total_analisis": total_analisis,
         "total_productos": total_muestras,

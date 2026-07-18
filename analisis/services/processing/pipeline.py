@@ -1,11 +1,21 @@
 import pandas as pd
 
+
 COLUMNAS_REQUERIDAS = [
     "kingdom", "phylum", "class", "order",
     "family", "genus", "species", "num_hits", "%_hits"
 ]
 
-NIVELES_VALIDOS = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
+
+class ColumnasInvalidasError(ValueError):
+    def __init__(self, faltantes, recibidas):
+        self.faltantes = faltantes
+        self.recibidas = recibidas
+        self.requeridas = COLUMNAS_REQUERIDAS
+        super().__init__(
+            f"Columnas faltantes: {', '.join(faltantes)}. "
+            f"Detectadas: {', '.join(recibidas) or '(ninguna)'}."
+        )
 
 
 class PipelineProcesamiento:
@@ -16,10 +26,9 @@ class PipelineProcesamiento:
         """Valida la presencia de la estructura de datos obligatoria."""
         faltantes = [c for c in COLUMNAS_REQUERIDAS if c not in df.columns]
         if faltantes:
-            raise ValueError(
-                f"El archivo no cumple con el estándar molecular. "
-                f"Columnas faltantes: {faltantes}. "
-                f"Columnas recibidas: {list(df.columns)}"
+            raise ColumnasInvalidasError(
+                faltantes=faltantes,
+                recibidas=df.columns.tolist(),
             )
 
     @staticmethod
@@ -48,7 +57,7 @@ class PipelineProcesamiento:
                 df["species"]
                 .str.replace(r"\(.*?\)", "", regex=True)
                 .str.replace("_", " ", regex=False)
-                .str.replace(r"\bsp\.?\b", "sp", regex=True)
+                .str.replace(r"\bsp\b\.?", "sp", regex=True)
                 .str.strip()
             )
             df["species"] = df["species"].replace(["", "nan"], "Unclassified")

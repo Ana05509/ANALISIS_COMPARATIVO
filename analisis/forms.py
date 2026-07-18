@@ -1,5 +1,6 @@
 from django import forms
 from analisis.models import MuestraSuelo, Cultivo, VariedadClon
+from analisis.constants import OPCIONES_TOP_N, NIVELES_CHOICES, MARCADORES_CHOICES
 
 class SubirDatosForm(forms.Form):
     TIPO_CHOICES = [("16S", "16S (Bacterias)"), ("ITS", "ITS (Hongos)")]
@@ -16,6 +17,19 @@ class SubirDatosForm(forms.Form):
         label="Localidad",
         widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: Manabí"}),
         required=True
+    )
+
+    finca_lote = forms.CharField(
+        max_length=150,
+        label="Finca / Lote",
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: Finca La Esperanza"}),
+        required=True
+    )
+
+    altitud = forms.IntegerField(
+        label="Altitud (msnm)",
+        widget=forms.NumberInput(attrs={"class": "form-control", "placeholder": "Ej: 1200"}),
+        required=False
     )
 
     cultivo = forms.ModelChoiceField(
@@ -74,16 +88,6 @@ class _MuestraMultipleField(forms.ModelMultipleChoiceField):
 
 
 class CompararForm(forms.Form):
-    MARCADOR_CHOICES = [("16S", "16S (Bacterias)"), ("ITS", "ITS (Hongos)")]
-    NIVEL_CHOICES = [
-        ("genus", "Género"),
-        ("family", "Familia"),
-        ("order", "Orden"),
-        ("class", "Clase"),
-        ("phylum", "Filo"),
-        ("species", "Especie"),
-    ]
-
     muestras = _MuestraMultipleField(
         queryset=MuestraSuelo.objects.select_related("cultivo", "variedad_clon").order_by("-id"),
         label="Seleccione las muestras a comparar",
@@ -96,16 +100,23 @@ class CompararForm(forms.Form):
     )
 
     marcador = forms.ChoiceField(
-        choices=MARCADOR_CHOICES,
-        label="Filtro de Marcador",
+        choices=MARCADORES_CHOICES,
+        label="Marcador Molecular",
         widget=forms.Select(attrs={"class": "form-control"})
     )
 
     nivel = forms.ChoiceField(
-        choices=NIVEL_CHOICES,
+        choices=NIVELES_CHOICES,
         initial="genus",
-        label="Profundidad Taxonómica",
+        label="Nivel Taxonómico",
         widget=forms.Select(attrs={"class": "form-control"})
+    )
+
+    top_n = forms.ChoiceField(
+        choices=[(str(n), f"Top {n}") for n in OPCIONES_TOP_N],
+        initial="10",
+        label="Top N taxa",
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
 
     def clean(self):
@@ -139,21 +150,3 @@ class CatalogoImportarForm(forms.Form):
             if archivo.size > 5 * 1024 * 1024:
                 raise forms.ValidationError("El archivo no puede superar los 5 MB.")
         return archivo
-
-
-class CustomSignupForm(forms.Form):
-    first_name = forms.CharField(
-        max_length=30, 
-        label='Nombre',
-        widget=forms.TextInput(attrs={'placeholder': 'Ej: Juan'})
-    )
-    last_name = forms.CharField(
-        max_length=30, 
-        label='Apellido',
-        widget=forms.TextInput(attrs={'placeholder': 'Ej: Pérez'})
-    )
-
-    def signup(self, request, user):
-        user.first_name = self.cleaned_data['first_name']
-        user.last_name = self.cleaned_data['last_name']
-        user.save()
