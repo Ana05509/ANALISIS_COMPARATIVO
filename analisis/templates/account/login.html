@@ -35,9 +35,6 @@
         @keyframes shake     { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-9px)} 40%{transform:translateX(9px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
         @keyframes shimmer   { 0%{background-position:-300% center} 100%{background-position:300% center} }
         @keyframes spin      { to{transform:rotate(360deg)} }
-        @keyframes float1    { 0%,100%{transform:translateY(0)   rotate(0deg)  scale(1)}   50%{transform:translateY(-22px) rotate(180deg) scale(1.15)} }
-        @keyframes float2    { 0%,100%{transform:translateY(0)   rotate(0deg)  scale(1)}   50%{transform:translateY(-30px) rotate(-120deg) scale(.9)} }
-        @keyframes float3    { 0%,100%{transform:translateY(0)   rotate(0deg)  scale(1)}   50%{transform:translateY(-15px) rotate(90deg) scale(1.2)} }
         @keyframes blobPulse { 0%,100%{transform:scale(1) rotate(0deg)} 40%{transform:scale(1.18) rotate(12deg)} 70%{transform:scale(.9) rotate(-7deg)} }
         @keyframes gridDrift { 0%{background-position:0 0} 100%{background-position:32px 32px} }
         @keyframes scanLine  { from{width:0;opacity:1} to{width:100%;opacity:1} }
@@ -70,38 +67,21 @@
             background:linear-gradient(135deg,rgba(15,38,28,.72) 0%,rgba(58,168,120,.28) 100%);
         }
 
-        /* partículas flotantes */
-        .particles { position:absolute; inset:0; z-index:3; pointer-events:none; overflow:hidden; }
-        .par {
-            position:absolute; border-radius:50%;
-            border:1.5px solid rgba(178,216,197,.45);
-        }
-        .par::before {
-            content:''; position:absolute; inset:5px; border-radius:50%;
-            background:rgba(178,216,197,.12);
-        }
-        .par-1 { width:64px;height:64px; top:12%; left:8%;   animation:float1 9s ease-in-out infinite; }
-        .par-2 { width:28px;height:28px; top:28%; left:72%;  animation:float2 6.5s ease-in-out infinite .8s; }
-        .par-3 { width:90px;height:90px; top:60%; left:15%;  animation:float3 11s ease-in-out infinite 2s; }
-        .par-4 { width:18px;height:18px; top:78%; left:58%;  animation:float1 7s  ease-in-out infinite 3s; }
-        .par-5 { width:44px;height:44px; top:42%; left:52%;  animation:float2 8s  ease-in-out infinite 1.5s; }
-        .par-6 { width:36px;height:36px; top:88%; left:30%;  animation:float3 10s ease-in-out infinite 4s; }
-        .par-7 { width:55px;height:55px; top:20%; left:38%;  animation:float1 12s ease-in-out infinite 0.5s; }
-
         /* contenido panel izquierdo */
         .brand-block { position:relative; z-index:4; animation:fadeIn .9s .1s ease both; }
         .logo-row {
-            display:flex; align-items:center; gap:12px; margin-bottom:1.75rem;
+            position:relative; z-index:5;
+            display:flex; flex-direction:column; align-items:center; gap:10px;
+            align-self:center;
+            animation:fadeIn .9s .1s ease both;
         }
         .logo-ico {
-            width:112px; height:112px; border-radius:22px;
-            background:rgba(255,255,255,.14); backdrop-filter:blur(10px);
-            border:1px solid rgba(255,255,255,.22);
+            width:150px; height:150px;
             display:flex; align-items:center; justify-content:center;
             flex-shrink:0;
         }
         .logo-ico i { color:#fff; font-size:24px; }
-        .logo-name { color:#fff; font-family:'Fraunces',serif; font-size:22px; font-weight:500; text-shadow:0 2px 4px rgba(0,0,0,.3); }
+        .logo-name { color:#fff; font-family:'Fraunces',serif; font-size:28px; font-weight:500; text-shadow:0 2px 4px rgba(0,0,0,.3); }
 
         .hero { font-family:'Fraunces',serif; font-size:36px; font-weight:300; color:#fff; line-height:1.15; margin-bottom:.7rem; text-shadow:0 2px 6px rgba(0,0,0,.35); }
         .hero em { font-style:italic; color:#b2d8c5; font-weight:400; }
@@ -159,7 +139,7 @@
         .card.shake { animation:slideUp .55s var(--ease) both,shake .45s .55s var(--ease) both; }
 
         /* ── Cabecera ───────────────────────────────── */
-        .card-head { margin-bottom:1.75rem; animation:slideUp .5s .12s var(--ease) both; }
+        .card-head { margin-bottom:1.1rem; animation:slideUp .5s .12s var(--ease) both; }
         .card-title {
             font-family:'Outfit',sans-serif; font-size:28px; font-weight:700;
             color:var(--text); letter-spacing:-.6px; margin-bottom:5px;
@@ -179,7 +159,7 @@
         /* ══════════════════════════════════════════════
            FLOATING-LABEL FIELDS
         ══════════════════════════════════════════════ */
-        .field-group { margin-bottom:1.4rem; }
+        .field-group { margin-bottom:.9rem; }
 
         .field-wrap {
             position:relative;
@@ -293,7 +273,7 @@
 
         /* ── Botón principal ────────────────────────── */
         .btn-main {
-            width:100%; padding:15px; margin-top:.25rem;
+            width:100%; padding:13px; margin-top:.2rem;
             background:linear-gradient(135deg,var(--p) 0%,var(--p-vivid) 100%);
             color:#fff; border:none; border-radius:14px;
             font-family:'Outfit',sans-serif; font-size:15.5px; font-weight:700;
@@ -319,7 +299,7 @@
         /* ── Divisor ───────────────────────────────── */
         .divider {
             display:flex; align-items:center; gap:14px;
-            margin:1.6rem 0; color:#b0bcb7; font-size:12.5px; font-weight:500;
+            margin:1.1rem 0; color:#b0bcb7; font-size:12.5px; font-weight:500;
             animation:fadeIn .5s .54s var(--ease) both;
         }
         .divider::before,.divider::after {
@@ -329,7 +309,7 @@
         /* ── Botón Google ───────────────────────────── */
         .btn-google {
             display:flex; align-items:center; justify-content:center; gap:11px;
-            width:100%; padding:13px; background:#fff; color:#374151;
+            width:100%; padding:11px; background:#fff; color:#374151;
             border:1.5px solid var(--border); border-radius:14px;
             font-family:'Outfit',sans-serif; font-size:14.5px; font-weight:600;
             text-decoration:none;
@@ -344,7 +324,7 @@
 
         /* ── Footer ─────────────────────────────────── */
         .auth-foot {
-            margin-top:1.6rem; text-align:center;
+            margin-top:1.1rem; text-align:center;
             font-size:14px; color:var(--muted);
             animation:fadeIn .5s .68s var(--ease) both;
         }
@@ -358,8 +338,8 @@
 
         /* Laptop pequeño (1024–1279 px) */
         @media (max-width: 1279px) {
-            .panel-l { padding: 3rem; }
-            .hero { font-size: 42px; }
+            .panel-l { padding: 2rem 2.5rem; }
+            .hero { font-size: 32px; }
         }
 
         /* Tablet (768–1023 px): panel izquierdo compacto, solo logo */
@@ -374,8 +354,8 @@
                 display: flex; flex-direction: column;
                 align-items: center; text-align: center;
             }
-            .logo-row   { margin-bottom: 0; }
-            .logo-name  { font-size: 14px; }
+            .logo-ico   { width: 96px; height: 96px; }
+            .logo-name  { font-size: 18px; }
             .hero       { display: none; }
             .hero-sub   { display: none; }
             .feature-grid { display: none; }
@@ -412,24 +392,14 @@
         </video>
         <div class="overlay"></div>
 
-        <!-- Partículas biológicas flotantes -->
-        <div class="particles">
-            <div class="par par-1"></div>
-            <div class="par par-2"></div>
-            <div class="par par-3"></div>
-            <div class="par par-4"></div>
-            <div class="par par-5"></div>
-            <div class="par par-6"></div>
-            <div class="par par-7"></div>
-        </div>
-
         <div class="brand-block">
-            <div class="logo-row">
-                <div class="logo-ico"><img src="{% static 'logo.png' %}" alt="BioMicro" style="width:70%; height:70%; object-fit:contain;"></div>
-                <span class="logo-name">BioMicro</span>
-            </div>
             <h1 class="hero">Análisis microbiano<br>para <em>suelos agrícolas</em></h1>
             <p class="hero-sub">Plataforma de análisis comparativo de perfiles microbianos 16S e ITS orientada a investigadores y agrónomos de la UTC.</p>
+        </div>
+
+        <div class="logo-row">
+            <div class="logo-ico"><img src="{% static 'logo.png' %}" alt="BioMicro" style="width:80%; height:80%; object-fit:contain;"></div>
+            <span class="logo-name">BioMicro</span>
         </div>
 
         <div class="feature-grid">
