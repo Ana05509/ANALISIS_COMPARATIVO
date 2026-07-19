@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}BioSuelo{% endblock %} — Análisis Microbiano</title>
-    <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
+    <title>{% block title %}BioMicro{% endblock %} — Análisis Microbiano</title>
+    <link rel="icon" type="image/png" href="{% static 'logo.png' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -128,15 +128,13 @@
         }
 
         .brand-icon {
-            width: 32px; height: 32px;
-            background: var(--verde);
-            border-radius: 8px;
+            width: 36px; height: 36px;
             display: flex; align-items: center; justify-content: center;
             flex-shrink: 0;
-            box-shadow: 0 2px 8px rgba(29,158,117,0.28);
         }
 
         .brand-icon i { color: #fff; font-size: 17px; }
+        .brand-logo-img { width: 100%; height: 100%; object-fit: contain; }
 
         .brand-text {
             display: flex;
@@ -182,7 +180,7 @@
             text-transform: uppercase;
             letter-spacing: 1.1px;
             color: var(--text-hint);
-            padding: 0.85rem 0.5rem 0.4rem;
+            padding: 0.3rem 0.5rem 0.1rem;
             font-weight: 600;
         }
 
@@ -190,14 +188,14 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 0.58rem 0.75rem;
+            padding: 0.2rem 0.75rem;
             border-radius: var(--radius);
             color: var(--text-muted);
             text-decoration: none;
             font-size: 14px;
             font-weight: 400;
             transition: background var(--transition), color var(--transition);
-            margin-bottom: 2px;
+            margin-bottom: 1px;
             position: relative;
         }
 
@@ -558,7 +556,7 @@
         .tu-drop-logout:hover { background: var(--rojo-light); }
 
         .page-content {
-            padding: 1.25rem 1.5rem;
+            padding: .9rem 1.25rem;
             flex: 1;
             min-width: 0;
             animation: pageFadeIn 0.28s ease both;
@@ -576,47 +574,47 @@
             line-height: 1.5;
         }
 
-        .page-header { margin-bottom: 1.5rem; }
+        .page-header { margin-bottom: .9rem; }
         .page-header h1 {
             font-family: 'Fraunces', serif;
-            font-size: 28px;
+            font-size: 22px;
             font-weight: 500;
             color: var(--text-primary);
             overflow-wrap: anywhere;
         }
-        .page-header p { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
+        .page-header p { color: var(--text-muted); font-size: 13px; margin-top: 3px; }
 
         .card {
             background: var(--surface);
             border: 1px solid var(--gris-border);
             border-radius: var(--radius-lg);
-            padding: 1.5rem;
+            padding: 1rem 1.1rem;
             box-shadow: var(--shadow-card);
         }
 
-        .card-sm { padding: 1rem 1.25rem; }
+        .card-sm { padding: .7rem .9rem; }
 
         .card-title {
-            font-size: 12.5px;
+            font-size: 12px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.7px;
             color: var(--text-hint);
-            margin-bottom: 0.85rem;
+            margin-bottom: 0.55rem;
         }
 
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-            gap: 14px;
-            margin-bottom: 1.75rem;
+            gap: 10px;
+            margin-bottom: 1rem;
         }
 
         .metric-card {
             background: var(--surface);
             border: 1px solid var(--gris-border);
             border-radius: var(--radius);
-            padding: 1.1rem 1.25rem;
+            padding: .75rem .9rem;
             box-shadow: var(--shadow-card);
             transition: box-shadow var(--transition), transform var(--transition);
         }
@@ -636,7 +634,7 @@
         }
 
         .metric-value {
-            font-size: 28px;
+            font-size: 22px;
             font-weight: 600;
             color: var(--text-primary);
             line-height: 1;
@@ -644,9 +642,9 @@
         }
 
         .metric-sub {
-            font-size: 12px;
+            font-size: 11.5px;
             color: var(--text-muted);
-            margin-top: 5px;
+            margin-top: 3px;
         }
 
         .metric-card.verde { border-left: 3px solid var(--verde); }
@@ -706,16 +704,16 @@
            .table-wrap — la tabla "se ajusta" apretando el contenido en vez
            de adaptarse. Con min-width, si no entra, se ve completa con scroll
            en lugar de columnas ilegibles. */
-        .table-inner { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13.5px; }
+        .table-inner { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13px; }
         .table-inner thead tr { border-bottom: 2px solid var(--gris-border); }
         .table-inner thead th { background: var(--gris-light); font-size: 11px; font-weight: 600;
                                  text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
-                                 color: var(--text-hint); padding: 8px 10px; text-align: left; }
+                                 color: var(--text-hint); padding: 6px 10px; text-align: left; }
         .table-inner tbody tr { border-bottom: 1px solid var(--gris-light); transition: background var(--transition); }
         .table-inner tbody tr:last-child { border-bottom: none; }
         .table-inner tbody tr:hover { background: #f5f4f0; }
-        .table-inner tbody td { padding: 8px 10px; color: var(--text-primary); }
-        .table-inner tfoot td { padding: 8px 10px; font-size: 12px;
+        .table-inner tbody td { padding: 6px 10px; color: var(--text-primary); }
+        .table-inner tfoot td { padding: 6px 10px; font-size: 12px;
                                  background: var(--gris-light); border-top: 2px solid var(--gris-border); }
 
         /* Utilidades de alineación */
@@ -785,7 +783,7 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 0.52rem 1.15rem;
+            padding: 0.42rem 1rem;
             border-radius: var(--radius);
             font-size: 14px;
             font-weight: 500;
@@ -794,7 +792,7 @@
             border: 1px solid transparent;
             text-decoration: none;
             transition: all var(--transition);
-            min-height: 38px;
+            min-height: 34px;
             white-space: nowrap;
             user-select: none;
         }
@@ -899,12 +897,12 @@
         tbody td { padding: 0.75rem 1rem; color: var(--text-primary); }
         .td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
 
-        .form-group { margin-bottom: 1.35rem; }
-        .form-label { display: block; font-size: 13.5px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
+        .form-group { margin-bottom: .85rem; }
+        .form-label { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 4px; }
 
         .form-control {
             width: 100%;
-            padding: 0.58rem 0.9rem;
+            padding: 0.44rem 0.8rem;
             border: 1px solid var(--gris-border);
             border-radius: var(--radius);
             font-family: 'Outfit', sans-serif;
@@ -912,7 +910,7 @@
             color: var(--text-primary);
             background: var(--surface);
             transition: border-color var(--transition), box-shadow var(--transition);
-            min-height: 40px;
+            min-height: 34px;
         }
 
         .form-control:focus { outline: none; border-color: var(--verde); box-shadow: 0 0 0 3px rgba(29,158,117,0.14); }
@@ -1131,7 +1129,7 @@
             /* En móvil: ocultar nombre/rol del usuario, solo avatar */
             .tu-info, .tu-caret { display: none; }
             .tu-btn { padding: 5px 6px; }
-            /* Breadcrumb: ocultar "BioSuelo ›" y mostrar solo la página */
+            /* Breadcrumb: ocultar "BioMicro ›" y mostrar solo la página */
             .tb-crumb-brand, .tb-crumb-sep { display: none; }
         }
 
@@ -1162,7 +1160,7 @@
 
     <script>
     /* ════════════════════════════════════════════════
-       SISTEMA DE INTERACTIVIDAD GLOBAL — BioSuelo
+       SISTEMA DE INTERACTIVIDAD GLOBAL — BioMicro
        1. Toast Manager
        2. Table Sorter
        3. Form Validator

@@ -1,4 +1,5 @@
 {% extends "templates_base.html" %}
+{% load static %}
 
 {% block layout_wrapper %}
 <div class="bs-app-layout-root">
@@ -6,10 +7,10 @@
     <aside class="bs-app-sidebar">
         <div class="sidebar-brand">
             <div class="brand-icon">
-                <i class="ti ti-dna-2" aria-hidden="true"></i>
+                <img src="{% static 'logo.png' %}" alt="BioMicro" class="brand-logo-img">
             </div>
             <div class="brand-text">
-                <div class="brand-name">BioSuelo</div>
+                <div class="brand-name">BioMicro</div>
                 <div class="brand-sub">Análisis 16S &amp; ITS</div>
             </div>
         </div>
@@ -127,7 +128,7 @@
                     <i class="ti ti-menu-2" aria-hidden="true"></i>
                 </button>
                 <nav class="topbar-breadcrumb" aria-label="Ruta de navegación">
-                    <span class="tb-crumb-brand">BioSuelo</span>
+                    <span class="tb-crumb-brand">BioMicro</span>
                     <i class="ti ti-chevron-right tb-crumb-sep" aria-hidden="true"></i>
                     <span class="tb-crumb-page">{% block topbar_title %}{% endblock %}</span>
                 </nav>
@@ -356,10 +357,10 @@
 
 <script>
 window.BioTour=(function(){
-var SK='biosuelo_tour_v1';
+var SK='biomicro_tour_v1';
 var STEPS=[
-{sel:null,title:'¡Bienvenido/a a BioSuelo!',text:'En los próximos pasos te mostramos los elementos principales de la plataforma. Puedes saltar el recorrido en cualquier momento.'},
-{sel:'.sidebar-brand',title:'Tu plataforma de análisis',text:'BioSuelo procesa y visualiza resultados de secuenciación molecular de suelo: <strong>16S rRNA</strong> para bacterias y arqueas, <strong>ITS</strong> para hongos.',pos:'right'},
+{sel:null,title:'¡Bienvenido/a a BioMicro!',text:'En los próximos pasos te mostramos los elementos principales de la plataforma. Puedes saltar el recorrido en cualquier momento.'},
+{sel:'.sidebar-brand',title:'Tu plataforma de análisis',text:'BioMicro procesa y visualiza resultados de secuenciación molecular de suelo: <strong>16S rRNA</strong> para bacterias y arqueas, <strong>ITS</strong> para hongos.',pos:'right'},
 {sel:'.sidebar-nav a[href*="subir"]',title:'Cargar Muestra',text:'Primer paso: aquí ingresas los datos de cada muestra y subes el archivo de resultados taxonómicos generado por el laboratorio de secuenciación.',pos:'right'},
 {sel:'.sidebar-nav a[href*="comparar"]',title:'Comparar Perfiles',text:'Contrasta la diversidad microbiana entre dos o más muestras. Incluye índices alfa, diversidad gamma y prueba estadística PERMANOVA.',pos:'right'},
 {sel:'.sidebar-nav a[href*="analisis-avanzado"]',title:'Análisis Avanzado',text:'Explora la composición interna con gráficas interactivas: treemap, heatmap, Top N microorganismos y diversidad beta (Bray-Curtis, Jaccard).',pos:'right'},

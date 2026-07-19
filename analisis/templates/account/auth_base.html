@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Acceso{% endblock %} — BioSuelo</title>
+    <title>{% block title %}Acceso{% endblock %} — BioMicro</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -452,8 +452,8 @@
 
         <div class="auth-brand">
             <div class="auth-logo-row">
-                <div class="auth-logo-ico"><i class="ti ti-dna-2"></i></div>
-                <span class="auth-logo-name">BioSuelo</span>
+                <div class="auth-logo-ico"><img src="{% static 'logo.png' %}" alt="BioMicro" style="width:70%; height:70%; object-fit:contain;"></div>
+                <span class="auth-logo-name">BioMicro</span>
             </div>
             {% block panel_hero %}
             <h1 class="auth-hero">Análisis microbiano<br>para <em>suelos agrícolas</em></h1>

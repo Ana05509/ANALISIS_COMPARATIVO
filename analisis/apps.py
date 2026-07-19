@@ -5,7 +5,7 @@ from django.db.models.signals import pre_save
 class AnalisisConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'analisis'
-    verbose_name = 'BioSuelo'
+    verbose_name = 'BioMicro'
 
     def ready(self):
         from django.contrib.auth import get_user_model
@@ -44,7 +44,7 @@ class AnalisisConfig(AppConfig):
 
             msg = EmailMultiAlternatives(
                 subject=asunto,
-                body=f'Bienvenido/a {user.first_name} a BioSuelo.',
+                body=f'Bienvenido/a {user.first_name} a BioMicro.',
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[user.email],
             )

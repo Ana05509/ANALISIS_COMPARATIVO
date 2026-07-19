@@ -26,8 +26,8 @@ from .models import (
 from analisis.services.processing.pipeline import PipelineProcesamiento
 
 # Configuración de cabeceras
-admin.site.site_header = "TerraBioLab UTC"
-admin.site.site_title  = "Administración TerraBioLab"
+admin.site.site_header = "BioMicro UTC"
+admin.site.site_title  = "Administración BioMicro"
 admin.site.index_title = "Panel de Control Microbiológico"
 
 
@@ -492,13 +492,13 @@ class UsuarioAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, BaseUserAdmin, Mode
     def get_fieldsets(self, request, obj=None):
         fieldsets = list(super().get_fieldsets(request, obj) or [])
         fieldsets.append((
-            "Rol en TerraBioLab UTC",
+            "Rol en BioMicro UTC",
             {"fields": ("rol",), "description": "Asigne el rol para determinar los permisos de visualización."}
         ))
         return fieldsets
 
     def save_model(self, request, obj, form, change):
-        # Sincronizar is_staff con el rol de BioSuelo para que el acceso
+        # Sincronizar is_staff con el rol de BioMicro para que el acceso
         # al panel /admin/ quede consistente con el rol asignado.
         if obj.rol == "admin":
             obj.is_staff = True
@@ -934,7 +934,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
             topMargin=30, bottomMargin=30, leftMargin=30, rightMargin=30,
         )
         contenido = [
-            Paragraph("BioSuelo — Bitácora de Eventos de Acceso", styles["Title"]),
+            Paragraph("BioMicro — Bitácora de Eventos de Acceso", styles["Title"]),
             Paragraph(
                 f"Generado: {timezone.now():%d/%m/%Y %H:%M} — {qs.count()} registro(s)",
                 styles["Normal"],

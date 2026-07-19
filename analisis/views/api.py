@@ -1,5 +1,5 @@
 """
-API REST v1 — TerraBioLab UTC
+API REST v1 — BioMicro UTC
 Endpoints JSON de solo lectura. Autenticación por sesión Django.
 Las vistas HTML existentes no se ven afectadas.
 

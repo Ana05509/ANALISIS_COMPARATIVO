@@ -1,4 +1,4 @@
-# Traducciones del proyecto TerraBioLab UTC
+# Traducciones del proyecto BioMicro UTC
 # Cubre cadenas de Unfold que no están en el catálogo de Django Admin
 msgid ""
 msgstr ""

@@ -200,8 +200,14 @@ def comparar(request):
 
             except Exception as e:
                 messages.error(request, f"Error en el procesamiento comparativo: {str(e)}")
-        else:
-            messages.error(request, "Seleccione al menos dos muestras para comparar.")
+    elif request.GET:
+        # El formulario se envió pero no pasó validación (ej. menos de 2
+        # muestras seleccionadas) — sin esto, el usuario no recibía ningún
+        # aviso y la página simplemente volvía al estado vacío en silencio.
+        primer_error = next(
+            (err for errs in form.errors.values() for err in errs), None
+        )
+        messages.error(request, primer_error or "Revise los campos del formulario.")
 
     return render(request, "analisis/comparar.html", contexto)
 

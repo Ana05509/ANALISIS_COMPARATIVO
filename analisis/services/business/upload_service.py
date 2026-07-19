@@ -6,6 +6,19 @@ from typing import Dict, Any
 from analisis.models import MuestraSuelo, ArchivoMolecular, ResultadoTaxonomico, Cultivo, VariedadClon
 from analisis.services.processing.pipeline import PipelineProcesamiento
 
+
+class MuestraDuplicadaError(ValueError):
+    """Ya existe un archivo del mismo marcador molecular cargado para esta muestra."""
+    def __init__(self, codigo, tipo, fecha_carga, total_taxones):
+        self.codigo = codigo
+        self.tipo = tipo
+        self.fecha_carga = fecha_carga
+        self.total_taxones = total_taxones
+        super().__init__(
+            f"Ya existe un archivo {tipo} cargado para la muestra {codigo}."
+        )
+
+
 def validar_archivo(archivo) -> None:
     if not archivo.name.lower().endswith((".csv", ".tsv", ".xlsx", ".xls")):
         raise ValueError("Formato inválido. Use CSV, TSV o Excel.")
@@ -35,10 +48,23 @@ def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
         raise ValueError("El código de muestra es obligatorio.")
     
     tipo = request.POST.get("tipo", "16S").strip()
+    confirmar_sobrescritura = request.POST.get("confirmar_sobrescritura") == "1"
+
+    archivo_existente = ArchivoMolecular.objects.filter(
+        muestra__codigo=codigo_muestra, tipo_analisis=tipo
+    ).select_related("muestra").first()
+    if archivo_existente and not confirmar_sobrescritura:
+        raise MuestraDuplicadaError(
+            codigo=codigo_muestra,
+            tipo=tipo,
+            fecha_carga=archivo_existente.fecha_carga,
+            total_taxones=archivo_existente.resultados_taxonomicos.count(),
+        )
+
     localidad = request.POST.get("localidad", "").strip()
     if not localidad:
         raise ValueError("La localidad es obligatoria.")
-    
+
     finca_lote = request.POST.get("finca_lote", "").strip()
     altitud = float(request.POST.get("altitud") or 0.0)
 

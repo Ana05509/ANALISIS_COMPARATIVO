@@ -17,7 +17,7 @@ OUTPUT_FILE = os.path.join(PROJECT_PATH, "analisis_proyecto.md")
 VALID_EXTENSIONS = [".py"]
 
 # ============================================================
-# CLASIFICADOR SEMÁNTICO ADAPTADO A TERRABIOLAB
+# CLASIFICADOR SEMÁNTICO ADAPTADO A BIOMICRO
 # ============================================================
 
 CATEGORY_RULES = {
@@ -167,7 +167,7 @@ def analyze_project(project_path: str):
 
 def generate_markdown(project_path: str, project_data: dict) -> str:
     lines = [
-        "# 🔬 REPORTE ESTRUCTURAL DE ARQUITECTURA: TERRABIOLAB",
+        "# 🔬 REPORTE ESTRUCTURAL DE ARQUITECTURA: BIOMICRO",
         f"**Fecha de Análisis:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"**Directorio Raíz:** `{project_path}`\n",
         "---",
@@ -217,7 +217,7 @@ def generate_markdown(project_path: str, project_data: dict) -> str:
 if __name__ == "__main__":
     print("\n" + "="*50)
     print("      ANALIZADOR DE COMPONENTES BIOINFORMÁTICOS       ")
-    print("              SISTEMA: TERRABIOLAB                    ")
+    print("              SISTEMA: BIOMICRO                    ")
     print("="*50 + "\n")
 
     if not os.path.exists(PROJECT_PATH):

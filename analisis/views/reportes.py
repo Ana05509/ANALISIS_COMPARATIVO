@@ -103,6 +103,15 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
         totales_clas["neutral"],  totales_clas["sin_clasificar"],
         shannon=shannon_val,
     )
+
+    # Agregación kingdom → phylum → <nivel actual>, para el gráfico Sunburst
+    # del reporte Excel (Fase 1.2). No reemplaza ninguna consulta existente.
+    jerarquia_taxonomica = list(
+        qs.values("kingdom", "phylum", campo_db)
+          .annotate(hits=Sum("num_hits"))
+          .order_by("-hits")[:150]
+    )
+
     return {
         "top_taxa":     todos_raw[:top_n],
         "todos_taxa":   todos_raw,
@@ -111,6 +120,8 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
         "totales_clas": totales_clas,
         "indice_salud": indice,
         "nivel_salud":  nivel_salud,
+        "jerarquia_taxonomica": jerarquia_taxonomica,
+        "nivel_campo_jerarquia": campo_db,
         "tipo": tipo, "nivel": nivel, "top_n": top_n,
     }
 
@@ -228,7 +239,7 @@ def reportes(request):
         "totales_clasificacion":   {"benefico": 0, "fitopatogeno": 0, "neutral": 0, "sin_clasificar": 0},
         "indice_salud":            None,
         "nivel_salud":             None,
-        "alfa_por_muestra_json":   "{}",
+        "alfa_por_muestra":        {},
     }
 
     # Solo cargar datos si el usuario seleccionó al menos una muestra
@@ -277,7 +288,7 @@ def reportes(request):
                             "simpson":       round(float(div_m.get("simpson", 0)), 4),
                             "equitatividad": round(float(div_m.get("equitatividad", 0)), 4),
                         }
-                ctx["alfa_por_muestra_json"] = json.dumps(alfa_pm)
+                ctx["alfa_por_muestra"] = alfa_pm
 
         except Exception as exc:
             import traceback; traceback.print_exc()

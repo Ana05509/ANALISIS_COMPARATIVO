@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.urls import reverse
-from analisis.services.business.upload_service import procesar_upload
+from analisis.services.business.upload_service import procesar_upload, MuestraDuplicadaError
 from analisis.services.processing.pipeline import ColumnasInvalidasError
 from analisis.forms import SubirDatosForm
 from analisis.models import VariedadClon, Cultivo
@@ -85,6 +85,17 @@ def subir_datos(request):
                         "recibidas": e.recibidas,
                         "requeridas": e.requeridas,
                     }, status=400)
+                upload_error = str(e)
+            except MuestraDuplicadaError as e:
+                if _is_ajax(request):
+                    return JsonResponse({
+                        "ok": False,
+                        "tipo": "duplicado",
+                        "codigo": e.codigo,
+                        "marcador": e.tipo,
+                        "fecha_carga": e.fecha_carga.strftime("%d/%m/%Y %H:%M") if e.fecha_carga else None,
+                        "total_taxones": e.total_taxones,
+                    }, status=409)
                 upload_error = str(e)
             except ValueError as e:
                 upload_error = str(e)

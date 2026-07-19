@@ -87,16 +87,32 @@ class _MuestraMultipleField(forms.ModelMultipleChoiceField):
         return " — ".join(parts)
 
 
+class _SelectMultipleSinValidacionNativa(forms.SelectMultiple):
+    """
+    El <select> real de este campo queda oculto (style="display:none") porque
+    la UI visible es la lista de checkboxes sincronizada por JS. Si Django
+    renderiza el atributo HTML "required" sobre ese <select> oculto, el
+    navegador bloquea el envío del formulario y muestra su aviso nativo
+    "este campo es obligatorio" anclado a un elemento invisible — el usuario
+    no tiene forma de saber a qué campo se refiere. La validación real la
+    hace Django en el servidor (ver CompararForm.clean()), así que el
+    navegador no necesita validar este campo también.
+    """
+    def use_required_attribute(self, initial):
+        return False
+
+
 class CompararForm(forms.Form):
     muestras = _MuestraMultipleField(
         queryset=MuestraSuelo.objects.select_related("cultivo", "variedad_clon").order_by("-id"),
         label="Seleccione las muestras a comparar",
-        widget=forms.SelectMultiple(attrs={
+        widget=_SelectMultipleSinValidacionNativa(attrs={
             "id": "id_muestras",
             "multiple": "multiple",
             "style": "display:none;",
         }),
         required=True,
+        error_messages={"required": "Seleccione al menos dos muestras para comparar."},
     )
 
     marcador = forms.ChoiceField(

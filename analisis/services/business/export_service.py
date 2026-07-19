@@ -2,9 +2,12 @@
 # Módulo de exportación avanzada (PDF, JSON, CSV, HTML) optimizado para consistencia de biodiversidad.
 
 import json
+import re
 import pandas as pd
 from datetime import datetime
+from pathlib import Path
 from io import BytesIO
+from django.conf import settings
 from django.http import HttpResponse
 from django.utils.text import slugify
 
@@ -13,8 +16,10 @@ import base64
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table as XLTable, TableStyleInfo
-from openpyxl.chart import BarChart, PieChart, Reference
-from openpyxl.chart.label import DataLabelList
+from openpyxl.worksheet.hyperlink import Hyperlink
+from openpyxl.drawing.image import Image as XLImage
+
+import plotly.graph_objects as go
 
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -79,6 +84,68 @@ _NIVEL_COLORES = {
     "EN RIESGO": "#dc2626",
     "CRÍTICO":   "#7f1d1d",
 }
+
+# ---------------------------------------------------------------------------
+# Identidad visual Plotly — gráficos del reporte Excel (Fase 1.2)
+# ---------------------------------------------------------------------------
+# Reusa los mismos tonos que ya usa el resto del reporte (CV/CAZUL/CA/CR de
+# generar_excel_multisheet), agregando un turquesa como puente visual entre
+# el verde y el azul. PLOTLY_FONT usa una familia ampliamente disponible en
+# el servidor: Kaleido renderiza server-side y no tiene garantizada ninguna
+# fuente web custom instalada.
+PLOTLY_VERDE    = "#1D9E75"
+PLOTLY_VERDE_OS = "#0F6E56"
+PLOTLY_AZUL     = "#185FA5"
+PLOTLY_TURQUESA = "#14B8A6"
+PLOTLY_AMBAR    = "#BA7517"
+PLOTLY_ROJO     = "#A32D2D"
+PLOTLY_GRIS     = "#94A3B8"
+PLOTLY_FONT     = "Arial, sans-serif"
+
+# Colores por clasificación ecológica — mismos usados en los íconos
+# 🟢🔴🔵⚪ del resto del reporte, para que los gráficos comuniquen el rol
+# funcional de un vistazo en vez de un solo color plano sin significado.
+COLOR_POR_CLAS = {
+    "benefico":       PLOTLY_VERDE,
+    "fitopatogeno":   PLOTLY_ROJO,
+    "neutral":        PLOTLY_AZUL,
+    "sin_clasificar": PLOTLY_GRIS,
+}
+
+
+def _plotly_layout_base(titulo="", subtitulo=None):
+    """Layout base compartido por todas las figuras del reporte: tipografía,
+    fondo blanco y título con estilo consistente, para no repetir estas
+    mismas líneas en cada gráfico."""
+    titulo_html = f"<b>{titulo}</b>"
+    if subtitulo:
+        titulo_html += f"<br><span style='font-size:12px;color:#6B7280'>{subtitulo}</span>"
+    return dict(
+        title=dict(text=titulo_html, font=dict(family=PLOTLY_FONT, size=16, color="#1F2937"),
+                   x=0.02, xanchor="left"),
+        font=dict(family=PLOTLY_FONT, size=13, color="#374151"),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        margin=dict(l=60, r=30, t=70 if not subtitulo else 90, b=50),
+        showlegend=False,
+    )
+
+
+def _fig_a_imagen_xl(fig, ancho_px=900, alto_px=520, escala=2):
+    """Renderiza una figura Plotly a PNG (motor Kaleido) y la envuelve como
+    openpyxl.drawing.image.Image lista para ws.add_image(). escala=2 da
+    resolución ~2x para que no se vea pixelada al ampliar en Excel —
+    equivalente al patrón dpi=120-130 que ya usa este mismo archivo para
+    embeber gráficos matplotlib en el PDF (ExportService._chart_donut_taxa
+    y similares)."""
+    fig.update_layout(width=ancho_px, height=alto_px)
+    buf = BytesIO()
+    fig.write_image(buf, format="png", scale=escala)
+    buf.seek(0)
+    img = XLImage(buf)
+    img.width, img.height = ancho_px, alto_px
+    return img
+
 
 # Colores ReportLab para clasificación
 _C_BEN  = colors.HexColor('#16a34a')
@@ -187,7 +254,7 @@ def _pdf_footer(canvas, doc):
     canvas.line(40, 30, A4[0] - 40, 30)
     canvas.setFont('Helvetica', 7)
     canvas.setFillColor(colors.HexColor('#94a3b8'))
-    canvas.drawString(40, 20, "TerraBioLab UTC — Análisis Microbiológico de Suelos")
+    canvas.drawString(40, 20, "BioMicro UTC — Análisis Microbiológico de Suelos")
     canvas.drawRightString(A4[0] - 40, 20, f"Pág. {canvas.getPageNumber()}")
     canvas.restoreState()
 
@@ -247,6 +314,524 @@ def _kpi_tiles(items, ancho_util, S):
 def _nivel_color_rl(nivel_salud: str):
     hex_color = _NIVEL_COLORES.get(nivel_salud, "#64748b")
     return colors.HexColor(hex_color)
+
+
+# ---------------------------------------------------------------------------
+# Fase 1 — Portada / Índice / Conclusiones / Recomendaciones / navegación
+# ---------------------------------------------------------------------------
+# Todo lo que sigue es aditivo sobre generar_excel_multisheet: agrega hojas
+# y una fila de navegación al tope de las hojas ya existentes, sin tocar su
+# contenido/valores. No modifica generar_pdf_individual, generar_pdf_comparativo
+# ni generar_html_reporte.
+
+_REF_RANGE_RE   = re.compile(r"([A-Z]+)(\d+):([A-Z]+)(\d+)")
+_CELL_ANCHOR_RE = re.compile(r"^([A-Z]+)(\d+)$")
+_FORMULA_ROW_RE = re.compile(r"\$([A-Z]+)\$(\d+)")
+
+
+def _shift_ref_rows(ref, offset):
+    """'A1:E26' -> 'A2:E27' (desplaza el rango de una Table de Excel)."""
+    m = _REF_RANGE_RE.match(ref or "")
+    if not m:
+        return ref
+    c1, r1, c2, r2 = m.groups()
+    return f"{c1}{int(r1) + offset}:{c2}{int(r2) + offset}"
+
+
+def _shift_anchor(anchor, offset):
+    """'G3' -> 'G4' (desplaza el ancla de un gráfico)."""
+    m = _CELL_ANCHOR_RE.match(str(anchor or ""))
+    if not m:
+        return anchor
+    col, row = m.groups()
+    return f"{col}{int(row) + offset}"
+
+
+def _shift_formula_rows(formula, offset):
+    """"'Hoja'!$D$1:$D$26" -> "'Hoja'!$D$2:$D$27" (fórmulas de series de gráfico)."""
+    if not formula:
+        return formula
+    return _FORMULA_ROW_RE.sub(
+        lambda m: f"${m.group(1)}${int(m.group(2)) + offset}", formula
+    )
+
+
+def _retro_freeze_y_nav(ws, freeze_cell="A3", titulo_extra=None, offset=1,
+                         indice_location="'Índice'!A1"):
+    """
+    Inserta una fila de navegación ("⬅ Volver al Índice") al tope de una hoja
+    YA construida y congela paneles, sin romper las Tables ni los gráficos
+    que la hoja ya tenga.
+
+    ws.insert_rows() no actualiza automáticamente el rango de las Tables de
+    Excel, ni el ancla/fórmulas de series de los gráficos, ni row_dimensions
+    (verificado empíricamente) — por eso se parchean a mano después de
+    insertar la fila. ws._charts es un atributo "privado" pero es la única
+    forma de llegar a los gráficos ya agregados (openpyxl no expone una API
+    pública de lectura).
+    """
+    original_heights = {k: v.height for k, v in list(ws.row_dimensions.items())
+                         if v.height is not None}
+    for k in list(ws.row_dimensions.keys()):
+        del ws.row_dimensions[k]
+
+    ws.insert_rows(1, amount=offset)
+
+    for k, h in original_heights.items():
+        ws.row_dimensions[k + offset].height = h
+    ws.row_dimensions[1].height = 20
+
+    for tbl in ws.tables.values():
+        tbl.ref = _shift_ref_rows(tbl.ref, offset)
+
+    for ch in ws._charts:
+        ch.anchor = _shift_anchor(ch.anchor, offset)
+        for s in ch.series:
+            if getattr(s, "val", None) and s.val.numRef:
+                s.val.numRef.f = _shift_formula_rows(s.val.numRef.f, offset)
+            if getattr(s, "cat", None):
+                ref = s.cat.numRef or s.cat.strRef
+                if ref:
+                    ref.f = _shift_formula_rows(ref.f, offset)
+            if getattr(s, "tx", None) and s.tx and s.tx.strRef:
+                s.tx.strRef.f = _shift_formula_rows(s.tx.strRef.f, offset)
+
+    # Los gráficos Plotly se embeben como imágenes (ws._images), no como
+    # ws._charts — su ancla es igual de una cadena tipo "G3" y necesita el
+    # mismo desplazamiento, si no quedan una fila más arriba de donde deben.
+    for img in ws._images:
+        img.anchor = _shift_anchor(img.anchor, offset)
+
+    texto_nav = "⬅ Volver al Índice"
+    if titulo_extra:
+        texto_nav += f"    |    {titulo_extra}"
+    c = ws.cell(row=1, column=1, value=texto_nav)
+    # Hipervínculo INTERNO (misma carpeta de trabajo): debe usarse el
+    # parámetro location= de Hyperlink, no target= (que es lo que openpyxl
+    # asigna por defecto si se pasa un string plano a .hyperlink). target=
+    # crea una relación con TargetMode="External" apuntando a un fragmento
+    # interno ("#'Índice'!A1"), algo que Excel detecta como contenido
+    # inválido y dispara el diálogo de "hemos encontrado un problema...".
+    # location= en cambio se escribe directo en el XML sin relationship.
+    c.hyperlink = Hyperlink(ref=c.coordinate, location=indice_location,
+                             tooltip="Volver al Índice")
+    c.font = Font(color="0563C1", underline="single", bold=True, size=10)
+    ws.freeze_panes = freeze_cell
+
+
+_ETIQUETAS_HOJAS = {
+    "Dashboard":               ("🌱", "Dashboard"),
+    "Resumen":                ("📋", "Resumen Ejecutivo"),
+    "Resumen_Comparativo":    ("📋", "Resumen Ejecutivo Comparativo"),
+    "Top_N_Taxa":              ("📊", "Top Taxa"),
+    "Top_N_Global":            ("📊", "Top Taxa Global"),
+    "Taxonomia_Completa":      ("🧬", "Taxonomía Completa"),
+    "Diversidad_Alfa":         ("🔬", "Diversidad Alfa"),
+    "Diversidad_Beta":         ("🔬", "Diversidad Beta"),
+    "Clasificacion_Funcional": ("🏷", "Clasificación Funcional"),
+    "Clas_Por_Muestra":        ("🏷", "Clasificación por Muestra"),
+    "Microorganismos_Detalle": ("🦠", "Microorganismos — Detalle"),
+    "Analisis_Diferencial":    ("⚖", "Análisis Diferencial"),
+    "Cuadro_Comparativo":      ("📐", "Cuadro Comparativo"),
+    "Conclusiones_Recomendaciones": ("✅", "Conclusiones y Recomendaciones"),
+}
+
+_TITULO_EXTRA_HOJAS = {
+    "Microorganismos_Detalle": "🟢🔴🔵 Benéficos · Fitopatógenos · Neutrales",
+}
+
+
+# ---------------------------------------------------------------------------
+# Interpretación automática — texto generado a partir de valores ya calculados
+# (no se agregan cálculos nuevos, solo se traducen a prosa)
+# ---------------------------------------------------------------------------
+
+_NIVEL_TEXTO_SALUD = {
+    "ÓPTIMO":    "Esto indica una comunidad microbiana altamente funcional, con condiciones "
+                 "óptimas para el desarrollo del cultivo.",
+    "FAVORABLE": "Esto indica condiciones adecuadas, con una relación entre microorganismos "
+                 "benéficos y fitopatógenos favorable al cultivo.",
+    "MODERADO":  "Esto indica un equilibrio funcional con margen de mejora; se recomienda "
+                 "monitorear la evolución del suelo.",
+    "EN RIESGO": "Esto indica un desequilibrio funcional que amerita intervención agronómica.",
+    "CRÍTICO":   "Esto indica una perturbación significativa del microbioma que requiere "
+                 "intervención urgente.",
+}
+
+
+def _texto_shannon(v):
+    v = float(v or 0)
+    if v > 3:
+        return ("Este valor refleja una diversidad alta: la comunidad es heterogénea y "
+                "potencialmente más resiliente frente a perturbaciones.")
+    if v > 2:
+        return "Este valor refleja una diversidad moderada-alta, propia de un ecosistema funcional."
+    if v > 1:
+        return "Este valor refleja una diversidad moderada, con distribución irregular entre los taxa presentes."
+    return "Este valor refleja una diversidad baja, con dominancia marcada de uno o pocos taxa."
+
+
+def _texto_simpson(v):
+    v = float(v or 0)
+    if v > 0.85:
+        return "Este valor indica alta equidad: la abundancia está distribuida de forma uniforme entre los taxa."
+    if v > 0.60:
+        return "Este valor indica buena equidad, con varios taxa de abundancia relevante."
+    if v > 0.30:
+        return "Este valor indica dominancia moderada: pocos taxa concentran buena parte del perfil."
+    return "Este valor indica dominancia alta: uno o dos taxa concentran la mayoría de la abundancia."
+
+
+def _contexto_reglas(datos: dict) -> dict:
+    """
+    Extrae un contexto plano y con defaults ya resueltos a partir del dict
+    `datos` que ya arma reportes.py — reusado por los tres generadores de
+    texto para no repetir la misma extracción tres veces. No calcula nada
+    nuevo, solo lee valores que ya vienen calculados.
+    """
+    diversidad   = datos.get("diversidad") or {}
+    totales_clas = datos.get("totales_clas") or {}
+    muestras     = datos.get("muestras") or []
+    n_ben  = totales_clas.get("benefico", 0)
+    n_fito = totales_clas.get("fitopatogeno", 0)
+    n_neu  = totales_clas.get("neutral", 0)
+    total_cat     = (n_ben + n_fito + n_neu) or 1
+    total_ben_fito = (n_ben + n_fito) or 1
+    return {
+        "indice_salud":     datos.get("indice_salud") or 0,
+        "nivel_salud":      datos.get("nivel_salud") or "N/A",
+        "shannon":          float(diversidad.get("shannon") or 0),
+        "simpson":          float(diversidad.get("simpson") or 0),
+        "equitatividad":    float(diversidad.get("equitatividad") or 0),
+        "riqueza":          int(diversidad.get("riqueza") or len(datos.get("todos_taxa") or [])),
+        "n_benefico":       n_ben,
+        "n_fitopatogeno":   n_fito,
+        "n_neutral":        n_neu,
+        "n_sin_clasificar": totales_clas.get("sin_clasificar", 0),
+        # ratio_ben/ratio_fito usan el mismo denominador (benéfico+fitopatógeno)
+        # que ya usa calcular_indice_salud() para el índice de salud — así las
+        # reglas de conclusiones/recomendaciones nunca contradicen el nivel
+        # de salud ya calculado (ej. no recomendar "más benéficos" en un
+        # suelo ÓPTIMO solo porque hay muchos taxa neutrales sin relación).
+        "ratio_ben":        n_ben / total_ben_fito,
+        "ratio_fito":       n_fito / total_ben_fito,
+        # Para la narrativa descriptiva ("% de los taxa catalogados"), que sí
+        # debe incluir neutrales en el denominador.
+        "ratio_fito_comunidad": n_fito / total_cat,
+        "n_muestras":       len(muestras),
+        "is_comparativo":   len(muestras) > 1,
+        "total_taxa":       len(datos.get("todos_taxa") or []),
+        "marcador":         datos.get("tipo") or "16S",
+        "nivel_tax":        datos.get("nivel") or "genus",
+    }
+
+
+def _generar_interpretacion_ejecutiva(datos: dict) -> list:
+    """4-6 párrafos de prosa que responden qué tan saludable está el suelo,
+    cuál es su diversidad, cuántos microorganismos se encontraron, si hay
+    fitopatógenos y qué significan Shannon/Simpson — todo a partir de valores
+    ya calculados en `datos`, sin cálculos nuevos."""
+    c = _contexto_reglas(datos)
+    parrafos = []
+
+    plural = "s" if c["is_comparativo"] else ""
+    parrafos.append(
+        f"Esta muestra{plural} presenta{plural} un Índice de Salud del Suelo de "
+        f"{c['indice_salud']}/100, clasificado como {c['nivel_salud']}. "
+        + _NIVEL_TEXTO_SALUD.get(c["nivel_salud"], "")
+    )
+
+    parrafos.append(
+        f"Se identificaron {c['total_taxa']} taxones distintos a nivel de {c['nivel_tax']} "
+        f"mediante el marcador molecular {c['marcador']}, de los cuales {c['n_benefico']} "
+        f"están catalogados como benéficos, {c['n_fitopatogeno']} como potenciales fitopatógenos, "
+        f"{c['n_neutral']} como neutrales y {c['n_sin_clasificar']} aún no están catalogados."
+    )
+
+    if c["n_fitopatogeno"] > 0:
+        riesgo = ("Su proporción es baja y no representa, por sí sola, un riesgo fitosanitario relevante."
+                  if c["ratio_fito"] < 0.15 else
+                  "Su proporción sugiere un riesgo fitosanitario que amerita monitoreo.")
+        parrafos.append(
+            f"Se detectó presencia de microorganismos fitopatógenos ({c['n_fitopatogeno']} "
+            f"taxón(es), {c['ratio_fito_comunidad']*100:.1f}% de los taxa catalogados funcionalmente). {riesgo}"
+        )
+    else:
+        parrafos.append("No se detectaron microorganismos fitopatógenos entre los taxa catalogados funcionalmente.")
+
+    parrafos.append(
+        f"El índice de Shannon (H'={c['shannon']:.4f}) mide la diversidad considerando tanto la "
+        f"riqueza de taxa como su distribución de abundancias. {_texto_shannon(c['shannon'])}"
+    )
+    parrafos.append(
+        f"El índice de Simpson (1-D={c['simpson']:.4f}) expresa la probabilidad de que dos "
+        f"individuos tomados al azar pertenezcan a taxa distintos. {_texto_simpson(c['simpson'])}"
+    )
+
+    return parrafos
+
+
+_REGLAS_CONCLUSIONES = [
+    {"condicion": lambda c: c["nivel_salud"] in ("ÓPTIMO", "FAVORABLE"),
+     "texto": lambda c: (
+        f"El índice de salud del suelo ({c['indice_salud']}/100, nivel {c['nivel_salud']}) indica "
+        f"una comunidad microbiana funcional y en equilibrio con el cultivo.")},
+    {"condicion": lambda c: c["nivel_salud"] in ("EN RIESGO", "CRÍTICO"),
+     "texto": lambda c: (
+        f"El índice de salud del suelo ({c['indice_salud']}/100, nivel {c['nivel_salud']}) señala "
+        f"un desequilibrio funcional de la comunidad microbiana que amerita atención.")},
+    {"condicion": lambda c: c["shannon"] > 3,
+     "texto": lambda c: (
+        f"La diversidad de Shannon (H'={c['shannon']:.4f}) es alta, lo que sugiere una comunidad "
+        f"microbiana resiliente frente a perturbaciones ambientales.")},
+    {"condicion": lambda c: c["shannon"] <= 1,
+     "texto": lambda c: (
+        f"La diversidad de Shannon (H'={c['shannon']:.4f}) es baja, evidenciando dominancia marcada "
+        f"de uno o pocos taxa sobre el resto de la comunidad.")},
+    {"condicion": lambda c: c["ratio_fito"] > 0.15,
+     "texto": lambda c: (
+        f"Los taxa fitopatógenos representan {c['ratio_fito']*100:.1f}% frente a los benéficos "
+        f"({c['n_fitopatogeno']} taxón(es)), un nivel que sugiere riesgo fitosanitario relevante.")},
+    {"condicion": lambda c: c["n_fitopatogeno"] == 0,
+     "texto": lambda c: "No se detectaron microorganismos fitopatógenos entre los taxa catalogados funcionalmente."},
+    {"condicion": lambda c: c["ratio_ben"] > 0.5,
+     "texto": lambda c: (
+        f"Los microorganismos benéficos predominan claramente sobre los fitopatógenos "
+        f"({c['ratio_ben']*100:.1f}% frente a estos últimos), aportando potencial de reciclaje de "
+        f"nutrientes y control biológico natural.")},
+    {"condicion": lambda c: 0 < c["equitatividad"] < 0.3,
+     "texto": lambda c: (
+        f"La equitatividad de Pielou (J'={c['equitatividad']:.4f}) es baja: uno o dos taxa concentran "
+        f"la mayor parte de la abundancia detectada.")},
+    {"condicion": lambda c: c["is_comparativo"],
+     "texto": lambda c: (
+        f"El análisis comparativo incluye {c['n_muestras']} muestras, lo que permite contrastar la "
+        f"composición microbiana entre distintos puntos de muestreo.")},
+]
+
+_REGLAS_RECOMENDACIONES = [
+    {"condicion": lambda c: c["ratio_ben"] < 0.3,
+     "texto": lambda c: (
+        "Favorecer la actividad de microorganismos benéficos mediante abonos orgánicos, compost "
+        "maduro o inoculantes microbianos específicos.")},
+    {"condicion": lambda c: c["nivel_salud"] in ("EN RIESGO", "CRÍTICO"),
+     "texto": lambda c: (
+        "Evitar aplicaciones innecesarias de fungicidas de amplio espectro, ya que pueden afectar "
+        "aún más el equilibrio de la comunidad microbiana del suelo.")},
+    {"condicion": lambda c: c["ratio_fito"] > 0.15,
+     "texto": lambda c: (
+        "Implementar monitoreo fitosanitario periódico y evaluar rotación de cultivos para reducir "
+        "la presión de organismos fitopatógenos sobre el sistema.")},
+    {"condicion": lambda c: c["shannon"] <= 1 or c["riqueza"] < 30,
+     "texto": lambda c: (
+        "Incrementar la diversidad microbiana mediante cobertura vegetal, rotación de cultivos y "
+        "reducción de la labranza intensiva.")},
+    {"condicion": lambda c: c["nivel_salud"] in ("ÓPTIMO", "FAVORABLE"),
+     "texto": lambda c: (
+        "Conservar las prácticas de manejo actuales, priorizando la cobertura vegetal y el aporte "
+        "de materia orgánica que sostienen el equilibrio observado.")},
+    {"condicion": lambda c: 0 < c["equitatividad"] < 0.3,
+     "texto": lambda c: (
+        "Diversificar fuentes de materia orgánica y evitar monocultivos prolongados para reducir la "
+        "dominancia de unos pocos taxa.")},
+    {"condicion": lambda c: True,
+     "texto": lambda c: (
+        "Mantener un monitoreo periódico de la comunidad microbiana para dar seguimiento a la "
+        "evolución del suelo en el tiempo.")},
+]
+
+
+def _generar_conclusiones(datos: dict) -> list:
+    c = _contexto_reglas(datos)
+    resultado = [regla["texto"](c) for regla in _REGLAS_CONCLUSIONES if regla["condicion"](c)]
+    return resultado or ["No se generaron conclusiones automáticas para los datos disponibles."]
+
+
+def _generar_recomendaciones(datos: dict) -> list:
+    c = _contexto_reglas(datos)
+    resultado = [regla["texto"](c) for regla in _REGLAS_RECOMENDACIONES if regla["condicion"](c)]
+    return resultado or ["No se generaron recomendaciones automáticas para los datos disponibles."]
+
+
+def _construir_hoja_portada(wb, datos):
+    """Hoja de portada: logo, identidad del sistema, datos institucionales e
+    identificación de la(s) muestra(s). Solo usa campos que existen en el
+    modelo MuestraSuelo — no incluye "Sector" ni "Laboratorio" (no existen)."""
+    ws = wb.create_sheet("Portada")
+    ws.sheet_view.showGridLines = False
+    ws.column_dimensions["A"].width = 4
+    ws.column_dimensions["B"].width = 28
+    ws.column_dimensions["C"].width = 46
+    for col in "DEFG":
+        ws.column_dimensions[col].width = 12
+
+    for col in range(1, 8):
+        ws.cell(row=1, column=col).fill = PatternFill("solid", fgColor="0F6E56")
+    ws.row_dimensions[1].height = 6
+
+    logo_path = settings.BASE_DIR / "portal" / "static" / "portal" / "img" / "logo.png"
+    if logo_path.exists():
+        try:
+            img = XLImage(str(logo_path))
+            img.width = 90
+            img.height = 90
+            ws.add_image(img, "B3")
+        except Exception:
+            pass  # el logo es decorativo — no debe romper la generación del reporte
+
+    ws.cell(row=3, column=3, value="BioMicro").font = Font(bold=True, size=28, color="0F6E56")
+    ws.cell(row=4, column=3,
+            value="Sistema Web para Procesamiento, Análisis Comparativo y").font = Font(size=11, italic=True, color="4A4A4A")
+    ws.cell(row=5, column=3,
+            value="Visualización de Perfiles Microbianos").font = Font(size=11, italic=True, color="4A4A4A")
+
+    fila = 8
+    for linea, tam, negrita, color in [
+        ("Universidad Técnica de Cotopaxi", 13, True, "0F6E56"),
+        ("Carrera de Ingeniería en Sistemas de Información", 11, False, "4A4A4A"),
+        ("Proyecto de Investigación — Análisis Comparativo de Perfiles Microbianos de Suelo", 10, False, "888888"),
+    ]:
+        ws.cell(row=fila, column=2, value=linea).font = Font(size=tam, bold=negrita, color=color)
+        ws.merge_cells(start_row=fila, start_column=2, end_row=fila, end_column=7)
+        fila += 1
+
+    fila += 1
+    ws.cell(row=fila, column=2,
+            value="REPORTE DE SALUD DEL SUELO Y BIODIVERSIDAD MICROBIANA").font = Font(bold=True, size=14, color="FFFFFF")
+    ws.cell(row=fila, column=2).fill = PatternFill("solid", fgColor="1D9E75")
+    for col in range(2, 8):
+        ws.cell(row=fila, column=col).fill = PatternFill("solid", fgColor="1D9E75")
+    ws.merge_cells(start_row=fila, start_column=2, end_row=fila, end_column=7)
+    ws.row_dimensions[fila].height = 26
+    fila += 2
+
+    muestras = datos.get("muestras") or []
+    muestra  = datos.get("muestra")
+    usuario  = datos.get("usuario")
+    if usuario:
+        nombre_completo = getattr(usuario, "get_full_name", lambda: "")()
+        usuario_nombre = _excel_safe(nombre_completo or getattr(usuario, "username", "Sistema"))
+    else:
+        usuario_nombre = "Sistema"
+    ahora = datetime.now()
+
+    filas_meta = [
+        ("Fecha de generación", ahora.strftime("%d/%m/%Y")),
+        ("Hora de generación", ahora.strftime("%H:%M:%S")),
+        ("Generado por", usuario_nombre),
+        ("Marcador molecular", "16S rRNA (bacterias)" if datos.get("tipo") == "16S" else "ITS (hongos)"),
+        ("Nivel taxonómico analizado", str(datos.get("nivel", "genus")).capitalize()),
+    ]
+
+    if muestra and len(muestras) <= 1:
+        cultivo_nom = getattr(getattr(muestra, "cultivo", None), "nombre", None) or "N/A"
+        var_nom     = getattr(getattr(muestra, "variedad_clon", None), "nombre", None) or "N/A"
+        filas_meta += [
+            ("Código de muestra", _excel_safe(str(getattr(muestra, "codigo", "N/A")))),
+            ("Cultivo",           _excel_safe(str(cultivo_nom))),
+            ("Variedad / Clon",   _excel_safe(str(var_nom))),
+            ("Localidad",         _excel_safe(str(getattr(muestra, "localidad", None) or "N/A"))),
+            ("Finca / Lote",      _excel_safe(str(getattr(muestra, "finca_lote", None) or "N/A"))),
+            ("Tipo de muestra",   _excel_safe(str(getattr(muestra, "tipo_muestra", None) or "Suelo"))),
+        ]
+        if getattr(muestra, "altitud", None) is not None:
+            filas_meta.append(("Altitud", f"{muestra.altitud} m.s.n.m."))
+    elif muestras:
+        codigos_list = [_excel_safe(str(getattr(m, "codigo", "N/A"))) for m in muestras[:12]]
+        codigos = ", ".join(codigos_list)
+        if len(muestras) > 12:
+            codigos += f" … (+{len(muestras) - 12} más)"
+        filas_meta += [
+            ("Tipo de reporte",    "Comparativo"),
+            ("N.° de muestras",    str(len(muestras))),
+            ("Muestras incluidas", codigos),
+        ]
+    else:
+        filas_meta.append(("Alcance", "Global (todas las muestras registradas)"))
+
+    for etiqueta, valor in filas_meta:
+        ws.cell(row=fila, column=2, value=etiqueta).font = Font(bold=True, size=10, color="0F6E56")
+        celda_valor = ws.cell(row=fila, column=3, value=valor)
+        celda_valor.font = Font(size=10, color="374151")
+        celda_valor.alignment = Alignment(wrap_text=True, vertical="center")
+        ws.merge_cells(start_row=fila, start_column=3, end_row=fila, end_column=7)
+        fila += 1
+
+    fila += 2
+    for col in range(1, 8):
+        ws.cell(row=fila, column=col).fill = PatternFill("solid", fgColor="E8F5EF")
+    ws.cell(row=fila, column=2,
+            value="Generado automáticamente por BioMicro — reporte científico de biodiversidad "
+                  "microbiana del suelo").font = Font(italic=True, size=9, color="0F6E56")
+    ws.merge_cells(start_row=fila, start_column=2, end_row=fila, end_column=7)
+    ws.row_dimensions[fila].height = 20
+
+    return ws
+
+
+def _construir_hoja_indice(wb, nombres_hojas):
+    """Hoja de índice con hipervínculos internos a cada hoja del reporte."""
+    ws = wb.create_sheet("Índice")
+    ws.sheet_view.showGridLines = False
+    ws.column_dimensions["A"].width = 46
+
+    ws.cell(row=1, column=1, value="Índice del Reporte").font = Font(bold=True, size=16, color="0F6E56")
+    ws.cell(row=2, column=1,
+            value="Haz clic en cualquier hoja para ir directamente a ella.").font = Font(italic=True, size=10, color="888888")
+
+    fila = 4
+    for nombre in nombres_hojas:
+        icono, etiqueta = _ETIQUETAS_HOJAS.get(nombre, ("📄", nombre))
+        celda = ws.cell(row=fila, column=1, value=f"{icono}  {etiqueta}")
+        celda.hyperlink = Hyperlink(ref=celda.coordinate, location=f"'{nombre}'!A1",
+                                     tooltip=f"Ir a {etiqueta}")
+        celda.font = Font(color="0563C1", underline="single", size=12)
+        ws.row_dimensions[fila].height = 22
+        fila += 1
+
+    return ws
+
+
+def _agregar_seccion_narrativa(ws, fila, titulo, items, color_hex):
+    """Escribe una sección narrativa (título + lista numerada) a partir de
+    `fila` y devuelve la siguiente fila libre — permite apilar varias
+    secciones en una misma hoja en vez de crear una hoja por sección."""
+    ws.cell(row=fila, column=2, value=titulo).font = Font(bold=True, size=15, color=color_hex)
+    ws.row_dimensions[fila].height = 26
+    fila += 2
+
+    for i, texto in enumerate(items, start=1):
+        celda = ws.cell(row=fila, column=2, value=f"{i}.  {texto}")
+        celda.font = Font(size=11, color="374151")
+        celda.alignment = Alignment(wrap_text=True, vertical="top")
+        lineas = max(1, -(-len(texto) // 90))  # ceil(len/90) sin importar math
+        ws.row_dimensions[fila].height = 18 * lineas
+        fila += 2
+
+    return fila + 1
+
+
+def _construir_hoja_conclusiones_recomendaciones(wb, datos):
+    """Una sola hoja con dos secciones (Conclusiones + Recomendaciones), en
+    vez de 2 hojas casi vacías separadas."""
+    ws = wb.create_sheet("Conclusiones_Recomendaciones")
+    ws.sheet_view.showGridLines = False
+    ws.column_dimensions["A"].width = 4
+    ws.column_dimensions["B"].width = 95
+
+    fila = _agregar_seccion_narrativa(
+        ws, 1, "✅  Conclusiones del Análisis",
+        _generar_conclusiones(datos), "0F6E56",
+    )
+    fila = _agregar_seccion_narrativa(
+        ws, fila + 1, "💡  Recomendaciones de Manejo del Suelo",
+        _generar_recomendaciones(datos), "BA7517",
+    )
+
+    ws.cell(row=fila, column=2,
+            value="Generado automáticamente por BioMicro a partir de los índices ecológicos "
+                  "calculados.").font = Font(italic=True, size=9, color="888888")
+    return ws
 
 
 class ExportService:
@@ -646,7 +1231,7 @@ class ExportService:
         # Banner superior de institución (ancho completo)
         banner_rows = [
             [Paragraph(
-                "<font size='16'><b>TerraBioLab UTC</b></font>",
+                "<font size='16'><b>BioMicro UTC</b></font>",
                 S["titulo"],
             )],
             [Paragraph(
@@ -756,7 +1341,7 @@ class ExportService:
                                     color=colors.HexColor('#cbd5e1')))
         contenido.append(Spacer(1, 6))
         contenido.append(Paragraph(
-            "Este reporte ha sido generado automáticamente por el sistema TerraBioLab UTC. "
+            "Este reporte ha sido generado automáticamente por el sistema BioMicro UTC. "
             "Los resultados deben ser interpretados por un profesional en microbiología de suelos.",
             S["muted"],
         ))
@@ -1165,7 +1750,7 @@ class ExportService:
             f"La diversidad alfa se calculó con Shannon-Wiener (H') y Simpson (1–D). "
             f"El Índice de Salud del Suelo integra la proporción benéfico/fitopatógeno (70%) y "
             f"la diversidad normalizada Shannon/3.5 (30%). "
-            f"Plataforma: TerraBioLab UTC — {fecha_gen}."
+            f"Plataforma: BioMicro UTC — {fecha_gen}."
         )
         t_nota = Table([[Paragraph(nota_meto, S["body_sm"])]], colWidths=[ancho_util])
         t_nota.setStyle(TableStyle([
@@ -1180,7 +1765,7 @@ class ExportService:
         contenido.append(Spacer(1, 14))
 
         contenido.append(Paragraph(
-            "<i>Reporte técnico automatizado — TerraBioLab UTC. "
+            "<i>Reporte técnico automatizado — BioMicro UTC. "
             "Los resultados deben ser interpretados por un profesional calificado en microbiología de suelos. "
             "Universidad Técnica de Cotopaxi · Laboratorio de Bioinformática de Suelos.</i>",
             S["italic"],
@@ -1229,7 +1814,7 @@ class ExportService:
         # ================================================================
         # Banda superior oscura
         t_banner = Table([[Paragraph(
-            "<font color='#ffffff'><b>TerraBioLab UTC</b></font>",
+            "<font color='#ffffff'><b>BioMicro UTC</b></font>",
             S["titulo"],
         )]], colWidths=[ancho_util])
         t_banner.setStyle(TableStyle([
@@ -1555,7 +2140,7 @@ class ExportService:
             f"· Nivel: <b>{nivel}</b>.<br/>"
             f"Taxa únicos detectados: <b>{riqueza_g}</b> · Shannon H' global: <b>{shannon_g:.3f}</b>.<br/><br/>"
             f"El Índice de Salud del Suelo integra la proporción benéfico/fitopatógeno (70%) y la diversidad "
-            f"normalizada Shannon/3.5 (30%). Plataforma: TerraBioLab UTC — {fecha_gen}."
+            f"normalizada Shannon/3.5 (30%). Plataforma: BioMicro UTC — {fecha_gen}."
         )
         t_nota = Table([[Paragraph(nota_meto, S["body_sm"])]], colWidths=[ancho_util])
         t_nota.setStyle(TableStyle([
@@ -1569,7 +2154,7 @@ class ExportService:
         contenido.append(t_nota)
         contenido.append(Spacer(1, 14))
         contenido.append(Paragraph(
-            "<i>Reporte técnico automatizado — TerraBioLab UTC. "
+            "<i>Reporte técnico automatizado — BioMicro UTC. "
             "Los resultados deben ser interpretados por un profesional calificado en microbiología de suelos. "
             "Universidad Técnica de Cotopaxi · Laboratorio de Bioinformática de Suelos.</i>",
             S["italic"],
@@ -1606,6 +2191,8 @@ class ExportService:
         usuario          = datos.get("usuario")
         datos_por_muestra = datos.get("datos_por_muestra", [])
         analisis_dif     = datos.get("analisis_diferencial") or {}
+        jerarquia_taxonomica  = datos.get("jerarquia_taxonomica", [])
+        nivel_campo_jerarquia = datos.get("nivel_campo_jerarquia", "genus")
         is_comparativo   = len(muestras) > 1
 
         # ── Constantes de estilo ──────────────────────────────────────────
@@ -1616,14 +2203,12 @@ class ExportService:
         CR        = "A32D2D"   # rojo
         CAZUL     = "185FA5"   # azul diversidad
         CGRIS     = "888888"   # gris neutro
-        CGRIS_H   = "4A4A4A"   # gris oscuro headers neutros
         CBLANCO   = "FFFFFF"
 
         fill_hdr       = PatternFill("solid", fgColor=CV_OSC)
         fill_seccion   = PatternFill("solid", fgColor=CV_CLAR)
         fill_titulo    = PatternFill("solid", fgColor=CV)
         fill_azul      = PatternFill("solid", fgColor=CAZUL)
-        fill_rojo      = PatternFill("solid", fgColor=CR)
 
         fnt_hdr        = Font(bold=True, color=CBLANCO, size=11)
         fnt_titulo     = Font(bold=True, color=CBLANCO, size=13)
@@ -1680,6 +2265,37 @@ class ExportService:
             if v > 0.10: return "Baja similitud — comunidades con perfiles distintos"
             return "Muy baja similitud — comunidades completamente diferenciadas"
 
+        # ── Interpretaciones cortas debajo de tablas clave (Fase 1) ────────
+        def _caption(ws, fila, texto, ancho_cols=5):
+            c = ws.cell(row=fila, column=1, value=f"ℹ  {texto}")
+            c.font = fnt_gris
+            c.alignment = al_l
+            ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=ancho_cols)
+            ws.row_dimensions[fila].height = 16
+
+        def _caption_top_taxa(ws, n_filas, top_taxón, ancho_cols=5):
+            if not top_taxón:
+                return
+            _caption(ws, n_filas + 2,
+                     f"El taxón más abundante es {top_taxón}, ordenado de mayor a menor abundancia relativa.",
+                     ancho_cols)
+
+        def _caption_diversidad(ws, fila, shanval, simpval, ancho_cols=4):
+            _caption(ws, fila,
+                     f"{_interp_shannon(shanval)}. {_interp_simpson(simpval)}.",
+                     ancho_cols)
+
+        def _caption_clasificacion(ws, fila, totales_clas_local, ancho_cols=4):
+            ben  = totales_clas_local.get("benefico", 0)
+            fito = totales_clas_local.get("fitopatogeno", 0)
+            if ben > fito:
+                texto = "La comunidad presenta una abundancia de microorganismos benéficos mayor que la de fitopatógenos."
+            elif fito > ben:
+                texto = "La comunidad presenta una abundancia de microorganismos fitopatógenos mayor que la de benéficos."
+            else:
+                texto = "La comunidad presenta un equilibrio entre microorganismos benéficos y fitopatógenos."
+            _caption(ws, fila, texto, ancho_cols)
+
         # ── Funciones auxiliares ──────────────────────────────────────────
         def _safe(obj, attr, default="N/A"):
             val = getattr(obj, attr, None) if obj else None
@@ -1711,14 +2327,6 @@ class ExportService:
                 c.alignment = al_c
                 c.border = borde
 
-        def _datos_filas(ws, min_row, max_row, alin=None):
-            """Aplica estilo a filas de datos."""
-            for row in ws.iter_rows(min_row=min_row, max_row=max_row):
-                for cell in row:
-                    cell.font   = fnt_normal
-                    cell.border = borde
-                    cell.alignment = alin or al_l
-
         def _ajustar_cols(ws, anchos: dict):
             """Fija anchos específicos {letra: ancho}."""
             for letra, ancho in anchos.items():
@@ -1747,6 +2355,77 @@ class ExportService:
                     )
                 ws.row_dimensions[i].height = h
 
+        # ── Motor único de formato de tabla (Fase 1.3) ──────────────────────
+        # Reemplaza la combinación _hdr+_datos_filas+_aplicar_tabla+_ajustar_cols
+        # +_wrap repetida en cada hoja: encabezado institucional verde/azul,
+        # Excel Table con autofiltro + bandas cebra, alineación y
+        # number_format por tipo de dato inferido del dtype de cada columna,
+        # ancho automático por contenido, e insignias de color por fila en la
+        # columna de clasificación funcional (en vez de pintar el encabezado
+        # completo de rojo/ámbar/gris como antes).
+        _BADGE_CLASIF = {
+            "benefico":         ("D4EDDA", "14532D"),
+            "fitopatogeno":     ("FADBD8", "7F1D1D"),
+            "neutral":          ("D6E4F0", "1E3A5F"),
+            "sin_clasificar":   ("E5E7EB", "374151"),
+            # variantes con etiqueta+emoji (p. ej. columna "Categoría" de
+            # Clasificacion_Funcional / Microorganismos_Detalle)
+            "🟢 Benéficos":      ("D4EDDA", "14532D"),
+            "🔴 Fitopatógenos":  ("FADBD8", "7F1D1D"),
+            "🔵 Neutrales":      ("D6E4F0", "1E3A5F"),
+            "⚪ Sin catalogar":  ("E5E7EB", "374151"),
+        }
+
+        def _formatear_tabla(ws, df, nombre, header="verde", col_clasif=None,
+                             min_w=10, max_w=48):
+            if df.empty:
+                return
+            fill = fill_hdr if header == "verde" else fill_azul
+            estilo = "TableStyleMedium7" if header == "verde" else "TableStyleMedium2"
+            n_cols = len(df.columns)
+
+            _hdr(ws, n_cols, fill=fill)
+
+            for j, col in enumerate(df.columns, start=1):
+                dtype = df[col].dtype
+                es_id = col in ("#", "N°") or str(col).lower() in ("id", "código", "codigo")
+                if es_id:
+                    alin, fmt = al_c, None
+                elif pd.api.types.is_integer_dtype(dtype):
+                    alin, fmt = Alignment(horizontal="right", vertical="center"), "#,##0"
+                elif pd.api.types.is_float_dtype(dtype):
+                    alin, fmt = Alignment(horizontal="right", vertical="center"), "0.00"
+                else:
+                    alin, fmt = al_l, None
+                for i in range(len(df)):
+                    c = ws.cell(row=2 + i, column=j)
+                    c.font = fnt_normal
+                    c.border = borde
+                    c.alignment = alin
+                    if fmt:
+                        c.number_format = fmt
+
+            if col_clasif and col_clasif in df.columns:
+                j = list(df.columns).index(col_clasif) + 1
+                for i, val in enumerate(df[col_clasif]):
+                    bg, fg = _BADGE_CLASIF.get(val, _BADGE_CLASIF["sin_clasificar"])
+                    c = ws.cell(row=2 + i, column=j)
+                    c.fill = PatternFill("solid", fgColor=bg)
+                    c.font = Font(bold=True, size=10, color=fg)
+
+            _aplicar_tabla(ws, df, nombre, estilo)
+            _auto_ancho(ws, min_w=min_w, max_w=max_w)
+
+            # Alto de fila dinámico: solo las filas con texto largo en
+            # columnas no numéricas necesitan más alto que una línea.
+            text_cols = [j for j, col in enumerate(df.columns, start=1)
+                         if not pd.api.types.is_numeric_dtype(df[col].dtype)]
+            for i in range(len(df)):
+                largo = max((len(str(ws.cell(row=2 + i, column=j).value or ""))
+                            for j in text_cols), default=0)
+                if largo > 40:
+                    ws.row_dimensions[2 + i].height = 30
+
         def _titulo_celda(ws, celda, texto, color=None):
             c = ws[celda]
             c.value = texto
@@ -1772,64 +2451,274 @@ class ExportService:
                 c.border = borde
             ws.cell(row=1, column=1).value = texto
 
-        def _chart_bars_h(ws, anchor, n_filas, col_datos, col_cats,
-                          color_fill=None, titulo_celda=None, titulo_txt=""):
-            """Gráfico barras horizontales."""
-            if titulo_celda:
-                _titulo_celda(ws, titulo_celda, titulo_txt)
-            ch = BarChart()
-            ch.type = "bar"; ch.grouping = "clustered"
-            ch.title = None
-            ch.y_axis.title = "Taxonomía"
-            ch.x_axis.title = "Abundancia (%)"
-            ch.style = 10; ch.width = 22
-            ch.height = max(10, min(n_filas * 0.65, 18))
-            dr = Reference(ws, min_col=col_datos, max_col=col_datos,
-                           min_row=1, max_row=n_filas + 1)
-            cr = Reference(ws, min_col=col_cats,  max_col=col_cats,
-                           min_row=2, max_row=n_filas + 1)
-            ch.add_data(dr, titles_from_data=True)
-            ch.set_categories(cr)
-            ch.series[0].graphicalProperties.solidFill = color_fill or CV
-            ws.add_chart(ch, anchor)
+        # ── Gráficos Plotly → PNG embebido (Fase 1.2) ───────────────────────
+        # Reemplaza los gráficos nativos de openpyxl (BarChart/DoughnutChart)
+        # por imágenes Plotly de alta resolución, con el mismo criterio de
+        # lectura de datos que las versiones nativas: leen directamente de
+        # las celdas ya escritas en la hoja en vez de duplicar los datos.
 
-        def _chart_bars_v(ws, anchor, data_ref, cats_ref,
-                          color_fill=None, titulo_celda=None, titulo_txt="",
-                          w=16, h=12):
-            """Gráfico barras verticales."""
+        def _fig_barras_h(ws, n_filas, col_datos, col_cats, color_fill=None,
+                          titulo_celda=None, titulo_txt="", col_clasif=None,
+                          ancho_px=820, fila_inicio=2):
+            """Barras horizontales (Top Taxa). Si col_clasif se indica,
+            colorea cada barra según la clasificación ecológica de esa fila.
+            fila_inicio es la primera fila de datos (por defecto 2, asumiendo
+            encabezado en la fila 1)."""
             if titulo_celda:
                 _titulo_celda(ws, titulo_celda, titulo_txt)
-            ch = BarChart()
-            ch.type = "col"; ch.grouping = "clustered"
-            ch.title = None; ch.y_axis.title = "Valor"
-            ch.style = 2; ch.width = w; ch.height = h
-            ch.add_data(data_ref, titles_from_data=True)
-            ch.set_categories(cats_ref)
-            ch.series[0].graphicalProperties.solidFill = color_fill or CV
-            ws.add_chart(ch, anchor)
+            categorias, valores, marker_colores = [], [], []
+            for i in range(n_filas):
+                fila = fila_inicio + i
+                categorias.append(str(ws.cell(row=fila, column=col_cats).value or ""))
+                valores.append(float(ws.cell(row=fila, column=col_datos).value or 0))
+                if col_clasif:
+                    clas = str(ws.cell(row=fila, column=col_clasif).value or "sin_clasificar")
+                    marker_colores.append(COLOR_POR_CLAS.get(clas, PLOTLY_GRIS))
+                else:
+                    marker_colores.append(color_fill or PLOTLY_VERDE)
+            # Invertido: Plotly dibuja barras horizontales de abajo hacia
+            # arriba, así que el taxón más abundante debe ir al final de la
+            # lista para quedar arriba (igual que el gráfico nativo original).
+            categorias, valores, marker_colores = (
+                categorias[::-1], valores[::-1], marker_colores[::-1])
+            fig = go.Figure(go.Bar(
+                x=valores, y=categorias, orientation="h",
+                marker=dict(color=marker_colores, line=dict(width=0)),
+                text=[f"{v:.2f}%" for v in valores], textposition="outside",
+                cliponaxis=False,
+            ))
+            layout = _plotly_layout_base(titulo_txt or "Abundancia relativa")
+            layout["xaxis"] = dict(title="Abundancia (%)", gridcolor="#EDEDED", zeroline=False)
+            layout["yaxis"] = dict(title="Taxonomía", automargin=True)
+            fig.update_layout(layout)
+            alto_px = max(360, min(int(n_filas * 28) + 110, 900))
+            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
 
-        def _pie_chart(ws, anchor, data_ref, cats_ref,
-                       titulo_celda=None, titulo_txt="",
-                       colores=None, w=18, h=14):
-            """Gráfico pastel con etiquetas % y categoría."""
+        def _fig_barras_v(ws, col_datos, col_cats, min_row, max_row,
+                          colores=None, color_fill=None, titulo_celda=None,
+                          titulo_txt="", y_titulo="Valor", y_max=None,
+                          ancho_px=760, alto_px=440):
+            """Barras verticales. `colores` es una lista paralela a las
+            categorías (para pintar por nivel/umbral); si no se indica,
+            usa `color_fill` como color único."""
             if titulo_celda:
                 _titulo_celda(ws, titulo_celda, titulo_txt)
-            from openpyxl.chart.series import DataPoint
-            pie = PieChart()
-            pie.title = None; pie.style = 10
-            pie.width = w; pie.height = h
-            pie.add_data(data_ref, titles_from_data=True)
-            pie.set_categories(cats_ref)
-            palette = colores or [CV, CR, CA, "9E9E9E"]
-            for i, color in enumerate(palette):
-                dp = DataPoint(idx=i)
-                dp.graphicalProperties.solidFill = color
-                pie.series[0].dPt.append(dp)
-            pie.dataLabels = DataLabelList()
-            pie.dataLabels.showPercent = True
-            pie.dataLabels.showCatName = True
-            pie.dataLabels.showVal = False
-            ws.add_chart(pie, anchor)
+            categorias, valores = [], []
+            for fila in range(min_row, max_row + 1):
+                categorias.append(str(ws.cell(row=fila, column=col_cats).value or ""))
+                valores.append(float(ws.cell(row=fila, column=col_datos).value or 0))
+            marker_colores = colores if colores else [color_fill or PLOTLY_VERDE] * len(valores)
+            fig = go.Figure(go.Bar(
+                x=categorias, y=valores,
+                marker=dict(color=marker_colores, line=dict(width=0)),
+                text=[f"{v:.2f}" for v in valores], textposition="outside",
+                cliponaxis=False,
+            ))
+            layout = _plotly_layout_base(titulo_txt)
+            layout["yaxis"] = dict(title=y_titulo, gridcolor="#EDEDED", zeroline=False,
+                                    range=[0, y_max] if y_max else None)
+            layout["xaxis"] = dict(showgrid=False)
+            fig.update_layout(layout)
+            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+
+        def _fig_donut(ws, col_datos, col_cats, min_row, max_row,
+                       titulo_celda=None, titulo_txt="", colores=None,
+                       ancho_px=560, alto_px=420):
+            """Donut de clasificación funcional — reemplaza el pastel nativo."""
+            if titulo_celda:
+                _titulo_celda(ws, titulo_celda, titulo_txt)
+            categorias, valores = [], []
+            for fila in range(min_row, max_row + 1):
+                categorias.append(str(ws.cell(row=fila, column=col_cats).value or ""))
+                valores.append(float(ws.cell(row=fila, column=col_datos).value or 0))
+            palette = colores or [PLOTLY_VERDE, PLOTLY_ROJO, PLOTLY_AMBAR, PLOTLY_GRIS]
+            fig = go.Figure(go.Pie(
+                labels=categorias, values=valores, hole=0.55,
+                marker=dict(colors=palette[:len(categorias)], line=dict(color="white", width=2)),
+                textinfo="percent", textfont=dict(size=13),
+            ))
+            layout = _plotly_layout_base(titulo_txt)
+            layout["showlegend"] = True
+            layout["legend"] = dict(orientation="h", yanchor="bottom", y=-0.18,
+                                     x=0.5, xanchor="center")
+            fig.update_layout(layout)
+            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+
+        def _fig_treemap(ids, labels, parents, values, colores=None,
+                         titulo_txt="Treemap de Abundancias",
+                         ancho_px=820, alto_px=520):
+            """Los valores de los nodos padre (categorías) se pasan como
+            None a propósito: Plotly los calcula automáticamente como la
+            suma de sus hijos en vez de exigir que coincidan manualmente."""
+            fig = go.Figure(go.Treemap(
+                ids=ids, labels=labels, parents=parents, values=values,
+                marker=(dict(colors=colores) if colores else
+                        dict(colorscale=[[0, PLOTLY_TURQUESA], [1, PLOTLY_VERDE_OS]])),
+                textinfo="label+percent parent",
+                root_color="white",
+            ))
+            fig.update_layout(_plotly_layout_base(titulo_txt))
+            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+
+        def _fig_sunburst(ids, labels, parents, values,
+                          titulo_txt="Jerarquía Taxonómica",
+                          ancho_px=760, alto_px=680):
+            """ids compuestos (no solo labels) para no fusionar nodos con
+            el mismo nombre en ramas distintas del árbol taxonómico."""
+            fig = go.Figure(go.Sunburst(
+                ids=ids, labels=labels, parents=parents, values=values,
+                marker=dict(colorscale=[[0, PLOTLY_TURQUESA], [0.5, PLOTLY_VERDE],
+                                         [1, PLOTLY_VERDE_OS]]),
+            ))
+            fig.update_layout(_plotly_layout_base(titulo_txt))
+            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+
+        def _fig_heatmap(matriz, filas, columnas,
+                         titulo_txt="Distribución de Abundancia por Muestra",
+                         ancho_px=900, alto_px=520):
+            fig = go.Figure(go.Heatmap(
+                z=matriz, x=columnas, y=filas,
+                colorscale=[[0, "#F0FDF9"], [0.5, PLOTLY_TURQUESA], [1, PLOTLY_VERDE_OS]],
+                colorbar=dict(title="%"),
+            ))
+            layout = _plotly_layout_base(titulo_txt)
+            layout["xaxis"] = dict(title="Muestra", side="bottom")
+            layout["yaxis"] = dict(title="Taxón", automargin=True)
+            fig.update_layout(layout)
+            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+
+        def _fig_radar(categorias, valores, titulo_txt="Indicadores Ecológicos",
+                       ancho_px=560, alto_px=520):
+            fig = go.Figure(go.Scatterpolar(
+                r=valores + valores[:1], theta=categorias + categorias[:1],
+                fill="toself", fillcolor="rgba(20,184,166,0.25)",
+                line=dict(color=PLOTLY_TURQUESA, width=2),
+                marker=dict(color=PLOTLY_VERDE_OS, size=6),
+            ))
+            layout = _plotly_layout_base(titulo_txt)
+            layout["polar"] = dict(
+                radialaxis=dict(visible=True, range=[0, 1], gridcolor="#E5E7EB"),
+                angularaxis=dict(gridcolor="#E5E7EB"),
+            )
+            fig.update_layout(layout)
+            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+
+        def _fig_gauge(valor, nivel_salud_g="N/A", titulo_txt="Índice de Salud del Suelo",
+                      ancho_px=520, alto_px=380):
+            color_aguja = _NIVEL_COLORES.get(nivel_salud_g, "#64748b")
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=valor,
+                number=dict(font=dict(size=36, color=color_aguja)),
+                gauge=dict(
+                    axis=dict(range=[0, 100], tickcolor="#9CA3AF"),
+                    bar=dict(color=color_aguja, thickness=0.28),
+                    bgcolor="white",
+                    borderwidth=0,
+                    steps=[
+                        dict(range=[0, 40],   color="#FEE2E2"),
+                        dict(range=[40, 60],  color="#FEF3C7"),
+                        dict(range=[60, 80],  color="#D1FAE5"),
+                        dict(range=[80, 100], color="#A7F3D0"),
+                    ],
+                ),
+            ))
+            fig.update_layout(_plotly_layout_base(titulo_txt, subtitulo=nivel_salud_g))
+            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+
+        # ── Datos para las visualizaciones nuevas (Fase 1.2) ────────────────
+        _CLASES_LBL = {
+            "benefico":       "🟢 Benéficos",
+            "fitopatogeno":   "🔴 Fitopatógenos",
+            "neutral":        "🔵 Neutrales",
+            "sin_clasificar": "⚪ Sin catalogar",
+        }
+
+        def _datos_treemap_taxa(registros, top=20):
+            """A partir de una lista de dicts con Taxón/Total_Hits/Clasificación
+            (misma forma que top_rec/todos_rec), arma ids/labels/parents/values
+            para un treemap de 2 niveles: Clasificación → Taxón."""
+            regs = sorted(registros, key=lambda r: r.get("Total_Hits", 0) or 0,
+                          reverse=True)[:top]
+            ids, labels, parents, values, colores = [], [], [], [], []
+            clases_usadas = {}
+            for i, r in enumerate(regs):
+                clas = r.get("Clasificación", "sin_clasificar")
+                lbl_clas = _CLASES_LBL.get(clas, clas)
+                clases_usadas.setdefault(lbl_clas, clas)
+                ids.append(f"T::{i}::{r.get('Taxón','?')}")
+                labels.append(str(r.get("Taxón", "?"))[:40])
+                parents.append(lbl_clas)
+                values.append(max(float(r.get("Total_Hits", 0) or 0), 0))
+                colores.append(COLOR_POR_CLAS.get(clas, PLOTLY_GRIS))
+            for lbl_clas, clas in clases_usadas.items():
+                ids.append(lbl_clas)
+                labels.append(lbl_clas)
+                parents.append("")
+                values.append(None)
+                colores.append(COLOR_POR_CLAS.get(clas, PLOTLY_GRIS))
+            return ids, labels, parents, values, colores
+
+        def _datos_sunburst_taxonomia(jerarquia, nivel_campo):
+            """A partir de datos['jerarquia_taxonomica'] (agregación
+            kingdom→phylum→<nivel>), arma ids/labels/parents/values."""
+            ids, labels, parents, values = ["Todos"], ["Todos"], [""], [None]
+            vistos = set()
+            for r in jerarquia:
+                reino = str(r.get("kingdom") or "Sin clasificar")
+                filo  = str(r.get("phylum") or "Sin clasificar")
+                hoja  = str(r.get(nivel_campo) or "Sin clasificar")
+                hits  = float(r.get("hits", 0) or 0)
+                if hits <= 0:
+                    continue
+                id_reino = f"R::{reino}"
+                if id_reino not in vistos:
+                    vistos.add(id_reino)
+                    ids.append(id_reino); labels.append(reino)
+                    parents.append("Todos"); values.append(None)
+                id_filo = f"F::{reino}::{filo}"
+                if id_filo not in vistos:
+                    vistos.add(id_filo)
+                    ids.append(id_filo); labels.append(filo)
+                    parents.append(id_reino); values.append(None)
+                id_hoja = f"H::{reino}::{filo}::{hoja}::{len(ids)}"
+                ids.append(id_hoja); labels.append(hoja)
+                parents.append(id_filo); values.append(hits)
+            return ids, labels, parents, values
+
+        def _datos_heatmap_muestras(datos_por_muestra_local, top=15):
+            """Matriz muestra × taxón (Top N por abundancia máxima entre
+            muestras) para el heatmap de distribución — solo modo comparativo."""
+            todas = {}
+            for dpm in datos_por_muestra_local:
+                cod = str(dpm["muestra"].codigo)
+                for r in dpm.get("top_taxa", []):
+                    taxon = str(r.get("taxonomia", r.get("nombre", "?")))
+                    val = float(r.get("total_porcentaje", r.get("porcentaje", 0)) or 0)
+                    todas.setdefault(taxon, {})[cod] = val
+            if not todas:
+                return [], [], []
+            taxa_top = sorted(todas.keys(), key=lambda t: max(todas[t].values()),
+                              reverse=True)[:top]
+            columnas = [str(dpm["muestra"].codigo) for dpm in datos_por_muestra_local]
+            matriz = [[todas[t].get(c, 0.0) for c in columnas] for t in taxa_top]
+            return matriz, taxa_top, columnas
+
+        def _datos_radar_diversidad(riqval_r, shanval_r, simpval_r, equival_r, indice_salud_r):
+            """Normaliza los 5 indicadores a escala 0-1 para el radar. La
+            riqueza se normaliza contra un techo de referencia (150 taxa,
+            valor generoso para suelos agrícolas); Shannon contra su techo
+            teórico habitual (~5); el resto ya vive en escala 0-1 o 0-100."""
+            return (
+                ["Riqueza", "Shannon H'", "Simpson D", "Equitatividad J'", "Salud del suelo"],
+                [
+                    round(min(riqval_r / 150, 1.0), 3),
+                    round(min(shanval_r / 5.0, 1.0), 3),
+                    round(min(simpval_r, 1.0), 3),
+                    round(min(equival_r, 1.0), 3),
+                    round(min(indice_salud_r / 100, 1.0), 3),
+                ],
+            )
 
         # ── Valores derivados ─────────────────────────────────────────────
         cultivo_nom = (muestra.cultivo.nombre
@@ -1867,7 +2756,7 @@ class ExportService:
                 ]
                 # Bloque encabezado
                 res_rows += [
-                    ["BioSuelo — Reporte Individual de Salud Microbiológica", "", ""],
+                    ["BioMicro — Reporte Individual de Salud Microbiológica", "", ""],
                     ["Fecha de generación", fecha_gen, ""],
                     ["Analista", analista, ""],
                     ["", "", ""],
@@ -1923,16 +2812,16 @@ class ExportService:
                 total_clf = max(total_catalogados, 1)
                 res_rows += [
                     ["CLASIFICACIÓN FUNCIONAL", "", ""],
-                    ["Taxa Benéficos",
+                    ["🟢 Taxa Benéficos",
                      str(totales_clas.get("benefico", 0)),
                      f"{totales_clas.get('benefico',0)/total_clf*100:.1f}% del total catalogado"],
-                    ["Taxa Fitopatógenos",
+                    ["🔴 Taxa Fitopatógenos",
                      str(totales_clas.get("fitopatogeno", 0)),
                      f"{totales_clas.get('fitopatogeno',0)/total_clf*100:.1f}% del total catalogado"],
-                    ["Taxa Neutrales",
+                    ["🔵 Taxa Neutrales",
                      str(totales_clas.get("neutral", 0)),
                      f"{totales_clas.get('neutral',0)/total_clf*100:.1f}% del total catalogado"],
-                    ["Taxa Sin Catalogar",
+                    ["⚪ Taxa Sin Catalogar",
                      str(totales_clas.get("sin_clasificar", 0)),
                      "No presentes en el catálogo funcional"],
                 ]
@@ -1957,7 +2846,7 @@ class ExportService:
                             cell.font = fnt_seccion
                             cell.border = borde
                         ws_r.row_dimensions[row[0].row].height = 18
-                    elif v == "BioSuelo — Reporte Individual de Salud Microbiológica":
+                    elif v == "BioMicro — Reporte Individual de Salud Microbiológica":
                         for cell in row:
                             cell.fill = fill_titulo
                             cell.font = Font(bold=True, color=CBLANCO, size=12)
@@ -1970,6 +2859,30 @@ class ExportService:
                             cell.alignment = al_l
                 _ajustar_cols(ws_r, {"A": 30, "B": 22, "C": 65})
                 _wrap(ws_r, min_row=2, h=28)
+
+                # ── Resumen ejecutivo interpretado (Fase 1) ─────────────
+                fila_hs = ws_r.max_row + 2
+                ws_r.cell(row=fila_hs, column=1, value="RESUMEN EJECUTIVO INTERPRETADO").font = fnt_seccion
+                for col in range(1, 4):
+                    c_sec = ws_r.cell(row=fila_hs, column=col)
+                    c_sec.fill = fill_seccion
+                    c_sec.border = borde
+                ws_r.row_dimensions[fila_hs].height = 18
+                fila_hs += 1
+
+                for col in range(4, 20):
+                    ws_r.column_dimensions[get_column_letter(col)].width = 4
+                ws_r.add_image(_fig_gauge(indice_salud, nivel_salud),
+                                f"{get_column_letter(4)}{fila_hs}")
+                fila_hs += 2
+
+                for parrafo in _generar_interpretacion_ejecutiva(datos):
+                    c_par = ws_r.cell(row=fila_hs, column=1, value=parrafo)
+                    c_par.font = fnt_normal
+                    c_par.alignment = al_l
+                    ws_r.merge_cells(start_row=fila_hs, start_column=1, end_row=fila_hs, end_column=3)
+                    ws_r.row_dimensions[fila_hs].height = 40
+                    fila_hs += 1
 
                 # ─────────────────────────────────────────────────────
                 # H-02  TOP N TAXA
@@ -1987,20 +2900,20 @@ class ExportService:
                                                      "Abundancia_%","Clasificación"]))
                 _excel_safe_df(df_top).to_excel(writer, index=False, sheet_name="Top_N_Taxa")
                 ws_top = writer.sheets["Top_N_Taxa"]
-                _hdr(ws_top, len(df_top.columns))
-                _datos_filas(ws_top, 2, len(df_top) + 1)
-                _aplicar_tabla(ws_top, df_top, "TablaTopN")
-                _ajustar_cols(ws_top, {"A": 6, "B": 42, "C": 14, "D": 16, "E": 20})
-                _wrap(ws_top)
+                _formatear_tabla(ws_top, df_top, "TablaTopN", col_clasif="Clasificación")
+                _caption_top_taxa(ws_top, len(df_top), top_rec[0]["Taxón"] if top_rec else None)
 
                 if len(df_top) > 0:
-                    _chart_bars_h(
-                        ws_top, anchor="G3", n_filas=len(df_top),
-                        col_datos=4, col_cats=2,
-                        color_fill=CV,
+                    ws_top.add_image(_fig_barras_h(
+                        ws_top, n_filas=len(df_top), col_datos=4, col_cats=2, col_clasif=5,
                         titulo_celda="G2",
                         titulo_txt=f"Top {top_n} Taxa — Abundancia (%) · Marcador {tipo}",
-                    )
+                    ), "G3")
+                    ids_tm, lbl_tm, par_tm, val_tm, col_tm = _datos_treemap_taxa(top_rec)
+                    ws_top.add_image(_fig_treemap(
+                        ids_tm, lbl_tm, par_tm, val_tm, colores=col_tm,
+                        titulo_txt="Treemap de Abundancias por Clasificación",
+                    ), "V3")
 
                 # ─────────────────────────────────────────────────────
                 # H-03  TAXONOMÍA COMPLETA
@@ -2018,11 +2931,12 @@ class ExportService:
                                                      "Abundancia_%","Clasificación"]))
                 _excel_safe_df(df_tod).to_excel(writer, index=False, sheet_name="Taxonomia_Completa")
                 ws_tod = writer.sheets["Taxonomia_Completa"]
-                _hdr(ws_tod, len(df_tod.columns))
-                _datos_filas(ws_tod, 2, len(df_tod) + 1)
-                _aplicar_tabla(ws_tod, df_tod, "TablaTaxonomia", "TableStyleMedium9")
-                _ajustar_cols(ws_tod, {"A": 6, "B": 42, "C": 14, "D": 16, "E": 20})
-                _wrap(ws_tod)
+                _formatear_tabla(ws_tod, df_tod, "TablaTaxonomia", col_clasif="Clasificación")
+                if jerarquia_taxonomica:
+                    ids_sb, lbl_sb, par_sb, val_sb = _datos_sunburst_taxonomia(
+                        jerarquia_taxonomica, nivel_campo_jerarquia)
+                    _titulo_celda(ws_tod, "G1", "Jerarquía Taxonómica", CV_OSC)
+                    ws_tod.add_image(_fig_sunburst(ids_sb, lbl_sb, par_sb, val_sb), "G2")
 
                 # ─────────────────────────────────────────────────────
                 # H-04  DIVERSIDAD ALFA
@@ -2057,48 +2971,39 @@ class ExportService:
                 df_div = pd.DataFrame(div_rec)
                 _excel_safe_df(df_div).to_excel(writer, index=False, sheet_name="Diversidad_Alfa")
                 ws_div = writer.sheets["Diversidad_Alfa"]
-                _hdr(ws_div, 4, fill=fill_azul)
-                _datos_filas(ws_div, 2, 6)
-                _aplicar_tabla(ws_div, df_div, "TablaDiversidad", "TableStyleMedium2")
-                _ajustar_cols(ws_div, {"A": 22, "B": 14, "C": 20, "D": 65})
-                _wrap(ws_div, h=28)
+                _formatear_tabla(ws_div, df_div, "TablaDiversidad", header="azul")
+                _caption_diversidad(ws_div, 7, shanval, simpval)
 
                 # Gráfico 4 índices (sin N° muestras)
-                _titulo_celda(ws_div, "F2", "Índices de Diversidad Alfa", CAZUL)
-                ch_div = BarChart()
-                ch_div.type = "col"; ch_div.grouping = "clustered"
-                ch_div.title = None; ch_div.y_axis.title = "Valor"
-                ch_div.style = 2; ch_div.width = 16; ch_div.height = 12
-                dv_dat = Reference(ws_div, min_col=2, max_col=2, min_row=1, max_row=5)
-                dv_cat = Reference(ws_div, min_col=1, max_col=1, min_row=2, max_row=5)
-                ch_div.add_data(dv_dat, titles_from_data=True)
-                ch_div.set_categories(dv_cat)
-                ch_div.series[0].graphicalProperties.solidFill = CAZUL
-                ws_div.add_chart(ch_div, "F3")
+                ws_div.add_image(_fig_barras_v(
+                    ws_div, col_datos=2, col_cats=1, min_row=2, max_row=5,
+                    colores=[PLOTLY_AZUL, PLOTLY_VERDE, PLOTLY_AMBAR, PLOTLY_TURQUESA],
+                    titulo_celda="F2", titulo_txt="Índices de Diversidad Alfa",
+                ), "F3")
 
                 # ─────────────────────────────────────────────────────
                 # H-05  CLASIFICACIÓN FUNCIONAL
                 # ─────────────────────────────────────────────────────
                 total_det = max(total_catalogados + totales_clas.get("sin_clasificar", 0), 1)
                 clf_rec = [
-                    {"Categoría": "Benéficos",
+                    {"Categoría": "🟢 Benéficos",
                      "N°_Taxa": totales_clas.get("benefico", 0),
                      "%_Total": round(totales_clas.get("benefico",0)/total_det*100, 2),
                      "Descripción_del_Rol":
                          "Promueven el crecimiento vegetal, fijan nitrógeno, solubilizan fósforo "
                          "o antagonizan patógenos"},
-                    {"Categoría": "Fitopatógenos",
+                    {"Categoría": "🔴 Fitopatógenos",
                      "N°_Taxa": totales_clas.get("fitopatogeno", 0),
                      "%_Total": round(totales_clas.get("fitopatogeno",0)/total_det*100, 2),
                      "Descripción_del_Rol":
                          "Causan o pueden causar enfermedades en el cultivo. "
                          "Su presencia en alta abundancia es señal de alerta fitosanitaria"},
-                    {"Categoría": "Neutrales",
+                    {"Categoría": "🔵 Neutrales",
                      "N°_Taxa": totales_clas.get("neutral", 0),
                      "%_Total": round(totales_clas.get("neutral",0)/total_det*100, 2),
                      "Descripción_del_Rol":
                          "Sin función agronómica conocida o con efecto dependiente del contexto"},
-                    {"Categoría": "Sin catalogar",
+                    {"Categoría": "⚪ Sin catalogar",
                      "N°_Taxa": totales_clas.get("sin_clasificar", 0),
                      "%_Total": round(totales_clas.get("sin_clasificar",0)/total_det*100, 2),
                      "Descripción_del_Rol":
@@ -2107,86 +3012,44 @@ class ExportService:
                 df_clf = pd.DataFrame(clf_rec)
                 _excel_safe_df(df_clf).to_excel(writer, index=False, sheet_name="Clasificacion_Funcional")
                 ws_clf = writer.sheets["Clasificacion_Funcional"]
-                _hdr(ws_clf, 4, fill=PatternFill("solid", fgColor=CA),
-                     font=Font(bold=True, color=CBLANCO, size=11))
-                _datos_filas(ws_clf, 2, 5)
-                _aplicar_tabla(ws_clf, df_clf, "TablaClasificacion", "TableStyleMedium4")
-                _ajustar_cols(ws_clf, {"A": 20, "B": 10, "C": 12, "D": 70})
-                _wrap(ws_clf, h=40)
+                _formatear_tabla(ws_clf, df_clf, "TablaClasificacion", col_clasif="Categoría")
+                _caption_clasificacion(ws_clf, 6, totales_clas)
 
-                # Pastel funcional
-                _pie_chart(
-                    ws_clf, anchor="F2",
-                    data_ref=Reference(ws_clf, min_col=2, max_col=2, min_row=1, max_row=5),
-                    cats_ref=Reference(ws_clf, min_col=1, max_col=1, min_row=2, max_row=5),
-                    titulo_celda="F1",
-                    titulo_txt="Distribución Funcional de Taxa",
-                    colores=[CV, CR, CA, "9E9E9E"],
-                )
+                # Donut funcional
+                ws_clf.add_image(_fig_donut(
+                    ws_clf, col_datos=2, col_cats=1, min_row=2, max_row=5,
+                    titulo_celda="F1", titulo_txt="Distribución Funcional de Taxa",
+                    colores=[PLOTLY_VERDE, PLOTLY_ROJO, PLOTLY_AMBAR, PLOTLY_GRIS],
+                ), "F2")
 
                 # ─────────────────────────────────────────────────────
-                # H-06  BENÉFICOS
+                # H-06  MICROORGANISMOS — detalle por categoría (fusión de
+                # Benéficos + Fitopatógenos + Neutrales en una sola tabla
+                # filtrable/ordenable en vez de 3 hojas casi idénticas)
                 # ─────────────────────────────────────────────────────
-                beneficos = detalle_clas.get("benefico", [])
-                ben_rec = [{
-                    "#": i + 1,
-                    "Organismo":          b.get("nombre", ""),
-                    "Abundancia_%":       round(float(b.get("porcentaje", 0) or 0), 4),
-                    "Función_Agronómica": b.get("descripcion", ""),
-                    "Referencia":         b.get("referencia", ""),
-                } for i, b in enumerate(beneficos)]
-                df_ben = (pd.DataFrame(ben_rec) if ben_rec
-                          else pd.DataFrame(columns=["#","Organismo","Abundancia_%",
-                                                     "Función_Agronómica","Referencia"]))
-                _excel_safe_df(df_ben).to_excel(writer, index=False, sheet_name="Beneficos")
-                ws_ben = writer.sheets["Beneficos"]
-                _hdr(ws_ben, 5, fill=PatternFill("solid", fgColor="0F6E56"))
-                _datos_filas(ws_ben, 2, len(df_ben) + 1)
-                _aplicar_tabla(ws_ben, df_ben, "TablaBeneficos", "TableStyleMedium7")
-                _ajustar_cols(ws_ben, {"A": 5, "B": 38, "C": 16, "D": 62, "E": 45})
-                _wrap(ws_ben, h=38)
-
-                # ─────────────────────────────────────────────────────
-                # H-07  FITOPATÓGENOS
-                # ─────────────────────────────────────────────────────
-                fitopatogenos = detalle_clas.get("fitopatogeno", [])
-                fito_rec = [{
-                    "#": i + 1,
-                    "Organismo":            f.get("nombre", ""),
-                    "Abundancia_%":         round(float(f.get("porcentaje", 0) or 0), 4),
-                    "Riesgo_Fitosanitario": f.get("descripcion", ""),
-                    "Referencia":           f.get("referencia", ""),
-                } for i, f in enumerate(fitopatogenos)]
-                df_fito = (pd.DataFrame(fito_rec) if fito_rec
-                           else pd.DataFrame(columns=["#","Organismo","Abundancia_%",
-                                                      "Riesgo_Fitosanitario","Referencia"]))
-                _excel_safe_df(df_fito).to_excel(writer, index=False, sheet_name="Fitopatogenos")
-                ws_fito = writer.sheets["Fitopatogenos"]
-                _hdr(ws_fito, 5, fill=fill_rojo)
-                _datos_filas(ws_fito, 2, len(df_fito) + 1)
-                _aplicar_tabla(ws_fito, df_fito, "TablaFitopatogenos", "TableStyleMedium3")
-                _ajustar_cols(ws_fito, {"A": 5, "B": 38, "C": 16, "D": 62, "E": 45})
-                _wrap(ws_fito, h=38)
-
-                # ─────────────────────────────────────────────────────
-                # H-08  NEUTRALES
-                # ─────────────────────────────────────────────────────
-                neutrales = detalle_clas.get("neutral", [])
-                neu_rec = [{
-                    "#": i + 1,
-                    "Organismo":    n.get("nombre", ""),
-                    "Abundancia_%": round(float(n.get("porcentaje", 0) or 0), 4),
-                    "Notas":        n.get("descripcion", "") or "Sin clasificación funcional definida",
-                } for i, n in enumerate(neutrales)]
-                df_neu = (pd.DataFrame(neu_rec) if neu_rec
-                          else pd.DataFrame(columns=["#","Organismo","Abundancia_%","Notas"]))
-                _excel_safe_df(df_neu).to_excel(writer, index=False, sheet_name="Neutrales")
-                ws_neu = writer.sheets["Neutrales"]
-                _hdr(ws_neu, 4, fill=PatternFill("solid", fgColor=CGRIS_H))
-                _datos_filas(ws_neu, 2, len(df_neu) + 1)
-                _aplicar_tabla(ws_neu, df_neu, "TablaNeutrales", "TableStyleMedium15")
-                _ajustar_cols(ws_neu, {"A": 5, "B": 38, "C": 16, "D": 50})
-                _wrap(ws_neu, h=30)
+                micro_datos = []
+                for b in detalle_clas.get("benefico", []):
+                    micro_datos.append(("🟢 Benéficos", b.get("nombre", ""),
+                        round(float(b.get("porcentaje", 0) or 0), 4),
+                        b.get("descripcion", ""), b.get("referencia", "")))
+                for f in detalle_clas.get("fitopatogeno", []):
+                    micro_datos.append(("🔴 Fitopatógenos", f.get("nombre", ""),
+                        round(float(f.get("porcentaje", 0) or 0), 4),
+                        f.get("descripcion", ""), f.get("referencia", "")))
+                for n in detalle_clas.get("neutral", []):
+                    micro_datos.append(("🔵 Neutrales", n.get("nombre", ""),
+                        round(float(n.get("porcentaje", 0) or 0), 4),
+                        n.get("descripcion", "") or "Sin clasificación funcional definida", ""))
+                micro_rec = [{
+                    "#": i + 1, "Organismo": org, "Categoría": cat,
+                    "Abundancia_%": pct, "Descripción": desc, "Referencia": ref,
+                } for i, (cat, org, pct, desc, ref) in enumerate(micro_datos)]
+                df_micro = (pd.DataFrame(micro_rec) if micro_rec else
+                            pd.DataFrame(columns=["#", "Organismo", "Categoría",
+                                                  "Abundancia_%", "Descripción", "Referencia"]))
+                _excel_safe_df(df_micro).to_excel(writer, index=False, sheet_name="Microorganismos_Detalle")
+                ws_micro = writer.sheets["Microorganismos_Detalle"]
+                _formatear_tabla(ws_micro, df_micro, "TablaMicroorganismos", col_clasif="Categoría")
 
                 # ─────────────────────────────────────────────────────
                 # H-09  ANÁLISIS DIFERENCIAL (si disponible)
@@ -2208,12 +3071,7 @@ class ExportService:
                     df_dif = pd.DataFrame(dif_rec)
                     _excel_safe_df(df_dif).to_excel(writer, index=False, sheet_name="Analisis_Diferencial")
                     ws_dif = writer.sheets["Analisis_Diferencial"]
-                    _hdr(ws_dif, 6, fill=fill_azul)
-                    _datos_filas(ws_dif, 2, len(df_dif) + 1)
-                    _aplicar_tabla(ws_dif, df_dif, "TablaDiferencial", "TableStyleMedium2")
-                    _ajustar_cols(ws_dif, {"A": 5, "B": 38, "C": 22,
-                                           "D": 20, "E": 18, "F": 22})
-                    _wrap(ws_dif, h=28)
+                    _formatear_tabla(ws_dif, df_dif, "TablaDiferencial", header="azul")
 
                     # Info beta-diversidad vs. referencia
                     if beta_dif:
@@ -2240,37 +3098,6 @@ class ExportService:
                             for c in range(1, 7):
                                 ws_dif.cell(row=j, column=c).border = borde
 
-                # ─────────────────────────────────────────────────────
-                # H-10  GRÁFICOS
-                # ─────────────────────────────────────────────────────
-                ws_g = wb.create_sheet("Graficos")
-                ws_g.cell(row=1, column=1,
-                          value="Gráficos — BioSuelo").font = fnt_titulo
-                ws_g.cell(row=1, column=1).fill = fill_titulo
-
-                # Mini tabla clasificación
-                ws_g.append(["", ""])
-                ws_g.append(["Clasificación", "N° Taxa"])
-                for cod, lbl in [("benefico","Benéficos"),("fitopatogeno","Fitopatógenos"),
-                                  ("neutral","Neutrales"),("sin_clasificar","Sin catalogar")]:
-                    ws_g.append([lbl, totales_clas.get(cod, 0)])
-                for cell in ws_g[3]:
-                    cell.fill = fill_hdr; cell.font = fnt_hdr; cell.alignment = al_c
-                for row in ws_g.iter_rows(min_row=4, max_row=7):
-                    for cell in row:
-                        cell.font = fnt_normal; cell.border = borde
-
-                _ajustar_cols(ws_g, {"A": 22, "B": 14})
-                _pie_chart(
-                    ws_g, anchor="D2",
-                    data_ref=Reference(ws_g, min_col=2, max_col=2, min_row=3, max_row=7),
-                    cats_ref=Reference(ws_g, min_col=1, max_col=1, min_row=4, max_row=7),
-                    titulo_celda="D1",
-                    titulo_txt="Distribución Funcional de la Comunidad Microbiana",
-                )
-                ws_g.cell(row=20, column=1,
-                          value="Generado por BioSuelo").font = fnt_gris
-
             # ════════════════════════════════════════════════════════════
             # ██  MODO COMPARATIVO — N muestras
             # ════════════════════════════════════════════════════════════
@@ -2285,7 +3112,7 @@ class ExportService:
 
                 res2 = [["Campo", "Valor", "Notas"]]
                 res2 += [
-                    ["BioSuelo — Reporte Comparativo de Salud Microbiológica", "", ""],
+                    ["BioMicro — Reporte Comparativo de Salud Microbiológica", "", ""],
                     ["Fecha de generación", fecha_gen, ""],
                     ["Analista", analista, ""],
                     ["N° muestras comparadas", str(len(muestras)), ""],
@@ -2316,10 +3143,10 @@ class ExportService:
                     ["Equitatividad J' (prom.)", f"{equival:.4f}", _interp_equit(equival)],
                     ["", "", ""],
                     ["CLASIFICACIÓN FUNCIONAL GLOBAL", "", ""],
-                    ["Taxa Benéficos",    str(totales_clas.get("benefico", 0)), ""],
-                    ["Taxa Fitopatógenos",str(totales_clas.get("fitopatogeno", 0)), ""],
-                    ["Taxa Neutrales",    str(totales_clas.get("neutral", 0)), ""],
-                    ["Taxa Sin Catalogar",str(totales_clas.get("sin_clasificar", 0)), ""],
+                    ["🟢 Taxa Benéficos",    str(totales_clas.get("benefico", 0)), ""],
+                    ["🔴 Taxa Fitopatógenos",str(totales_clas.get("fitopatogeno", 0)), ""],
+                    ["🔵 Taxa Neutrales",    str(totales_clas.get("neutral", 0)), ""],
+                    ["⚪ Taxa Sin Catalogar",str(totales_clas.get("sin_clasificar", 0)), ""],
                     ["Índice Salud Global", str(indice_salud),
                      INTERP_SALUD.get(nivel_salud, "")],
                     ["Nivel cualitativo global", nivel_salud, ""],
@@ -2340,7 +3167,7 @@ class ExportService:
                         for cell in row:
                             cell.fill = fill_seccion; cell.font = fnt_seccion
                             cell.border = borde
-                    elif v.startswith("BioSuelo"):
+                    elif v.startswith("BioMicro"):
                         for cell in row:
                             cell.fill = fill_titulo
                             cell.font = Font(bold=True, color=CBLANCO, size=12)
@@ -2350,6 +3177,30 @@ class ExportService:
                             cell.font = fnt_normal; cell.border = borde; cell.alignment = al_l
                 _ajustar_cols(ws_rc, {"A": 34, "B": 25, "C": 65})
                 _wrap(ws_rc, h=28)
+
+                # ── Resumen ejecutivo interpretado (Fase 1) ─────────────
+                fila_hsc = ws_rc.max_row + 2
+                ws_rc.cell(row=fila_hsc, column=1, value="RESUMEN EJECUTIVO INTERPRETADO").font = fnt_seccion
+                for col in range(1, 4):
+                    c_sec = ws_rc.cell(row=fila_hsc, column=col)
+                    c_sec.fill = fill_seccion
+                    c_sec.border = borde
+                ws_rc.row_dimensions[fila_hsc].height = 18
+                fila_hsc += 1
+
+                for col in range(4, 20):
+                    ws_rc.column_dimensions[get_column_letter(col)].width = 4
+                ws_rc.add_image(_fig_gauge(indice_salud, nivel_salud),
+                                 f"{get_column_letter(4)}{fila_hsc}")
+                fila_hsc += 2
+
+                for parrafo in _generar_interpretacion_ejecutiva(datos):
+                    c_par = ws_rc.cell(row=fila_hsc, column=1, value=parrafo)
+                    c_par.font = fnt_normal
+                    c_par.alignment = al_l
+                    ws_rc.merge_cells(start_row=fila_hsc, start_column=1, end_row=fila_hsc, end_column=3)
+                    ws_rc.row_dimensions[fila_hsc].height = 40
+                    fila_hsc += 1
 
                 # ─────────────────────────────────────────────────────
                 # H-02  CUADRO COMPARATIVO POR MUESTRA
@@ -2384,32 +3235,18 @@ class ExportService:
                                "Benéficos","Fitopatógenos","Neutrales","Sin_Catalogar"]))
                 _excel_safe_df(df_cuad).to_excel(writer, index=False, sheet_name="Cuadro_Comparativo")
                 ws_cuad = writer.sheets["Cuadro_Comparativo"]
-                _hdr(ws_cuad, len(df_cuad.columns))
-                _datos_filas(ws_cuad, 2, len(df_cuad) + 1, alin=al_c)
-                _aplicar_tabla(ws_cuad, df_cuad, "TablaCuadroComp", "TableStyleMedium9")
-                _ajustar_cols(ws_cuad, {
-                    "A": 16, "B": 20, "C": 20, "D": 18,
-                    "E": 14, "F": 14, "G": 12, "H": 14,
-                    "I": 12, "J": 18, "K": 12, "L": 14, "M": 12, "N": 14,
-                })
-                _wrap(ws_cuad, h=26)
+                _formatear_tabla(ws_cuad, df_cuad, "TablaCuadroComp")
 
                 # Gráfico: Índice de salud por muestra
                 if len(df_cuad) > 0:
-                    _titulo_celda(ws_cuad, "P2", "Índice de Salud por Muestra", CV_OSC)
-                    ch_sal = BarChart()
-                    ch_sal.type = "col"; ch_sal.grouping = "clustered"
-                    ch_sal.title = None; ch_sal.y_axis.title = "Índice (0-100)"
-                    ch_sal.style = 10; ch_sal.width = 18; ch_sal.height = 12
-                    ch_sal.y_axis.scaling.max = 100
-                    dat_s = Reference(ws_cuad, min_col=5, max_col=5,
-                                      min_row=1, max_row=len(df_cuad)+1)
-                    cat_s = Reference(ws_cuad, min_col=1, max_col=1,
-                                      min_row=2, max_row=len(df_cuad)+1)
-                    ch_sal.add_data(dat_s, titles_from_data=True)
-                    ch_sal.set_categories(cat_s)
-                    ch_sal.series[0].graphicalProperties.solidFill = CV
-                    ws_cuad.add_chart(ch_sal, "P3")
+                    colores_sal = [_NIVEL_COLORES.get(f.get("Nivel"), PLOTLY_VERDE)
+                                   for f in cuad_rec]
+                    ws_cuad.add_image(_fig_barras_v(
+                        ws_cuad, col_datos=5, col_cats=1, min_row=2, max_row=len(df_cuad) + 1,
+                        colores=colores_sal, titulo_celda="P2",
+                        titulo_txt="Índice de Salud por Muestra",
+                        y_titulo="Índice (0-100)", y_max=100,
+                    ), "P3")
 
                 # ─────────────────────────────────────────────────────
                 # H-03  DIVERSIDAD ALFA DETALLADA POR MUESTRA
@@ -2452,43 +3289,31 @@ class ExportService:
                                                       "Equitatividad_J'"]))
                 _excel_safe_df(df_alfa).to_excel(writer, index=False, sheet_name="Diversidad_Alfa")
                 ws_alfa = writer.sheets["Diversidad_Alfa"]
-                _hdr(ws_alfa, 6, fill=fill_azul)
-                _datos_filas(ws_alfa, 2, len(df_alfa) + 1, alin=al_c)
-                # Fila promedio en negrita
+                _formatear_tabla(ws_alfa, df_alfa, "TablaDivAlfa", header="azul")
+                # Fila promedio en negrita (después de _formatear_tabla, que
+                # ya fijó la fuente normal en todas las celdas de datos)
                 if alfa_rec:
                     for c in range(1, 7):
                         ws_alfa.cell(row=len(df_alfa) + 1, column=c).font = fnt_bold
-                _aplicar_tabla(ws_alfa, df_alfa, "TablaDivAlfa", "TableStyleMedium2")
-                _ajustar_cols(ws_alfa, {"A": 18, "B": 12, "C": 14, "D": 22, "E": 12, "F": 18})
-                _wrap(ws_alfa, h=24)
+                _caption_diversidad(ws_alfa, ws_alfa.max_row + 2, shanval, simpval)
 
                 # Gráfico Shannon por muestra — colores por umbral absoluto
                 # (<1 rojo, 1-2 naranja, 2-3 amarillo, ≥3 verde)
-                from openpyxl.chart.series import DataPoint as XLDataPoint
                 n_data = len(alfa_rec) - 1 if alfa_rec else 0  # excluye fila PROMEDIO
                 if n_data > 0:
-                    _titulo_celda(ws_alfa, "H2", "Shannon H' por Muestra (colores por umbral)", CAZUL)
-                    ch_sh = BarChart()
-                    ch_sh.type = "col"; ch_sh.grouping = "clustered"
-                    ch_sh.title = None; ch_sh.y_axis.title = "Shannon H'"
-                    ch_sh.style = 10; ch_sh.width = 20; ch_sh.height = 14
-                    sh_dat = Reference(ws_alfa, min_col=3, max_col=3,
-                                       min_row=1, max_row=n_data + 1)
-                    sh_cat = Reference(ws_alfa, min_col=1, max_col=1,
-                                       min_row=2, max_row=n_data + 1)
-                    ch_sh.add_data(sh_dat, titles_from_data=True)
-                    ch_sh.set_categories(sh_cat)
-                    # Color por umbral Shannon en cada barra (<1 rojo, 1-2 naranja, 2-3 amarillo, ≥3 verde)
-                    for idx, row_data in enumerate(alfa_rec[:n_data]):
+                    colores_sh = []
+                    for row_data in alfa_rec[:n_data]:
                         sv = float(row_data.get("Shannon_H'", 0) or 0)
-                        if sv >= 3.0:   fill_c = "16A34A"
-                        elif sv >= 2.0: fill_c = "EAB308"
-                        elif sv >= 1.0: fill_c = "F97316"
-                        else:           fill_c = "DC2626"
-                        dp = XLDataPoint(idx=idx)
-                        dp.graphicalProperties.solidFill = fill_c
-                        ch_sh.series[0].dPt.append(dp)
-                    ws_alfa.add_chart(ch_sh, "H3")
+                        if sv >= 3.0:   colores_sh.append("#16A34A")
+                        elif sv >= 2.0: colores_sh.append("#EAB308")
+                        elif sv >= 1.0: colores_sh.append("#F97316")
+                        else:           colores_sh.append("#DC2626")
+                    ws_alfa.add_image(_fig_barras_v(
+                        ws_alfa, col_datos=3, col_cats=1, min_row=2, max_row=n_data + 1,
+                        colores=colores_sh, titulo_celda="H2",
+                        titulo_txt="Shannon H' por Muestra (colores por umbral)",
+                        y_titulo="Shannon H'",
+                    ), "H3")
 
                 # ─────────────────────────────────────────────────────
                 # H-04  DIVERSIDAD BETA
@@ -2562,6 +3387,15 @@ class ExportService:
 
                 for col_idx in range(1, len(codigos_m) + 2):
                     ws_beta.column_dimensions[get_column_letter(col_idx)].width = 16
+
+                # Heatmap de distribución de abundancia (muestra × taxón) —
+                # solo tiene sentido en modo comparativo, con 2+ muestras.
+                matriz_hm, taxa_hm, cols_hm = _datos_heatmap_muestras(datos_por_muestra)
+                if matriz_hm:
+                    col_hm = get_column_letter(len(codigos_m) + 3)
+                    _titulo_celda(ws_beta, f"{col_hm}1", "Distribución de Abundancia (Top taxa)", CV_OSC)
+                    ws_beta.add_image(
+                        _fig_heatmap(matriz_hm, taxa_hm, cols_hm), f"{col_hm}2")
 
                 # — Sección 2: Taxa compartidos por par —
                 fila_shared = fila + len(codigos_m) + 3
@@ -2651,18 +3485,19 @@ class ExportService:
                                                      "Abundancia_%","Clasificación"]))
                 _excel_safe_df(df_top).to_excel(writer, index=False, sheet_name="Top_N_Global")
                 ws_top = writer.sheets["Top_N_Global"]
-                _hdr(ws_top, len(df_top.columns))
-                _datos_filas(ws_top, 2, len(df_top) + 1)
-                _aplicar_tabla(ws_top, df_top, "TablaTopNGlobal")
-                _ajustar_cols(ws_top, {"A": 6, "B": 42, "C": 14, "D": 16, "E": 20})
-                _wrap(ws_top)
+                _formatear_tabla(ws_top, df_top, "TablaTopNGlobal", col_clasif="Clasificación")
+                _caption_top_taxa(ws_top, len(df_top), top_rec[0]["Taxón"] if top_rec else None)
                 if len(df_top) > 0:
-                    _chart_bars_h(
-                        ws_top, anchor="G3", n_filas=len(df_top),
-                        col_datos=4, col_cats=2, color_fill=CV,
+                    ws_top.add_image(_fig_barras_h(
+                        ws_top, n_filas=len(df_top), col_datos=4, col_cats=2, col_clasif=5,
                         titulo_celda="G2",
                         titulo_txt=f"Top {top_n} Taxa Global — Abundancia (%) · {tipo}",
-                    )
+                    ), "G3")
+                    ids_tm2, lbl_tm2, par_tm2, val_tm2, col_tm2 = _datos_treemap_taxa(top_rec)
+                    ws_top.add_image(_fig_treemap(
+                        ids_tm2, lbl_tm2, par_tm2, val_tm2, colores=col_tm2,
+                        titulo_txt="Treemap de Abundancias por Clasificación",
+                    ), "V3")
 
                 # ─────────────────────────────────────────────────────
                 # H-06  TAXONOMÍA COMPLETA
@@ -2680,11 +3515,12 @@ class ExportService:
                                                      "Abundancia_%","Clasificación"]))
                 _excel_safe_df(df_tod).to_excel(writer, index=False, sheet_name="Taxonomia_Completa")
                 ws_tod = writer.sheets["Taxonomia_Completa"]
-                _hdr(ws_tod, len(df_tod.columns))
-                _datos_filas(ws_tod, 2, len(df_tod) + 1)
-                _aplicar_tabla(ws_tod, df_tod, "TablaTaxonomia", "TableStyleMedium9")
-                _ajustar_cols(ws_tod, {"A": 6, "B": 42, "C": 14, "D": 16, "E": 20})
-                _wrap(ws_tod)
+                _formatear_tabla(ws_tod, df_tod, "TablaTaxonomia", col_clasif="Clasificación")
+                if jerarquia_taxonomica:
+                    ids_sb, lbl_sb, par_sb, val_sb = _datos_sunburst_taxonomia(
+                        jerarquia_taxonomica, nivel_campo_jerarquia)
+                    _titulo_celda(ws_tod, "G1", "Jerarquía Taxonómica", CV_OSC)
+                    ws_tod.add_image(_fig_sunburst(ids_sb, lbl_sb, par_sb, val_sb), "G2")
 
                 # ─────────────────────────────────────────────────────
                 # H-07  CLASIFICACIÓN POR MUESTRA
@@ -2709,148 +3545,176 @@ class ExportService:
                               "Sin_Catalogar","Total_Taxa","%_Benéficos","%_Fitopatógenos"]))
                 _excel_safe_df(df_cls).to_excel(writer, index=False, sheet_name="Clas_Por_Muestra")
                 ws_cls = writer.sheets["Clas_Por_Muestra"]
-                _hdr(ws_cls, len(df_cls.columns),
-                     fill=PatternFill("solid", fgColor=CA),
-                     font=Font(bold=True, color=CBLANCO, size=11))
-                _datos_filas(ws_cls, 2, len(df_cls) + 1, alin=al_c)
-                _aplicar_tabla(ws_cls, df_cls, "TablaClsPorMuestra", "TableStyleMedium4")
-                _ajustar_cols(ws_cls, {
-                    "A": 18, "B": 13, "C": 15, "D": 13,
-                    "E": 15, "F": 13, "G": 16, "H": 18,
-                })
-                _wrap(ws_cls, h=24)
+                _formatear_tabla(ws_cls, df_cls, "TablaClsPorMuestra")
+                _caption_clasificacion(ws_cls, ws_cls.max_row + 2, totales_clas, ancho_cols=7)
 
                 # ─────────────────────────────────────────────────────
-                # H-08  BENÉFICOS (global)
+                # H-08  MICROORGANISMOS — detalle por categoría (global,
+                # fusión de Benéficos + Fitopatógenos + Neutrales)
                 # ─────────────────────────────────────────────────────
-                beneficos = detalle_clas.get("benefico", [])
-                ben_rec = [{
-                    "#": i + 1,
-                    "Organismo":          b.get("nombre", ""),
-                    "Abundancia_%":       round(float(b.get("porcentaje", 0) or 0), 4),
-                    "Función_Agronómica": b.get("descripcion", ""),
-                    "Referencia":         b.get("referencia", ""),
-                } for i, b in enumerate(beneficos)]
-                df_ben = (pd.DataFrame(ben_rec) if ben_rec
-                          else pd.DataFrame(columns=["#","Organismo","Abundancia_%",
-                                                     "Función_Agronómica","Referencia"]))
-                _excel_safe_df(df_ben).to_excel(writer, index=False, sheet_name="Beneficos")
-                ws_ben = writer.sheets["Beneficos"]
-                _hdr(ws_ben, 5, fill=PatternFill("solid", fgColor="0F6E56"))
-                _datos_filas(ws_ben, 2, len(df_ben) + 1)
-                _aplicar_tabla(ws_ben, df_ben, "TablaBeneficos", "TableStyleMedium7")
-                _ajustar_cols(ws_ben, {"A": 5, "B": 38, "C": 16, "D": 62, "E": 45})
-                _wrap(ws_ben, h=38)
+                micro_datos = []
+                for b in detalle_clas.get("benefico", []):
+                    micro_datos.append(("🟢 Benéficos", b.get("nombre", ""),
+                        round(float(b.get("porcentaje", 0) or 0), 4),
+                        b.get("descripcion", ""), b.get("referencia", "")))
+                for f in detalle_clas.get("fitopatogeno", []):
+                    micro_datos.append(("🔴 Fitopatógenos", f.get("nombre", ""),
+                        round(float(f.get("porcentaje", 0) or 0), 4),
+                        f.get("descripcion", ""), f.get("referencia", "")))
+                for n in detalle_clas.get("neutral", []):
+                    micro_datos.append(("🔵 Neutrales", n.get("nombre", ""),
+                        round(float(n.get("porcentaje", 0) or 0), 4),
+                        n.get("descripcion", "") or "Sin clasificación funcional definida", ""))
+                micro_rec = [{
+                    "#": i + 1, "Organismo": org, "Categoría": cat,
+                    "Abundancia_%": pct, "Descripción": desc, "Referencia": ref,
+                } for i, (cat, org, pct, desc, ref) in enumerate(micro_datos)]
+                df_micro = (pd.DataFrame(micro_rec) if micro_rec else
+                            pd.DataFrame(columns=["#", "Organismo", "Categoría",
+                                                  "Abundancia_%", "Descripción", "Referencia"]))
+                _excel_safe_df(df_micro).to_excel(writer, index=False, sheet_name="Microorganismos_Detalle")
+                ws_micro = writer.sheets["Microorganismos_Detalle"]
+                _formatear_tabla(ws_micro, df_micro, "TablaMicroorganismos", col_clasif="Categoría")
 
-                # ─────────────────────────────────────────────────────
-                # H-09  FITOPATÓGENOS (global)
-                # ─────────────────────────────────────────────────────
-                fitopatogenos = detalle_clas.get("fitopatogeno", [])
-                fito_rec = [{
-                    "#": i + 1,
-                    "Organismo":            f.get("nombre", ""),
-                    "Abundancia_%":         round(float(f.get("porcentaje", 0) or 0), 4),
-                    "Riesgo_Fitosanitario": f.get("descripcion", ""),
-                    "Referencia":           f.get("referencia", ""),
-                } for i, f in enumerate(fitopatogenos)]
-                df_fito = (pd.DataFrame(fito_rec) if fito_rec
-                           else pd.DataFrame(columns=["#","Organismo","Abundancia_%",
-                                                      "Riesgo_Fitosanitario","Referencia"]))
-                _excel_safe_df(df_fito).to_excel(writer, index=False, sheet_name="Fitopatogenos")
-                ws_fito = writer.sheets["Fitopatogenos"]
-                _hdr(ws_fito, 5, fill=fill_rojo)
-                _datos_filas(ws_fito, 2, len(df_fito) + 1)
-                _aplicar_tabla(ws_fito, df_fito, "TablaFitopatogenos", "TableStyleMedium3")
-                _ajustar_cols(ws_fito, {"A": 5, "B": 38, "C": 16, "D": 62, "E": 45})
-                _wrap(ws_fito, h=38)
+            # ─────────────────────────────────────────────────────────────
+            # DASHBOARD — tarjetas KPI + visualizaciones consolidadas (Fase 1.2)
+            # ─────────────────────────────────────────────────────────────
+            ws_dash = wb.create_sheet("Dashboard")
+            ws_dash.sheet_view.showGridLines = False
 
-                # ─────────────────────────────────────────────────────
-                # H-10  NEUTRALES (global)
-                # ─────────────────────────────────────────────────────
-                neutrales = detalle_clas.get("neutral", [])
-                neu_rec = [{
-                    "#": i + 1,
-                    "Organismo":    n.get("nombre", ""),
-                    "Abundancia_%": round(float(n.get("porcentaje", 0) or 0), 4),
-                    "Notas":        n.get("descripcion", "") or "Sin clasificación funcional definida",
-                } for i, n in enumerate(neutrales)]
-                df_neu = (pd.DataFrame(neu_rec) if neu_rec
-                          else pd.DataFrame(columns=["#","Organismo","Abundancia_%","Notas"]))
-                _excel_safe_df(df_neu).to_excel(writer, index=False, sheet_name="Neutrales")
-                ws_neu = writer.sheets["Neutrales"]
-                _hdr(ws_neu, 4, fill=PatternFill("solid", fgColor=CGRIS_H))
-                _datos_filas(ws_neu, 2, len(df_neu) + 1)
-                _aplicar_tabla(ws_neu, df_neu, "TablaNeutrales", "TableStyleMedium15")
-                _ajustar_cols(ws_neu, {"A": 5, "B": 38, "C": 16, "D": 50})
-                _wrap(ws_neu, h=30)
+            ws_dash.merge_cells(start_row=1, start_column=1, end_row=1, end_column=24)
+            c_tit_d = ws_dash.cell(row=1, column=1, value="🌱  Dashboard — BioMicro")
+            c_tit_d.font = Font(bold=True, color=CBLANCO, size=16)
+            c_tit_d.fill = fill_titulo
+            c_tit_d.alignment = al_c
+            ws_dash.row_dimensions[1].height = 30
 
-                # ─────────────────────────────────────────────────────
-                # H-11  GRÁFICOS COMPARATIVOS
-                # ─────────────────────────────────────────────────────
-                ws_g = wb.create_sheet("Graficos")
-                ws_g.cell(row=1, column=1,
-                          value="Gráficos — BioSuelo").font = fnt_titulo
-                ws_g.cell(row=1, column=1).fill = fill_titulo
-                ws_g.row_dimensions[1].height = 22
+            def _kpi_card(fila, col, titulo, valor, color_hex, ancho_cols=4):
+                color = str(color_hex).lstrip("#")
+                fill = PatternFill("solid", fgColor=color)
+                ws_dash.merge_cells(start_row=fila, start_column=col,
+                                     end_row=fila + 1, end_column=col + ancho_cols - 1)
+                c_val = ws_dash.cell(row=fila, column=col, value=valor)
+                c_val.font = Font(bold=True, color="FFFFFF", size=20)
+                c_val.alignment = al_c
+                ws_dash.merge_cells(start_row=fila + 2, start_column=col,
+                                     end_row=fila + 2, end_column=col + ancho_cols - 1)
+                c_lbl = ws_dash.cell(row=fila + 2, column=col, value=titulo)
+                c_lbl.font = Font(bold=True, color="FFFFFF", size=9)
+                c_lbl.alignment = al_c
+                for r in range(fila, fila + 3):
+                    for c in range(col, col + ancho_cols):
+                        ws_dash.cell(row=r, column=c).fill = fill
+                ws_dash.row_dimensions[fila].height = 34
+                ws_dash.row_dimensions[fila + 1].height = 10
+                ws_dash.row_dimensions[fila + 2].height = 18
 
-                # Mini tabla clasificación global
-                ws_g.append(["", ""])
-                ws_g.append(["Clasificación", "N° Taxa"])
-                for cod, lbl in [("benefico","Benéficos"),("fitopatogeno","Fitopatógenos"),
-                                  ("neutral","Neutrales"),("sin_clasificar","Sin catalogar")]:
-                    ws_g.append([lbl, totales_clas.get(cod, 0)])
-                for cell in ws_g[3]:
-                    cell.fill = fill_hdr; cell.font = fnt_hdr; cell.alignment = al_c
-                for row in ws_g.iter_rows(min_row=4, max_row=7):
-                    for cell in row:
-                        cell.font = fnt_normal; cell.border = borde
-                _ajustar_cols(ws_g, {"A": 22, "B": 14})
+            color_salud_d = _NIVEL_COLORES.get(nivel_salud, "#64748b")
+            _kpi_card(3, 1,  "Total Taxa Detectados", total_taxa_global, PLOTLY_VERDE_OS)
+            _kpi_card(3, 6,  "Shannon H'", f"{shanval:.2f}", PLOTLY_AZUL)
+            _kpi_card(3, 11, "Índice de Salud", f"{indice_salud}/100", color_salud_d)
+            _kpi_card(3, 16, "Taxa Benéficos", totales_clas.get("benefico", 0), PLOTLY_VERDE)
+            _kpi_card(3, 21, "Taxa Fitopatógenos", totales_clas.get("fitopatogeno", 0), PLOTLY_ROJO)
 
-                # Pastel global
-                _pie_chart(
-                    ws_g, anchor="D2",
-                    data_ref=Reference(ws_g, min_col=2, max_col=2, min_row=3, max_row=7),
-                    cats_ref=Reference(ws_g, min_col=1, max_col=1, min_row=4, max_row=7),
-                    titulo_celda="D1",
-                    titulo_txt="Distribución Funcional Global de la Comunidad Microbiana",
+            # Gauge + Radar
+            ws_dash.add_image(_fig_gauge(indice_salud, nivel_salud), "A8")
+            cat_radar, val_radar = _datos_radar_diversidad(
+                riqval, shanval, simpval, equival, indice_salud)
+            ws_dash.add_image(_fig_radar(cat_radar, val_radar), "N8")
+
+            # ── Tablas de apoyo (no visibles en el panel, alimentan los
+            # gráficos de abajo con el mismo criterio de lectura-desde-celda
+            # que usa el resto del reporte) ─────────────────────────────
+            fila_ap = 160
+            ws_dash.cell(row=fila_ap, column=1,
+                         value="Datos de apoyo (alimentan los gráficos de este panel)").font = fnt_gris
+            fila_ap += 1
+            ws_dash.cell(row=fila_ap, column=1, value="Categoría").font = fnt_hdr
+            ws_dash.cell(row=fila_ap, column=2, value="N°_Taxa").font = fnt_hdr
+            fila_clf0 = fila_ap + 1
+            for i, (cod, lbl) in enumerate([
+                ("benefico", "Benéficos"), ("fitopatogeno", "Fitopatógenos"),
+                ("neutral", "Neutrales"), ("sin_clasificar", "Sin catalogar"),
+            ]):
+                ws_dash.cell(row=fila_clf0 + i, column=1, value=lbl)
+                ws_dash.cell(row=fila_clf0 + i, column=2, value=totales_clas.get(cod, 0))
+
+            # Donut + Top 20 microorganismos
+            ws_dash.add_image(_fig_donut(
+                ws_dash, col_datos=2, col_cats=1, min_row=fila_clf0, max_row=fila_clf0 + 3,
+                titulo_txt="Distribución Funcional",
+            ), "A36")
+
+            fila_top0 = fila_clf0 + 6
+            top20 = todos_taxa[:20]
+            for i, r in enumerate(top20):
+                fr = fila_top0 + i
+                ws_dash.cell(row=fr, column=1,
+                             value=_excel_safe(str(r.get("taxonomia", r.get("nombre", "?")))))
+                ws_dash.cell(row=fr, column=2,
+                             value=round(float(r.get("total_porcentaje",
+                                                r.get("porcentaje", 0)) or 0), 4))
+                ws_dash.cell(row=fr, column=3, value=r.get("clasificacion", "sin_clasificar"))
+            if top20:
+                ws_dash.add_image(_fig_barras_h(
+                    ws_dash, n_filas=len(top20), col_datos=2, col_cats=1, col_clasif=3,
+                    fila_inicio=fila_top0, titulo_txt="Top 20 Microorganismos — Abundancia (%)",
+                ), "N36")
+
+            # Sunburst taxonómico + Treemap de abundancias
+            if jerarquia_taxonomica:
+                ids_sb_d, lbl_sb_d, par_sb_d, val_sb_d = _datos_sunburst_taxonomia(
+                    jerarquia_taxonomica, nivel_campo_jerarquia)
+                ws_dash.add_image(_fig_sunburst(ids_sb_d, lbl_sb_d, par_sb_d, val_sb_d), "A72")
+            if todos_taxa:
+                todos_rec_dash = [{
+                    "Taxón": r.get("taxonomia", r.get("nombre", "?")),
+                    "Total_Hits": int(r.get("total_hits", r.get("hits", 0)) or 0),
+                    "Clasificación": r.get("clasificacion", "sin_clasificar"),
+                } for r in todos_taxa]
+                ids_tm_d, lbl_tm_d, par_tm_d, val_tm_d, col_tm_d = _datos_treemap_taxa(
+                    todos_rec_dash, top=25)
+                ws_dash.add_image(_fig_treemap(
+                    ids_tm_d, lbl_tm_d, par_tm_d, val_tm_d, colores=col_tm_d,
+                    titulo_txt="Treemap de Abundancias",
+                ), "N72")
+
+            # Heatmap de distribución — solo modo comparativo (2+ muestras)
+            if is_comparativo:
+                matriz_hm_d, taxa_hm_d, cols_hm_d = _datos_heatmap_muestras(datos_por_muestra)
+                if matriz_hm_d:
+                    ws_dash.add_image(_fig_heatmap(
+                        matriz_hm_d, taxa_hm_d, cols_hm_d, ancho_px=1600, alto_px=520,
+                    ), "A108")
+
+            ws_dash.cell(row=157, column=1,
+                         value="Generado por BioMicro").font = fnt_gris
+
+            # ── Fase 1: Portada / Índice / Conclusiones / Recomendaciones ──
+            # Aditivo: agrega hojas y una fila de navegación al tope de las
+            # que ya existen, sin tocar su contenido (ver _retro_freeze_y_nav).
+            hojas_originales = list(wb.sheetnames)
+            # El Dashboard se construyó al final (necesita datos ya calculados
+            # en ambos modos), pero visualmente debe ir primero, justo
+            # después del Índice.
+            hojas_originales.remove("Dashboard")
+            hojas_originales.insert(0, "Dashboard")
+
+            FREEZE_OVERRIDES = {"Diversidad_Beta": "B4"}
+            for _nombre_hoja in hojas_originales:
+                _retro_freeze_y_nav(
+                    wb[_nombre_hoja],
+                    freeze_cell=FREEZE_OVERRIDES.get(_nombre_hoja, "A3"),
+                    titulo_extra=_TITULO_EXTRA_HOJAS.get(_nombre_hoja),
                 )
 
-                # Mini tabla Índice de salud por muestra (para gráfico)
-                ws_g.cell(row=22, column=1, value="Muestra").font = fnt_hdr
-                ws_g.cell(row=22, column=1).fill = fill_hdr
-                ws_g.cell(row=22, column=1).alignment = al_c
-                ws_g.cell(row=22, column=2, value="Índice de Salud").font = fnt_hdr
-                ws_g.cell(row=22, column=2).fill = fill_hdr
-                ws_g.cell(row=22, column=2).alignment = al_c
-                fila_sal = 23
-                for dpm in datos_por_muestra:
-                    ws_g.cell(row=fila_sal, column=1,
-                              value=str(dpm["muestra"].codigo)).font = fnt_normal
-                    ws_g.cell(row=fila_sal, column=2,
-                              value=dpm.get("indice_salud", 0)).font = fnt_normal
-                    for c in range(1, 3):
-                        ws_g.cell(row=fila_sal, column=c).border = borde
-                    fila_sal += 1
+            _construir_hoja_conclusiones_recomendaciones(wb, datos)
+            _construir_hoja_portada(wb, datos)
+            _construir_hoja_indice(wb, hojas_originales + ["Conclusiones_Recomendaciones"])
 
-                n_sal = len(datos_por_muestra)
-                if n_sal > 0:
-                    _titulo_celda(ws_g, "D21", "Índice de Salud por Muestra", CV_OSC)
-                    ch_s2 = BarChart()
-                    ch_s2.type = "col"; ch_s2.grouping = "clustered"
-                    ch_s2.title = None; ch_s2.y_axis.title = "Índice (0-100)"
-                    ch_s2.style = 10; ch_s2.width = 18; ch_s2.height = 12
-                    ch_s2.y_axis.scaling.max = 100
-                    ds2 = Reference(ws_g, min_col=2, max_col=2,
-                                    min_row=22, max_row=22 + n_sal)
-                    cs2 = Reference(ws_g, min_col=1, max_col=1,
-                                    min_row=23, max_row=22 + n_sal)
-                    ch_s2.add_data(ds2, titles_from_data=True)
-                    ch_s2.set_categories(cs2)
-                    ch_s2.series[0].graphicalProperties.solidFill = CV
-                    ws_g.add_chart(ch_s2, "D22")
-
-                ws_g.cell(row=40, column=1,
-                          value="Generado por BioSuelo").font = fnt_gris
+            _orden_final = ["Portada", "Índice"] + hojas_originales + ["Conclusiones_Recomendaciones"]
+            wb._sheets = [wb[_n] for _n in _orden_final]
+            wb.active = 0
 
         # ── Respuesta HTTP ────────────────────────────────────────────────
         buffer.seek(0)

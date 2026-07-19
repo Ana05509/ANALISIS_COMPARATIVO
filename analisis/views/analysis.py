@@ -7,19 +7,14 @@ from django.db.models import F, Sum
 import json
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 
 from ..services.business.analysis_service import (
     obtener_analisis_avanzado,
     obtener_analisis_diferencial,
     obtener_diversidad,
-    obtener_diversidad_beta_inter,
-    obtener_diversidad_gamma,
-    obtener_permanova,
 )
 from ..services.business.visualization_service import VisualizationService
 from ..models import ResultadoTaxonomico, MuestraSuelo, ArchivoMolecular
-from analisis.services.processing.diversity import DiversityService
 from analisis.constants import OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES, NIVELES_ES, MARCADORES_ES, NIVELES_CHOICES, MARCADORES_CHOICES
 
 @login_required
@@ -93,23 +88,9 @@ def analisis_avanzado(request):
         if diversidad:
             contexto["diversidad"] = diversidad
 
-        # Diversidad beta inter-muestra (Bray-Curtis y Jaccard entre pares)
-        if len(muestra_ids) >= 2:
-            beta_inter = obtener_diversidad_beta_inter(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids)
-            if beta_inter:
-                contexto["diversidad_beta"] = beta_inter
-
-        # Diversidad gamma (metacomunidad: todas las muestras combinadas)
-        if len(muestra_ids) >= 2:
-            gamma = obtener_diversidad_gamma(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids)
-            if gamma:
-                contexto["diversidad_gamma"] = gamma
-
-        # PERMANOVA: ¿difieren significativamente los grupos (cultivos)?
-        if len(muestra_ids) >= 2:
-            permanova = obtener_permanova(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids)
-            if permanova:
-                contexto["permanova"] = permanova
+        # Nota: diversidad beta/gamma y PERMANOVA (estadísticas inherentemente
+        # multi-muestra) viven solo en "Comparar Perfiles", que ya exige ≥2
+        # muestras para ese propósito — evita mostrar el mismo cálculo dos veces.
 
         # --- GRÁFICAS AVANZADAS ---
         qs = ResultadoTaxonomico.objects.filter(
@@ -155,95 +136,6 @@ def analisis_avanzado(request):
                     nivel='taxon',
                     top_n=top_n,
                 )
-
-                # Shannon completo: calcula los 4 índices alfa por muestra sobre TODOS los taxones
-                alfa_completo = {}
-                for muestra_codigo in df_pivot_full.columns:
-                    serie = df_pivot_full[muestra_codigo]
-                    df_m = pd.DataFrame({'%_hits': serie[serie > 0].values})
-                    if not df_m.empty:
-                        alfa_completo[muestra_codigo] = DiversityService.calcular_diversidad_alfa(df_m)
-                    else:
-                        alfa_completo[muestra_codigo] = {
-                            'riqueza': 0, 'shannon': 0.0, 'simpson': 0.0, 'equitatividad': 0.0
-                        }
-
-                if alfa_completo:
-                    df_sh = pd.DataFrame([
-                        {'muestra': k, **v} for k, v in alfa_completo.items()
-                    ]).sort_values('shannon', ascending=False)
-
-                    h_max = float(df_sh['shannon'].max())
-
-                    # Colores por umbral absoluto — el color es independiente de
-                    # las muestras seleccionadas, así rojo siempre significa baja
-                    # diversidad y verde siempre significa alta, sin engañar al especialista
-                    def _color_shannon(h):
-                        if h < 1.0:   return '#DC2626'   # rojo   — muy baja
-                        if h < 2.0:   return '#F97316'   # naranja — baja
-                        if h < 3.0:   return '#EAB308'   # ámbar  — moderada
-                        return '#16A34A'                  # verde  — alta
-
-                    bar_colors = [_color_shannon(h) for h in df_sh['shannon']]
-
-                    hover_texts = [
-                        [f"<b>{row['muestra']}</b><br>"
-                         f"Shannon H': <b>{row['shannon']:.4f}</b><br>"
-                         f"Riqueza (S): {int(row['riqueza'])} taxa<br>"
-                         f"Simpson (1-D): {row['simpson']:.4f}<br>"
-                         f"Equitatividad (J'): {row['equitatividad']:.4f}"]
-                        for _, row in df_sh.iterrows()
-                    ]
-
-                    fig_box = go.Figure()
-                    fig_box.add_trace(go.Bar(
-                        x=df_sh['muestra'],
-                        y=df_sh['shannon'],
-                        marker=dict(color=bar_colors, line=dict(color='white', width=1.5)),
-                        text=[f"{v:.3f}" for v in df_sh['shannon']],
-                        textposition='outside',
-                        textfont=dict(size=10),
-                        customdata=hover_texts,
-                        hovertemplate='%{customdata[0]}<extra></extra>',
-                        showlegend=False,
-                    ))
-
-                    # Líneas de referencia con etiquetas dentro del área del gráfico
-                    # (xref='paper' garantiza que el texto siempre sea visible)
-                    for ref_y, ref_label, ref_color in [
-                        (1.0, "Diversidad baja  (H'=1)",     'rgba(220,38,38,0.6)'),
-                        (2.0, "Diversidad moderada  (H'=2)", 'rgba(234,179,8,0.7)'),
-                        (3.0, "Diversidad alta  (H'=3)",     'rgba(22,163,74,0.7)'),
-                    ]:
-                        if ref_y <= h_max * 1.25:
-                            fig_box.add_hline(
-                                y=ref_y,
-                                line=dict(dash='dot', color=ref_color, width=1.2),
-                            )
-                            fig_box.add_annotation(
-                                x=0.99, y=ref_y,
-                                xref='paper', yref='y',
-                                text=ref_label,
-                                showarrow=False,
-                                xanchor='right',
-                                yanchor='bottom',
-                                font=dict(size=9, color='gray'),
-                                bgcolor='rgba(255,255,255,0.75)',
-                            )
-
-                    fig_box.update_layout(
-                        title=dict(text="Shannon H' por Muestra (perfil taxonómico completo)",
-                                   font=dict(size=14), x=0.5, xanchor='center'),
-                        yaxis=dict(title="Shannon H'", rangemode='tozero',
-                                   gridcolor='rgba(220,220,220,0.5)', zeroline=False),
-                        xaxis=dict(title='Muestra', tickangle=-30,
-                                   automargin=True, tickfont=dict(size=10)),
-                        template='plotly_white',
-                        height=460,
-                        margin=dict(b=120, t=80, l=60, r=30),
-                        bargap=0.35,
-                    )
-                    graficos_avanzados['grafico_boxplot'] = json.loads(fig_box.to_json())
 
                 contexto["graficos_avanzados"] = graficos_avanzados
                 contexto["graficos_avanzados_json"] = json.dumps(graficos_avanzados)

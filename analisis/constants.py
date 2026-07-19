@@ -1,6 +1,6 @@
 """
 Constantes compartidas para el módulo analisis.
-Fuente única de verdad para parámetros de validación de la plataforma TerraBioLab UTC.
+Fuente única de verdad para parámetros de validación de la plataforma BioMicro UTC.
 """
 
 MARCADORES_VALIDOS = ("16S", "ITS")

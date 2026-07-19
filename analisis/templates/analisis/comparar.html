@@ -11,14 +11,14 @@
 .muestra-row { border-bottom: 1px solid var(--gris-light); }
 .muestra-row:last-child { border-bottom: none; }
 .muestra-row label {
-    display: flex; align-items: center; gap: 9px;
-    padding: 8px 12px; cursor: pointer; font-size: 13.5px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 10px; cursor: pointer; font-size: 13px;
     transition: background var(--transition); user-select: none;
     width: 100%; box-sizing: border-box;
 }
 .muestra-row label:hover { background: var(--gris-light); }
 .muestra-row.activa label { background: var(--verde-light); font-weight: 500; color: var(--verde-dark); }
-.muestra-row input[type="checkbox"] { accent-color: var(--verde); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
+.muestra-row input[type="checkbox"] { accent-color: var(--verde); width: 14px; height: 14px; cursor: pointer; flex-shrink: 0; }
 .muestra-row.oculta        { display: none; }
 .muestra-row.marcador-oculta { display: none; }
 
@@ -69,7 +69,7 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: .85rem;
 }
 @media (max-width: 780px) {
     .taxa-panels { grid-template-columns: minmax(0, 1fr); }
@@ -160,40 +160,15 @@
 .taxa-panel.excl .taxa-panel-count { color: #d97706; }
 .taxa-panel.excl .taxa-item-dot    { background: #d97706; }
 .taxa-panel.excl                   { border-top: 3px solid #d97706; }
-@keyframes ctxOut {
-    from { opacity:1; max-height:300px; margin-bottom:1.5rem; padding-top:14px; padding-bottom:14px; border-width:1px; }
-    to   { opacity:0; max-height:0;     margin-bottom:0;      padding-top:0;    padding-bottom:0;    border-width:0; }
-}
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- Banner de contexto -->
-<div class="ctx-banner" style="display:flex;align-items:flex-start;gap:14px;background:#EBF4FF;border:1px solid #BFDBFE;border-radius:var(--radius);padding:14px 18px;margin-bottom:1.5rem;overflow:hidden;animation:ctxOut .6s ease 5s forwards;">
-    <div style="width:38px;height:38px;border-radius:10px;background:#2563EB;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <i class="ti ti-arrows-diff" style="color:#fff;font-size:19px;"></i>
-    </div>
-    <div>
-        <div style="font-size:13.5px;font-weight:700;color:#1E3A8A;margin-bottom:3px;">¿En qué se diferencian estas muestras entre sí?</div>
-        <div style="font-size:12.5px;color:#3B5EA6;line-height:1.6;">
-            Este módulo compara la composición microbiana <strong>entre 2 o más muestras</strong>. Identifica qué taxa son compartidos, cuáles son exclusivos de cada muestra y si las diferencias son estadísticamente significativas (PERMANOVA).
-            <span style="display:inline-flex;align-items:center;gap:14px;margin-top:6px;flex-wrap:wrap;">
-                <span><i class="ti ti-share-3" style="font-size:12px;"></i> Taxa compartidos y exclusivos</span>
-                <span><i class="ti ti-chart-dots" style="font-size:12px;"></i> Diversidad alfa, beta y gamma</span>
-                <span><i class="ti ti-math-function" style="font-size:12px;"></i> PERMANOVA</span>
-            </span>
-        </div>
-    </div>
-    <a href="{% url 'analisis:analisis_avanzado' %}" style="margin-left:auto;flex-shrink:0;font-size:12px;color:#2563EB;text-decoration:none;white-space:nowrap;display:flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid #BFDBFE;border-radius:8px;background:#fff;transition:background .2s;" title="Ir a Análisis Avanzado">
-        <i class="ti ti-microscope" style="font-size:14px;"></i> Análisis Avanzado
-    </a>
-</div>
-
-<div class="card" style="margin-bottom: 1.5rem;">
-    <div class="card-title">Parámetros de comparación</div>
+<div class="card" style="margin-bottom: .85rem; padding: .8rem 1rem;">
+    <div class="card-title" style="margin-bottom: .4rem;">Parámetros de comparación</div>
     <form method="get">
-        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:10px;">
+        <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:8px;">
             <div>
                 <label class="form-label"><span class="bs-tip" data-tip="<strong>Marcador Molecular</strong> — región del ADN analizada. <strong>16S rRNA</strong>: identifica bacterias y arqueas · <strong>ITS</strong>: identifica hongos. Solo se muestran muestras con el marcador seleccionado.">Marcador Molecular <i class="ti ti-help-circle bs-tip-ico"></i></span></label>
                 {{ form.marcador }}
@@ -206,23 +181,23 @@
                 <label class="form-label"><span class="bs-tip" data-tip="<strong>Top N taxa</strong> — cuántos microorganismos mostrar en la tabla comparativa, ordenados por abundancia total. Usar un número más alto muestra más diversidad pero puede dificultar la lectura.">Top N taxa <i class="ti ti-help-circle bs-tip-ico"></i></span></label>
                 {{ form.top_n }}
             </div>
-            <button type="submit" id="btn-comparar" class="btn btn-primary" style="height:38px;">
+            <button type="submit" id="btn-comparar" class="btn btn-primary" style="height:34px;">
                 <i class="ti ti-arrows-diff" aria-hidden="true"></i> Comparar
             </button>
         </div>
         <div>
-            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                 <span>Seleccione muestras</span>
                 <span id="sample-counter" style="font-size:12px; font-weight:600; color:var(--text-hint);"></span>
             </label>
-            <div style="display:flex; gap:6px; margin-bottom:6px; align-items:center;">
+            <div style="display:flex; gap:6px; margin-bottom:5px; align-items:center;">
                 <input id="muestra-search" type="text" placeholder="Buscar muestra..."
                        aria-label="Filtrar muestras por nombre" autocomplete="off"
-                       class="form-control" style="font-size:13px; min-height:34px; padding:0.35rem 0.75rem;">
+                       class="form-control" style="font-size:13px; min-height:32px; padding:0.3rem 0.7rem;">
                 <button type="button" id="btn-select-all" class="btn btn-ghost-verde btn-sm" style="white-space:nowrap;">✓ Todo</button>
                 <button type="button" id="btn-clear-all"  class="btn btn-outline btn-sm"       style="white-space:nowrap;">✕ Limpiar</button>
             </div>
-            <div id="muestra-list-wrap" style="border:1px solid var(--gris-border); border-radius:8px; max-height:190px; overflow-y:auto;">
+            <div id="muestra-list-wrap" style="border:1px solid var(--gris-border); border-radius:8px; max-height:150px; overflow-y:auto;">
                 <div id="muestra-checkbox-list"></div>
             </div>
             {{ form.muestras }}
@@ -233,7 +208,7 @@
 {% if tabla_comparativa %}
 
 <!-- MÉTRICAS RESUMEN -->
-<div class="metrics-grid" style="margin-bottom:1.25rem;">
+<div class="metrics-grid" style="margin-bottom: .7rem;">
     <div class="metric-card">
         <div class="metric-label">Taxa comparados</div>
         <div class="metric-value td-mono">{{ total_taxonomias }}</div>
@@ -333,7 +308,7 @@
 {% endif %}
 
 <!-- TABLA COMPARATIVA -->
-<div class="card" style="margin-bottom:1.5rem;">
+<div class="card" style="margin-bottom: .85rem;">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:0.75rem;">
         <div class="card-title" style="margin:0;">Tabla comparativa por {{ nivel_actual_label }}</div>
         <span style="font-size:12px; color:var(--text-hint);">
@@ -396,7 +371,7 @@
 </div>
 
 <!-- HEATMAP -->
-<div class="card" style="margin-top:1.25rem;">
+<div class="card" style="margin-top: .7rem;">
     <div class="card-title">
         <i class="ti ti-grid-dots"></i> Mapa de Calor Comparativo
     </div>
@@ -409,7 +384,7 @@
 </div>
 
 <!-- SHANNON -->
-<div class="card" style="margin-top:1.25rem;">
+<div class="card" style="margin-top: .7rem;">
     <div class="card-title">
         <i class="ti ti-chart-bar"></i> Shannon H' por Muestra
     </div>
@@ -427,7 +402,7 @@
 
 <!-- TABLA DIVERSIDAD ALFA COMPLETA -->
 {% if alfa_por_muestra %}
-<div class="card" style="margin-top:1.25rem;">
+<div class="card" style="margin-top: .7rem;">
     <div class="card-title"><i class="ti ti-leaf"></i> Diversidad Alfa — Métricas por Muestra</div>
     <p style="font-size:12.5px; color:var(--text-hint); margin:0 0 0.75rem;">Perfil taxonómico completo por muestra (sin truncar al Top N).</p>
     <div class="table-wrap cards-mobile">
@@ -459,7 +434,7 @@
 
 <!-- BETA INTER-MUESTRA -->
 {% if diversidad_beta %}
-<div class="card" style="margin-top:1.25rem;">
+<div class="card" style="margin-top: .7rem;">
     <div class="card-title"><i class="ti ti-arrows-diff"></i> Diversidad Beta — Disimilitud entre Muestras</div>
     <p style="font-size:12.5px; color:var(--text-hint); margin:0.2rem 0 0.85rem;">
         Mide qué tan diferentes son las comunidades entre las {{ diversidad_beta.n_muestras }} muestras

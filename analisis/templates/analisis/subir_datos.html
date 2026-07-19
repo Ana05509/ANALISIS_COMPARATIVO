@@ -1,5 +1,4 @@
 {% extends "analisis/base.html" %}
-{% load custom_filters %}
 
 {% block title %}Cargar Muestra{% endblock %}
 {% block nav_subir %}active{% endblock %}
@@ -10,36 +9,50 @@
 .upload-grid {
     display: grid;
     grid-template-columns: 1.4fr 1fr;
-    gap: 1.5rem;
+    gap: .75rem;
     align-items: start;
 }
 @media (max-width: 900px) {
     .upload-grid { grid-template-columns: 1fr; }
 }
+.upload-grid .card { padding: .8rem 1rem; }
+.upload-grid .form-group { margin-bottom: .55rem; }
+.upload-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .6rem;
+}
+@media (max-width: 560px) {
+    .upload-field-row { grid-template-columns: 1fr; }
+}
+.upload-toggle-btn {
+    margin-top: .3rem;
+}
 </style>
 <div class="upload-grid">
 
     <div class="card">
-        <div class="card-title">Datos del archivo</div>
+        <div class="card-title"><i class="ti ti-clipboard-text" aria-hidden="true"></i> Datos del archivo</div>
 
         {% if upload_error %}
-        <div style="background: var(--rojo-light); border: 1.5px solid var(--rojo); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1.25rem; display: flex; gap: 0.75rem; align-items: flex-start;">
-            <i class="ti ti-file-x" style="color: var(--rojo); font-size: 22px; flex-shrink: 0; margin-top: 1px;"></i>
+        <div class="alert alert-error" style="margin-bottom: .85rem;">
+            <i class="ti ti-file-x" aria-hidden="true"></i>
             <div>
-                <strong style="color: var(--rojo); display: block; margin-bottom: 4px;">El archivo no pudo ser procesado</strong>
-                <span style="font-size: 13.5px; color: var(--rojo); line-height: 1.5;">{{ upload_error }}</span>
+                <strong style="display: block; margin-bottom: 2px;">El archivo no pudo ser procesado</strong>
+                <span style="font-size: 13px; line-height: 1.5;">{{ upload_error }}</span>
             </div>
         </div>
         {% elif form.errors %}
-        <div style="background: var(--rojo-light); color: var(--rojo); padding: 1rem; border-radius: var(--radius); margin-bottom: 1rem;">
-            <strong>Error en la carga:</strong> Por favor, verifica los campos obligatorios.
+        <div class="alert alert-error" style="margin-bottom: .85rem;">
+            <i class="ti ti-alert-circle" aria-hidden="true"></i>
+            <span><strong>Error en la carga:</strong> Por favor, verifica los campos obligatorios.</span>
         </div>
         {% endif %}
 
         <form method="post" enctype="multipart/form-data" id="upload-form">
             {% csrf_token %}
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="upload-field-row">
                 <div class="form-group">
                     <label class="form-label">Código de muestra</label>
                     {{ form.nombre_producto }}
@@ -53,14 +66,14 @@
                             <option value="{{ cultivo.id }}">{{ cultivo.nombre }}</option>
                         {% endfor %}
                     </select>
-                    <input type="text" name="cultivo_manual" id="cultivo_manual" class="form-control" placeholder="Escriba un cultivo nuevo" style="display:none; margin-top: 0.5rem;">
-                    <button type="button" id="toggleCultivoBtn" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 12px; margin-top: 0.5rem;">
+                    <input type="text" name="cultivo_manual" id="cultivo_manual" class="form-control" placeholder="Escriba un cultivo nuevo" style="display:none; margin-top: .5rem;">
+                    <button type="button" id="toggleCultivoBtn" class="btn btn-outline btn-sm upload-toggle-btn">
                         Ingresar manualmente
                     </button>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="upload-field-row">
                 <div class="form-group">
                     <label class="form-label">Localidad</label>
                     {{ form.localidad }}
@@ -74,14 +87,14 @@
                     <select name="variedad_clon" id="variedad_clon" class="form-control" required>
                         <option value="">Primero seleccione un cultivo</option>
                     </select>
-                    <input type="text" name="variedad_manual" id="variedad_manual" class="form-control" placeholder="Escriba una variedad nueva" style="display:none; margin-top: 0.5rem;">
-                    <button type="button" id="toggleVariedadBtn" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 12px; margin-top: 0.5rem;">
+                    <input type="text" name="variedad_manual" id="variedad_manual" class="form-control" placeholder="Escriba una variedad nueva" style="display:none; margin-top: .5rem;">
+                    <button type="button" id="toggleVariedadBtn" class="btn btn-outline btn-sm upload-toggle-btn">
                         Ingresar manualmente
                     </button>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="upload-field-row">
                 <div class="form-group">
                     <label class="form-label">Finca / Lote</label>
                     {{ form.finca_lote }}
@@ -143,7 +156,7 @@
                 <p id="progress-sub" class="progress-sub">Transfiriendo datos al servidor…</p>
             </div>
 
-            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1.25rem;">
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: .5rem;">
                 <a href="{% url 'analisis:dashboard' %}" class="btn btn-outline" id="cancel-btn">Cancelar</a>
                 <button type="submit" class="btn btn-primary" id="submit-btn" disabled>
                     <i class="ti ti-upload" aria-hidden="true"></i> Procesar archivo
@@ -152,29 +165,64 @@
         </form>
     </div>
 
-    <div style="display: flex; flex-direction: column; gap: 1rem;">
-        <div class="card card-sm">
-            <div class="card-title">Columnas requeridas en el archivo</div>
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 0.5rem;">
-                {% for col in "kingdom,phylum,class,order,family,genus,species,num_hits,%_hits"|split:"," %}
+    <div style="display: flex; flex-direction: column; gap: .55rem;">
+        <div class="card card-sm" style="padding: .6rem .8rem;">
+            <div class="card-title"><i class="ti ti-list-check" aria-hidden="true"></i> Columnas requeridas en el archivo</div>
+            <p style="font-size: 11px; color: var(--text-muted); margin: .3rem 0 0; line-height: 1.45;">
+                Son las que exporta el pipeline de clasificación taxonómica (16S/ITS). Sin ellas no se puede ubicar cada microorganismo en el árbol taxonómico ni calcular su abundancia.
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 5px; margin-top: .5rem;">
+
                 <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
                     <i class="ti ti-check" style="color:var(--verde);" aria-hidden="true"></i>
-                    <code>{{ col }}</code>
+                    <span class="bs-tip" data-tip="<strong>Reino</strong> — nivel taxonómico más alto (p. ej. Bacteria, Fungi). Ubica al microorganismo en la rama principal del árbol de la vida."><code>kingdom</code> <i class="ti ti-help-circle bs-tip-ico"></i></span>
                 </div>
-                {% endfor %}
+                <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                    <i class="ti ti-check" style="color:var(--verde);" aria-hidden="true"></i>
+                    <span class="bs-tip" data-tip="<strong>Filo</strong> — agrupa organismos que comparten una gran línea evolutiva dentro del reino."><code>phylum</code> <i class="ti ti-help-circle bs-tip-ico"></i></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                    <i class="ti ti-check" style="color:var(--verde);" aria-hidden="true"></i>
+                    <span class="bs-tip" data-tip="<strong>Clase</strong> — subdivisión del filo; agrupa órdenes con características comunes."><code>class</code> <i class="ti ti-help-circle bs-tip-ico"></i></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                    <i class="ti ti-check" style="color:var(--verde);" aria-hidden="true"></i>
+                    <span class="bs-tip" data-tip="<strong>Orden</strong> — subdivisión de la clase; agrupa familias emparentadas."><code>order</code> <i class="ti ti-help-circle bs-tip-ico"></i></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                    <i class="ti ti-check" style="color:var(--verde);" aria-hidden="true"></i>
+                    <span class="bs-tip" data-tip="<strong>Familia</strong> — subdivisión del orden; agrupa géneros relacionados entre sí."><code>family</code> <i class="ti ti-help-circle bs-tip-ico"></i></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                    <i class="ti ti-check" style="color:var(--verde);" aria-hidden="true"></i>
+                    <span class="bs-tip" data-tip="<strong>Género</strong> — nivel con el que el sistema cruza cada taxón contra el catálogo de referencia para determinar si es benéfico, fitopatógeno o neutral."><code>genus</code> <i class="ti ti-help-circle bs-tip-ico"></i></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                    <i class="ti ti-check" style="color:var(--verde);" aria-hidden="true"></i>
+                    <span class="bs-tip" data-tip="<strong>Especie</strong> — máxima resolución taxonómica disponible; identifica el microorganismo con la mayor precisión posible."><code>species</code> <i class="ti ti-help-circle bs-tip-ico"></i></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                    <i class="ti ti-check" style="color:var(--verde);" aria-hidden="true"></i>
+                    <span class="bs-tip" data-tip="<strong>Número de lecturas (reads)</strong> asignadas a este taxón en la secuenciación. Es la base para calcular la abundancia y los índices de diversidad (Shannon, Simpson, Bray-Curtis)."><code>num_hits</code> <i class="ti ti-help-circle bs-tip-ico"></i></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+                    <i class="ti ti-check" style="color:var(--verde);" aria-hidden="true"></i>
+                    <span class="bs-tip" data-tip="<strong>Porcentaje de abundancia relativa</strong> del taxón dentro de la muestra. Se usa en las tablas y gráficos de composición microbiana."><code>%_hits</code> <i class="ti ti-help-circle bs-tip-ico"></i></span>
+                </div>
+
             </div>
         </div>
 
-        <div class="card card-sm" style="border-left: 3px solid var(--verde);">
-            <div class="card-title" style="font-size: 13px;">Carga completa</div>
-            <p style="font-size: 12px; color: var(--text-muted); margin: 0.25rem 0 0;">
+        <div class="card card-sm" style="padding: .6rem .8rem; border-left: 3px solid var(--verde);">
+            <div class="card-title"><i class="ti ti-shield-check" style="color:var(--verde);" aria-hidden="true"></i> Carga completa</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin: .3rem 0 0; line-height: 1.45;">
                 Se guardan <strong>todos los taxones</strong> del archivo sin truncamiento.
                 El filtrado Top N se aplica únicamente en la visualización del análisis.
             </p>
         </div>
 
         <!-- Estado de la carga en tiempo real (lateral) -->
-        <div id="status-card" class="card card-sm status-card" style="display:none;">
+        <div id="status-card" class="card card-sm status-card" style="display:none; padding:.6rem .8rem;">
             <div class="status-card__dot" id="status-dot"></div>
             <div>
                 <div id="status-title" class="status-card__title">Subiendo…</div>
@@ -189,7 +237,7 @@
 .drop-zone {
     border: 2px dashed var(--gris-border, #d1d5db);
     border-radius: var(--radius, 8px);
-    padding: 2.25rem 1.5rem;
+    padding: .85rem 1.25rem;
     text-align: center;
     cursor: pointer;
     position: relative;
@@ -213,10 +261,10 @@
     background: var(--rojo-light);
 }
 .drop-zone__icon {
-    font-size: 38px;
+    font-size: 24px;
     color: var(--text-hint, #9ca3af);
     display: block;
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.25rem;
     transition: color .2s, transform .2s;
 }
 .drop-zone.dz-over .drop-zone__icon {
@@ -295,7 +343,7 @@
 }
 .file-preview__remove:hover {
     color: var(--rojo, #ef4444);
-    background: #fef2f2;
+    background: var(--rojo-light);
 }
 
 /* ── Barra de progreso ───────────────────────────────────── */
@@ -320,7 +368,7 @@
     transition: color .3s;
 }
 .progress-track {
-    background: #e5e7eb;
+    background: var(--gris-border);
     border-radius: 99px;
     height: 8px;
     overflow: hidden;
@@ -360,7 +408,7 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #e5e7eb;
+    background: var(--gris-border);
     flex-shrink: 0;
     transition: background .3s;
 }
@@ -465,7 +513,7 @@
         dzTitle.textContent = file.name;
         dropZone.style.borderColor = 'var(--verde, #22c55e)';
         dropZone.style.borderStyle = 'solid';
-        dropZone.style.background  = '#f0fdf4';
+        dropZone.style.background  = 'var(--verde-light)';
 
         submitBtn.disabled = false;
     }
@@ -475,55 +523,84 @@
         if (!el) {
             el = document.createElement('div');
             el.id = 'upload-error-inline';
-            el.style.cssText = 'margin-bottom:1.25rem;';
+            el.style.cssText = 'margin-bottom:.85rem;';
             form.parentNode.insertBefore(el, form);
         }
 
-        if (data && data.tipo === 'columnas') {
+        if (data && data.tipo === 'duplicado') {
+            el.innerHTML =
+                '<div style="background:var(--amber-light);border:1.5px solid var(--amber);border-radius:10px;padding:1rem;">'
+              +   '<div style="display:flex;align-items:flex-start;gap:10px;">'
+              +     '<i class="ti ti-alert-triangle" style="color:var(--amber);font-size:22px;flex-shrink:0;margin-top:1px;"></i>'
+              +     '<div style="flex:1;">'
+              +       '<strong style="color:var(--amber);font-size:14.5px;display:block;margin-bottom:4px;">Esta muestra ya tiene datos cargados</strong>'
+              +       '<p style="font-size:13px;color:var(--text-primary);line-height:1.5;margin:0 0 .6rem;">'
+              +         'La muestra <strong>' + data.codigo + '</strong> ya tiene un archivo <strong>' + data.marcador + '</strong> cargado'
+              +         (data.fecha_carga ? ' el ' + data.fecha_carga : '') + ' con <strong>' + data.total_taxones + '</strong> taxones. '
+              +         'Si continúa, esos datos se reemplazarán por los del archivo nuevo y no se podrán recuperar.'
+              +       '</p>'
+              +       '<div style="display:flex;gap:8px;">'
+              +         '<button type="button" id="btn-confirmar-sobrescritura" class="btn btn-primary btn-sm" style="background:var(--amber);border-color:var(--amber);">'
+              +           '<i class="ti ti-refresh"></i> Sí, reemplazar datos'
+              +         '</button>'
+              +         '<button type="button" id="btn-cancelar-sobrescritura" class="btn btn-outline btn-sm">Cancelar</button>'
+              +       '</div>'
+              +     '</div>'
+              +   '</div>'
+              + '</div>';
+
+            document.getElementById('btn-confirmar-sobrescritura').addEventListener('click', function () {
+                el.innerHTML = '';
+                enviarFormulario(true);
+            });
+            document.getElementById('btn-cancelar-sobrescritura').addEventListener('click', function () {
+                el.innerHTML = '';
+            });
+        } else if (data && data.tipo === 'columnas') {
             const faltantesSet = new Set(data.faltantes);
             const chipsHTML = data.requeridas.map(function(col, i) {
                 const falta = faltantesSet.has(col);
                 return '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">'
-                     +   '<span style="font-size:10px;color:#9ca3af;font-weight:600;">' + (i + 1) + '</span>'
+                     +   '<span style="font-size:10px;color:var(--text-hint);font-weight:600;">' + (i + 1) + '</span>'
                      +   '<div style="padding:4px 10px;border-radius:6px;font-size:12px;font-weight:700;font-family:monospace;'
-                     +     'background:' + (falta ? '#fef2f2' : '#f0fdf4') + ';'
-                     +     'color:'      + (falta ? '#dc2626' : '#15803d') + ';'
-                     +     'border:1.5px solid ' + (falta ? '#fca5a5' : '#86efac') + ';'
+                     +     'background:' + (falta ? 'var(--rojo-light)' : 'var(--verde-light)') + ';'
+                     +     'color:'      + (falta ? 'var(--rojo)' : 'var(--verde-dark)') + ';'
+                     +     'border:1.5px solid ' + (falta ? 'var(--rojo)' : 'var(--verde)') + ';'
                      +     'white-space:nowrap;">' + col + '</div>'
-                     +   '<span style="font-size:10px;font-weight:600;color:' + (falta ? '#dc2626' : '#15803d') + ';">'
+                     +   '<span style="font-size:10px;font-weight:600;color:' + (falta ? 'var(--rojo)' : 'var(--verde-dark)') + ';">'
                      +     (falta ? '✗ falta' : '✓') + '</span>'
                      + '</div>';
             }).join('');
 
             const recibidasHTML = data.recibidas.length
                 ? data.recibidas.map(function(c) {
-                    return '<span style="padding:2px 8px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;font-size:11.5px;font-family:monospace;color:#475569;">' + c + '</span>';
+                    return '<span style="padding:2px 8px;background:var(--gris-light);border:1px solid var(--gris-border);border-radius:4px;font-size:11.5px;font-family:monospace;color:var(--text-muted);">' + c + '</span>';
                   }).join(' ')
-                : '<em style="color:#9ca3af;">(ninguna detectada)</em>';
+                : '<em style="color:var(--text-hint);">(ninguna detectada)</em>';
 
             el.innerHTML =
-                '<div style="background:#fef2f2;border:1.5px solid #dc2626;border-radius:10px;padding:1.25rem;">'
-              +   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:.85rem;">'
-              +     '<i class="ti ti-file-x" style="color:#dc2626;font-size:22px;flex-shrink:0;"></i>'
-              +     '<strong style="color:#dc2626;font-size:15px;">El archivo no tiene el formato requerido</strong>'
+                '<div style="background:var(--rojo-light);border:1.5px solid var(--rojo);border-radius:10px;padding:1rem;">'
+              +   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:.7rem;">'
+              +     '<i class="ti ti-file-x" style="color:var(--rojo);font-size:22px;flex-shrink:0;"></i>'
+              +     '<strong style="color:var(--rojo);font-size:15px;">El archivo no tiene el formato requerido</strong>'
               +   '</div>'
-              +   '<p style="font-size:13px;color:#7f1d1d;margin:0 0 .85rem;">'
+              +   '<p style="font-size:13px;color:var(--rojo);margin:0 0 .7rem;">'
               +     'Faltan <strong>' + data.faltantes.length + '</strong> columna(s). '
               +     'Su archivo debe tener estas columnas <strong>en este orden</strong>:'
               +   '</p>'
-              +   '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:.85rem;background:#fff5f5;border-radius:8px;margin-bottom:.85rem;">'
+              +   '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:.7rem;background:var(--surface);border-radius:8px;margin-bottom:.7rem;">'
               +     chipsHTML
               +   '</div>'
-              +   '<p style="font-size:12px;color:#6b7280;margin:0;">Columnas detectadas en su archivo: ' + recibidasHTML + '</p>'
+              +   '<p style="font-size:12px;color:var(--text-muted);margin:0;">Columnas detectadas en su archivo: ' + recibidasHTML + '</p>'
               + '</div>';
         } else {
             const msg = (data && data.error) ? data.error : String(data || 'Error desconocido.');
             el.innerHTML =
-                '<div style="background:#fef2f2;border:1.5px solid #dc2626;border-radius:8px;padding:1rem 1.25rem;display:flex;gap:.75rem;align-items:flex-start;">'
-              +   '<i class="ti ti-alert-circle" style="color:#dc2626;font-size:22px;flex-shrink:0;margin-top:1px;"></i>'
+                '<div class="alert alert-error" style="margin:0;">'
+              +   '<i class="ti ti-alert-circle" aria-hidden="true"></i>'
               +   '<div>'
-              +     '<strong style="color:#dc2626;display:block;margin-bottom:4px;">Error al procesar el archivo</strong>'
-              +     '<span style="font-size:13.5px;color:#b91c1c;line-height:1.5;">' + msg + '</span>'
+              +     '<strong style="display:block;margin-bottom:2px;">Error al procesar el archivo</strong>'
+              +     '<span style="font-size:13px;line-height:1.5;">' + msg + '</span>'
               +   '</div>'
               + '</div>';
         }
@@ -611,15 +688,9 @@
     /* ── Envío con XHR y progreso en tiempo real ─────────── */
     let processingTimer = null;
 
-    form.addEventListener('submit', function (e) {
-        e.preventDefault();
-
-        if (!fileInput.files.length) {
-            setDropError('Seleccione un archivo antes de continuar.');
-            return;
-        }
-
+    function enviarFormulario(forzarSobrescritura) {
         const formData = new FormData(form);
+        if (forzarSobrescritura) formData.set('confirmar_sobrescritura', '1');
 
         // UI: bloquear controles
         submitBtn.disabled = true;
@@ -692,6 +763,17 @@
         xhr.open('POST', form.action || window.location.pathname);
         xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         xhr.send(formData);
+    }
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        if (!fileInput.files.length) {
+            setDropError('Seleccione un archivo antes de continuar.');
+            return;
+        }
+
+        enviarFormulario(false);
     });
 
     /* ── Carga de variedades vía AJAX ────────────────────── */

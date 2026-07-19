@@ -5,8 +5,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acceso — BioSuelo</title>
-    <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
+    <title>Acceso — BioMicro</title>
+    <link rel="icon" type="image/png" href="{% static 'logo.png' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -58,7 +58,7 @@
         ══════════════════════════════════════════════ */
         .panel-l {
             flex:1.2; position:relative; display:flex; flex-direction:column;
-            justify-content:space-between; padding:4.5rem; overflow:hidden;
+            justify-content:space-between; padding:2.5rem 3rem; overflow:hidden;
             background:#1d3328;
         }
         .video-bg {
@@ -91,27 +91,28 @@
         /* contenido panel izquierdo */
         .brand-block { position:relative; z-index:4; animation:fadeIn .9s .1s ease both; }
         .logo-row {
-            display:flex; align-items:center; gap:12px; margin-bottom:4rem;
+            display:flex; align-items:center; gap:12px; margin-bottom:1.75rem;
         }
         .logo-ico {
-            width:48px; height:48px; border-radius:12px;
+            width:112px; height:112px; border-radius:22px;
             background:rgba(255,255,255,.14); backdrop-filter:blur(10px);
             border:1px solid rgba(255,255,255,.22);
             display:flex; align-items:center; justify-content:center;
+            flex-shrink:0;
         }
         .logo-ico i { color:#fff; font-size:24px; }
         .logo-name { color:#fff; font-family:'Fraunces',serif; font-size:22px; font-weight:500; text-shadow:0 2px 4px rgba(0,0,0,.3); }
 
-        .hero { font-family:'Fraunces',serif; font-size:52px; font-weight:300; color:#fff; line-height:1.1; margin-bottom:1.25rem; text-shadow:0 2px 6px rgba(0,0,0,.35); }
+        .hero { font-family:'Fraunces',serif; font-size:36px; font-weight:300; color:#fff; line-height:1.15; margin-bottom:.7rem; text-shadow:0 2px 6px rgba(0,0,0,.35); }
         .hero em { font-style:italic; color:#b2d8c5; font-weight:400; }
-        .hero-sub { color:rgba(255,255,255,.85); font-size:15px; line-height:1.65; max-width:420px; }
+        .hero-sub { color:rgba(255,255,255,.85); font-size:14px; line-height:1.55; max-width:420px; }
 
-        .feature-grid { position:relative; z-index:4; display:grid; gap:.85rem; animation:fadeIn .9s .4s ease both; }
+        .feature-grid { position:relative; z-index:4; display:grid; gap:.55rem; animation:fadeIn .9s .4s ease both; }
         .feat {
-            display:flex; align-items:center; gap:14px; padding:15px 20px;
+            display:flex; align-items:center; gap:14px; padding:11px 18px;
             background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18);
             border-radius:14px; backdrop-filter:blur(8px); color:#fff;
-            font-size:14px; font-weight:400; transition:background .3s,transform .3s;
+            font-size:13.5px; font-weight:400; transition:background .3s,transform .3s;
         }
         .feat:hover { background:rgba(255,255,255,.22); transform:translateX(6px); }
         .feat i { color:#b2d8c5; font-size:20px; flex-shrink:0; }
@@ -122,7 +123,7 @@
         .panel-r {
             flex:1; display:flex; flex-direction:column;
             justify-content:center; align-items:center;
-            background:var(--bg); padding:2rem;
+            background:var(--bg); padding:1.25rem;
             position:relative; overflow:hidden;
         }
 
@@ -149,7 +150,7 @@
         .card {
             position:relative; z-index:1; background:var(--surface);
             width:100%; max-width:440px;
-            padding:2.5rem 2.5rem 2rem;
+            padding:1.75rem 2rem 1.4rem;
             border-radius:24px;
             box-shadow:0 24px 60px -10px rgba(15,38,28,.1),0 1px 4px rgba(0,0,0,.06);
             border:1px solid rgba(214,228,221,.8);
@@ -424,8 +425,8 @@
 
         <div class="brand-block">
             <div class="logo-row">
-                <div class="logo-ico"><i class="ti ti-dna-2"></i></div>
-                <span class="logo-name">BioSuelo</span>
+                <div class="logo-ico"><img src="{% static 'logo.png' %}" alt="BioMicro" style="width:70%; height:70%; object-fit:contain;"></div>
+                <span class="logo-name">BioMicro</span>
             </div>
             <h1 class="hero">Análisis microbiano<br>para <em>suelos agrícolas</em></h1>
             <p class="hero-sub">Plataforma de análisis comparativo de perfiles microbianos 16S e ITS orientada a investigadores y agrónomos de la UTC.</p>

@@ -316,10 +316,19 @@ def _static_con_version(nombre_relativo):
 
 
 UNFOLD = {
-    "SITE_TITLE": "BioSuelo",
-    "SITE_HEADER": "BioSuelo",
+    "SITE_TITLE": "BioMicro",
+    "SITE_HEADER": "BioMicro",
     "SITE_SUBHEADER": "Procesamiento y visualización de resultados microbiológicos",
     "SITE_SYMBOL": "biotech",
+    "SITE_ICON": lambda request: _static_con_version("logo.png"),
+    "SITE_LOGO": lambda request: _static_con_version("logo.png"),
+    "SITE_FAVICONS": [
+        {
+            "rel": "icon",
+            "type": "image/png",
+            "href": lambda request: _static_con_version("logo.png"),
+        },
+    ],
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
     "DASHBOARD_CALLBACK": "analisis.admin.dashboard_callback",
@@ -463,7 +472,7 @@ EMAIL_PORT      = 587
 EMAIL_USE_TLS   = True
 EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL  = 'BioSuelo <{}>'.format(os.environ.get('EMAIL_HOST_USER', 'noreply@biosuelo.ec'))
+DEFAULT_FROM_EMAIL  = 'BioMicro <{}>'.format(os.environ.get('EMAIL_HOST_USER', 'noreply@biomicro.ec'))
 
 # Si hay credenciales en .env usa SMTP real; si no, imprime en consola
 if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
