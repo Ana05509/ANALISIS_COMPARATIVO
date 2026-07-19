@@ -1,0 +1,98 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirma tu correo — BioMicro</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f5f3;font-family:'Segoe UI',Arial,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f5f3;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+          <!-- Cabecera verde -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#2d6b52,#38a878);border-radius:16px 16px 0 0;padding:40px 48px;text-align:center;">
+              <div style="display:inline-flex;align-items:center;justify-content:center;
+                          width:60px;height:60px;background:rgba(255,255,255,.15);
+                          border:1px solid rgba(255,255,255,.3);border-radius:14px;margin-bottom:20px;">
+                <span style="font-size:28px;">✉️</span>
+              </div>
+              <h1 style="margin:0;font-size:26px;font-weight:700;color:#ffffff;letter-spacing:-.5px;">
+                BioMicro
+              </h1>
+              <p style="margin:6px 0 0;font-size:14px;color:rgba(255,255,255,.75);">
+                Confirmación de correo electrónico
+              </p>
+            </td>
+          </tr>
+
+          <!-- Cuerpo -->
+          <tr>
+            <td style="background:#ffffff;padding:44px 48px;">
+
+              <h2 style="margin:0 0 10px;font-size:22px;font-weight:700;color:#0f1923;">
+                ¡Ya casi está, {{ user.first_name|default:"bienvenido/a" }}! 🎉
+              </h2>
+              <p style="margin:0 0 28px;font-size:15px;color:#4b5563;line-height:1.65;">
+                Recibiste este correo porque se registró una cuenta en
+                <strong style="color:#2d6b52;">BioMicro</strong> con esta dirección de correo.
+                Confirma tu correo electrónico para completar tu registro.
+              </p>
+
+              <!-- Botón -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+                <tr>
+                  <td align="center">
+                    <a href="{{ activate_url }}"
+                       style="display:inline-block;background:linear-gradient(135deg,#4a7c64,#38a878);
+                              color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;
+                              padding:14px 36px;border-radius:12px;
+                              box-shadow:0 4px 14px rgba(56,168,120,.35);">
+                      Confirmar mi correo
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 6px;font-size:12.5px;color:#9ca3af;line-height:1.6;">
+                Si el botón no funciona, copia y pega este enlace en tu navegador:
+              </p>
+              <p style="margin:0;font-size:12.5px;color:#38a878;word-break:break-all;line-height:1.6;">
+                {{ activate_url }}
+              </p>
+
+              <table width="100%" cellpadding="0" cellspacing="0"
+                     style="background:#f0f5f3;border-radius:12px;padding:16px 20px;margin-top:28px;">
+                <tr>
+                  <td>
+                    <span style="font-size:13px;color:#6b7280;line-height:1.6;">
+                      ℹ️ Si tú no creaste esta cuenta, puedes ignorar este correo con tranquilidad.
+                    </span>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Pie -->
+          <tr>
+            <td style="background:#f0f5f3;border-radius:0 0 16px 16px;padding:24px 48px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">
+                Este mensaje fue generado automáticamente por BioMicro.<br>
+                {{ current_site.domain }}
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

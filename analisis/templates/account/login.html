@@ -42,20 +42,22 @@
 
         /* ── Reset ─────────────────────────────────── */
         *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
-        /* overflow-x (no overflow a secas): si la tarjeta es más alta que la
-           ventana -laptops 1366x768, zoom del navegador, etc.- el body debe
-           poder hacer scroll vertical o el contenido queda inaccesible. */
-        body { font-family:'Outfit',sans-serif; color:var(--text); min-height:100vh; display:flex; overflow-x:hidden; }
+        /* Todo el contenido debe caber en un único pantallazo, sin scroll,
+           gracias al espaciado fluido (clamp/vh) del panel izquierdo y la
+           tarjeta. En móvil (<768px) se revierte a scroll normal. */
+        html, body { height:100vh; overflow:hidden; }
+        body { font-family:'Outfit',sans-serif; color:var(--text); display:flex; }
 
         /* ── Layout ─────────────────────────────────── */
-        .split { display:flex; width:100%; min-height:100vh; }
+        .split { display:flex; width:100%; height:100vh; }
 
         /* ══════════════════════════════════════════════
            PANEL IZQUIERDO
         ══════════════════════════════════════════════ */
         .panel-l {
             flex:1.2; position:relative; display:flex; flex-direction:column;
-            justify-content:space-between; padding:2.5rem 3rem; overflow:hidden;
+            justify-content:center; align-items:center; gap:clamp(1.4rem, 4vh, 2.4rem);
+            padding:clamp(1.5rem, 5vh, 3rem) 3rem; overflow:hidden;
             background:#1d3328;
         }
         .video-bg {
@@ -64,38 +66,54 @@
         }
         .overlay {
             position:absolute; inset:0; z-index:2;
-            background:linear-gradient(135deg,rgba(15,38,28,.72) 0%,rgba(58,168,120,.28) 100%);
+            background:linear-gradient(180deg,rgba(10,26,20,.78) 0%,rgba(15,38,28,.6) 45%,rgba(10,26,20,.86) 100%);
         }
 
-        /* contenido panel izquierdo */
-        .brand-block { position:relative; z-index:4; animation:fadeIn .9s .1s ease both; }
+        /* contenido panel izquierdo — orden vertical: logo → hero → insignias */
         .logo-row {
             position:relative; z-index:5;
             display:flex; flex-direction:column; align-items:center; gap:10px;
-            align-self:center;
             animation:fadeIn .9s .1s ease both;
         }
         .logo-ico {
-            width:150px; height:150px;
+            width:118px; height:118px;
             display:flex; align-items:center; justify-content:center;
             flex-shrink:0;
         }
         .logo-ico i { color:#fff; font-size:24px; }
-        .logo-name { color:#fff; font-family:'Fraunces',serif; font-size:28px; font-weight:500; text-shadow:0 2px 4px rgba(0,0,0,.3); }
+        .logo-name { color:#fff; font-family:'Fraunces',serif; font-size:26px; font-weight:500; text-shadow:0 2px 4px rgba(0,0,0,.3); }
 
-        .hero { font-family:'Fraunces',serif; font-size:36px; font-weight:300; color:#fff; line-height:1.15; margin-bottom:.7rem; text-shadow:0 2px 6px rgba(0,0,0,.35); }
+        .brand-block { position:relative; z-index:4; text-align:center; max-width:480px; animation:fadeIn .9s .22s ease both; }
+        .hero { font-family:'Fraunces',serif; font-size:32px; font-weight:300; color:#fff; line-height:1.18; margin-bottom:.7rem; text-shadow:0 2px 6px rgba(0,0,0,.35); }
         .hero em { font-style:italic; color:#b2d8c5; font-weight:400; }
-        .hero-sub { color:rgba(255,255,255,.85); font-size:14px; line-height:1.55; max-width:420px; }
+        .hero-sub { color:rgba(255,255,255,.85); font-size:14px; line-height:1.55; }
 
-        .feature-grid { position:relative; z-index:4; display:grid; gap:.55rem; animation:fadeIn .9s .4s ease both; }
-        .feat {
-            display:flex; align-items:center; gap:14px; padding:11px 18px;
-            background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18);
-            border-radius:14px; backdrop-filter:blur(8px); color:#fff;
-            font-size:13.5px; font-weight:400; transition:background .3s,transform .3s;
+        .bio-deco {
+            position:absolute; z-index:1; pointer-events:none;
+            color:rgba(255,255,255,.06); line-height:1;
+            top:6%; right:-4%; font-size:420px; transform:rotate(8deg);
         }
-        .feat:hover { background:rgba(255,255,255,.22); transform:translateX(6px); }
-        .feat i { color:#b2d8c5; font-size:20px; flex-shrink:0; }
+
+        /* ── Flujo vertical de 4 pasos ─────────────────── */
+        .flow-list {
+            position:relative; z-index:4; width:100%; max-width:420px;
+            display:flex; flex-direction:column; align-items:flex-start;
+            animation:fadeIn .9s .38s ease both;
+        }
+        .flow-item { display:flex; align-items:center; gap:14px; }
+        .flow-ico {
+            width:38px; height:38px; border-radius:50%; flex-shrink:0;
+            background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.22);
+            display:flex; align-items:center; justify-content:center;
+            transition:background .3s, transform .3s;
+        }
+        .flow-item:hover .flow-ico { background:rgba(255,255,255,.18); transform:scale(1.06); }
+        .flow-ico i { color:#b2d8c5; font-size:17px; }
+        .flow-text { color:#fff; font-size:14px; font-weight:500; }
+        .flow-chevron {
+            margin-left:18px; color:rgba(255,255,255,.32);
+            font-size:15px; line-height:1; padding:1px 0;
+        }
 
         /* ══════════════════════════════════════════════
            PANEL DERECHO
@@ -103,7 +121,7 @@
         .panel-r {
             flex:1; display:flex; flex-direction:column;
             justify-content:center; align-items:center;
-            background:var(--bg); padding:1.25rem;
+            background:var(--bg); padding:clamp(1rem, 4vh, 2rem) 1.25rem;
             position:relative; overflow:hidden;
         }
 
@@ -139,7 +157,7 @@
         .card.shake { animation:slideUp .55s var(--ease) both,shake .45s .55s var(--ease) both; }
 
         /* ── Cabecera ───────────────────────────────── */
-        .card-head { margin-bottom:1.1rem; animation:slideUp .5s .12s var(--ease) both; }
+        .card-head { margin-bottom:1.1rem; text-align:center; animation:slideUp .5s .12s var(--ease) both; }
         .card-title {
             font-family:'Outfit',sans-serif; font-size:28px; font-weight:700;
             color:var(--text); letter-spacing:-.6px; margin-bottom:5px;
@@ -348,23 +366,20 @@
                 flex: 0 0 260px;
                 padding: 2rem 1.5rem;
                 justify-content: center;
-                gap: 0;
-            }
-            .brand-block {
-                display: flex; flex-direction: column;
-                align-items: center; text-align: center;
+                gap: 1rem;
             }
             .logo-ico   { width: 96px; height: 96px; }
             .logo-name  { font-size: 18px; }
             .hero       { display: none; }
             .hero-sub   { display: none; }
-            .feature-grid { display: none; }
+            .flow-list  { display: none; }
+            .bio-deco   { display: none; }
         }
 
         /* Móvil (< 768 px): solo el formulario */
         @media (max-width: 767px) {
-            body { overflow: auto; }
-            .split { flex-direction: column; }
+            html, body { height: auto; overflow: auto; }
+            .split { flex-direction: column; height: auto; }
             .panel-l { display: none; }
             .panel-r { padding: 1.5rem; background: #fff; min-height: 100vh; }
             .panel-r::before, .panel-r::after { display: none; }
@@ -391,29 +406,37 @@
             <source src="{% static 'videos/mi_video.mp4' %}" type="video/mp4">
         </video>
         <div class="overlay"></div>
-
-        <div class="brand-block">
-            <h1 class="hero">Análisis microbiano<br>para <em>suelos agrícolas</em></h1>
-            <p class="hero-sub">Plataforma de análisis comparativo de perfiles microbianos 16S e ITS orientada a investigadores y agrónomos de la UTC.</p>
-        </div>
+        <i class="ti ti-dna-2 bio-deco" aria-hidden="true"></i>
 
         <div class="logo-row">
             <div class="logo-ico"><img src="{% static 'logo.png' %}" alt="BioMicro" style="width:80%; height:80%; object-fit:contain;"></div>
             <span class="logo-name">BioMicro</span>
         </div>
 
-        <div class="feature-grid">
-            <div class="feat">
-                <i class="ti ti-microscope" style="color:#00e5ff; filter:drop-shadow(0 0 8px rgba(0,229,255,.6));"></i>
-                Pipeline bioinformático automatizado
+        <div class="brand-block">
+            <h1 class="hero">Análisis Comparativo<br>de <em>Perfiles Microbianos</em></h1>
+            <p class="hero-sub">Importa, procesa y analiza archivos CSV generados por laboratorios de secuenciación para obtener visualizaciones y reportes científicos.</p>
+        </div>
+
+        <div class="flow-list">
+            <div class="flow-item">
+                <div class="flow-ico"><i class="ti ti-flask"></i></div>
+                <span class="flow-text">Laboratorio de secuenciación</span>
             </div>
-            <div class="feat">
-                <i class="ti ti-leaf" style="color:#69f542; filter:drop-shadow(0 0 8px rgba(105,245,66,.6));"></i>
-                Clasificación funcional de microorganismos
+            <i class="ti ti-chevron-down flow-chevron"></i>
+            <div class="flow-item">
+                <div class="flow-ico"><i class="ti ti-file-spreadsheet"></i></div>
+                <span class="flow-text">Importación de archivos CSV</span>
             </div>
-            <div class="feat">
-                <i class="ti ti-chart-bar" style="color:#ffa733; filter:drop-shadow(0 0 8px rgba(255,167,51,.6));"></i>
-                Análisis diferencial 16S e ITS
+            <i class="ti ti-chevron-down flow-chevron"></i>
+            <div class="flow-item">
+                <div class="flow-ico"><i class="ti ti-git-compare"></i></div>
+                <span class="flow-text">Análisis comparativo</span>
+            </div>
+            <i class="ti ti-chevron-down flow-chevron"></i>
+            <div class="flow-item">
+                <div class="flow-ico"><i class="ti ti-chart-bar"></i></div>
+                <span class="flow-text">Reportes y visualización</span>
             </div>
         </div>
     </div>
@@ -425,8 +448,8 @@
         <div class="card {% if form.errors %}shake{% endif %}">
 
             <div class="card-head">
-                <h1 class="card-title">Bienvenido<span>/a</span> 🌿</h1>
-                <p class="card-sub">Accede al laboratorio de análisis de suelos</p>
+                <h1 class="card-title">Iniciar <span>sesión</span></h1>
+                <p class="card-sub">Ingresa tus credenciales para acceder a la plataforma</p>
             </div>
 
             {% if form.errors %}
