@@ -145,11 +145,11 @@
         }
         .nav-brand { display:flex; align-items:center; gap:10px; }
         .nav-logo {
-            width:36px; height:36px; border-radius:9px; background:var(--p-vivid);
+            width:36px; height:36px;
             display:flex; align-items:center; justify-content:center; flex-shrink:0;
-            box-shadow:0 2px 8px rgba(56,168,120,.3);
         }
         .nav-logo i { color:#fff; font-size:19px; }
+        .nav-logo img { width:100%; height:100%; object-fit:contain; }
         .nav-brand-name { font-family:'Fraunces',serif; font-size:17px; font-weight:500; }
         .nav-links { display:flex; align-items:center; gap:2rem; }
         .nav-links a {
@@ -205,7 +205,10 @@
         }
         .hero-blob { position:absolute; border-radius:50%; filter:blur(60px); z-index:0; pointer-events:none; }
         .hero-blob-1 { width:460px; height:460px; background:rgba(56,168,120,.16); top:-140px; left:-100px; animation:blobDrift 14s ease-in-out infinite; }
-        .hero-blob-2 { width:380px; height:380px; background:rgba(186,117,23,.12); bottom:-120px; right:-80px; animation:blobDrift 18s ease-in-out infinite reverse; }
+        .hero-blob-2 { width:420px; height:420px; background:rgba(186,117,23,.20); bottom:-120px; right:-80px; animation:blobDrift 18s ease-in-out infinite reverse; }
+        /* Resplandor cálido detrás de la ilustración: sensación de luz de
+           atardecer filtrándose, en vez de un fondo plano y frío. */
+        .hero-blob-3 { width:320px; height:320px; background:rgba(255,193,86,.16); top:18%; right:14%; animation:blobDrift 22s ease-in-out infinite; }
         @keyframes blobDrift {
             0%, 100% { transform:translate(0,0) scale(1); }
             50%      { transform:translate(24px,-18px) scale(1.08); }
@@ -218,6 +221,27 @@
             animation:meshRotate 30s linear infinite;
         }
         @keyframes meshRotate { to { transform:rotate(360deg); } }
+
+        /* ── Elementos científicos de fondo, muy sutiles: refuerzan la
+           identidad bioinformática sin competir con el contenido ── */
+        .hero-sci-grid {
+            position:absolute; inset:0; z-index:0; pointer-events:none;
+            background-image:radial-gradient(circle, rgba(56,168,120,.16) 1.4px, transparent 1.6px);
+            background-size:34px 34px;
+            -webkit-mask-image:radial-gradient(ellipse 65% 55% at 30% 40%, #000 0%, transparent 72%);
+                    mask-image:radial-gradient(ellipse 65% 55% at 30% 40%, #000 0%, transparent 72%);
+        }
+        .hero-sci-glyph {
+            position:absolute; z-index:0; pointer-events:none; line-height:1;
+            color:rgba(56,168,120,.07);
+        }
+        .hero-sci-glyph.amber { color:rgba(186,117,23,.08); }
+        .hero-sci-1 { top:4%; right:2%; font-size:260px; transform:rotate(14deg); }
+        .hero-sci-2 { bottom:-4%; left:1%; font-size:200px; transform:rotate(-10deg); }
+        /* Nodos + líneas conectadas (motivo de red molecular/datos), SVG inline */
+        .hero-sci-nodes { position:absolute; z-index:0; pointer-events:none; opacity:.5; }
+        .hero-sci-nodes circle { animation:nodePulse 4s ease-in-out infinite; }
+        @keyframes nodePulse { 0%,100% { opacity:.5; } 50% { opacity:1; } }
 
         /* Entrada escalonada del hero al cargar la página */
         .hero-in { opacity:0; transform:translateY(22px); animation:heroIn .7s var(--ease) forwards; }
@@ -233,9 +257,9 @@
             display:grid; grid-template-columns:1.05fr .95fr; gap:3.5rem; align-items:center;
         }
         .hero h1 {
-            font-family:'Fraunces',serif; font-weight:300; color:var(--text);
+            font-family:'Fraunces',serif; font-weight:300; color:#2b2620;
             font-size:clamp(30px, 3.8vw, 46px); line-height:1.15; letter-spacing:-.6px;
-            margin-bottom:1.4rem; text-align:center;
+            margin-bottom:1.85rem; text-align:center;
         }
         /* Texto destacado con degradado animado (llama la atención sobre el beneficio clave) */
         .hero h1 em {
@@ -248,12 +272,12 @@
             0%, 100% { background-position:0% 50%; }
             50%      { background-position:100% 50%; }
         }
-        .hero p { color:var(--muted); font-size:17px; max-width:480px; margin-bottom:2.25rem; }
+        .hero p { color:var(--muted); font-size:17px; max-width:480px; margin-bottom:2.75rem; }
         .hero-ctas { display:flex; gap:14px; flex-wrap:wrap; }
         .btn-hero-primary {
             position:relative; overflow:hidden;
             display:inline-flex; align-items:center; gap:9px;
-            background:linear-gradient(135deg, var(--p) 0%, var(--p-vivid) 100%);
+            background:linear-gradient(120deg, var(--p-vivid) 0%, var(--p-vivid) 60%, var(--amber) 145%);
             color:#fff; padding:0.95rem 1.9rem; border-radius:13px;
             font-size:15.5px; font-weight:700; text-decoration:none;
             box-shadow:0 6px 20px rgba(56,168,120,.35);
@@ -285,15 +309,50 @@
             position:relative; width:100%; max-width:420px; aspect-ratio:1/1; margin:0 auto;
             transform-style:preserve-3d; transition:transform .2s ease-out;
         }
+        /* Halo cálido detrás del círculo: sensación de luz dorada, no un
+           disco verde flotando solo sobre fondo plano. Pulsa muy suave. */
+        .hero-visual::before {
+            content:''; position:absolute; inset:-16%; border-radius:50%; z-index:0; pointer-events:none;
+            background:radial-gradient(circle, rgba(255,193,86,.32) 0%, rgba(255,193,86,0) 70%);
+            animation:haloPulse 5s ease-in-out infinite;
+        }
+        @keyframes haloPulse {
+            0%,100% { opacity:.8; transform:scale(1); }
+            50%     { opacity:1; transform:scale(1.06); }
+        }
         .hero-visual-core {
             position:absolute; inset:14%; border-radius:50%; overflow:hidden;
             background:linear-gradient(135deg, var(--p-vivid) 0%, var(--p-mint) 100%);
-            box-shadow:0 24px 60px -10px rgba(56,168,120,.4);
+            box-shadow:
+                0 24px 60px -10px rgba(56,168,120,.4),
+                0 4px 14px rgba(15,40,25,.25),
+                inset 0 2px 0 rgba(255,255,255,.22),
+                inset 0 -18px 26px rgba(0,0,0,.14);
             display:flex; align-items:center; justify-content:center;
+            padding:15%;
+            transform:translateZ(26px);
+            animation:coreBreathe 6s ease-in-out infinite;
+        }
+        @keyframes coreBreathe {
+            0%,100% { transform:translateZ(26px) scale(1); }
+            50%     { transform:translateZ(26px) scale(1.018); }
+        }
+        /* Brillo de vidrio sobre el logo: le da relieve, como una medalla
+           pulida en vez de un círculo plano. */
+        .hero-visual-core::after {
+            content:''; position:absolute; inset:0; border-radius:50%; pointer-events:none;
+            background:linear-gradient(135deg, rgba(255,255,255,.38) 0%, transparent 42%);
         }
         .hero-visual-core i { color:#fff; font-size:min(96px, 22vw); }
-        /* Si se usa una imagen en vez del ícono, que llene el círculo sin deformarse */
-        .hero-visual-core img { width:100%; height:100%; object-fit:cover; }
+        /* object-fit:contain + padding en el contenedor: el logo se ve
+           siempre completo y centrado, con aire alrededor, en vez de
+           estirado/recortado a la fuerza para llenar el círculo. El
+           drop-shadow lo despega del degradado verde como una medalla. */
+        .hero-visual-core img {
+            width:100%; height:100%; object-fit:contain;
+            filter:drop-shadow(0 8px 18px rgba(10,40,25,.25));
+            position:relative; z-index:0;
+        }
         .hero-visual-ring {
             position:absolute; inset:2%; border-radius:50%; border:1.5px dashed rgba(56,168,120,.3);
             animation:ringSpin 40s linear infinite;
@@ -307,9 +366,14 @@
         }
         .hero-float-card i { font-size:18px; }
         .hero-float-a { top:6%; left:-8%; }
-        .hero-float-a i { color:var(--hint); }
+        .hero-float-a i { color:var(--amber); }
         .hero-float-b { bottom:8%; right:-10%; animation-delay:-2.5s; }
         .hero-float-b i { color:var(--p-vivid); }
+        /* Tercera tarjeta: equilibra la composición en el lado opuesto
+           (a=arriba-izq, b=abajo-der, c=medio-der) formando un triángulo
+           alrededor del círculo en vez de dejarlo solo con dos puntos. */
+        .hero-float-c { top:46%; right:-13%; animation-delay:-1.2s; }
+        .hero-float-c i { color:var(--blue); }
         @keyframes floatY { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-10px); } }
 
         /* ═══════════════════════════════════════════════════════════
@@ -475,7 +539,7 @@
 <!-- ═══════════════════ NAV ═══════════════════ -->
 <nav class="nav" id="mainNav">
     <div class="nav-brand">
-        <div class="nav-logo"><i class="ti ti-dna-2"></i></div>
+        <div class="nav-logo"><img src="{% static 'portal/img/logo.png' %}" alt="BioMicro"></div>
         <span class="nav-brand-name">BioMicro</span>
     </div>
     <div class="nav-links" id="navLinks">
@@ -498,7 +562,7 @@
 <div class="mobile-menu" id="mobileMenu">
     <div class="mobile-menu-head">
         <div class="nav-brand">
-            <div class="nav-logo"><i class="ti ti-dna-2"></i></div>
+            <div class="nav-logo"><img src="{% static 'portal/img/logo.png' %}" alt="BioMicro"></div>
             <span class="nav-brand-name">BioMicro</span>
         </div>
         <button class="mobile-menu-close" id="mobileMenuClose" aria-label="Cerrar menú"><i class="ti ti-x"></i></button>
@@ -519,6 +583,30 @@
     <div class="hero-mesh"></div>
     <div class="hero-blob hero-blob-1"></div>
     <div class="hero-blob hero-blob-2"></div>
+    <div class="hero-blob hero-blob-3"></div>
+
+    <!-- Elementos científicos de fondo: refuerzan la identidad
+         bioinformática de forma sutil, sin competir con el contenido -->
+    <div class="hero-sci-grid" aria-hidden="true"></div>
+    <i class="ti ti-dna-2 hero-sci-glyph hero-sci-1" aria-hidden="true"></i>
+    <i class="ti ti-atom-2 hero-sci-glyph amber hero-sci-2" aria-hidden="true"></i>
+    <svg class="hero-sci-nodes" width="360" height="240" style="top:10%; left:4%;" viewBox="0 0 360 240" aria-hidden="true">
+        <g stroke="#38a878" stroke-width="1" opacity=".4">
+            <line x1="28" y1="36" x2="118" y2="86"></line>
+            <line x1="118" y1="86" x2="88" y2="172"></line>
+            <line x1="118" y1="86" x2="222" y2="58"></line>
+            <line x1="222" y1="58" x2="300" y2="124"></line>
+            <line x1="88" y1="172" x2="190" y2="210"></line>
+        </g>
+        <g fill="#38a878">
+            <circle cx="28" cy="36" r="4"></circle>
+            <circle cx="118" cy="86" r="5"></circle>
+            <circle cx="88" cy="172" r="4"></circle>
+            <circle cx="222" cy="58" r="4"></circle>
+            <circle cx="300" cy="124" r="5"></circle>
+            <circle cx="190" cy="210" r="4"></circle>
+        </g>
+    </svg>
 
     <div class="hero-grid">
         <div>
@@ -542,6 +630,7 @@
             </div>
             <div class="hero-float-card hero-float-a"><i class="ti ti-file-text"></i> Resultado de laboratorio</div>
             <div class="hero-float-card hero-float-b"><i class="ti ti-chart-infographic"></i> Información clara</div>
+            <div class="hero-float-card hero-float-c"><i class="ti ti-shield-check"></i> Acceso seguro</div>
         </div>
     </div>
 </header>
@@ -834,7 +923,7 @@
 <footer class="foot">
     <div class="foot-inner">
         <div class="foot-brand">
-            <div class="nav-logo"><i class="ti ti-dna-2"></i></div>
+            <div class="nav-logo"><img src="{% static 'portal/img/logo.png' %}" alt="BioMicro"></div>
             <span class="foot-brand-name">BioMicro</span>
         </div>
         <div class="foot-links">

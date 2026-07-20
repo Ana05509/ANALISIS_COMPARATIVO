@@ -6,8 +6,6 @@ from typing import Any, Dict, List
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponse, HttpResponseBase
-from django.views.decorators.http import require_POST
 
 from django.db.models import Sum
 
@@ -15,19 +13,13 @@ from analisis.models import ResultadoTaxonomico, ArchivoMolecular
 from analisis.services.business.comparison_service import ejecutar_comparacion_clean
 from analisis.services.processing.diversity import DiversityService
 from analisis.services.business.analysis_service import (
-    obtener_analisis_avanzado,
     obtener_diversidad_beta_inter,
     obtener_diversidad_gamma,
     obtener_permanova,
 )
-from analisis.services.business.export_service import ExportService
-from analisis.services.business.report_generation_service import ReportGenerationService
 from analisis.constants import (
-    MARCADORES_VALIDOS, OPCIONES_TOP_N, NIVELES_ES, MARCADORES_ES,
-    NIVELES_CHOICES, MARCADORES_CHOICES, get_taxonomia_annotation,
+    OPCIONES_TOP_N, NIVELES_ES, get_taxonomia_annotation,
 )
-
-FORMATOS_VALIDOS = ("pdf", "excel", "html", "json")
 
 
 def _contar_clasificaciones(tabla: List[Dict[str, Any]]) -> Dict[str, int]:
@@ -210,70 +202,3 @@ def comparar(request):
         messages.error(request, primer_error or "Revise los campos del formulario.")
 
     return render(request, "analisis/comparar.html", contexto)
-
-
-@login_required
-@require_POST
-def exportar_reporte_comparativo(request) -> HttpResponseBase:
-    try:
-        tipo = request.POST.get("marcador", "16S")
-        nivel = request.POST.get("nivel", "genus")
-        formato = request.POST.get("formato", "pdf")
-        variedad_id = request.POST.get("producto_id") or None
-
-        if tipo not in MARCADORES_VALIDOS:
-            tipo = "16S"
-        if formato not in FORMATOS_VALIDOS:
-            return JsonResponse({"ok": False, "error": "Formato de exportación inválido"}, status=400)
-
-        try:
-            top_n = int(request.POST.get("top_n", 10))
-            if top_n not in OPCIONES_TOP_N:
-                top_n = 10
-        except (ValueError, TypeError):
-            top_n = 10
-
-        # Fix 2 — construir DataFrame real en lugar de vacío
-        resultado_analisis = obtener_analisis_avanzado(
-            tipo=tipo, top_n=top_n, nivel=nivel, variedad_id=variedad_id
-        )
-        resumen = resultado_analisis.get("resumen", [])
-        df_reporte = pd.DataFrame(resumen) if resumen else pd.DataFrame()
-
-        titulo = f"Reporte Comparativo {tipo} — {nivel.capitalize()} (Top {top_n})"
-
-        if formato == "html":
-            html_puro = ExportService.generar_html_reporte(
-                titulo=titulo,
-                datos_analisis=resultado_analisis,
-                df_datos=df_reporte,
-                usuario=request.user,
-                nombre_archivo=f"reporte_{tipo}_{nivel}.html"
-            )
-            if isinstance(html_puro, str):
-                return HttpResponse(html_puro, content_type="text/html")
-            return html_puro
-
-        elif formato == "pdf":
-            return ExportService.exportar_pdf_response(
-                titulo=titulo,
-                datos_analisis=resultado_analisis,
-                df_datos=df_reporte,
-                usuario=request.user
-            )
-
-        elif formato == "json":
-            return ExportService.exportar_json(
-                df_reporte.to_dict("records"),
-                nombre_archivo=f"reporte_comparativo_{tipo}_{nivel}.json"
-            )
-
-        else:
-            resultado = ReportGenerationService.generar_reporte_analisis(
-                tipo=tipo, variedad_id=variedad_id, formato=formato,
-                top_n=top_n, nivel=nivel, usuario=request.user,
-            )
-            return JsonResponse({"ok": True, "url_reporte": resultado.get("url")})
-
-    except Exception as e:
-        return JsonResponse({"ok": False, "error": str(e)}, status=500)

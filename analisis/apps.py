@@ -1,3 +1,5 @@
+import os
+
 from django.apps import AppConfig
 from django.db.models.signals import pre_save
 
@@ -8,6 +10,30 @@ class AnalisisConfig(AppConfig):
     verbose_name = 'BioMicro'
 
     def ready(self):
+        # ── Sincronizar el dominio del Site con Railway automáticamente ──
+        # Mismo problema que ya resuelven ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS
+        # en settings.py: Railway puede regenerar el dominio público en
+        # cada despliegue. django-allauth arma la redirect_uri de Google
+        # OAuth a partir del dominio guardado en la tabla django_site
+        # (Site.domain), NO del dominio real de la petición — si ese
+        # registro queda desactualizado (p. ej. sigue en "127.0.0.1:8000"
+        # de una migración local), Google responde "Error 400:
+        # redirect_uri_mismatch" aunque el resto de la app funcione bien y
+        # Google Cloud Console tenga el URI correcto configurado. Se
+        # sincroniza después de cada migrate (Railway corre migrate en
+        # cada deploy); en local RAILWAY_PUBLIC_DOMAIN no existe, así que
+        # esto no hace nada.
+        railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+        if railway_domain:
+            from django.db.models.signals import post_migrate
+
+            def sincronizar_dominio_site(sender, **kwargs):
+                from django.conf import settings as dj_settings
+                from django.contrib.sites.models import Site
+                Site.objects.filter(id=dj_settings.SITE_ID).update(domain=railway_domain)
+
+            post_migrate.connect(sincronizar_dominio_site, sender=self)
+
         from django.contrib.auth import get_user_model
         User = get_user_model()
 

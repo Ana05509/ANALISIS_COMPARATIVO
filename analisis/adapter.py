@@ -86,6 +86,27 @@ class CustomAccountAdapter(DefaultAccountAdapter):
 
         return email
 
+    def pre_login(self, request, user, **kwargs):
+        """Tras registrarse, no autentica automáticamente: redirige a login
+        con un mensaje de éxito para que el usuario ingrese con sus propias
+        credenciales."""
+        response = super().pre_login(request, user, **kwargs)
+        if response is not None:
+            return response
+
+        if kwargs.get('signup'):
+            from django.contrib import messages
+            from django.http import HttpResponseRedirect
+            from django.urls import reverse
+
+            messages.success(
+                request,
+                "¡Tu cuenta ha sido creada exitosamente! Ya puedes iniciar sesión con tus credenciales."
+            )
+            return HttpResponseRedirect(reverse('analisis:login'))
+
+        return None
+
     def populate_username(self, request, user):
         """Deriva el username directamente del email para evitar duplicación de campos."""
         from allauth.account.utils import user_email, user_username

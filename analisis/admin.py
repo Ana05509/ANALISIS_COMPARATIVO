@@ -99,6 +99,10 @@ class CultivoAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, ModelAdmin):
             "description": "Registre el cultivo agrícola principal. El nombre debe ser único.",
             "fields": ("nombre", "descripcion"),
         }),
+        ("Imagen / Fotografía", {
+            "description": "Sube un archivo o pega el enlace a una imagen externa. Si se cargan ambos, el archivo subido tiene prioridad.",
+            "fields": ("imagen", "imagen_url"),
+        }),
     )
 
     def save_model(self, request, obj, form, change):
