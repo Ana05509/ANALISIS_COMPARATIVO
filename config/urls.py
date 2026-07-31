@@ -18,5 +18,8 @@ urlpatterns = [
     path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Se sirve siempre (no solo con DEBUG=True): Railway no tiene nginx/S3
+# delante como en un despliegue tradicional, así que Django es el único
+# que puede responder /media/ también en producción — si esto se dejara
+# solo para DEBUG, avatars/ y cultivos/ (subidos al repo) darían 404 en Railway.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
