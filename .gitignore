@@ -182,9 +182,19 @@ cython_debug/
 .staticfiles
 staticfiles/
 .claudeignore 
-media/
 .vscode/
 vscode/
 .claude/
 .gitignore
 .settings
+
+# Ignorar todo el contenido de media
+/media/*
+
+# Permitir avatars
+!/media/avatars/
+!/media/avatars/**
+
+# Permitir cultivos
+!/media/cultivos/
+!/media/cultivos/**
