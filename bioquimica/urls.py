@@ -6,5 +6,6 @@ app_name = 'bioquimica'
 urlpatterns = [
     path('', views.lista_ensayos, name='lista'),
     path('subir/', views.subir_pdf, name='subir_pdf'),
+    path('manual/', views.ingreso_manual, name='ingreso_manual'),
     path('<int:pk>/', views.detalle_ensayo, name='detalle'),
 ]

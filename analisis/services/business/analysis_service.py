@@ -1,6 +1,6 @@
 import pandas as pd
 from django.db.models import F, Sum
-from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo, VariedadClon
+from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo, VariedadClon, MuestraSuelo
 from analisis.services.processing.diversity import DiversityService
 from analisis.services.processing.abundance import comparar_abundancias
 from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, MAPA_NIVELES, OPCIONES_TOP_N, get_taxonomia_annotation, clasificar_taxon, NIVEL_ALIASES, normalizar_nombre_catalogo
@@ -346,19 +346,32 @@ def obtener_permanova(tipo="16S", nivel="genus", muestra_ids=None, n_perm=499):
 
 
 def obtener_analisis_diferencial(tipo="16S", nivel="genus", variedad_id=None, muestra_id=None):
+    """
+    Compara un conjunto A (la muestra o variedad seleccionada) contra un
+    conjunto B: TODAS las demás muestras del mismo cultivo, agrupadas en un
+    solo perfil agregado (no una segunda muestra individual). Sirve para ver
+    si la muestra elegida es "típica" del cultivo o si se aparta de lo que
+    normalmente se encuentra en él (taxa exclusivos, similitud de Jaccard).
+    """
     if tipo not in MARCADORES_VALIDOS: tipo = "16S"
 
+    etiqueta_a = None
     if variedad_id:
         try:
             variedad_origen = VariedadClon.objects.get(id=variedad_id)
             cultivo_id = variedad_origen.cultivo_id
+            cultivo_nombre = variedad_origen.cultivo.nombre
+            etiqueta_a = f"Variedad {variedad_origen.nombre}"
         except VariedadClon.DoesNotExist:
             return None
     elif muestra_id:
         try:
             qs_m = ResultadoTaxonomico.objects.filter(archivo__muestra_id=muestra_id).first()
             if not qs_m: return None
-            cultivo_id = qs_m.archivo.muestra.cultivo_id
+            muestra_origen = qs_m.archivo.muestra
+            cultivo_id = muestra_origen.cultivo_id
+            cultivo_nombre = muestra_origen.cultivo.nombre
+            etiqueta_a = muestra_origen.codigo
         except Exception:
             return None
     else:
@@ -372,6 +385,8 @@ def obtener_analisis_diferencial(tipo="16S", nivel="genus", variedad_id=None, mu
         qs_b = qs_b.exclude(archivo__muestra_id=muestra_id)
 
     if not qs_a.exists() or not qs_b.exists(): return None
+
+    n_muestras_b = qs_b.values("archivo__muestra_id").distinct().count()
 
     taxonomia_expr = get_taxonomia_annotation(nivel)
 
@@ -392,4 +407,9 @@ def obtener_analisis_diferencial(tipo="16S", nivel="genus", variedad_id=None, mu
     return {
         "diferencial": comparar_abundancias(df_a, df_b, nivel=nivel),
         "beta": DiversityService.calcular_diversidad_beta(df_a, df_b, nivel=nivel), # CORRECCIÓN
+        # Metadatos solo descriptivos (para la interfaz) — no participan en
+        # ningún cálculo anterior ni lo modifican.
+        "etiqueta_a": etiqueta_a,
+        "cultivo_nombre": cultivo_nombre,
+        "n_muestras_b": n_muestras_b,
     }

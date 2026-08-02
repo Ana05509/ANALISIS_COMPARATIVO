@@ -1,5 +1,6 @@
 {% extends "analisis/base.html" %}
 {% load custom_filters %}
+{% load static %}
 
 {% block title %}Comparar Perfiles{% endblock %}
 {% block nav_comparar %}active{% endblock %}
@@ -313,7 +314,7 @@
         <div class="card-title" style="margin:0;">Tabla comparativa por {{ nivel_actual_label }}</div>
         <span style="font-size:12px; color:var(--text-hint);">
             Taxón más abundante:
-            <strong style="color:var(--verde-dark); font-style:italic;">{{ top_taxonomia|default:"—" }}</strong>
+            <strong style="color:var(--verde-dark); font-style:italic;">{{ top_taxonomia|taxon_legible|default:"—" }}</strong>
         </span>
     </div>
     <div class="table-wrap">
@@ -334,7 +335,7 @@
             <tbody>
                 {% for fila in tabla_comparativa %}
                 <tr>
-                    <td style="font-style:italic; font-weight:500; color:var(--text-primary);">{{ fila.taxonomia }}</td>
+                    <td style="font-style:italic; font-weight:500; color:var(--text-primary);">{{ fila.taxonomia|taxon_legible }}</td>
                     {% for key, val in fila.items %}
                     {% if key != 'taxonomia' and key != 'clasificacion' %}
                     <td class="td-mono" style="text-align:right;">{{ val|floatformat:4 }}</td>
@@ -356,11 +357,15 @@
     </div>
 </div>
 
+<!-- CONTROL DE VISUALIZACIÓN (aplica a las 3 gráficas de esta sección) -->
+<div id="cmp-mode-selector-wrap" style="margin-bottom:0.5rem;"></div>
+
 <!-- GRÁFICO BARRAS AGRUPADAS -->
 <div class="card" style="margin-bottom:0;">
-    <div class="card-title">
-        <i class="ti ti-chart-bar"></i>
-        Abundancia Relativa Comparada — Top {{ top_actual }} por {{ nivel_actual_label }}
+    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <span><i class="ti ti-chart-bar"></i>
+        Abundancia Relativa Comparada — Top {{ top_actual }} por {{ nivel_actual_label }}</span>
+        <span id="dl-barras-comp"></span>
     </div>
     <p style="font-size:12.5px; color:var(--text-hint); margin:0.25rem 0 0.75rem;">
         Cada grupo de barras representa un taxón; el color distingue la muestra. Permite identificar taxa que dominan en una muestra pero están ausentes en otra.
@@ -372,8 +377,9 @@
 
 <!-- HEATMAP -->
 <div class="card" style="margin-top: .7rem;">
-    <div class="card-title">
-        <i class="ti ti-grid-dots"></i> Mapa de Calor Comparativo
+    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <span><i class="ti ti-grid-dots"></i> Mapa de Calor Comparativo</span>
+        <span id="dl-heatmap-comp"></span>
     </div>
     <p style="font-size:12.5px; color:var(--text-hint); margin:0 0 0.75rem;">
         Intensidad = abundancia relativa (%). Identifica taxa diferenciadores entre muestras.
@@ -385,8 +391,9 @@
 
 <!-- SHANNON -->
 <div class="card" style="margin-top: .7rem;">
-    <div class="card-title">
-        <i class="ti ti-chart-bar"></i> Shannon H' por Muestra
+    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <span><i class="ti ti-chart-bar"></i> Shannon H' por Muestra</span>
+        <span id="dl-shannon-comp"></span>
     </div>
     <p style="font-size:12.5px; color:var(--text-hint); margin:0 0 0.75rem;">
         Diversidad alfa sobre el perfil taxonómico completo.
@@ -551,6 +558,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="{% static 'analisis/js/chart_theme.js' %}"></script>
 <script>var TIPOS_POR_MUESTRA_CMP = {{ tipos_por_muestra_json|json_embed }};</script>
 
 <script>
@@ -672,72 +680,147 @@
     {% if tabla_comparativa %}
     document.addEventListener('DOMContentLoaded', function () {
 
-        var COLORES = ['#1D9E75','#BA7517','#185FA5','#A32D2D','#0F6E56','#6B4E9E','#0C447C','#5F5E5A',
-                       '#E07B39','#264653','#E9C46A','#3A86FF'];
+        var NIVEL_LABEL_CMP = "{{ nivel_actual_label|default:'Taxón'|escapejs }}";
+        var gBarrasRaw  = {{ graficos_json|json_embed }};
+        var tablaData   = {{ tabla_json|json_embed }};
+        var alfaData    = {{ alfa_json|json_embed }};
 
         /* 1. Barras agrupadas */
-        try {
-            var gBarras = {{ graficos_json|json_embed }};
-            if (gBarras && gBarras.data) {
-                gBarras.data.forEach(function(trace, i) {
-                    trace.marker = trace.marker || {};
-                    trace.marker.color = COLORES[i % COLORES.length];
-                    trace.marker.line  = { width: 0 };
+        function renderBarras(mode) {
+            try {
+                if (!gBarrasRaw || !gBarrasRaw.data) return;
+                var data = JSON.parse(JSON.stringify(gBarrasRaw.data));
+                ChartTheme.styleTracesByIndex(data, mode);
+                // Traducir "Unclassified" en TODAS las traces por igual — Plotly
+                // agrupa las barras entre traces por el valor exacto de x, así
+                // que si solo una trace tradujera el nombre quedarían como dos
+                // categorías distintas en vez de una sola barra agrupada.
+                data.forEach(function(trace) {
+                    if (Array.isArray(trace.x)) trace.x = trace.x.map(ChartTheme.taxonLegible);
                 });
-                gBarras.layout = Object.assign({}, gBarras.layout, {
-                    template: 'plotly_white',
-                    font: { family: 'Outfit, sans-serif' },
-                    legend: { orientation: 'h', y: -0.25, x: 0.5, xanchor: 'center' },
-                    height: 440,
-                    margin: { t: 50, b: 110, l: 60, r: 20 },
-                    xaxis: Object.assign({}, (gBarras.layout||{}).xaxis, {
-                        tickangle: -40, automargin: true, tickfont: { size: 10 }
+
+                var categoriasX = (data[0] && data[0].x) || [];
+                // Con pocas barras el % se ve bien sobre cada una; con muchas
+                // (Top 25/50 × varias muestras) se amontona y se oculta,
+                // dejando el valor exacto disponible en el hover.
+                var mostrarTexto = ChartTheme.shouldShowBarText(categoriasX.length, data.length);
+
+                data.forEach(function(trace) {
+                    trace.marker.line = ChartTheme.isGrayMode(mode) ? { color: '#ffffff', width: 0.5 } : { width: 0 };
+                    if (mostrarTexto) {
+                        trace.texttemplate = '%{y:.2f}%';
+                        trace.textposition = 'outside';
+                        trace.textfont = { size: 8 };
+                    } else {
+                        trace.texttemplate = undefined;
+                        trace.textposition = 'none';
+                    }
+                    trace.hovertemplate = '<b>%{fullData.name}</b><br>%{x}<br>Abundancia relativa: <b>%{y:.2f} %</b><extra></extra>';
+                });
+                // Margen inferior y alto dinámicos según el nombre más largo del
+                // eje X (ej. "Otros microorganismos (< abundancia)"): con un
+                // margen fijo, las etiquetas rotadas de nombres largos terminan
+                // superponiéndose con la leyenda de muestras y el título del eje.
+                var maxLenX = categoriasX.reduce(function(m, c) { return Math.max(m, String(c).length); }, 0);
+                var bottomMargin = Math.min(Math.max(Math.round(maxLenX * 4.3) + 70, 130), 230);
+                var chartHeight = 380 + bottomMargin;
+
+                var rawXTitle = (gBarrasRaw.layout || {}).xaxis && gBarrasRaw.layout.xaxis.title;
+                var xTitleText = (rawXTitle && typeof rawXTitle === 'object') ? rawXTitle.text : rawXTitle;
+
+                // Nombres de taxón largos (ej. "Otros microorganismos (< abundancia)",
+                // "Spartobacteria_genera_incertae_sedis") se recortan con "…" en el
+                // eje — igual que Excel cuando una categoría no cabe — en vez de
+                // dejar que el texto rotado se corte a la mitad o se monte sobre el
+                // grupo de barras vecino. El nombre completo sigue disponible en el
+                // hover (%{x} en hovertemplate usa el valor real, sin truncar).
+                var ticksX = ChartTheme.buildTruncatedTicks(categoriasX, 18);
+
+                // Rango Y con margen explícito: sin esto, el texto "outside"
+                // sobre la barra más alta (ej. "94.47%") puede quedar cortado
+                // por el borde superior del área de la gráfica — el autorange
+                // de Plotly no siempre reserva espacio suficiente para esa
+                // etiqueta de texto además de la barra.
+                // ChartTheme.extractArray: Plotly a veces serializa "y" en un
+                // formato binario compacto ({dtype,bdata}) en vez de un array
+                // plano — sin decodificarlo, el cálculo de rango no encontraba
+                // ningún número y el eje se quedaba con el autorange feo de
+                // Plotly en vez del máximo "redondo" calculado aquí.
+                var todosValoresY = [].concat.apply([], data.map(function(t) { return ChartTheme.extractArray(t.y); }));
+                var yRangeBarras = ChartTheme.computeYRange(todosValoresY);
+
+                var layout = Object.assign({}, gBarrasRaw.layout, ChartTheme.baseLayout(mode), {
+                    legend: { orientation: 'h', y: -(bottomMargin - 45) / chartHeight, x: 0.5, xanchor: 'center' },
+                    height: chartHeight,
+                    margin: { t: 50, b: bottomMargin, l: 60, r: 20 },
+                    xaxis: Object.assign({}, (gBarrasRaw.layout||{}).xaxis, {
+                        tickangle: -40, automargin: true, tickfont: { size: 10 },
+                        tickvals: ticksX.tickvals, ticktext: ticksX.ticktext,
+                        title: { text: xTitleText, standoff: Math.round(maxLenX * 2.2) + 20 },
                     }),
+                    yaxis: Object.assign({}, (gBarrasRaw.layout||{}).yaxis, ChartTheme.yAxisGrid(mode),
+                        { rangemode: 'tozero' },
+                        // autorange:false explícito — si no, Plotly puede seguir
+                        // calculando su propio rango y descartar el nuestro.
+                        yRangeBarras ? { range: yRangeBarras, autorange: false } : {}),
                 });
-                Plotly.newPlot('grafico-barras-comp', gBarras.data, gBarras.layout, { responsive: true });
-            }
-        } catch (e) { console.error('Barras comparativas:', e); }
+                Plotly.newPlot('grafico-barras-comp', data, layout, { responsive: true });
+            } catch (e) { console.error('Barras comparativas:', e); }
+        }
 
         /* 2. Heatmap */
-        try {
-            var tablaData = {{ tabla_json|json_embed }};
-            if (Array.isArray(tablaData) && tablaData.length > 0) {
+        function renderHeatmap(mode) {
+            try {
+                if (!Array.isArray(tablaData) || tablaData.length === 0) return;
                 var muestrasHM = Object.keys(tablaData[0]).filter(function(k) {
                     return k !== 'taxonomia' && k !== 'clasificacion';
                 });
-                var taxa = tablaData.map(function(r) { return r.taxonomia || '—'; });
+                var taxa = tablaData.map(function(r) { return ChartTheme.taxonLegible(r.taxonomia) || '—'; });
                 var zValues = muestrasHM.map(function(m) {
                     return tablaData.map(function(r) { return parseFloat(r[m] || 0); });
+                });
+                // Mismo recorte con "…" que en las barras comparativas — el nombre
+                // completo del taxón sigue disponible en el hover.
+                var ticksHM = ChartTheme.buildTruncatedTicks(taxa, 18);
+
+                var layout = Object.assign({}, ChartTheme.baseLayout(mode), {
+                    height: 380,
+                    margin: { t: 20, b: 90, l: 120, r: 30 },
+                    xaxis: {
+                        title: NIVEL_LABEL_CMP + ' taxonómico', tickangle: -35, tickfont: { size: 10 }, automargin: true,
+                        tickvals: ticksHM.tickvals, ticktext: ticksHM.ticktext,
+                    },
+                    yaxis: { title: 'Muestra', tickfont: { size: 11 }, automargin: true },
                 });
                 Plotly.newPlot('grafico-heatmap-comp', [{
                     type: 'heatmap',
                     x: taxa, y: muestrasHM, z: zValues,
-                    colorscale: 'Viridis',
+                    colorscale: ChartTheme.heatmapColorscale(mode),
                     hovertemplate: '<b>%{y}</b><br>%{x}<br>Abundancia: %{z:.4f}%<extra></extra>',
-                    colorbar: { title: { text: '%', side: 'right' } }
-                }], {
-                    template: 'plotly_white',
-                    font: { family: 'Outfit, sans-serif' },
-                    height: 380,
-                    margin: { t: 20, b: 90, l: 120, r: 30 },
-                    xaxis: { tickangle: -35, tickfont: { size: 10 }, automargin: true },
-                    yaxis: { tickfont: { size: 11 }, automargin: true },
-                }, { responsive: true });
-            }
-        } catch (e) { console.error('Heatmap comparativo:', e); }
+                    colorbar: { title: { text: 'Abundancia relativa (%)', side: 'right' } }
+                }], layout, { responsive: true });
+            } catch (e) { console.error('Heatmap comparativo:', e); }
+        }
 
         /* 3. Shannon — umbrales absolutos (igual que en análisis avanzado) */
-        try {
-            var alfaData = {{ alfa_json|json_embed }};
-            var muestrasS = Object.keys(alfaData);
-
-            if (muestrasS.length > 0) {
+        function renderShannon(mode) {
+            try {
+                var muestrasS = Object.keys(alfaData);
+                if (muestrasS.length === 0) {
+                    document.getElementById('grafico-shannon-comp').innerHTML =
+                        '<p style="padding:2rem;text-align:center;color:var(--text-hint);font-size:13px;">No hay datos de diversidad para las muestras seleccionadas.</p>';
+                    return;
+                }
                 var valoresS  = muestrasS.map(function(m) { return alfaData[m].shannon || 0; });
                 var riquezaS  = muestrasS.map(function(m) { return alfaData[m].riqueza  || 0; });
                 var simpsonS  = muestrasS.map(function(m) { return alfaData[m].simpson  || 0; });
                 var equitS    = muestrasS.map(function(m) { return alfaData[m].equitatividad || 0; });
 
-                /* Color por umbral absoluto — consistente con análisis avanzado */
+                /* Color por umbral absoluto — consistente con análisis avanzado.
+                   En modo grises/publicación se preserva el orden de severidad
+                   convirtiendo cada color semántico a su gris equivalente, y el
+                   valor numérico ya impreso sobre cada barra evita depender del
+                   color para identificarla. */
                 function colorShannon(h) {
                     if (h < 1.0) return '#DC2626';
                     if (h < 2.0) return '#F97316';
@@ -748,7 +831,9 @@
                 var hoverTexts = muestrasS.map(function(m, i) {
                     return [
                         '<b>' + m + '</b><br>' +
-                        "Shannon H': <b>" + valoresS[i].toFixed(4) + '</b><br>' +
+                        // Misma precisión (3 decimales) que el texto ya impreso sobre
+                        // la barra — evita que hover y etiqueta parezcan "valores distintos".
+                        "Shannon H': <b>" + valoresS[i].toFixed(3) + '</b><br>' +
                         'Riqueza (S): ' + riquezaS[i] + ' taxa<br>' +
                         'Simpson (1-D): ' + simpsonS[i].toFixed(4) + '<br>' +
                         "Equitatividad (J'): " + equitS[i].toFixed(4)
@@ -761,9 +846,13 @@
                 var muestrasOrden  = orden.map(function(i) { return muestrasS[i]; });
                 var valoresOrden   = orden.map(function(i) { return valoresS[i]; });
                 var coloresOrden   = valoresOrden.map(colorShannon);
+                if (ChartTheme.isGrayMode(mode)) {
+                    coloresOrden = coloresOrden.map(ChartTheme.toGrayscaleHex);
+                }
                 var hoverOrden     = orden.map(function(i) { return hoverTexts[i]; });
 
                 var hMax = Math.max.apply(null, valoresOrden);
+                var yRange = ChartTheme.computeYRange(valoresOrden);
                 var figShannon = {
                     data: [{
                         type: 'bar',
@@ -777,17 +866,15 @@
                         hovertemplate: '%{customdata[0]}<extra></extra>',
                         showlegend: false,
                     }],
-                    layout: {
-                        template: 'plotly_white',
-                        font: { family: 'Outfit, sans-serif' },
-                        yaxis: { title: "Shannon H'", rangemode: 'tozero',
-                                 gridcolor: 'rgba(220,220,220,0.5)', zeroline: false },
-                        xaxis: { tickangle: -30, automargin: true, tickfont: { size: 10 } },
+                    layout: Object.assign({}, ChartTheme.baseLayout(mode), {
+                        yaxis: Object.assign({ title: "Índice de diversidad de Shannon (H′)", rangemode: 'tozero' },
+                            ChartTheme.yAxisGrid(mode), yRange ? { range: yRange, autorange: false } : {}),
+                        xaxis: { title: 'Muestra', tickangle: -30, automargin: true, tickfont: { size: 10 } },
                         height: 380,
                         margin: { t: 50, b: 100, l: 60, r: 30 },
                         bargap: 0.35,
                         annotations: [],
-                    }
+                    })
                 };
 
                 /* Líneas de referencia con etiqueta dentro del área */
@@ -813,12 +900,24 @@
                 });
 
                 Plotly.newPlot('grafico-shannon-comp', figShannon.data, figShannon.layout, { responsive: true });
-            } else {
-                document.getElementById('grafico-shannon-comp').innerHTML =
-                    '<p style="padding:2rem;text-align:center;color:var(--text-hint);font-size:13px;">No hay datos de diversidad para las muestras seleccionadas.</p>';
-            }
-        } catch (e) { console.error('Shannon comparativo:', e); }
+            } catch (e) { console.error('Shannon comparativo:', e); }
+        }
 
+        function renderTodo(mode) {
+            renderBarras(mode);
+            renderHeatmap(mode);
+            renderShannon(mode);
+        }
+
+        var modeCtl = ChartTheme.mountModeSelector('cmp-mode-selector-wrap', {
+            initial: 'color',
+            onChange: renderTodo,
+        });
+        renderTodo(modeCtl.getMode());
+
+        ChartTheme.addPlotlyDownloadButtons('dl-barras-comp',  { divId: 'grafico-barras-comp',  filenameBase: 'abundancia_comparada', getMode: modeCtl.getMode });
+        ChartTheme.addPlotlyDownloadButtons('dl-heatmap-comp', { divId: 'grafico-heatmap-comp', filenameBase: 'heatmap_comparativo',  getMode: modeCtl.getMode });
+        ChartTheme.addPlotlyDownloadButtons('dl-shannon-comp', { divId: 'grafico-shannon-comp', filenameBase: 'shannon_comparativo',  getMode: modeCtl.getMode });
     });
     {% endif %}
 

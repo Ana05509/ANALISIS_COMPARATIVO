@@ -68,10 +68,18 @@ class VisualizationService:
             return None
 
     @staticmethod
-    def obtener_paquete_graficos_avanzados(df_pivote: pd.DataFrame, columnas_muestras: List[str], nivel: str, top_n: int = 10) -> Dict[str, Any]:
+    def obtener_paquete_graficos_avanzados(df_pivote: pd.DataFrame, columnas_muestras: List[str], nivel: str, top_n: int = 10,
+                                            orden_taxa: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Coordinador analítico: Procesa el DataFrame de abundancias microbianas según el Top N elegido.
         Retorna un diccionario estructurado con objetos JSON (dict) listos para el frontend.
+
+        `orden_taxa`: lista opcional de nombres de taxón, ya ordenada de mayor a
+        menor abundancia con el MISMO criterio que la tabla "Top N" de la misma
+        página (hits acumulados/pooled). Si se pasa, las gráficas usan ese orden
+        para elegir el Top N en vez de calcular uno propio por promedio de
+        porcentajes — así la tabla y las gráficas siempre muestran los mismos
+        taxa. Si no se pasa, se conserva el criterio de promedio (compatibilidad).
         """
         paquete_graficos: Dict[str, Any] = {}
         
@@ -94,9 +102,17 @@ class VisualizationService:
             else:
                 df_analisis[col] = 0.0
 
-        # Calcular promedio para el ordenamiento del Top N
-        df_analisis['__promedio_abundancia'] = df_analisis[columnas_muestras].mean(axis=1)
-        df_ordenado = df_analisis.sort_values(by='__promedio_abundancia', ascending=False)
+        if orden_taxa:
+            # Mismo orden que la tabla Top N (hits acumulados/pooled) — se
+            # reindexa en vez de recalcular un criterio de orden propio.
+            orden_presente = [t for t in orden_taxa if t in set(df_analisis[nivel])]
+            df_analisis = df_analisis.set_index(nivel).reindex(orden_presente).reset_index()
+        else:
+            # Compatibilidad: sin orden explícito, se ordena por promedio de
+            # abundancia relativa entre las muestras seleccionadas.
+            df_analisis['__promedio_abundancia'] = df_analisis[columnas_muestras].mean(axis=1)
+            df_analisis = df_analisis.sort_values(by='__promedio_abundancia', ascending=False)
+        df_ordenado = df_analisis
 
         # -----------------------------------------------------------------
         # 1. GRÁFICO DE BARRAS APILADAS AL 100%
@@ -144,12 +160,15 @@ class VisualizationService:
                 template="plotly_white",
             )
             fig_barras.update_traces(
+                # El % de cada segmento se ve al pasar el cursor, no como texto
+                # fijo sobre la barra — con varias muestras, cada taxón tiene un
+                # valor distinto por muestra y no cabe legible ahí.
                 hovertemplate=(
                     "<b>%{fullData.name}</b><br>"
                     "Muestra: %{x}<br>"
                     "Abundancia: <b>%{y:.2f} %</b>"
                     "<extra></extra>"
-                )
+                ),
             )
             fig_barras.update_layout(
                 barmode="stack", barnorm="percent",
@@ -305,10 +324,10 @@ class VisualizationService:
                 fig_pcoa.update_layout(
                     title=dict(text='PCoA — Disimilitud Bray-Curtis', font=dict(size=14),
                                x=0.5, xanchor='center'),
-                    xaxis=dict(title='PCo1', zeroline=False,
-                               gridcolor='rgba(220,220,220,0.5)', automargin=True),
-                    yaxis=dict(title='PCo2', zeroline=False,
-                               gridcolor='rgba(220,220,220,0.5)', automargin=True),
+                    xaxis=dict(title='Coordenada Principal 1 (PCo1) — eje sin unidad física', zeroline=False,
+                               gridcolor='#c8c8c8', automargin=True),
+                    yaxis=dict(title='Coordenada Principal 2 (PCo2) — eje sin unidad física', zeroline=False,
+                               gridcolor='#c8c8c8', automargin=True),
                     template='plotly_white',
                     height=560,
                     legend=dict(

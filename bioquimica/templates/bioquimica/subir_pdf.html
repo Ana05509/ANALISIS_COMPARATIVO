@@ -10,6 +10,32 @@
 
 {% block nav_ensayos %}active{% endblock %}
 
+{% block extra_css %}
+<style>
+.bq-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 1.1rem;
+    border-bottom: 1px solid var(--gris-border, #E5E3DC);
+}
+.bq-tab-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: none; border: none; cursor: pointer;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13.5px; font-weight: 600;
+    color: #888780;
+    text-decoration: none;
+    padding: .7rem 1.1rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .15s, border-color .15s;
+}
+.bq-tab-btn i { font-size: 16px; }
+.bq-tab-btn:hover { color: #1A1A18; }
+.bq-tab-btn.active { color: #1D9E75; border-bottom-color: #1D9E75; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div style="max-width: 580px; margin: 0 auto;">
 
@@ -21,6 +47,15 @@
             Sube uno o varios PDFs del laboratorio DISErLAB-PUCE. El sistema extrae
             automáticamente los datos de recuento UFC/g o pruebas bioquímicas.
         </p>
+    </div>
+
+    <div class="bq-tabs">
+        <a href="{% url 'bioquimica:subir_pdf' %}" class="bq-tab-btn active">
+            <i class="ti ti-file-upload"></i> Subir PDF (automático)
+        </a>
+        <a href="{% url 'bioquimica:ingreso_manual' %}" class="bq-tab-btn">
+            <i class="ti ti-keyboard"></i> Ingreso manual
+        </a>
     </div>
 
     <div class="card" style="padding: 28px 32px;">

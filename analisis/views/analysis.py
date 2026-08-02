@@ -113,6 +113,18 @@ def analisis_avanzado(request):
                 df_raw = pd.DataFrame(data_agg)
                 df_raw = df_raw[df_raw['taxon'].notna() & (df_raw['taxon'] != '')]
 
+                # Orden "Top N" por hits acumulados (pooled), calculado ANTES de
+                # normalizar por muestra — el MISMO criterio que usa la tabla de
+                # arriba (obtener_analisis_avanzado, que ordena por Sum(num_hits)
+                # agrupado). Se pasa explícitamente a las gráficas para que
+                # muestren los mismos Top N taxa que la tabla, en vez de que cada
+                # una calcule su propio orden con un criterio distinto.
+                orden_taxa_pooled = (
+                    df_raw.groupby('taxon')['abundancia'].sum()
+                    .sort_values(ascending=False)
+                    .index.tolist()
+                )
+
                 # Normaliza a abundancia relativa por muestra antes del pivot
                 totales = df_raw.groupby('muestra')['abundancia'].transform('sum')
                 df_raw['abundancia'] = df_raw['abundancia'] / totales.replace(0, 1) * 100
@@ -135,6 +147,7 @@ def analisis_avanzado(request):
                     columnas_muestras=columnas_muestras,
                     nivel='taxon',
                     top_n=top_n,
+                    orden_taxa=orden_taxa_pooled,
                 )
 
                 contexto["graficos_avanzados"] = graficos_avanzados

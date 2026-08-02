@@ -1,4 +1,5 @@
 {% extends "analisis/base.html" %}
+{% load custom_filters %}
 
 {% block title %}Resultados Taxonómicos{% endblock %}
 {% block nav_analisis %}active{% endblock %}
@@ -6,7 +7,7 @@
 
 {% block topbar_actions %}
 <a href="{% url 'analisis:historial' %}" class="btn btn-outline btn-sm">
-    <i class="ti ti-arrow-left" aria-hidden="true"></i> Historial
+    <i class="ti ti-arrow-left" aria-hidden="true"></i> Registro de Muestras
 </a>
 {% endblock %}
 
@@ -89,7 +90,7 @@
                 <tr>
                     <td data-label="#" class="td-mono td-muted">{{ forloop.counter }}</td>
                     <td data-label="Taxonomía">
-                        <strong class="td-taxonomy">{{ item.taxonomia|default:"Desconocido" }}</strong>
+                        <strong class="td-taxonomy">{{ item.taxonomia|taxon_legible|default:"Desconocido" }}</strong>
                     </td>
                     <td data-label="Núm. Hits" class="td-mono">{{ item.total_hits|default:"0" }}</td>
                     <td data-label="% Abundancia">

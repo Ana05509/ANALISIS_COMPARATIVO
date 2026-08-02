@@ -224,7 +224,7 @@ th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; color: var(--verde,
     </div>
 
     <div class="metric-card">
-        <div class="metric-label">Sin clasificar</div>
+        <div class="metric-label">Sin clasificación</div>
         <div class="metric-value td-mono">{{ estadisticas.total_sin_clas }}</div>
         <div style="margin-top:8px;">
             <div style="height:4px;background:rgba(0,0,0,.1);border-radius:4px;overflow:hidden;">
@@ -363,7 +363,7 @@ th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; color: var(--verde,
                         {% elif m.clasificacion == 'neutral' %}
                             <span class="badge badge-neutral"><i class="ti ti-minus" aria-hidden="true"></i> Neutral</span>
                         {% else %}
-                            <span class="badge badge-sin-clas"><i class="ti ti-circle-dashed" aria-hidden="true"></i> Sin clasif.</span>
+                            <span class="badge badge-sin-clas"><i class="ti ti-circle-dashed" aria-hidden="true"></i> Sin clasificación</span>
                         {% endif %}
                     </td>
 
@@ -428,7 +428,7 @@ th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; color: var(--verde,
                 <option value="benefico">Benéfico</option>
                 <option value="fitopatogeno">Fitopatógeno</option>
                 <option value="neutral">Neutral</option>
-                <option value="sin_clasificar">Sin clasificar</option>
+                <option value="sin_clasificar">Sin clasificación</option>
             </select>
         </div>
         <div style="display:flex; gap:8px; justify-content:flex-end;">

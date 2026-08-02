@@ -1,5 +1,6 @@
 {% extends "analisis/base.html" %}
 {% load custom_filters %}
+{% load static %}
 
 {% block title %}{{ ensayo.codigo }} — BioMicro{% endblock %}
 {% block nav_ensayos %}active{% endblock %}
@@ -75,10 +76,12 @@
 {% if ensayo.tipo == 'recuento' %}
 
 {% if grafico_recuento_json %}
+<div id="bq-mode-selector-wrap" style="margin-bottom:0.5rem;"></div>
 <div class="card" style="margin-bottom:1.25rem;">
-    <div class="card-title">
-        <i class="ti ti-chart-bar"></i> UFC/g por microorganismo
-        <span style="font-size:12px; font-weight:400; color:var(--text-hint); margin-left:8px;">escala logarítmica</span>
+    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <span><i class="ti ti-chart-bar"></i> UFC/g por microorganismo
+        <span style="font-size:12px; font-weight:400; color:var(--text-hint); margin-left:8px;">escala logarítmica</span></span>
+        <span id="dl-recuento"></span>
     </div>
     <div id="grafico-recuento"></div>
 </div>
@@ -139,10 +142,12 @@
 {% elif ensayo.tipo == 'aislamiento' %}
 
 {% if grafico_heatmap_json %}
+<div id="bq-mode-selector-wrap" style="margin-bottom:0.5rem;"></div>
 <div class="card" style="margin-bottom:1.25rem;">
-    <div class="card-title">
-        <i class="ti ti-table"></i> Mapa de Pruebas Bioquímicas
-        <span style="font-size:12px; font-weight:400; color:var(--text-hint); margin-left:8px;">verde = positivo · naranja = negativo</span>
+    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <span><i class="ti ti-table"></i> Mapa de Pruebas Bioquímicas
+        <span id="bq-heatmap-legend" style="font-size:12px; font-weight:400; color:var(--text-hint); margin-left:8px;">verde = positivo · naranja = negativo</span></span>
+        <span id="dl-heatmap"></span>
     </div>
     <div id="grafico-heatmap"></div>
 </div>
@@ -261,18 +266,70 @@
 
 {% block extra_js %}
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script src="{% static 'analisis/js/chart_theme.js' %}"></script>
 <script>
-{% if grafico_recuento_json %}
 (function(){
-    var data = {{ grafico_recuento_json|json_embed }};
-    Plotly.newPlot('grafico-recuento', data.data, data.layout, {responsive: true, displayModeBar: false});
+    'use strict';
+    var modeCtl = null;
+
+    {% if grafico_recuento_json %}
+    var recuentoRaw = {{ grafico_recuento_json|json_embed }};
+
+    function renderRecuento(mode) {
+        var dataObj = JSON.parse(JSON.stringify(recuentoRaw));
+        var trace = dataObj.data[0];
+        var tipos = trace.customdata || [];
+        var gris = ChartTheme.isGrayMode(mode);
+        var colores = [], patterns = [];
+        for (var i = 0; i < tipos.length; i++) {
+            var esBacteria = tipos[i] === 'bacteria';
+            colores.push(gris ? (esBacteria ? '#3d3d3d' : '#b0b0b0') : (esBacteria ? '#1D9E75' : '#F5A623'));
+            patterns.push(esBacteria ? '' : '/');
+        }
+        trace.marker = trace.marker || {};
+        trace.marker.color = colores;
+        trace.marker.pattern = gris ? { shape: patterns, fgcolor: '#ffffff', size: 6 } : undefined;
+
+        var layout = Object.assign({}, dataObj.layout, ChartTheme.baseLayout(mode));
+        Plotly.react('grafico-recuento', dataObj.data, layout, {responsive: true, displayModeBar: false});
+    }
+    {% endif %}
+
+    {% if grafico_heatmap_json %}
+    var heatmapRaw = {{ grafico_heatmap_json|json_embed }};
+
+    function renderHeatmap(mode) {
+        var dataObj = JSON.parse(JSON.stringify(heatmapRaw));
+        var trace = dataObj.data[0];
+        var gris = ChartTheme.isGrayMode(mode);
+        trace.colorscale = gris
+            ? [[0.0, '#e0e0e0'], [0.5, '#b0b0b0'], [1.0, '#5c5c5c']]
+            : [[0.0, '#FDBA74'], [0.5, '#E5E7EB'], [1.0, '#86EFAC']];
+
+        var layout = Object.assign({}, dataObj.layout, ChartTheme.baseLayout(mode));
+        Plotly.react('grafico-heatmap', dataObj.data, layout, {responsive: true, displayModeBar: false});
+
+        var leyenda = document.getElementById('bq-heatmap-legend');
+        if (leyenda) {
+            leyenda.textContent = gris ? 'oscuro = positivo · claro = negativo' : 'verde = positivo · naranja = negativo';
+        }
+    }
+    {% endif %}
+
+    function renderTodo(mode) {
+        {% if grafico_recuento_json %}renderRecuento(mode);{% endif %}
+        {% if grafico_heatmap_json %}renderHeatmap(mode);{% endif %}
+    }
+
+    modeCtl = ChartTheme.mountModeSelector('bq-mode-selector-wrap', { onChange: renderTodo });
+    renderTodo(modeCtl.getMode());
+
+    {% if grafico_recuento_json %}
+    ChartTheme.addPlotlyDownloadButtons('dl-recuento', { divId: 'grafico-recuento', filenameBase: 'recuento_ufc', getMode: modeCtl.getMode });
+    {% endif %}
+    {% if grafico_heatmap_json %}
+    ChartTheme.addPlotlyDownloadButtons('dl-heatmap', { divId: 'grafico-heatmap', filenameBase: 'mapa_pruebas', getMode: modeCtl.getMode });
+    {% endif %}
 })();
-{% endif %}
-{% if grafico_heatmap_json %}
-(function(){
-    var data = {{ grafico_heatmap_json|json_embed }};
-    Plotly.newPlot('grafico-heatmap', data.data, data.layout, {responsive: true, displayModeBar: false});
-})();
-{% endif %}
 </script>
 {% endblock extra_js %}

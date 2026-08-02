@@ -21,15 +21,19 @@ MAPA_NIVELES = {
 
 CLASIFICACIONES = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
 
-# Etiquetas en español para la interfaz de usuario
+# Etiquetas en español para la interfaz de usuario. El orden de este dict
+# define el orden en que aparecen las opciones en los desplegables de "Nivel
+# Taxonómico" (NIVELES_CHOICES más abajo) — Género y Especie van primero por
+# ser los niveles que realmente se usan en los análisis; Reino/Filo/Clase/
+# Orden/Familia quedan disponibles pero al final de la lista.
 NIVELES_ES: dict[str, str] = {
+    "genus":   "Género",
+    "species": "Especie",
     "kingdom": "Reino",
     "phylum":  "Filo",
     "class":   "Clase",
     "order":   "Orden",
     "family":  "Familia",
-    "genus":   "Género",
-    "species": "Especie",
 }
 
 MARCADORES_ES: dict[str, str] = {

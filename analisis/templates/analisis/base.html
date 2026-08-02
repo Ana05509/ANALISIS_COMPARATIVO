@@ -32,7 +32,7 @@
                 <i class="ti ti-chart-dots" aria-hidden="true"></i> Análisis Avanzado
             </a>
             <a href="{% url 'analisis:historial' %}" class="nav-link {% block nav_historial %}{% endblock %}">
-                <i class="ti ti-history" aria-hidden="true"></i> Historial
+                <i class="ti ti-history" aria-hidden="true"></i> Registro de Muestras
             </a>
 
             <div class="nav-section-label">Catálogo</div>
@@ -53,13 +53,13 @@
 
             <div class="nav-section-label">Soporte</div>
             <a href="{% url 'analisis:ayuda' %}" class="nav-link {% block nav_ayuda %}{% endblock %}">
-                <i class="ti ti-help-circle" aria-hidden="true"></i> Manual de Ayuda
+                <i class="ti ti-help-circle" aria-hidden="true"></i> Guía y Glosario
             </a>
         </nav>
 
         <div class="marker-tabs">
-            <a href="?tipo=16S" class="marker-tab" data-tipo="16S">16S</a>
-            <a href="?tipo=ITS" class="marker-tab" data-tipo="ITS">ITS</a>
+            <a href="?tipo=16S" class="marker-tab" data-tipo="16S" title="Bacterias y arqueas (marcador 16S rRNA)">Bacterias</a>
+            <a href="?tipo=ITS" class="marker-tab" data-tipo="ITS" title="Hongos (marcador ITS)">Hongos</a>
         </div>
     </aside>
 
@@ -364,8 +364,8 @@ var STEPS=[
 {sel:'.sidebar-nav a[href*="subir"]',title:'Cargar Muestra',text:'Primer paso: aquí ingresas los datos de cada muestra y subes el archivo de resultados taxonómicos generado por el laboratorio de secuenciación.',pos:'right'},
 {sel:'.sidebar-nav a[href*="comparar"]',title:'Comparar Perfiles',text:'Contrasta la diversidad microbiana entre dos o más muestras. Incluye índices alfa, diversidad gamma y prueba estadística PERMANOVA.',pos:'right'},
 {sel:'.sidebar-nav a[href*="analisis-avanzado"]',title:'Análisis Avanzado',text:'Explora la composición interna con gráficas interactivas: treemap, heatmap, Top N microorganismos y diversidad beta (Bray-Curtis, Jaccard).',pos:'right'},
-{sel:'.sidebar-nav a[href*="historial"]',title:'Historial',text:'Consulta todos tus análisis anteriores con sus parámetros exactos. Útil para comparar resultados a lo largo del tiempo.',pos:'right'},
-{sel:'.sidebar-nav a[href*="ayuda"]',title:'Manual de Ayuda',text:'Guía rápida, descripción de módulos y glosario completo. También puedes relanzar este recorrido desde ahí cuando quieras.',pos:'right'},
+{sel:'.sidebar-nav a[href*="historial"]',title:'Registro de Muestras',text:'Consulta todas las muestras subidas al sistema, con sus parámetros exactos. Útil para comparar resultados a lo largo del tiempo.',pos:'right'},
+{sel:'.sidebar-nav a[href*="ayuda"]',title:'Guía y Glosario',text:'Guía rápida, descripción de módulos y glosario completo. También puedes relanzar este recorrido desde ahí cuando quieras.',pos:'right'},
 {sel:null,title:'¡Ya estás listo/a!',text:'Cualquier término con el ícono <i class="ti ti-help-circle" style="color:#1D9E75;font-size:13px;"></i> tiene su explicación al pasar el cursor. ¡Éxito en tu análisis!'}
 ];
 var cur=0,ov,hl,pop;

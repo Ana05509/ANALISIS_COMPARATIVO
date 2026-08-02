@@ -112,6 +112,44 @@ COLOR_POR_CLAS = {
     "sin_clasificar": PLOTLY_GRIS,
 }
 
+# ---------------------------------------------------------------------------
+# Modo de exportación (color / escala de grises) — Fase presentación
+# ---------------------------------------------------------------------------
+# El modo por defecto ("color") no cambia ningún valor respecto al
+# comportamiento histórico de este archivo. El modo "grises" es aditivo:
+# convierte cada color a su equivalente de luminancia percibida y, para
+# gráficos de barras/torta, agrega un patrón de trama (hatch) distinto por
+# categoría para que la figura siga siendo legible sin depender del color
+# (requisito de tesis/publicación impresa en blanco y negro).
+_HATCHES = ['', '//', 'xx', '..', '||', '--', '++', 'oo']  # matplotlib (multi-char permitido)
+_HATCHES_PLOTLY = ['', '/', '\\', 'x', '-', '|', '+', '.']  # Plotly solo acepta 1 carácter
+
+
+def _hex_a_gris(hex_color):
+    """Convierte un color hex a su equivalente en gris (luminancia perceptual)."""
+    h = (hex_color or "").lstrip('#')
+    if len(h) != 6:
+        return hex_color
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    y = round(0.299 * r + 0.587 * g + 0.114 * b)
+    return '#{0:02x}{0:02x}{0:02x}'.format(max(0, min(255, y)))
+
+
+def _resolver_color(hex_color, modo):
+    return hex_color if modo != "grises" else _hex_a_gris(hex_color)
+
+
+def _resolver_colores(hex_list, modo):
+    return [_resolver_color(c, modo) for c in hex_list]
+
+
+def _resolver_hatch(i, modo):
+    return _HATCHES[i % len(_HATCHES)] if modo == "grises" else None
+
+
+def _resolver_hatch_plotly(i, modo):
+    return _HATCHES_PLOTLY[i % len(_HATCHES_PLOTLY)] if modo == "grises" else ""
+
 
 def _plotly_layout_base(titulo="", subtitulo=None):
     """Layout base compartido por todas las figuras del reporte: tipografía,
@@ -131,13 +169,14 @@ def _plotly_layout_base(titulo="", subtitulo=None):
     )
 
 
-def _fig_a_imagen_xl(fig, ancho_px=900, alto_px=520, escala=2):
+def _fig_a_imagen_xl(fig, ancho_px=900, alto_px=520, escala=3):
     """Renderiza una figura Plotly a PNG (motor Kaleido) y la envuelve como
-    openpyxl.drawing.image.Image lista para ws.add_image(). escala=2 da
-    resolución ~2x para que no se vea pixelada al ampliar en Excel —
-    equivalente al patrón dpi=120-130 que ya usa este mismo archivo para
-    embeber gráficos matplotlib en el PDF (ExportService._chart_donut_taxa
-    y similares)."""
+    openpyxl.drawing.image.Image lista para ws.add_image(). escala=3 da
+    ~300 DPI equivalentes (partiendo de una base de pantalla de 96 DPI) para
+    que la imagen no se vea pixelada ni al ampliar en Excel ni si se
+    reutiliza en un informe impreso — mismo criterio de resolución que usa
+    este archivo para los gráficos matplotlib del PDF (dpi=300, ver
+    ExportService._chart_donut_taxa y similares)."""
     fig.update_layout(width=ancho_px, height=alto_px)
     buf = BytesIO()
     fig.write_image(buf, format="png", scale=escala)
@@ -843,12 +882,19 @@ class ExportService:
 
     @staticmethod
     def _chart_donut_taxa(top_taxa, width_pt=250, height_pt=200,
-                          titulo="Composición Taxonómica", subtitulo="Top 10 taxa por abundancia relativa (%)"):
+                          titulo="Composición Taxonómica", subtitulo="Top 10 taxa por abundancia relativa (%)",
+                          modo="color"):
         """Donut chart de top 10 taxa con título interno. Devuelve RLImage o None."""
         try:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
+            # Sans-serif (Arial/Helvetica) — lo que piden la mayoría de
+            # revistas científicas para el texto DENTRO de las figuras;
+            # DejaVu Sans (incluida con matplotlib) como respaldo si el
+            # servidor no tiene Arial/Helvetica instalada.
+            plt.rcParams['font.family'] = 'sans-serif'
+            plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
 
             if not top_taxa:
                 return None
@@ -864,6 +910,7 @@ class ExportService:
                 palette = _DONUT_PALETTE[:len(taxa_top10)] + [_COLOR_OTROS]
             else:
                 palette = _DONUT_PALETTE[:len(labels)]
+            palette = _resolver_colores(palette, modo)
 
             fig, ax = plt.subplots(figsize=(width_pt / 72, height_pt / 72))
             fig.patch.set_facecolor('#ffffff')
@@ -873,6 +920,9 @@ class ExportService:
                 startangle=90, counterclock=False,
                 wedgeprops=dict(width=0.48, edgecolor='white', linewidth=0.8),
             )
+            if modo == "grises":
+                for i, w in enumerate(wedges):
+                    w.set_hatch(_resolver_hatch(i, modo))
             ax.legend(
                 wedges, labels, loc='center left',
                 bbox_to_anchor=(1.0, 0.5),
@@ -889,7 +939,7 @@ class ExportService:
             plt.tight_layout(pad=0.3, rect=[0, 0, 1, 0.88])
 
             buf = BytesIO()
-            fig.savefig(buf, format='png', dpi=120, bbox_inches='tight')
+            fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             buf.seek(0)
             return RLImage(buf, width=width_pt, height=height_pt)
@@ -898,22 +948,32 @@ class ExportService:
 
     @staticmethod
     def _chart_barras_clas(totales, width_pt=220, height_pt=130,
-                           titulo="Categorías Funcionales", subtitulo="N.° de taxa por rol en el suelo"):
+                           titulo="Categorías Funcionales", subtitulo="N.° de taxa por rol en el suelo",
+                           modo="color"):
         """Barras horizontales de resumen funcional (4 categorías) con título interno."""
         try:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
+            # Sans-serif (Arial/Helvetica) — lo que piden la mayoría de
+            # revistas científicas para el texto DENTRO de las figuras;
+            # DejaVu Sans (incluida con matplotlib) como respaldo si el
+            # servidor no tiene Arial/Helvetica instalada.
+            plt.rcParams['font.family'] = 'sans-serif'
+            plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
 
             cats   = ["Benéfico", "Fitopatógeno", "Neutral", "Sin clas."]
             keys   = ["benefico", "fitopatogeno", "neutral", "sin_clasificar"]
-            clrs   = ['#16a34a', '#dc2626', '#64748b', '#94a3b8']
+            clrs   = _resolver_colores(['#16a34a', '#dc2626', '#64748b', '#94a3b8'], modo)
             values = [totales.get(k, 0) for k in keys]
 
             fig, ax = plt.subplots(figsize=(width_pt / 72, height_pt / 72))
             fig.patch.set_facecolor('#ffffff')
 
             bars = ax.barh(cats, values, color=clrs, edgecolor='white', linewidth=0.6, height=0.55)
+            if modo == "grises":
+                for i, b in enumerate(bars):
+                    b.set_hatch(_resolver_hatch(i, modo))
             ax.bar_label(bars, padding=4, fontsize=7, color='#374151', fontweight='bold')
             ax.set_xlabel("N.° de taxa", fontsize=6.5)
             ax.tick_params(axis='y', labelsize=7)
@@ -926,7 +986,7 @@ class ExportService:
             plt.tight_layout(pad=0.4)
 
             buf = BytesIO()
-            fig.savefig(buf, format='png', dpi=120, bbox_inches='tight')
+            fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             buf.seek(0)
             return RLImage(buf, width=width_pt, height=height_pt)
@@ -936,7 +996,8 @@ class ExportService:
     @staticmethod
     def _chart_ranked_bar_taxa(top_taxa, width_pt=440, height_pt=None,
                                titulo="Perfil de Abundancia Relativa",
-                               subtitulo="Taxa ordenados de mayor a menor — color indica rol funcional"):
+                               subtitulo="Taxa ordenados de mayor a menor — color indica rol funcional",
+                               modo="color"):
         """
         Barras horizontales rankeadas de top taxa, coloreadas por clasificación funcional.
         Forma estándar para perfiles de abundancia en microbiología de suelos.
@@ -945,17 +1006,21 @@ class ExportService:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
+            # Sans-serif (Arial/Helvetica) — lo que piden la mayoría de
+            # revistas científicas para el texto DENTRO de las figuras;
+            # DejaVu Sans (incluida con matplotlib) como respaldo si el
+            # servidor no tiene Arial/Helvetica instalada.
+            plt.rcParams['font.family'] = 'sans-serif'
+            plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
             from matplotlib.patches import Patch
 
             if not top_taxa:
                 return None
 
-            CLR_MAP = {
-                'benefico':      '#16a34a',
-                'fitopatogeno':  '#dc2626',
-                'neutral':       '#64748b',
-                'sin_clasificar':'#94a3b8',
-            }
+            CATS_ORDEN = ['benefico', 'fitopatogeno', 'neutral', 'sin_clasificar']
+            CLR_MAP = dict(zip(CATS_ORDEN, _resolver_colores(
+                ['#16a34a', '#dc2626', '#64748b', '#94a3b8'], modo)))
+            HATCH_MAP = {cat: _resolver_hatch(i, modo) for i, cat in enumerate(CATS_ORDEN)}
 
             # Ordenar: menor→mayor abundancia (el de mayor abundancia queda arriba en el eje Y)
             sorted_taxa = sorted(
@@ -965,7 +1030,8 @@ class ExportService:
 
             nombres = [str(r.get("taxonomia", r.get("nombre", "?"))) for r in sorted_taxa]
             valores = [float(r.get("total_porcentaje", r.get("porcentaje", 0)) or 0) for r in sorted_taxa]
-            colores = [CLR_MAP.get(r.get("clasificacion", "sin_clasificar"), '#94a3b8') for r in sorted_taxa]
+            clases  = [r.get("clasificacion", "sin_clasificar") for r in sorted_taxa]
+            colores = [CLR_MAP.get(c, CLR_MAP['sin_clasificar']) for c in clases]
 
             n     = len(nombres)
             dyn_h = height_pt or min(max(n * 14 + 80, 140), 520)
@@ -975,6 +1041,9 @@ class ExportService:
             fig.patch.set_facecolor('#ffffff')
 
             bars = ax.barh(nombres, valores, color=colores, edgecolor='white', linewidth=0.5, height=0.70)
+            if modo == "grises":
+                for bar, cat in zip(bars, clases):
+                    bar.set_hatch(HATCH_MAP.get(cat, ''))
 
             # Etiqueta de porcentaje fuera de la barra
             for bar, val in zip(bars, valores):
@@ -998,10 +1067,10 @@ class ExportService:
 
             # Leyenda compacta
             legend_elements = [
-                Patch(facecolor='#16a34a', label='Benéfico'),
-                Patch(facecolor='#dc2626', label='Fitopatógeno'),
-                Patch(facecolor='#64748b', label='Neutral'),
-                Patch(facecolor='#94a3b8', label='Sin catalogar'),
+                Patch(facecolor=CLR_MAP['benefico'], hatch=HATCH_MAP['benefico'], label='Benéfico'),
+                Patch(facecolor=CLR_MAP['fitopatogeno'], hatch=HATCH_MAP['fitopatogeno'], label='Fitopatógeno'),
+                Patch(facecolor=CLR_MAP['neutral'], hatch=HATCH_MAP['neutral'], label='Neutral'),
+                Patch(facecolor=CLR_MAP['sin_clasificar'], hatch=HATCH_MAP['sin_clasificar'], label='Sin clasificación'),
             ]
             ax.legend(handles=legend_elements, loc='lower right',
                       fontsize=6, framealpha=0.8, ncol=2,
@@ -1009,7 +1078,7 @@ class ExportService:
 
             plt.tight_layout(pad=0.5)
             buf = BytesIO()
-            fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
+            fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             buf.seek(0)
             return RLImage(buf, width=width_pt, height=dyn_h)
@@ -1017,7 +1086,7 @@ class ExportService:
             return None
 
     @staticmethod
-    def _chart_comparativo_shannon(datos_por_muestra, width_pt=460, height_pt=170):
+    def _chart_comparativo_shannon(datos_por_muestra, width_pt=460, height_pt=170, modo="color"):
         """
         Dos subplots: Shannon H' (colores por umbral absoluto) e Índice de Salud por muestra.
         Umbrales Shannon: <1 rojo · 1-2 naranja · 2-3 amarillo · ≥3 verde.
@@ -1026,6 +1095,12 @@ class ExportService:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
+            # Sans-serif (Arial/Helvetica) — lo que piden la mayoría de
+            # revistas científicas para el texto DENTRO de las figuras;
+            # DejaVu Sans (incluida con matplotlib) como respaldo si el
+            # servidor no tiene Arial/Helvetica instalada.
+            plt.rcParams['font.family'] = 'sans-serif'
+            plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
             from matplotlib.patches import Patch
 
             if not datos_por_muestra:
@@ -1035,26 +1110,34 @@ class ExportService:
             shannons = [float(d.get("diversidad", {}).get("shannon", 0) or 0) for d in datos_por_muestra]
             indices  = [d.get("indice_salud", 0) for d in datos_por_muestra]
 
-            def _color_shannon(v):
-                if v >= 3.0:  return '#16A34A'
-                if v >= 2.0:  return '#EAB308'
-                if v >= 1.0:  return '#F97316'
-                return '#DC2626'
+            SHAN_PALETA = _resolver_colores(['#DC2626', '#F97316', '#EAB308', '#16A34A'], modo)  # bajo→alto
+            SAL_PALETA  = _resolver_colores(['#dc2626', '#ca8a04', '#16a34a', '#14532d'], modo)   # crítico→excelente
 
-            def _color_indice(v):
-                if v >= 80:  return '#14532d'
-                if v >= 65:  return '#16a34a'
-                if v >= 50:  return '#ca8a04'
-                return '#dc2626'
+            def _bucket_shannon(v):
+                if v >= 3.0: return 3
+                if v >= 2.0: return 2
+                if v >= 1.0: return 1
+                return 0
 
-            shan_colors = [_color_shannon(v) for v in shannons]
-            bar_colors  = [_color_indice(v)  for v in indices]
+            def _bucket_indice(v):
+                if v >= 80: return 3
+                if v >= 65: return 2
+                if v >= 50: return 1
+                return 0
+
+            shan_buckets = [_bucket_shannon(v) for v in shannons]
+            sal_buckets  = [_bucket_indice(v) for v in indices]
+            shan_colors  = [SHAN_PALETA[b] for b in shan_buckets]
+            bar_colors   = [SAL_PALETA[b] for b in sal_buckets]
 
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(width_pt / 72, height_pt / 72))
             fig.patch.set_facecolor('#ffffff')
 
             # ── Subplot izquierdo: Shannon H' ───────────────────────────
-            ax1.bar(codigos, shannons, color=shan_colors, edgecolor='white', linewidth=0.6, width=0.55)
+            bars1 = ax1.bar(codigos, shannons, color=shan_colors, edgecolor='white', linewidth=0.6, width=0.55)
+            if modo == "grises":
+                for bar, b in zip(bars1, shan_buckets):
+                    bar.set_hatch(_resolver_hatch(b, modo))
             for ref, lbl in [(1.0, "H'=1 (bajo)"), (2.0, "H'=2"), (3.0, "H'=3 (alto)")]:
                 ax1.axhline(ref, color='#94a3b8', linewidth=0.7, linestyle='--', zorder=0)
                 ax1.text(len(codigos) - 0.45, ref + 0.06, lbl,
@@ -1068,16 +1151,19 @@ class ExportService:
             ax1.spines[['top', 'right']].set_visible(False)
             # Mini leyenda de colores Shannon
             shan_leg = [
-                Patch(facecolor='#16A34A', label='Alta (≥3)'),
-                Patch(facecolor='#EAB308', label='Media-alta (2-3)'),
-                Patch(facecolor='#F97316', label='Media-baja (1-2)'),
-                Patch(facecolor='#DC2626', label='Baja (<1)'),
+                Patch(facecolor=SHAN_PALETA[3], hatch=_resolver_hatch(3, modo), label='Alta (≥3)'),
+                Patch(facecolor=SHAN_PALETA[2], hatch=_resolver_hatch(2, modo), label='Media-alta (2-3)'),
+                Patch(facecolor=SHAN_PALETA[1], hatch=_resolver_hatch(1, modo), label='Media-baja (1-2)'),
+                Patch(facecolor=SHAN_PALETA[0], hatch=_resolver_hatch(0, modo), label='Baja (<1)'),
             ]
             ax1.legend(handles=shan_leg, fontsize=5, framealpha=0.8,
                        ncol=2, loc='upper left', edgecolor='#e2e8f0')
 
             # ── Subplot derecho: Índice de Salud ────────────────────────
-            ax2.bar(codigos, indices, color=bar_colors, edgecolor='white', linewidth=0.6, width=0.55)
+            bars2 = ax2.bar(codigos, indices, color=bar_colors, edgecolor='white', linewidth=0.6, width=0.55)
+            if modo == "grises":
+                for bar, b in zip(bars2, sal_buckets):
+                    bar.set_hatch(_resolver_hatch(b, modo))
             for ref, lbl in [(50, "Crítico"), (65, "Moderado"), (80, "Bueno")]:
                 ax2.axhline(ref, color='#94a3b8', linewidth=0.7, linestyle='--', zorder=0)
                 ax2.text(len(codigos) - 0.45, ref + 1.5, lbl,
@@ -1092,17 +1178,17 @@ class ExportService:
             ax2.spines[['top', 'right']].set_visible(False)
             # Mini leyenda de niveles de salud
             sal_leg = [
-                Patch(facecolor='#14532d', label='Excelente (≥80)'),
-                Patch(facecolor='#16a34a', label='Bueno (65-80)'),
-                Patch(facecolor='#ca8a04', label='Moderado (50-65)'),
-                Patch(facecolor='#dc2626', label='Crítico (<50)'),
+                Patch(facecolor=SAL_PALETA[3], hatch=_resolver_hatch(3, modo), label='Excelente (≥80)'),
+                Patch(facecolor=SAL_PALETA[2], hatch=_resolver_hatch(2, modo), label='Bueno (65-80)'),
+                Patch(facecolor=SAL_PALETA[1], hatch=_resolver_hatch(1, modo), label='Moderado (50-65)'),
+                Patch(facecolor=SAL_PALETA[0], hatch=_resolver_hatch(0, modo), label='Crítico (<50)'),
             ]
             ax2.legend(handles=sal_leg, fontsize=5, framealpha=0.8,
                        ncol=2, loc='upper left', edgecolor='#e2e8f0')
 
             plt.tight_layout(pad=0.6)
             buf = BytesIO()
-            fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
+            fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             buf.seek(0)
             return RLImage(buf, width=width_pt, height=height_pt)
@@ -1112,7 +1198,8 @@ class ExportService:
     @staticmethod
     def _chart_barras_agrupadas_funcional(datos_por_muestra, width_pt=460, height_pt=175,
                                           titulo="Composición Funcional Comparativa",
-                                          subtitulo="N.° de taxa por categoría funcional en cada muestra"):
+                                          subtitulo="N.° de taxa por categoría funcional en cada muestra",
+                                          modo="color"):
         """
         Barras agrupadas por clasificación funcional, una barra por muestra.
         Equivalente visual al modo multi-muestra del preview web.
@@ -1121,6 +1208,12 @@ class ExportService:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
+            # Sans-serif (Arial/Helvetica) — lo que piden la mayoría de
+            # revistas científicas para el texto DENTRO de las figuras;
+            # DejaVu Sans (incluida con matplotlib) como respaldo si el
+            # servidor no tiene Arial/Helvetica instalada.
+            plt.rcParams['font.family'] = 'sans-serif'
+            plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
             import numpy as np
 
             if not datos_por_muestra:
@@ -1128,8 +1221,8 @@ class ExportService:
 
             codigos = [d["muestra"].codigo for d in datos_por_muestra]
             cats    = ['benefico', 'fitopatogeno', 'neutral', 'sin_clasificar']
-            labels  = ['Benéfico', 'Fitopatógeno', 'Neutral', 'Sin catalogar']
-            clrs    = ['#16a34a', '#dc2626', '#64748b', '#94a3b8']
+            labels  = ['Benéfico', 'Fitopatógeno', 'Neutral', 'Sin clasificación']
+            clrs    = _resolver_colores(['#16a34a', '#dc2626', '#64748b', '#94a3b8'], modo)
 
             x       = np.arange(len(codigos))
             n_c     = len(cats)
@@ -1139,11 +1232,12 @@ class ExportService:
             fig, ax = plt.subplots(figsize=(width_pt / 72, height_pt / 72))
             fig.patch.set_facecolor('#ffffff')
 
-            for cat, lbl, clr, off in zip(cats, labels, clrs, offsets):
+            for i, (cat, lbl, clr, off) in enumerate(zip(cats, labels, clrs, offsets)):
                 vals = [d.get("totales_clas", {}).get(cat, 0) for d in datos_por_muestra]
                 if any(v > 0 for v in vals):
                     bars = ax.bar(x + off, vals, width=w, label=lbl,
-                                  color=clr, edgecolor='white', linewidth=0.5)
+                                  color=clr, edgecolor='white', linewidth=0.5,
+                                  hatch=_resolver_hatch(i, modo))
                     ax.bar_label(bars, fmt='%d', fontsize=5.5, padding=2, color='#374151')
 
             ax.set_xticks(x)
@@ -1159,7 +1253,7 @@ class ExportService:
 
             plt.tight_layout(pad=0.5)
             buf = BytesIO()
-            fig.savefig(buf, format='png', dpi=130, bbox_inches='tight')
+            fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             buf.seek(0)
             return RLImage(buf, width=width_pt, height=height_pt)
@@ -1190,6 +1284,7 @@ class ExportService:
         nivel        = datos.get("nivel", "genus")
         top_n        = datos.get("top_n", 25)
         usuario      = datos.get("usuario")
+        modo         = datos.get("modo_color", "color")
 
         buffer = BytesIO()
         doc = SimpleDocTemplate(
@@ -1424,7 +1519,7 @@ class ExportService:
             {"val": str(totales_clas.get("benefico", 0)),      "lbl": "Benéficos",     "color": "#16A34A", "sub": "Taxa"},
             {"val": str(totales_clas.get("fitopatogeno", 0)),  "lbl": "Fitopatógenos", "color": "#DC2626", "sub": "Taxa"},
             {"val": str(totales_clas.get("neutral", 0)),       "lbl": "Neutrales",     "color": "#64748b", "sub": "Taxa"},
-            {"val": str(totales_clas.get("sin_clasificar", 0)),"lbl": "Sin catalogar", "color": "#94A3B8", "sub": "Taxa"},
+            {"val": str(totales_clas.get("sin_clasificar", 0)),"lbl": "Sin clasificación", "color": "#94A3B8", "sub": "Taxa"},
         ], ancho_util, S)
         contenido.append(kpi_func)
         contenido.append(Spacer(1, 12))
@@ -1454,13 +1549,14 @@ class ExportService:
             top_taxa, width_pt=ancho_util,
             titulo=f"Perfil de Abundancia Relativa — Top {top_n} {nivel.capitalize()}",
             subtitulo=f"Marcador {tipo} · Muestra {cod_muestra} · Ordenado de mayor a menor abundancia relativa",
+            modo=modo,
         )
         if chart_ranked:
             contenido.append(chart_ranked)
             contenido.append(Paragraph(
                 f"Figura 1. Top {top_n} {nivel} detectados en la muestra {cod_muestra} "
                 f"(marcador {tipo}). Barras coloreadas por rol funcional: "
-                "verde = benéfico · rojo = fitopatógeno · gris = neutral · gris claro = sin catalogar.",
+                "verde = benéfico · rojo = fitopatógeno · gris = neutral · gris claro = sin clasificación.",
                 S["caption"],
             ))
 
@@ -1469,11 +1565,13 @@ class ExportService:
             top_taxa, width_pt=200, height_pt=158,
             titulo="Composición Taxonómica",
             subtitulo=f"Top 10 {nivel} · muestra {cod_muestra}",
+            modo=modo,
         )
         chart_clas  = ExportService._chart_barras_clas(
             totales_clas, width_pt=200, height_pt=128,
             titulo="Categorías Funcionales",
             subtitulo=f"N.° taxa por rol · muestra {cod_muestra}",
+            modo=modo,
         )
         if chart_donut or chart_clas:
             cap_d = Paragraph("Composición relativa (top 10 taxa)", S["caption"])
@@ -1645,7 +1743,7 @@ class ExportService:
             {"val": str(totales_clas.get("benefico", 0)),      "lbl": "Benéficos",     "color": "#16A34A", "sub": "Promotores de crecimiento"},
             {"val": str(totales_clas.get("fitopatogeno", 0)),  "lbl": "Fitopatógenos", "color": "#DC2626", "sub": "Riesgo fitosanitario"},
             {"val": str(totales_clas.get("neutral", 0)),       "lbl": "Neutrales",     "color": "#64748b", "sub": "Sin función definida"},
-            {"val": str(totales_clas.get("sin_clasificar", 0)),"lbl": "Sin catalogar", "color": "#94A3B8", "sub": "No en catálogo"},
+            {"val": str(totales_clas.get("sin_clasificar", 0)),"lbl": "Sin clasificación", "color": "#94A3B8", "sub": "No en catálogo"},
         ], ancho_util, S))
         contenido.append(Spacer(1, 12))
 
@@ -1790,11 +1888,13 @@ class ExportService:
         muestras          = datos.get("muestras", [])
         datos_por_muestra = datos.get("datos_por_muestra", [])
         top_taxa          = datos.get("top_taxa", [])
+        todos_taxa        = datos.get("todos_taxa", [])
         diversidad        = datos.get("diversidad", {})
         totales_clas      = datos.get("totales_clas", {})
         tipo              = datos.get("tipo", "16S")
         nivel             = datos.get("nivel", "genus")
         usuario           = datos.get("usuario")
+        modo              = datos.get("modo_color", "color")
 
         buffer = BytesIO()
         doc = SimpleDocTemplate(
@@ -1928,14 +2028,19 @@ class ExportService:
             m    = d["muestra"]
             tc   = d.get("totales_clas", {})
             shan = float(d.get("diversidad", {}).get("shannon", 0) or 0)
+            # "Taxa" en la misma fila que "Benéficos"/"Fitopatógenos" — ambos
+            # deben venir del universo completo de la muestra (todos_taxa), no
+            # del Top N recortado (top_taxa). Con top_taxa, cualquier muestra
+            # con más taxa que el Top N elegido mostraba siempre el mismo
+            # número (el propio top_n) sin importar su riqueza real.
             comp_hdr.append([
-                Paragraph(str(m.codigo),                   S["body_sm"]),
-                Paragraph(str(d.get("indice_salud", 0)),   S["body_sm"]),
-                Paragraph(str(d.get("nivel_salud", "N/A")),S["body_sm"]),
-                Paragraph(str(len(d.get("top_taxa", []))), S["body_sm"]),
-                Paragraph(f"{shan:.3f}",                   S["body_sm"]),
-                Paragraph(str(tc.get("benefico", 0)),      S["body_sm"]),
-                Paragraph(str(tc.get("fitopatogeno", 0)),  S["body_sm"]),
+                Paragraph(str(m.codigo),                     S["body_sm"]),
+                Paragraph(str(d.get("indice_salud", 0)),     S["body_sm"]),
+                Paragraph(str(d.get("nivel_salud", "N/A")),  S["body_sm"]),
+                Paragraph(str(len(d.get("todos_taxa", []))), S["body_sm"]),
+                Paragraph(f"{shan:.3f}",                     S["body_sm"]),
+                Paragraph(str(tc.get("benefico", 0)),        S["body_sm"]),
+                Paragraph(str(tc.get("fitopatogeno", 0)),    S["body_sm"]),
             ])
         col_comp = [80, 68, 72, 48, 65, 65, 70]
         t_comp = Table(comp_hdr, colWidths=col_comp, repeatRows=1)
@@ -1954,7 +2059,7 @@ class ExportService:
         contenido.append(Spacer(1, 14))
 
         # Gráfica comparativa Shannon + Salud
-        chart_comp = ExportService._chart_comparativo_shannon(sorted_dpm, width_pt=ancho_util, height_pt=160)
+        chart_comp = ExportService._chart_comparativo_shannon(sorted_dpm, width_pt=ancho_util, height_pt=160, modo=modo)
         if chart_comp:
             contenido.append(chart_comp)
             contenido.append(Paragraph(
@@ -1976,12 +2081,13 @@ class ExportService:
             top_taxa, width_pt=ancho_util,
             titulo=f"Perfil de Abundancia Relativa — Top {datos.get('top_n', len(top_taxa))} {nivel.capitalize()} (acumulado comparativo)",
             subtitulo=f"Marcador {tipo} · {len(muestras)} muestras · Ordenado de mayor a menor abundancia relativa global",
+            modo=modo,
         )
         if chart_ranked_g:
             contenido.append(chart_ranked_g)
             contenido.append(Paragraph(
                 f"Figura 2. Abundancia relativa acumulada de los principales {nivel} en el conjunto comparativo ({len(muestras)} muestras, marcador {tipo}). "
-                "Color: verde = benéfico · rojo = fitopatógeno · gris = neutral · gris claro = sin catalogar.",
+                "Color: verde = benéfico · rojo = fitopatógeno · gris = neutral · gris claro = sin clasificación.",
                 S["caption"],
             ))
             contenido.append(Spacer(1, 8))
@@ -2036,7 +2142,7 @@ class ExportService:
             {"val": str(totales_clas.get("benefico", 0)),      "lbl": "Benéficos",     "color": "#16A34A", "sub": "Global acumulado"},
             {"val": str(totales_clas.get("fitopatogeno", 0)),  "lbl": "Fitopatógenos", "color": "#DC2626", "sub": "Global acumulado"},
             {"val": str(totales_clas.get("neutral", 0)),       "lbl": "Neutrales",     "color": "#64748b", "sub": "Global acumulado"},
-            {"val": str(totales_clas.get("sin_clasificar", 0)),"lbl": "Sin catalogar", "color": "#94A3B8", "sub": "Global acumulado"},
+            {"val": str(totales_clas.get("sin_clasificar", 0)),"lbl": "Sin clasificación", "color": "#94A3B8", "sub": "Global acumulado"},
         ], ancho_util, S))
         contenido.append(Spacer(1, 12))
 
@@ -2045,6 +2151,7 @@ class ExportService:
             datos_por_muestra, width_pt=ancho_util, height_pt=175,
             titulo="Composición Funcional Comparativa por Muestra",
             subtitulo=f"N.° de taxa por categoría funcional en cada muestra · Marcador {tipo} · Nivel {nivel}",
+            modo=modo,
         )
         if chart_agrupada:
             contenido.append(chart_agrupada)
@@ -2061,7 +2168,7 @@ class ExportService:
             Paragraph("<b>Benéficos</b>",      S["th_dark"]),
             Paragraph("<b>Fitopatógenos</b>",  S["th_dark"]),
             Paragraph("<b>Neutrales</b>",      S["th_dark"]),
-            Paragraph("<b>Sin catalogar</b>",  S["th_dark"]),
+            Paragraph("<b>Sin clasificación</b>",  S["th_dark"]),
         ]]
         for d in datos_por_muestra:
             tc = d.get("totales_clas", {})
@@ -2134,7 +2241,11 @@ class ExportService:
 
         marcador_txt = "16S rRNA" if tipo == "16S" else "ITS (Internal Transcribed Spacer)"
         shannon_g    = float(diversidad.get("shannon", 0) or 0)
-        riqueza_g    = diversidad.get("riqueza", len(top_taxa))
+        # Universo completo de taxa (todos_taxa), no el Top N recortado
+        # (top_taxa) — mismo criterio de respaldo que el resto del reporte
+        # (ver _div_valor / líneas 544, 1284, 2852, 3211) para que "Taxa
+        # únicos detectados" no dependa de qué Top N se haya elegido.
+        riqueza_g    = diversidad.get("riqueza") or len(todos_taxa)
         nota_meto = (
             f"Análisis comparativo de <b>{len(muestras)}</b> muestras · Marcador: <b>{marcador_txt}</b> "
             f"· Nivel: <b>{nivel}</b>.<br/>"
@@ -2194,6 +2305,9 @@ class ExportService:
         jerarquia_taxonomica  = datos.get("jerarquia_taxonomica", [])
         nivel_campo_jerarquia = datos.get("nivel_campo_jerarquia", "genus")
         is_comparativo   = len(muestras) > 1
+        # Modo de color de los gráficos Plotly/Kaleido embebidos (no afecta
+        # el resto del formato de la hoja: encabezados, fills, tablas).
+        modo             = datos.get("modo_color", "color")
 
         # ── Constantes de estilo ──────────────────────────────────────────
         CV        = "1D9E75"   # verde medio
@@ -2373,7 +2487,7 @@ class ExportService:
             "🟢 Benéficos":      ("D4EDDA", "14532D"),
             "🔴 Fitopatógenos":  ("FADBD8", "7F1D1D"),
             "🔵 Neutrales":      ("D6E4F0", "1E3A5F"),
-            "⚪ Sin catalogar":  ("E5E7EB", "374151"),
+            "⚪ Sin clasificación":  ("E5E7EB", "374151"),
         }
 
         def _formatear_tabla(ws, df, nombre, header="verde", col_clasif=None,
@@ -2466,29 +2580,36 @@ class ExportService:
             encabezado en la fila 1)."""
             if titulo_celda:
                 _titulo_celda(ws, titulo_celda, titulo_txt)
-            categorias, valores, marker_colores = [], [], []
+            categorias, valores, marker_colores, marker_hatches = [], [], [], []
+            _clas_orden = ["benefico", "fitopatogeno", "neutral", "sin_clasificar"]
             for i in range(n_filas):
                 fila = fila_inicio + i
                 categorias.append(str(ws.cell(row=fila, column=col_cats).value or ""))
                 valores.append(float(ws.cell(row=fila, column=col_datos).value or 0))
                 if col_clasif:
                     clas = str(ws.cell(row=fila, column=col_clasif).value or "sin_clasificar")
-                    marker_colores.append(COLOR_POR_CLAS.get(clas, PLOTLY_GRIS))
+                    marker_colores.append(_resolver_color(COLOR_POR_CLAS.get(clas, PLOTLY_GRIS), modo))
+                    marker_hatches.append(_resolver_hatch_plotly(
+                        _clas_orden.index(clas) if clas in _clas_orden else 3, modo))
                 else:
-                    marker_colores.append(color_fill or PLOTLY_VERDE)
+                    marker_colores.append(_resolver_color(color_fill or PLOTLY_VERDE, modo))
+                    marker_hatches.append(_resolver_hatch_plotly(0, modo))
             # Invertido: Plotly dibuja barras horizontales de abajo hacia
             # arriba, así que el taxón más abundante debe ir al final de la
             # lista para quedar arriba (igual que el gráfico nativo original).
-            categorias, valores, marker_colores = (
-                categorias[::-1], valores[::-1], marker_colores[::-1])
+            categorias, valores, marker_colores, marker_hatches = (
+                categorias[::-1], valores[::-1], marker_colores[::-1], marker_hatches[::-1])
+            marker_kwargs = dict(color=marker_colores, line=dict(width=0))
+            if modo == "grises":
+                marker_kwargs["pattern"] = dict(shape=marker_hatches, fgcolor="#ffffff", size=6)
             fig = go.Figure(go.Bar(
                 x=valores, y=categorias, orientation="h",
-                marker=dict(color=marker_colores, line=dict(width=0)),
+                marker=marker_kwargs,
                 text=[f"{v:.2f}%" for v in valores], textposition="outside",
                 cliponaxis=False,
             ))
             layout = _plotly_layout_base(titulo_txt or "Abundancia relativa")
-            layout["xaxis"] = dict(title="Abundancia (%)", gridcolor="#EDEDED", zeroline=False)
+            layout["xaxis"] = dict(title="Abundancia (%)", gridcolor="#c8c8c8", zeroline=False)
             layout["yaxis"] = dict(title="Taxonomía", automargin=True)
             fig.update_layout(layout)
             alto_px = max(360, min(int(n_filas * 28) + 110, 900))
@@ -2508,14 +2629,20 @@ class ExportService:
                 categorias.append(str(ws.cell(row=fila, column=col_cats).value or ""))
                 valores.append(float(ws.cell(row=fila, column=col_datos).value or 0))
             marker_colores = colores if colores else [color_fill or PLOTLY_VERDE] * len(valores)
+            marker_colores = _resolver_colores(marker_colores, modo)
+            marker_kwargs = dict(color=marker_colores, line=dict(width=0))
+            if modo == "grises":
+                marker_kwargs["pattern"] = dict(
+                    shape=[_resolver_hatch_plotly(i, modo) for i in range(len(valores))],
+                    fgcolor="#ffffff", size=6)
             fig = go.Figure(go.Bar(
                 x=categorias, y=valores,
-                marker=dict(color=marker_colores, line=dict(width=0)),
+                marker=marker_kwargs,
                 text=[f"{v:.2f}" for v in valores], textposition="outside",
                 cliponaxis=False,
             ))
             layout = _plotly_layout_base(titulo_txt)
-            layout["yaxis"] = dict(title=y_titulo, gridcolor="#EDEDED", zeroline=False,
+            layout["yaxis"] = dict(title=y_titulo, gridcolor="#c8c8c8", zeroline=False,
                                     range=[0, y_max] if y_max else None)
             layout["xaxis"] = dict(showgrid=False)
             fig.update_layout(layout)
@@ -2532,9 +2659,14 @@ class ExportService:
                 categorias.append(str(ws.cell(row=fila, column=col_cats).value or ""))
                 valores.append(float(ws.cell(row=fila, column=col_datos).value or 0))
             palette = colores or [PLOTLY_VERDE, PLOTLY_ROJO, PLOTLY_AMBAR, PLOTLY_GRIS]
+            palette = _resolver_colores(palette[:len(categorias)], modo)
+            marker_kwargs = dict(colors=palette, line=dict(color="white", width=2))
+            if modo == "grises":
+                marker_kwargs["pattern"] = dict(
+                    shape=[_resolver_hatch_plotly(i, modo) for i in range(len(categorias))])
             fig = go.Figure(go.Pie(
                 labels=categorias, values=valores, hole=0.55,
-                marker=dict(colors=palette[:len(categorias)], line=dict(color="white", width=2)),
+                marker=marker_kwargs,
                 textinfo="percent", textfont=dict(size=13),
             ))
             layout = _plotly_layout_base(titulo_txt)
@@ -2550,10 +2682,12 @@ class ExportService:
             """Los valores de los nodos padre (categorías) se pasan como
             None a propósito: Plotly los calcula automáticamente como la
             suma de sus hijos en vez de exigir que coincidan manualmente."""
+            gris_scale = [[0, "#F3F4F6"], [1, "#4B5563"]]
             fig = go.Figure(go.Treemap(
                 ids=ids, labels=labels, parents=parents, values=values,
-                marker=(dict(colors=colores) if colores else
-                        dict(colorscale=[[0, PLOTLY_TURQUESA], [1, PLOTLY_VERDE_OS]])),
+                marker=(dict(colors=_resolver_colores(colores, modo)) if colores else
+                        dict(colorscale=gris_scale if modo == "grises"
+                             else [[0, PLOTLY_TURQUESA], [1, PLOTLY_VERDE_OS]])),
                 textinfo="label+percent parent",
                 root_color="white",
             ))
@@ -2565,10 +2699,11 @@ class ExportService:
                           ancho_px=760, alto_px=680):
             """ids compuestos (no solo labels) para no fusionar nodos con
             el mismo nombre en ramas distintas del árbol taxonómico."""
+            colorscale_sb = ([[0, "#F3F4F6"], [0.5, "#9CA3AF"], [1, "#374151"]] if modo == "grises"
+                              else [[0, PLOTLY_TURQUESA], [0.5, PLOTLY_VERDE], [1, PLOTLY_VERDE_OS]])
             fig = go.Figure(go.Sunburst(
                 ids=ids, labels=labels, parents=parents, values=values,
-                marker=dict(colorscale=[[0, PLOTLY_TURQUESA], [0.5, PLOTLY_VERDE],
-                                         [1, PLOTLY_VERDE_OS]]),
+                marker=dict(colorscale=colorscale_sb),
             ))
             fig.update_layout(_plotly_layout_base(titulo_txt))
             return _fig_a_imagen_xl(fig, ancho_px, alto_px)
@@ -2576,10 +2711,12 @@ class ExportService:
         def _fig_heatmap(matriz, filas, columnas,
                          titulo_txt="Distribución de Abundancia por Muestra",
                          ancho_px=900, alto_px=520):
+            colorscale_hm = ([[0, "#F9FAFB"], [0.5, "#9CA3AF"], [1, "#1F2937"]] if modo == "grises"
+                              else [[0, "#F0FDF9"], [0.5, PLOTLY_TURQUESA], [1, PLOTLY_VERDE_OS]])
             fig = go.Figure(go.Heatmap(
                 z=matriz, x=columnas, y=filas,
-                colorscale=[[0, "#F0FDF9"], [0.5, PLOTLY_TURQUESA], [1, PLOTLY_VERDE_OS]],
-                colorbar=dict(title="%"),
+                colorscale=colorscale_hm,
+                colorbar=dict(title="Abundancia (%)"),
             ))
             layout = _plotly_layout_base(titulo_txt)
             layout["xaxis"] = dict(title="Muestra", side="bottom")
@@ -2589,11 +2726,14 @@ class ExportService:
 
         def _fig_radar(categorias, valores, titulo_txt="Indicadores Ecológicos",
                        ancho_px=560, alto_px=520):
+            linea_color  = _resolver_color(PLOTLY_TURQUESA, modo)
+            marker_color = _resolver_color(PLOTLY_VERDE_OS, modo)
+            fill_color   = "rgba(107,114,128,0.25)" if modo == "grises" else "rgba(20,184,166,0.25)"
             fig = go.Figure(go.Scatterpolar(
                 r=valores + valores[:1], theta=categorias + categorias[:1],
-                fill="toself", fillcolor="rgba(20,184,166,0.25)",
-                line=dict(color=PLOTLY_TURQUESA, width=2),
-                marker=dict(color=PLOTLY_VERDE_OS, size=6),
+                fill="toself", fillcolor=fill_color,
+                line=dict(color=linea_color, width=2),
+                marker=dict(color=marker_color, size=6),
             ))
             layout = _plotly_layout_base(titulo_txt)
             layout["polar"] = dict(
@@ -2605,7 +2745,8 @@ class ExportService:
 
         def _fig_gauge(valor, nivel_salud_g="N/A", titulo_txt="Índice de Salud del Suelo",
                       ancho_px=520, alto_px=380):
-            color_aguja = _NIVEL_COLORES.get(nivel_salud_g, "#64748b")
+            color_aguja = _resolver_color(_NIVEL_COLORES.get(nivel_salud_g, "#64748b"), modo)
+            pasos_color = _resolver_colores(["#FEE2E2", "#FEF3C7", "#D1FAE5", "#A7F3D0"], modo)
             fig = go.Figure(go.Indicator(
                 mode="gauge+number",
                 value=valor,
@@ -2616,10 +2757,10 @@ class ExportService:
                     bgcolor="white",
                     borderwidth=0,
                     steps=[
-                        dict(range=[0, 40],   color="#FEE2E2"),
-                        dict(range=[40, 60],  color="#FEF3C7"),
-                        dict(range=[60, 80],  color="#D1FAE5"),
-                        dict(range=[80, 100], color="#A7F3D0"),
+                        dict(range=[0, 40],   color=pasos_color[0]),
+                        dict(range=[40, 60],  color=pasos_color[1]),
+                        dict(range=[60, 80],  color=pasos_color[2]),
+                        dict(range=[80, 100], color=pasos_color[3]),
                     ],
                 ),
             ))
@@ -2631,7 +2772,7 @@ class ExportService:
             "benefico":       "🟢 Benéficos",
             "fitopatogeno":   "🔴 Fitopatógenos",
             "neutral":        "🔵 Neutrales",
-            "sin_clasificar": "⚪ Sin catalogar",
+            "sin_clasificar": "⚪ Sin clasificación",
         }
 
         def _datos_treemap_taxa(registros, top=20):
@@ -2821,7 +2962,7 @@ class ExportService:
                     ["🔵 Taxa Neutrales",
                      str(totales_clas.get("neutral", 0)),
                      f"{totales_clas.get('neutral',0)/total_clf*100:.1f}% del total catalogado"],
-                    ["⚪ Taxa Sin Catalogar",
+                    ["⚪ Taxa Sin Clasificación",
                      str(totales_clas.get("sin_clasificar", 0)),
                      "No presentes en el catálogo funcional"],
                 ]
@@ -3003,7 +3144,7 @@ class ExportService:
                      "%_Total": round(totales_clas.get("neutral",0)/total_det*100, 2),
                      "Descripción_del_Rol":
                          "Sin función agronómica conocida o con efecto dependiente del contexto"},
-                    {"Categoría": "⚪ Sin catalogar",
+                    {"Categoría": "⚪ Sin clasificación",
                      "N°_Taxa": totales_clas.get("sin_clasificar", 0),
                      "%_Total": round(totales_clas.get("sin_clasificar",0)/total_det*100, 2),
                      "Descripción_del_Rol":
@@ -3146,7 +3287,7 @@ class ExportService:
                     ["🟢 Taxa Benéficos",    str(totales_clas.get("benefico", 0)), ""],
                     ["🔴 Taxa Fitopatógenos",str(totales_clas.get("fitopatogeno", 0)), ""],
                     ["🔵 Taxa Neutrales",    str(totales_clas.get("neutral", 0)), ""],
-                    ["⚪ Taxa Sin Catalogar",str(totales_clas.get("sin_clasificar", 0)), ""],
+                    ["⚪ Taxa Sin Clasificación",str(totales_clas.get("sin_clasificar", 0)), ""],
                     ["Índice Salud Global", str(indice_salud),
                      INTERP_SALUD.get(nivel_salud, "")],
                     ["Nivel cualitativo global", nivel_salud, ""],
@@ -3226,13 +3367,13 @@ class ExportService:
                         "Benéficos":        tc.get("benefico", 0),
                         "Fitopatógenos":    tc.get("fitopatogeno", 0),
                         "Neutrales":        tc.get("neutral", 0),
-                        "Sin_Catalogar":    tc.get("sin_clasificar", 0),
+                        "Sin_Clasificacion":    tc.get("sin_clasificar", 0),
                     })
                 df_cuad = (pd.DataFrame(cuad_rec) if cuad_rec
                            else pd.DataFrame(columns=["Muestra","Cultivo","Variedad",
                                "Localidad","Índice_Salud","Nivel","Riqueza",
                                "Shannon_H'","Simpson_D","Equitatividad_J'",
-                               "Benéficos","Fitopatógenos","Neutrales","Sin_Catalogar"]))
+                               "Benéficos","Fitopatógenos","Neutrales","Sin_Clasificacion"]))
                 _excel_safe_df(df_cuad).to_excel(writer, index=False, sheet_name="Cuadro_Comparativo")
                 ws_cuad = writer.sheets["Cuadro_Comparativo"]
                 _formatear_tabla(ws_cuad, df_cuad, "TablaCuadroComp")
@@ -3534,7 +3675,7 @@ class ExportService:
                         "Benéficos":       tc.get("benefico", 0),
                         "Fitopatógenos":   tc.get("fitopatogeno", 0),
                         "Neutrales":       tc.get("neutral", 0),
-                        "Sin_Catalogar":   tc.get("sin_clasificar", 0),
+                        "Sin_Clasificacion":   tc.get("sin_clasificar", 0),
                         "Total_Taxa":      tot,
                         "%_Benéficos":     round(tc.get("benefico",0)/tot*100, 2),
                         "%_Fitopatógenos": round(tc.get("fitopatogeno",0)/tot*100, 2),
@@ -3542,7 +3683,7 @@ class ExportService:
                 df_cls = (pd.DataFrame(cls_rec) if cls_rec
                           else pd.DataFrame(columns=[
                               "Muestra","Benéficos","Fitopatógenos","Neutrales",
-                              "Sin_Catalogar","Total_Taxa","%_Benéficos","%_Fitopatógenos"]))
+                              "Sin_Clasificacion","Total_Taxa","%_Benéficos","%_Fitopatógenos"]))
                 _excel_safe_df(df_cls).to_excel(writer, index=False, sheet_name="Clas_Por_Muestra")
                 ws_cls = writer.sheets["Clas_Por_Muestra"]
                 _formatear_tabla(ws_cls, df_cls, "TablaClsPorMuestra")
@@ -3634,7 +3775,7 @@ class ExportService:
             fila_clf0 = fila_ap + 1
             for i, (cod, lbl) in enumerate([
                 ("benefico", "Benéficos"), ("fitopatogeno", "Fitopatógenos"),
-                ("neutral", "Neutrales"), ("sin_clasificar", "Sin catalogar"),
+                ("neutral", "Neutrales"), ("sin_clasificar", "Sin clasificación"),
             ]):
                 ws_dash.cell(row=fila_clf0 + i, column=1, value=lbl)
                 ws_dash.cell(row=fila_clf0 + i, column=2, value=totales_clas.get(cod, 0))

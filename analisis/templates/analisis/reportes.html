@@ -1,4 +1,6 @@
 {% extends "analisis/base.html" %}
+{% load static %}
+{% load custom_filters %}
 
 {% block title %}Reportes — BioMicro UTC{% endblock %}
 {% block nav_reportes %}active{% endblock %}
@@ -6,7 +8,7 @@
 
 {% block topbar_actions %}
 <a href="{% url 'analisis:historial' %}" class="btn btn-outline btn-sm">
-    <i class="ti ti-arrow-left"></i> Historial
+    <i class="ti ti-arrow-left"></i> Registro de Muestras
 </a>
 {% endblock %}
 
@@ -246,6 +248,13 @@
                style="display:none; font-size:16px; color:var(--verde); animation:rpt-spin 1s linear infinite;"></i>
         </div>
 
+        <label style="display:flex; align-items:center; gap:5px; font-size:12.5px; color:var(--text-muted); cursor:pointer; white-space:nowrap;">
+            <input type="checkbox" id="rpt-modo-grises">
+            <span class="bs-tip" data-tip="Genera los gráficos internos del PDF/Excel en escala de grises con tramas por categoría, para impresión o publicación en blanco y negro. No afecta los datos.">
+                Escala de grises (impresión) <i class="ti ti-help-circle bs-tip-ico"></i>
+            </span>
+        </label>
+
         <div style="display:flex; gap:4px;">
             <button id="btn-pdf" onclick="descargar('pdf')"
                     class="btn btn-primary btn-sm" title="PDF del reporte de la(s) muestra(s) seleccionada(s)">
@@ -340,7 +349,7 @@
         <div class="metric-sub">Sin impacto directo</div>
     </div>
     <div class="metric-card gris-claro">
-        <div class="metric-label">Sin catalogar</div>
+        <div class="metric-label">Sin clasificación</div>
         <div class="metric-value">{{ totales_clasificacion.sin_clasificar }}</div>
         <div class="metric-sub">No en catálogo</div>
     </div>
@@ -369,10 +378,7 @@
                 {% endif %}
             </p>
         </div>
-        <button onclick="exportarGrafica('rpt-grafico-principal','perfil_abundancia')"
-                class="btn btn-outline btn-sm" style="flex-shrink:0;">
-            <i class="ti ti-download"></i> PNG
-        </button>
+        <span id="dl-rpt-principal" style="flex-shrink:0;"></span>
     </div>
     <div id="rpt-grafico-principal" style="width:100%; min-height:420px;"></div>
 </div>
@@ -443,7 +449,7 @@
                     </td>
                     <td>
                         <strong style="font-family:'DM Mono',monospace; font-weight:500; font-size:13px;">
-                            {{ item.taxonomia|default:"Desconocido" }}
+                            {{ item.taxonomia|taxon_legible|default:"Desconocido" }}
                         </strong>
                     </td>
                     <td class="td-mono" style="font-size:13px;">
@@ -476,7 +482,7 @@
                                 Neutral
                             </span>
                         {% else %}
-                            <span class="badge badge-sin-clas">Sin catalogar</span>
+                            <span class="badge badge-sin-clas">Sin clasificación</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -559,6 +565,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="{% static 'analisis/js/chart_theme.js' %}"></script>
 
 <script>
 var _MODO_MUESTRA = {{ muestra_ids_seleccionados|length }};
@@ -578,127 +585,145 @@ var LABEL_CLAS = {
     sin_clasificar:'Sin clasificación',
 };
 
-function exportarGrafica(divId, nombre) {
-    var el = document.getElementById(divId);
-    if (el) Plotly.downloadImage(el, { format:'png', filename:nombre, width:1600, height:650, scale:2 });
+function claseColor(hex, mode) {
+    return ChartTheme.isGrayMode(mode) ? ChartTheme.toGrayscaleHex(hex) : hex;
+}
+
+function renderPerfil(mode) {
+    var div = document.getElementById('rpt-grafico-principal');
+    if (!div || !(_RESUMEN_JSON.length > 0)) return;
+
+    var nombres = _RESUMEN_JSON.map(function(d){ return ChartTheme.taxonLegible(d.nombre); });
+    var CATS = ['benefico', 'fitopatogeno', 'neutral', 'sin_clasificar'];
+    var gray = ChartTheme.isGrayMode(mode);
+
+    var traces = CATS.map(function(cat, i) {
+        var color = claseColor(COLOR_CLAS[cat], mode);
+        var ys = _RESUMEN_JSON.map(function(d){
+            return d.clasificacion === cat ? d.porcentaje : null;
+        });
+        var hoverTexts = _RESUMEN_JSON.map(function(d){
+            if (d.clasificacion !== cat) return '';
+            return '<b>' + ChartTheme.taxonLegible(d.nombre) + '</b><br>'
+                 + d.porcentaje.toFixed(2) + '% &nbsp;(' + d.hits + ' hits)<br>'
+                 + '<i>' + LABEL_CLAS[cat] + '</i>';
+        });
+        return {
+            type: 'scatter',
+            mode: 'lines+markers+text',
+            name: LABEL_CLAS[cat],
+            x: nombres,
+            y: ys,
+            text: ys.map(function(p){ return (p !== null && p > 0) ? p.toFixed(2) + '%' : ''; }),
+            textposition: 'top center',
+            textfont: { size: 10, color: color, family: 'Arial, sans-serif' },
+            hovertext: hoverTexts,
+            hoverinfo: 'text',
+            connectgaps: false,
+            line:   { color: color, width: 2.5, dash: gray ? ChartTheme.getDash(i) : 'solid' },
+            marker: { color: color, size: 10, symbol: gray ? ChartTheme.getSymbol(i) : 'circle',
+                      line: { color: '#ffffff', width: 2 } },
+        };
+    });
+
+    var todosValores = [].concat.apply([], traces.map(function(t){ return t.y.filter(function(v){ return v !== null; }); }));
+    var yRange = ChartTheme.computeYRange(todosValores);
+    // Nombres de taxón largos recortados con "…" en el eje (igual que Excel);
+    // el nombre completo sigue disponible en el hover.
+    var ticksNombres = ChartTheme.buildTruncatedTicks(nombres, 18);
+
+    Plotly.newPlot(div, traces, Object.assign({}, ChartTheme.baseLayout(mode), {
+        title: {
+            text: 'Perfil de Abundancia Relativa por {{ nivel_actual|capfirst }}',
+            font: { size: 14, color: '#1e293b', family: 'Arial, sans-serif' },
+            x: 0.5, xanchor: 'center',
+        },
+        xaxis: {
+            title: 'Taxón',
+            tickangle: nombres.length > 6 ? -40 : 0,
+            automargin: true, showgrid: false, zeroline: false,
+            tickfont: { size: nombres.length > 15 ? 9 : 11 },
+            tickvals: ticksNombres.tickvals, ticktext: ticksNombres.ticktext,
+        },
+        yaxis: Object.assign({
+            title: { text: 'Abundancia relativa (%)', standoff: 6 },
+            rangemode: 'tozero', zeroline: true, zerolinecolor: '#cbd5e1',
+            tickfont: { size: 10 }, automargin: true,
+        }, ChartTheme.yAxisGrid(mode), yRange ? { range: yRange, autorange: false } : {}),
+        legend: { orientation: 'h', y: -0.22, xanchor: 'center', x: 0.5, font: { size: 12 } },
+        height: 470,
+        margin: { t: 60, r: 30, b: 110, l: 70 },
+        hovermode: 'x unified',
+    }), { responsive: true, displayModeBar: false });
+}
+
+function renderTendencia(mode) {
+    var div = document.getElementById('rpt-grafico-principal');
+    if (!div || !(_CLAS_JSON.length > 0)) return;
+
+    var muestras = _CLAS_JSON.map(function(d){ return d.muestra; });
+    var gray = ChartTheme.isGrayMode(mode);
+    var CFG = [
+        { key:'benefico',     label:'Benéfico',               color:'#16a34a' },
+        { key:'fitopatogeno', label:'Potencial Fitopatógeno', color:'#dc2626' },
+        { key:'neutral',      label:'Neutral',                color:'#475569' },
+    ];
+    var traces = CFG.map(function(cfg, i) {
+        var color = claseColor(cfg.color, mode);
+        var counts = _CLAS_JSON.map(function(d){ return d[cfg.key] || 0; });
+        var hover  = _CLAS_JSON.map(function(d) {
+            var n     = d[cfg.key] || 0;
+            var names = d['nombres_' + cfg.key] || [];
+            if (n === 0) return '<b>' + cfg.label + ': 0 taxones</b>';
+            var lista = names.slice(0, 15).map(function(s){ return ' • ' + ChartTheme.taxonLegible(s); }).join('<br>');
+            var extra = names.length > 15 ? '<br><i>…y ' + (names.length-15) + ' más</i>' : '';
+            return '<b>' + cfg.label + ': ' + n + ' taxón(es)</b><br>' + lista + extra;
+        });
+        return {
+            type: 'scatter', mode: 'lines+markers+text',
+            name: cfg.label, x: muestras, y: counts,
+            text: counts.map(function(n){ return n > 0 ? String(n) : ''; }),
+            textposition: 'top center',
+            textfont: { size: 11, color: color },
+            hovertext: hover, hoverinfo: 'text',
+            line:   { color: color, width: 2.5, dash: gray ? ChartTheme.getDash(i) : 'solid' },
+            marker: { color: color, size: 11, symbol: gray ? ChartTheme.getSymbol(i) : 'circle',
+                      line: { color:'#ffffff', width:2 } },
+            connectgaps: true,
+        };
+    });
+
+    var todosValores = [].concat.apply([], traces.map(function(t){ return t.y; }));
+    var yRange = ChartTheme.computeYRange(todosValores);
+
+    Plotly.newPlot(div, traces, Object.assign({}, ChartTheme.baseLayout(mode), {
+        height: 420,
+        margin: { t: 20, b: muestras.length > 4 ? 130 : 90, l: 60, r: 25 },
+        xaxis: { title: 'Muestra', tickangle: muestras.length > 4 ? -38 : 0, automargin: true, tickfont: { size: 10 }, showgrid: false, zeroline: false },
+        yaxis: Object.assign({ title: { text: 'N.° de taxa únicos', standoff: 6 }, zeroline: true, zerolinecolor: '#cbd5e1', tickfont: { size: 10 }, rangemode: 'tozero' },
+            ChartTheme.yAxisGrid(mode), yRange ? { range: yRange } : {}),
+        legend: { orientation: 'h', y: -0.24, x: 0.5, xanchor: 'center', font: { size: 11.5 } },
+        hovermode: 'closest',
+    }), { responsive: true, displayModeBar: false });
 }
 
 document.addEventListener('DOMContentLoaded', function () {
     var div = document.getElementById('rpt-grafico-principal');
     if (!div) return;
 
-    // ── Modo 1 muestra (o global): perfil de abundancia, una línea por categoría ──
-    if (_MODO_MUESTRA <= 1 && _RESUMEN_JSON.length > 0) {
-        var nombres = _RESUMEN_JSON.map(function(d){ return d.nombre; });
-
-        // Categorías en el orden que aparecerán en la leyenda
-        var CATS = ['benefico', 'fitopatogeno', 'neutral', 'sin_clasificar'];
-
-        var traces = CATS.map(function(cat) {
-            // Cada traza solo tiene valor (%) donde el organismo pertenece a esa categoría
-            // En los demás posiciones → null (la línea no se conecta, queda separada)
-            var ys = _RESUMEN_JSON.map(function(d){
-                return d.clasificacion === cat ? d.porcentaje : null;
-            });
-
-            var hoverTexts = _RESUMEN_JSON.map(function(d, i){
-                if (d.clasificacion !== cat) return '';
-                return '<b>' + d.nombre + '</b><br>'
-                     + d.porcentaje.toFixed(2) + '% &nbsp;(' + d.hits + ' hits)<br>'
-                     + '<i>' + LABEL_CLAS[cat] + '</i>';
-            });
-
-            return {
-                type: 'scatter',
-                mode: 'lines+markers+text',
-                name: LABEL_CLAS[cat],
-                x: nombres,
-                y: ys,
-                // Valor % encima de cada punto que tiene dato
-                text: ys.map(function(p){
-                    return (p !== null && p > 0) ? p.toFixed(2) + '%' : '';
-                }),
-                textposition: 'top center',
-                textfont: { size: 10, color: COLOR_CLAS[cat], family: 'Arial, sans-serif' },
-                hovertext: hoverTexts,
-                hoverinfo: 'text',
-                connectgaps: false,          // NO conectar puntos de categorías distintas
-                line:   { color: COLOR_CLAS[cat], width: 2.5 },
-                marker: { color: COLOR_CLAS[cat], size: 10,
-                          line: { color: '#ffffff', width: 2 } },
-            };
-        });
-
-        Plotly.newPlot(div, traces, {
-            title: {
-                text: 'Perfil de Abundancia Relativa por {{ nivel_actual|capfirst }}',
-                font: { size: 14, color: '#1e293b', family: 'Arial, sans-serif' },
-                x: 0.5, xanchor: 'center',
-            },
-            xaxis: {
-                tickangle: nombres.length > 6 ? -40 : 0,
-                automargin: true, showgrid: false, zeroline: false,
-                tickfont: { size: nombres.length > 15 ? 9 : 11 },
-            },
-            yaxis: {
-                title: { text: 'Abundancia relativa (%)', standoff: 6 },
-                rangemode: 'tozero', showgrid: true,
-                gridcolor: '#e2e8f0', zeroline: true, zerolinecolor: '#cbd5e1',
-                tickfont: { size: 10 }, automargin: true,
-            },
-            legend: {
-                orientation: 'h', y: -0.22, xanchor: 'center', x: 0.5,
-                font: { size: 12 },
-            },
-            height: 470,
-            margin: { t: 60, r: 30, b: 110, l: 70 },
-            hovermode: 'x unified',
-            plot_bgcolor: '#ffffff', paper_bgcolor: '#ffffff',
-        }, { responsive: true, displayModeBar: false });
-
-    // ── Modo 2+ muestras: tendencia de taxones por categoría ───────────
-    } else if (_MODO_MUESTRA >= 2 && _CLAS_JSON.length > 0) {
-        var muestras = _CLAS_JSON.map(function(d){ return d.muestra; });
-        var CFG = [
-            { key:'benefico',     label:'Benéfico',               color:'#16a34a' },
-            { key:'fitopatogeno', label:'Potencial Fitopatógeno', color:'#dc2626' },
-            { key:'neutral',      label:'Neutral',                color:'#475569' },
-        ];
-        var traces = CFG.map(function(cfg) {
-            var counts = _CLAS_JSON.map(function(d){ return d[cfg.key] || 0; });
-            var hover  = _CLAS_JSON.map(function(d) {
-                var n     = d[cfg.key] || 0;
-                var names = d['nombres_' + cfg.key] || [];
-                if (n === 0) return '<b>' + cfg.label + ': 0 taxones</b>';
-                var lista = names.slice(0, 15).map(function(s){ return ' • ' + s; }).join('<br>');
-                var extra = names.length > 15 ? '<br><i>…y ' + (names.length-15) + ' más</i>' : '';
-                return '<b>' + cfg.label + ': ' + n + ' taxón(es)</b><br>' + lista + extra;
-            });
-            return {
-                type: 'scatter', mode: 'lines+markers+text',
-                name: cfg.label, x: muestras, y: counts,
-                text: counts.map(function(n){ return n > 0 ? String(n) : ''; }),
-                textposition: 'top center',
-                textfont: { size: 11, color: cfg.color },
-                hovertext: hover, hoverinfo: 'text',
-                line:   { color: cfg.color, width: 2.5 },
-                marker: { color: cfg.color, size: 11, line: { color:'#ffffff', width:2 } },
-                connectgaps: true,
-            };
-        });
-
-        Plotly.newPlot(div, traces, {
-            template: 'plotly_white',
-            font: { family: 'Outfit, sans-serif' },
-            height: 420,
-            margin: { t: 20, b: muestras.length > 4 ? 130 : 90, l: 60, r: 25 },
-            xaxis: { tickangle: muestras.length > 4 ? -38 : 0, automargin: true, tickfont: { size: 10 }, showgrid: false, zeroline: false },
-            yaxis: { title: { text: 'N.° taxa únicos', standoff: 6 }, gridcolor: '#e2e8f0', zeroline: true, zerolinecolor: '#cbd5e1', tickfont: { size: 10 }, rangemode: 'tozero' },
-            legend: { orientation: 'h', y: -0.24, x: 0.5, xanchor: 'center', font: { size: 11.5 } },
-            hovermode: 'closest',
-            plot_bgcolor: '#ffffff', paper_bgcolor: '#ffffff',
-        }, { responsive: true, displayModeBar: false });
+    function renderTodo(mode) {
+        if (_MODO_MUESTRA <= 1) { renderPerfil(mode); }
+        else { renderTendencia(mode); }
     }
+
+    // Sin selector Color/Escala de grises en esta página — siempre a color.
+    renderTodo('color');
+
+    ChartTheme.addPlotlyDownloadButtons('dl-rpt-principal', {
+        divId: 'rpt-grafico-principal',
+        filenameBase: 'perfil_abundancia',
+        getMode: function () { return 'color'; },
+    });
 });
 </script>
 
@@ -763,18 +788,20 @@ document.addEventListener('DOMContentLoaded', syncHidden);
 function parametrosReporteActual() {
     var ids = Array.from(document.querySelectorAll('#rpt-select-hidden option:checked'))
                    .map(function(o){ return o.value; });
+    var chkGrises = document.getElementById('rpt-modo-grises');
     return {
         tipo:  '{{ tipo_actual|default:"16S" }}',
         nivel: '{{ nivel_actual|default:"genus" }}',
         topN:  document.getElementById('top-n-selector').value,
         ids:   ids,
+        modoColor: (chkGrises && chkGrises.checked) ? 'grises' : 'color',
     };
 }
 
 // Pide el reporte al servidor y devuelve el blob (lanza excepción si falla).
 async function pedirBlobReporte(formato) {
     var p    = parametrosReporteActual();
-    var body = new URLSearchParams({ tipo:p.tipo, nivel:p.nivel, top_n:p.topN, formato:formato });
+    var body = new URLSearchParams({ tipo:p.tipo, nivel:p.nivel, top_n:p.topN, formato:formato, modo_color:p.modoColor });
     p.ids.forEach(function(id){ body.append('muestra_id', id); });
 
     var resp = await fetch("{% url 'analisis:generar_reporte' %}", {

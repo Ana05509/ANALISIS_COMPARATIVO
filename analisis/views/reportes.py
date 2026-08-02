@@ -13,6 +13,8 @@ from analisis.models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorga
 from analisis.services.business.analysis_service import obtener_analisis_avanzado, obtener_diversidad, _filtrar_catalogo_por_nivel
 from analisis.services.business.export_service import ExportService
 from analisis.constants import MARCADORES_VALIDOS, OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES, get_taxonomia_annotation, clasificar_taxon, buscar_en_catalogo, NIVELES_ES, MARCADORES_ES, NIVELES_CHOICES, MARCADORES_CHOICES, normalizar_nombre_catalogo
+from analisis.audit import registrar_accion
+from django.contrib.admin.models import CHANGE
 
 FORMATOS_VALIDOS = ("pdf", "excel")
 
@@ -318,6 +320,10 @@ def generar_reporte(request) -> HttpResponseBase:
     muestra_ids = [int(x) for x in request.POST.getlist("muestra_id") if x.isdigit()]
     ids_param   = muestra_ids if muestra_ids else None
 
+    modo_color = request.POST.get("modo_color", "color")
+    if modo_color not in ("color", "grises"):
+        modo_color = "color"
+
     try:
         datos_rpt = _construir_datos_reporte(tipo, nivel, top_n, ids_param)
         if not datos_rpt:
@@ -337,6 +343,7 @@ def generar_reporte(request) -> HttpResponseBase:
             "muestras": muestras_list,
             "muestra":  muestras_list[0] if len(muestras_list) == 1 else None,
             "usuario":  request.user,
+            "modo_color": modo_color,
         }
 
         if formato == "excel":
@@ -356,6 +363,12 @@ def generar_reporte(request) -> HttpResponseBase:
                         datos["analisis_diferencial"] = diff
                 except Exception:
                     pass
+            if muestras_list:
+                registrar_accion(
+                    request, muestras_list[0],
+                    f"Reporte Excel generado (nivel {nivel}, top {top_n}, {len(muestras_list)} muestra(s)).",
+                    accion=CHANGE,
+                )
             return ExportService.generar_excel_multisheet(datos)
 
         # PDF — individual si 0-1 muestras, comparativo si 2+
@@ -367,6 +380,13 @@ def generar_reporte(request) -> HttpResponseBase:
             pdf_bytes = ExportService.generar_pdf_individual(datos)
             codigo    = muestras_list[0].codigo if muestras_list else "global"
             nombre    = f"reporte_{tipo}_{nivel}_{codigo}_{fecha}.pdf"
+
+        if muestras_list:
+            registrar_accion(
+                request, muestras_list[0],
+                f"Reporte PDF generado (nivel {nivel}, top {top_n}, {len(muestras_list)} muestra(s)).",
+                accion=CHANGE,
+            )
 
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{nombre}"'

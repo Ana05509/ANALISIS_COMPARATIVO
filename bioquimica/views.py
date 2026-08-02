@@ -1,5 +1,6 @@
 import json
 from datetime import date
+from decimal import Decimal, InvalidOperation
 
 import plotly.graph_objects as go
 from django.contrib import messages
@@ -7,10 +8,13 @@ from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.shortcuts import redirect, render, get_object_or_404
 
+from .forms import EnsayoManualForm
 from .models import (
     EnsayoMicrobiologico, RecuentoUFC,
     MicroorganismoAislado, PruebaBioquimica,
 )
+from analisis.audit import registrar_accion
+from django.contrib.admin.models import ADDITION
 
 
 def _grafico_recuento(ensayo):
@@ -22,6 +26,10 @@ def _grafico_recuento(ensayo):
     valores = [max(r.valor_numerico, 0.1) for r in recuentos]
     etiquetas = [r.valor_display for r in recuentos]
     colores = ['#1D9E75' if r.tipo_organismo == 'bacteria' else '#F5A623' for r in recuentos]
+    # tipo_organismo por punto — el cliente lo usa para recolorear en modo
+    # Escala de grises sin perder la agrupación bacteria/hongo (ver
+    # ChartTheme en detalle.html); no afecta el color/valor mostrado en modo Color.
+    tipos = [r.tipo_organismo for r in recuentos]
 
     fig = go.Figure(go.Bar(
         x=nombres,
@@ -29,6 +37,7 @@ def _grafico_recuento(ensayo):
         text=etiquetas,
         textposition='outside',
         marker_color=colores,
+        customdata=tipos,
         hovertemplate='<b>%{x}</b><br>%{text}<extra></extra>',
     ))
 
@@ -294,6 +303,11 @@ def subir_pdf(request):
     for archivo in archivos:
         try:
             ensayo = _guardar_ensayo(archivo, request)
+            registrar_accion(
+                request, ensayo,
+                f"Ensayo importado desde PDF ({archivo.name}).",
+                accion=ADDITION,
+            )
             creados.append((ensayo.codigo, ensayo.pk))
         except _DuplicadoError as e:
             duplicados.append(e.codigo)
@@ -316,3 +330,177 @@ def subir_pdf(request):
         return render(request, 'bioquimica/subir_pdf.html')
 
     return redirect('bioquimica:lista')
+
+
+# ─── Ingreso manual (alternativa a subir PDF) ──────────────────────────────
+#
+# Para reportes cuya estructura no coincide con la que espera pdf_parser.py
+# (otro formato de laboratorio, PDF escaneado sin capa de texto, etc.): en
+# vez de intentar leer el documento, la persona transcribe los valores a
+# mano en un formulario con los mismos campos que ya usa el sistema. El PDF
+# original se puede adjuntar igual como respaldo (campo archivo_pdf), pero
+# ya no es la fuente de la que se extraen los datos.
+
+def _decimal_o_none(valor):
+    valor = (valor or '').strip().replace(',', '.')
+    if not valor:
+        return None
+    try:
+        return Decimal(valor)
+    except InvalidOperation:
+        return None
+
+
+def _int_o_none(valor):
+    valor = (valor or '').strip()
+    if not valor:
+        return None
+    try:
+        return int(valor)
+    except ValueError:
+        return None
+
+
+def _parsear_recuento_manual(post):
+    """Filas de recuento UFC/g ingresadas a mano (arrays paralelos por índice)."""
+    tipos   = post.getlist('rec_tipo[]')
+    nombres = post.getlist('rec_nombre[]')
+    coefs   = post.getlist('rec_coeficiente[]')
+    exps    = post.getlist('rec_exponente[]')
+    menores = post.getlist('rec_menor[]')
+
+    filas = []
+    for i, nombre in enumerate(nombres):
+        nombre = (nombre or '').strip()
+        if not nombre:
+            continue
+        menor = (menores[i] if i < len(menores) else 'no') == 'si'
+        filas.append({
+            'tipo_organismo':   tipos[i] if i < len(tipos) else 'bacteria',
+            'nombre':           nombre,
+            'coeficiente':      None if menor else _decimal_o_none(coefs[i] if i < len(coefs) else ''),
+            'exponente':        None if menor else _int_o_none(exps[i] if i < len(exps) else ''),
+            'menor_que_limite': menor,
+        })
+    return filas
+
+
+def _parsear_aislamiento_manual(post):
+    """
+    Organismos aislados ingresados a mano. Cada organismo tiene sus campos
+    de taxonomía sufijados por índice (org_nombre_0, org_dominio_0, …) y sus
+    pruebas bioquímicas en arrays paralelos sufijados con el mismo índice
+    (prueba_nombre_0[], prueba_resultado_0[], …), generados por el JS del
+    template al agregar/quitar organismos y pruebas dinámicamente.
+    """
+    organismos = []
+    i = 0
+    while f'org_nombre_{i}' in post:
+        nombre = (post.get(f'org_nombre_{i}') or '').strip()
+        if not nombre:
+            i += 1
+            continue
+
+        org_data = {
+            'tipo':              post.get(f'org_tipo_{i}', 'bacteria'),
+            'nombre_cientifico': nombre,
+            'dominio':           (post.get(f'org_dominio_{i}') or '').strip(),
+            'filo':              (post.get(f'org_filo_{i}') or '').strip(),
+            'clase':             (post.get(f'org_clase_{i}') or '').strip(),
+            'orden_taxonomico':  (post.get(f'org_orden_{i}') or '').strip(),
+            'familia':           (post.get(f'org_familia_{i}') or '').strip(),
+            'genero':            (post.get(f'org_genero_{i}') or '').strip(),
+            'especie':           (post.get(f'org_especie_{i}') or '').strip(),
+        }
+
+        numeros    = post.getlist(f'prueba_numero_{i}[]')
+        nombres_p  = post.getlist(f'prueba_nombre_{i}[]')
+        resultados = post.getlist(f'prueba_resultado_{i}[]')
+        pruebas = []
+        siguiente = 1
+        for j, nombre_prueba in enumerate(nombres_p):
+            nombre_prueba = (nombre_prueba or '').strip()
+            if not nombre_prueba:
+                continue
+            resultado = (resultados[j] or '').strip() if j < len(resultados) else ''
+            numero = _int_o_none(numeros[j] if j < len(numeros) else '') or siguiente
+            pruebas.append({'numero': numero, 'nombre_prueba': nombre_prueba, 'resultado': resultado or '—'})
+            siguiente += 1
+        org_data['pruebas'] = pruebas
+
+        organismos.append(org_data)
+        i += 1
+
+    return organismos
+
+
+@login_required
+def ingreso_manual(request):
+    if request.user.rol == 'estudiante':
+        messages.error(
+            request,
+            "Su nivel de cuenta no dispone de permisos para registrar ensayos. "
+            "Si es docente o investigador, contacte al administrador del sistema para actualizar su rol."
+        )
+        return redirect("bioquimica:lista")
+
+    if request.method != 'POST':
+        return render(request, 'bioquimica/ingreso_manual.html', {'form': EnsayoManualForm()})
+
+    form = EnsayoManualForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return render(request, 'bioquimica/ingreso_manual.html', {'form': form})
+
+    codigo = form.cleaned_data['codigo']
+    if EnsayoMicrobiologico.objects.filter(codigo=codigo).exists():
+        form.add_error('codigo', 'Ya existe un ensayo con este código.')
+        return render(request, 'bioquimica/ingreso_manual.html', {'form': form})
+
+    tipo = form.cleaned_data['tipo']
+
+    try:
+        with transaction.atomic():
+            ensayo = EnsayoMicrobiologico(
+                codigo=codigo,
+                tipo=tipo,
+                nombre_muestra=form.cleaned_data['nombre_muestra'],
+                etiqueta=form.cleaned_data.get('etiqueta') or '',
+                fecha_recepcion=form.cleaned_data['fecha_recepcion'],
+                fecha_ejecucion=form.cleaned_data['fecha_ejecucion'],
+                fecha_reporte=form.cleaned_data['fecha_reporte'],
+                temp_ambiental=form.cleaned_data.get('temp_ambiental'),
+                humedad_ambiental=form.cleaned_data.get('humedad_ambiental'),
+                observaciones=form.cleaned_data.get('observaciones') or '',
+                registrado_por=request.user,
+            )
+            archivo_pdf = form.cleaned_data.get('archivo_pdf')
+            if archivo_pdf:
+                ensayo.archivo_pdf = archivo_pdf
+            ensayo.save()
+
+            if tipo == 'recuento':
+                filas = _parsear_recuento_manual(request.POST)
+                if not filas:
+                    raise ValueError("Agrega al menos un microorganismo con su recuento UFC/g.")
+                RecuentoUFC.objects.bulk_create([
+                    RecuentoUFC(ensayo=ensayo, orden=i, **f) for i, f in enumerate(filas)
+                ])
+            else:
+                organismos = _parsear_aislamiento_manual(request.POST)
+                if not organismos:
+                    raise ValueError("Agrega al menos un microorganismo aislado.")
+                for org_data in organismos:
+                    pruebas = org_data.pop('pruebas')
+                    org = MicroorganismoAislado(ensayo=ensayo, **org_data)
+                    org.save()
+                    if pruebas:
+                        PruebaBioquimica.objects.bulk_create([
+                            PruebaBioquimica(microorganismo=org, **p) for p in pruebas
+                        ])
+    except ValueError as e:
+        messages.error(request, str(e))
+        return render(request, 'bioquimica/ingreso_manual.html', {'form': form})
+
+    registrar_accion(request, ensayo, "Ensayo registrado manualmente (sin PDF).", accion=ADDITION)
+    messages.success(request, f"Ensayo {ensayo.codigo} registrado manualmente.")
+    return redirect('bioquimica:detalle', pk=ensayo.pk)

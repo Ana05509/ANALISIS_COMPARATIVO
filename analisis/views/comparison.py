@@ -35,7 +35,19 @@ def _contar_clasificaciones(tabla: List[Dict[str, Any]]) -> Dict[str, int]:
 def comparar(request):
     from analisis.forms import CompararForm
 
-    form = CompararForm(request.GET or None)
+    # El selector Bacterias/Hongos del menú lateral es compartido por todo el
+    # sitio y navega agregando "?tipo=16S"/"?tipo=ITS" a la URL (ver
+    # templates_base.html) — pero el formulario de esta página lee el
+    # marcador con el nombre de campo "marcador", no "tipo". Sin este ajuste,
+    # llegar aquí desde el menú lateral no reflejaba la selección: el
+    # desplegable de esta página se quedaba en su propio valor por defecto
+    # (16S) sin importar qué se hubiera elegido en el menú.
+    get_params = request.GET
+    if "tipo" in get_params and "marcador" not in get_params:
+        get_params = get_params.copy()
+        get_params["marcador"] = get_params["tipo"]
+
+    form = CompararForm(get_params or None)
 
     _tipos_raw: dict = {}
     for mid, t in ArchivoMolecular.objects.values_list("muestra_id", "tipo_analisis").distinct():
@@ -107,10 +119,20 @@ def comparar(request):
                     contexto["total_taxonomias"] = len(tabla)
                     contexto["top_taxonomia"] = tabla[0].get("taxonomia", "—")
 
-                    # Fix 1 — % taxa compartidos (ecológicamente significativo vs promedio de porcentajes)
-                    taxa_unicos = len([f for f in tabla if "Otros microorganismos" not in str(f.get("taxonomia", ""))])
+                    # % de taxa compartidos, SOLO dentro de los taxa mostrados en la
+                    # tabla (Top N). `compartidos` viene calculado sobre el universo
+                    # completo de taxa detectados (sin truncar), mientras que la tabla
+                    # está recortada a Top N — dividir uno entre el otro sin acotar
+                    # antes el numerador a ese mismo Top N podía dar más de 100% (el
+                    # conjunto compartido completo puede ser más grande que la tabla).
+                    taxa_en_tabla = {
+                        f.get("taxonomia") for f in tabla
+                        if "Otros microorganismos" not in str(f.get("taxonomia", ""))
+                    }
+                    taxa_unicos = len(taxa_en_tabla)
+                    compartidos_en_tabla = [t for t in compartidos if t in taxa_en_tabla]
                     contexto["pct_compartidos"] = (
-                        round(len(compartidos) / taxa_unicos * 100, 1) if taxa_unicos > 0 else 0.0
+                        round(len(compartidos_en_tabla) / taxa_unicos * 100, 1) if taxa_unicos > 0 else 0.0
                     )
 
                     # Fix 3 — gráfico con todas las muestras seleccionadas
@@ -124,14 +146,21 @@ def comparar(request):
                                 var_name="Muestra",
                                 value_name="Abundancia"
                             )
+                            nivel_label = NIVELES_ES.get(nivel, (nivel or '').capitalize())
                             fig = px.bar(
                                 df_plot, x="taxonomia", y="Abundancia", color="Muestra",
                                 barmode="group",
-                                title=f"Comparación de Abundancias — {(nivel or '').capitalize()} (Top {TOP_N_VISUALIZACION})",
+                                title=f"Comparación de Abundancias — {nivel_label} (Top {TOP_N_VISUALIZACION})",
+                                labels={
+                                    "taxonomia": f"{nivel_label} taxonómico",
+                                    "Abundancia": "Abundancia relativa (%)",
+                                    "Muestra": "Muestra",
+                                },
                                 template="plotly_white",
                             )
                             fig.update_layout(
                                 xaxis=dict(tickangle=-45, automargin=True, tickfont=dict(size=10)),
+                                yaxis=dict(rangemode="tozero"),
                                 margin=dict(b=160, t=60, l=60, r=20),
                                 height=460,
                             )

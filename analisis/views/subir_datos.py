@@ -6,8 +6,10 @@ from django.urls import reverse
 from analisis.services.business.upload_service import procesar_upload, MuestraDuplicadaError
 from analisis.services.processing.pipeline import ColumnasInvalidasError
 from analisis.forms import SubirDatosForm
-from analisis.models import VariedadClon, Cultivo
+from analisis.models import VariedadClon, Cultivo, MuestraSuelo
 from analisis.constants import MARCADORES_VALIDOS
+from analisis.audit import registrar_accion
+from django.contrib.admin.models import ADDITION
 
 def _is_ajax(request):
     return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -15,7 +17,11 @@ def _is_ajax(request):
 @login_required
 def subir_datos(request):
     if request.user.rol == 'estudiante':
-        messages.error(request, "Su nivel de cuenta no dispone de permisos para cargar datos moleculares.")
+        messages.error(
+            request,
+            "Su nivel de cuenta no dispone de permisos para cargar datos moleculares. "
+            "Si es docente o investigador, contacte al administrador del sistema para actualizar su rol."
+        )
         return redirect("analisis:dashboard")
 
     if request.method == "POST":
@@ -65,6 +71,14 @@ def subir_datos(request):
             try:
                 localidad_limpia = form.cleaned_data.get("localidad")
                 resultado = procesar_upload(request)
+                muestra = MuestraSuelo.objects.filter(pk=resultado.get("muestra_id")).first()
+                if muestra:
+                    registrar_accion(
+                        request, muestra,
+                        f"Archivo molecular subido ({resultado.get('total_registros', 0)} registros, "
+                        f"localidad {localidad_limpia}).",
+                        accion=ADDITION,
+                    )
                 if _is_ajax(request):
                     return JsonResponse({
                         "ok": True,

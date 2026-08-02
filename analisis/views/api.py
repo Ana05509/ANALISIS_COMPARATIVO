@@ -99,13 +99,17 @@ def api_muestra_detalle(request, pk):
 
     catalogo = obtener_lookup_catalogo(tipo)
 
-    taxa = list(
+    todos_los_taxa = list(
         qs.values(taxonomia=F("genus"))
         .annotate(total_hits=Sum("num_hits"))
-        .order_by("-total_hits")[:top_n]
+        .order_by("-total_hits")
     )
-
-    grand_total = sum(t["total_hits"] for t in taxa) or 1
+    # El total (100%) debe ser sobre TODA la muestra, no solo el Top N que se
+    # va a mostrar — si se sumara después de recortar, los porcentajes del
+    # Top N siempre sumarían 100% entre sí, aunque en realidad representen
+    # menos que el total real de la muestra.
+    grand_total = sum(t["total_hits"] for t in todos_los_taxa) or 1
+    taxa = todos_los_taxa[:top_n]
     for t in taxa:
         t["porcentaje"]    = round(t["total_hits"] / grand_total * 100, 2)
         t["clasificacion"] = catalogo.get((t["taxonomia"] or "").lower(), "sin_clasificar")

@@ -159,6 +159,16 @@ def _parsear_recuento(pdf) -> list:
                     continue
 
                 coef, exp, menor = _parsear_ufc(ufc_str)
+
+                # Fila de encabezado/sección sin UFC real (p. ej. "TOTAL HONGOS"
+                # u otra variante no cubierta por la lista de nombres exactos de
+                # arriba): una fila de datos genuina siempre trae un valor
+                # numérico o "<1"; si no se pudo parsear ninguno, no es un
+                # microorganismo real y se descarta en vez de guardarse como
+                # una barra fantasma sin valor.
+                if coef is None and not menor:
+                    continue
+
                 resultados.append({
                     'tipo_organismo':   tipo,
                     'nombre':           nombre,

@@ -744,7 +744,7 @@ def _figura_catalogo_distribucion(conteos):
 
     etiquetas = {
         "benefico": "Benéfico", "fitopatogeno": "Fitopatógeno",
-        "neutral": "Neutral", "sin_clasificar": "Sin clasificar",
+        "neutral": "Neutral", "sin_clasificar": "Sin clasificación",
     }
     colores = {
         "benefico": "#1D9E75", "fitopatogeno": "#BA7517",
@@ -1029,9 +1029,17 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
 class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
     """
     Django genera un LogEntry cada vez que alguien crea, edita o borra algo
-    desde el admin — pero no lo registra en el admin por defecto, así que
-    ese historial existía pero nadie podía verlo. Igual que EventoAcceso,
-    es de solo lectura.
+    desde el admin — pero no lo registraba en el admin por defecto, así que
+    ese historial existía pero nadie podía verlo. El enlace del sidebar
+    (config/settings.py, sección UNFOLD > Auditoría > "Registro de
+    Acciones") ya apunta aquí (admin:admin_logentry_changelist).
+
+    Además de lo que el admin llena solo, las acciones hechas desde las
+    vistas propias de la app (fuera de /admin/ — subir muestra, reclasificar
+    catálogo, generar reporte, ensayos de bioquímica…) también caen aquí:
+    ver registrar_accion() en analisis/audit.py y sus llamadas en cada vista.
+
+    Igual que EventoAcceso, es de solo lectura.
     """
     list_display  = ("accion_badge", "user", "content_type", "object_repr", "change_message", "action_time_corta", "acciones")
     list_filter   = ("action_flag", "content_type", "action_time")

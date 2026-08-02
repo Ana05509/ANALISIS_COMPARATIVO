@@ -5,6 +5,8 @@ from django.contrib.auth.decorators import login_required
 from analisis.models import CatalogoMicroorganismo
 from analisis.services.business.catalog_service import CatalogService
 from analisis.forms import CatalogoImportarForm
+from analisis.audit import registrar_accion
+from django.contrib.admin.models import ADDITION, CHANGE
 
 @login_required
 def catalogo_microorganismos(request):
@@ -59,7 +61,7 @@ def catalogo_microorganismos(request):
         ("benefico",      "Benéfico"),
         ("fitopatogeno",  "Fitopatógeno"),
         ("neutral",       "Neutral"),
-        ("sin_clasificar","Sin Clasificar"),
+        ("sin_clasificar","Sin clasificación"),
     ]
 
     return render(request, "analisis/catalogo_microorganismos.html", {
@@ -91,8 +93,14 @@ def actualizar_clasificacion(request, pk):
         microorganismo = get_object_or_404(CatalogoMicroorganismo, pk=pk)
 
         if nueva_clasificacion in ['benefico', 'fitopatogeno', 'neutral', 'sin_clasificar']:
+            anterior = microorganismo.get_clasificacion_display()
             microorganismo.clasificacion = nueva_clasificacion
             microorganismo.save()
+            registrar_accion(
+                request, microorganismo,
+                f"Reclasificado de «{anterior}» a «{microorganismo.get_clasificacion_display()}».",
+                accion=CHANGE,
+            )
             messages.success(request, "Clasificación actualizada correctamente.")
 
     return redirect('analisis:catalogo')
@@ -116,6 +124,23 @@ def importar_catalogo(request):
                     form.cleaned_data['archivo']
                 )
                 resumen = f"{creados} creados, {actualizados} actualizados"
+                if creados or actualizados:
+                    # Importación masiva: no hay un único microorganismo al
+                    # que atribuirle el registro (LogEntry exige un objeto
+                    # puntual), así que se registra un resumen con object_id=0
+                    # como ancla — no apunta a una fila real del catálogo,
+                    # solo dice "qué modelo" para agruparlo bajo Catálogo de
+                    # Microorganismos en el listado de auditoría.
+                    from django.contrib.admin.models import LogEntry
+                    from django.contrib.contenttypes.models import ContentType
+                    LogEntry.objects.create(
+                        user_id=request.user.pk,
+                        content_type_id=ContentType.objects.get_for_model(CatalogoMicroorganismo).pk,
+                        object_id=0,
+                        object_repr=f"Importación masiva — {form.cleaned_data['archivo'].name}",
+                        action_flag=ADDITION,
+                        change_message=f"{resumen}, {errores} fila(s) omitida(s).",
+                    )
                 if errores:
                     messages.warning(
                         request,

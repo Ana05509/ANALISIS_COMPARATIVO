@@ -1,8 +1,8 @@
 {% extends "analisis/base.html" %}
 
-{% block title %}Manual de Ayuda{% endblock %}
+{% block title %}Guía y Glosario{% endblock %}
 {% block nav_ayuda %}active{% endblock %}
-{% block topbar_title %}Manual de Ayuda{% endblock %}
+{% block topbar_title %}Guía y Glosario{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -112,6 +112,29 @@
 }
 .glosario-item dd strong { color: var(--verde-dark, #1a5c42); }
 
+/* Pestañas Manual / Glosario */
+.ayuda-tabs {
+    display: flex; gap: 6px;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--gris-border);
+}
+.ayuda-tab-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: none; border: none; cursor: pointer;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13.5px; font-weight: 600;
+    color: var(--text-hint);
+    padding: .7rem 1.1rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .15s, border-color .15s;
+}
+.ayuda-tab-btn i { font-size: 16px; }
+.ayuda-tab-btn:hover { color: var(--text-primary); }
+.ayuda-tab-btn.active { color: var(--verde); border-bottom-color: var(--verde); }
+.ayuda-tab-panel { display: none; }
+.ayuda-tab-panel.active { display: block; }
+
 /* Consejos */
 .tips-list { display: flex; flex-direction: column; gap: .55rem; }
 .tip-item {
@@ -128,7 +151,7 @@
 <div class="ayuda-hero">
     <div class="ayuda-hero-icon"><i class="ti ti-help-circle"></i></div>
     <div style="flex:1;">
-        <h1>Manual de Ayuda — BioMicro</h1>
+        <h1>Guía y Glosario — BioMicro</h1>
         <p>Guía rápida de inicio, descripción de módulos y glosario de términos técnicos.</p>
     </div>
     <button onclick="BioTour.reset(); BioTour.start();"
@@ -141,6 +164,19 @@
         <i class="ti ti-route" style="font-size:16px;"></i> Iniciar recorrido guiado
     </button>
 </div>
+
+<!-- PESTAÑAS: Manual vs Glosario — separadas para no mezclar la guía de uso
+     con la referencia de términos técnicos. -->
+<div class="ayuda-tabs" role="tablist">
+    <button type="button" class="ayuda-tab-btn active" data-tab="manual" role="tab" aria-selected="true">
+        <i class="ti ti-book"></i> Manual
+    </button>
+    <button type="button" class="ayuda-tab-btn" data-tab="glosario" role="tab" aria-selected="false">
+        <i class="ti ti-book-2"></i> Glosario de términos
+    </button>
+</div>
+
+<div class="ayuda-tab-panel active" data-tab-panel="manual">
 
 <!-- 1. GUÍA RÁPIDA -->
 <div class="card ayuda-section">
@@ -187,7 +223,7 @@
             <div class="step-num">6</div>
             <div class="step-body">
                 <h4>Genera un reporte</h4>
-                <p>Ve a <strong>Reportes</strong> para exportar los resultados en PDF o tabla. El historial guarda todos tus análisis anteriores para que puedas consultarlos cuando necesites.</p>
+                <p>Ve a <strong>Reportes</strong> para exportar los resultados en PDF o tabla. El <strong>Registro de Muestras</strong> guarda todas tus muestras y análisis anteriores para que puedas consultarlos cuando necesites.</p>
             </div>
         </div>
     </div>
@@ -233,7 +269,10 @@
     </div>
 </div>
 
+</div><!-- /ayuda-tab-panel[manual] -->
+
 <!-- 3. GLOSARIO -->
+<div class="ayuda-tab-panel" data-tab-panel="glosario">
 <div class="card ayuda-section">
     <div class="ayuda-section-title">
         <i class="ti ti-book-2"></i> Glosario de términos técnicos
@@ -335,9 +374,36 @@
             <dd>Número de taxa a mostrar en gráficas y tablas, ordenados de mayor a menor abundancia relativa. Un Top 10 muestra los 10 microorganismos más abundantes del conjunto analizado.</dd>
         </div>
 
+        <div class="glosario-item">
+            <dt>Mapa de Calor — Pruebas Bioquímicas</dt>
+            <dd>En Microbiología Clásica, cada celda es el resultado de una prueba puntual: <strong>verde = positivo</strong>, <strong>naranja = negativo</strong> (gris = resultado neutro/no aplica). No indica cantidad, solo si dio positivo o negativo.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Mapa de Calor — Abundancia</dt>
+            <dd>En Análisis Avanzado y Comparar Perfiles, el color indica <strong>intensidad</strong>, no un resultado positivo/negativo: mientras más oscuro/intenso, mayor la abundancia de ese taxón en esa muestra. Es una escala continua, no dos categorías.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>PNG</dt>
+            <dd>Formato de imagen para descargar las gráficas (botón "PNG" en cada visualización). Se genera a 300 DPI, resolución mínima que piden las revistas científicas para publicación — a diferencia del SVG, no se puede agrandar sin perder nitidez.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>SVG</dt>
+            <dd>Formato de imagen vectorial para descargar las gráficas. A diferencia del PNG, se puede agrandar a cualquier tamaño sin perder calidad — ideal para editar la figura o insertarla en un documento que luego se imprime a otro tamaño.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>CSV (Comma-Separated Values)</dt>
+            <dd>Formato de archivo de texto plano con columnas separadas por comas, usado para <strong>subir</strong> resultados taxonómicos o el catálogo de microorganismos al sistema. Se puede crear o editar desde Excel/Google Sheets ("Guardar como CSV").</dd>
+        </div>
+
     </dl>
 </div>
+</div><!-- /ayuda-tab-panel[glosario] -->
 
+<div class="ayuda-tab-panel active" data-tab-panel="manual">
 <!-- 4. CONSEJOS -->
 <div class="card ayuda-section" style="margin-bottom: 0;">
     <div class="ayuda-section-title">
@@ -362,9 +428,34 @@
         </div>
         <div class="tip-item">
             <i class="ti ti-check"></i>
-            <span>Si un resultado te parece inesperado, revisa el <strong>Historial</strong> — allí puedes ver los parámetros exactos usados en análisis anteriores.</span>
+            <span>Si un resultado te parece inesperado, revisa el <strong>Registro de Muestras</strong> — allí puedes ver los parámetros exactos usados en análisis anteriores.</span>
         </div>
     </div>
 </div>
+</div><!-- /ayuda-tab-panel[manual] -->
 
 {% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    'use strict';
+    var btns   = document.querySelectorAll('.ayuda-tab-btn');
+    var panels = document.querySelectorAll('.ayuda-tab-panel');
+
+    btns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var tab = btn.dataset.tab;
+
+            btns.forEach(function (b) {
+                b.classList.toggle('active', b === btn);
+                b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+            });
+            panels.forEach(function (p) {
+                p.classList.toggle('active', p.dataset.tabPanel === tab);
+            });
+        });
+    });
+})();
+</script>
+{% endblock extra_js %}

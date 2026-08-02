@@ -1,0 +1,380 @@
+{% extends "analisis/base.html" %}
+
+{% block topbar_title %}Ingreso Manual{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'bioquimica:lista' %}" class="btn btn-outline btn-sm">
+    <i class="ti ti-arrow-left"></i> Volver
+</a>
+{% endblock %}
+
+{% block nav_ensayos %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+.bq-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 1.1rem;
+    border-bottom: 1px solid var(--gris-border, #E5E3DC);
+}
+.bq-tab-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: none; border: none; cursor: pointer;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13.5px; font-weight: 600;
+    color: #888780;
+    text-decoration: none;
+    padding: .7rem 1.1rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .15s, border-color .15s;
+}
+.bq-tab-btn i { font-size: 16px; }
+.bq-tab-btn:hover { color: #1A1A18; }
+.bq-tab-btn.active { color: #1D9E75; border-bottom-color: #1D9E75; }
+
+.bq-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .6rem .9rem;
+}
+.bq-form-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .6rem .9rem;
+}
+@media (max-width: 720px) {
+    .bq-form-grid, .bq-form-grid-3 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+    .bq-form-grid, .bq-form-grid-3 { grid-template-columns: 1fr; }
+}
+.bq-form-grid .form-group, .bq-form-grid-3 .form-group { margin-bottom: .55rem; }
+
+.bq-rec-table { width: 100%; border-collapse: collapse; margin-top: .5rem; }
+.bq-rec-table th {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+    color: #888780; text-align: left; padding: 0 6px 6px;
+}
+.bq-rec-row td { padding: 4px 6px; vertical-align: middle; }
+.bq-rec-row input, .bq-rec-row select { font-size: 13px; padding: 6px 8px; }
+.bq-rec-row .btn-quitar { color: #A32D2D; background: none; border: none; cursor: pointer; font-size: 15px; }
+
+.bq-org-card {
+    border: 1px solid #E5E3DC; border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 14px; background: #FAFAF8;
+}
+.bq-org-card-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.bq-org-card-hdr strong { font-size: 13px; color: #1A1A18; }
+.bq-org-taxo-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem;
+    margin-top: .5rem;
+}
+@media (max-width: 700px) { .bq-org-taxo-grid { grid-template-columns: 1fr 1fr; } }
+
+.bq-prueba-row td { padding: 3px 6px; }
+.bq-prueba-row input { font-size: 12.5px; padding: 5px 7px; }
+
+.btn-quitar-org {
+    color: #A32D2D; background: none; border: 1px solid #E8B4B4;
+    border-radius: 6px; cursor: pointer; font-size: 12px; padding: 4px 10px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 760px; margin: 0 auto;">
+
+    <div class="page-header">
+        <h1 style="font-family:'Fraunces',serif; font-size:24px; font-weight:500; color:#1A1A18;">
+            Registrar Ensayo Manualmente
+        </h1>
+        <p style="color:#5F5E5A; font-size:14px; margin-top:6px;">
+            Úsalo cuando el reporte no tenga la estructura que el lector automático de PDF espera
+            (otro formato del laboratorio, documento escaneado, etc.). Los datos se transcriben
+            a mano; el PDF original se puede adjuntar solo como respaldo.
+        </p>
+    </div>
+
+    <div class="bq-tabs">
+        <a href="{% url 'bioquimica:subir_pdf' %}" class="bq-tab-btn">
+            <i class="ti ti-file-upload"></i> Subir PDF (automático)
+        </a>
+        <a href="{% url 'bioquimica:ingreso_manual' %}" class="bq-tab-btn active">
+            <i class="ti ti-keyboard"></i> Ingreso manual
+        </a>
+    </div>
+
+    {% if form.errors %}
+    <div class="alert alert-error" style="margin-bottom: .85rem;">
+        <i class="ti ti-alert-circle" aria-hidden="true"></i>
+        <span><strong>Revisa los campos:</strong> {{ form.non_field_errors|join:" " }}
+        {% for field in form %}{% if field.errors %} {{ field.label }}: {{ field.errors|join:", " }}.{% endif %}{% endfor %}</span>
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" id="form-manual">
+        {% csrf_token %}
+
+        <div class="card" style="padding: 22px 26px; margin-bottom: 1.1rem;">
+            <div class="card-title"><i class="ti ti-clipboard-text"></i> Datos del Ensayo</div>
+
+            <div class="bq-form-grid" style="margin-top:.75rem;">
+                <div class="form-group">
+                    <label class="form-label">{{ form.codigo.label }}</label>
+                    {{ form.codigo }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">{{ form.tipo.label }}</label>
+                    {{ form.tipo }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">{{ form.nombre_muestra.label }}</label>
+                    {{ form.nombre_muestra }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">{{ form.archivo_pdf.label }}</label>
+                    {{ form.archivo_pdf }}
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top:.3rem;">
+                <label class="form-label">{{ form.etiqueta.label }}</label>
+                {{ form.etiqueta }}
+            </div>
+
+            <div class="bq-form-grid-3" style="margin-top:.3rem;">
+                <div class="form-group">
+                    <label class="form-label">{{ form.fecha_recepcion.label }}</label>
+                    {{ form.fecha_recepcion }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">{{ form.fecha_ejecucion.label }}</label>
+                    {{ form.fecha_ejecucion }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">{{ form.fecha_reporte.label }}</label>
+                    {{ form.fecha_reporte }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">{{ form.temp_ambiental.label }}</label>
+                    {{ form.temp_ambiental }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">{{ form.humedad_ambiental.label }}</label>
+                    {{ form.humedad_ambiental }}
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top:.3rem;">
+                <label class="form-label">{{ form.observaciones.label }}</label>
+                {{ form.observaciones }}
+            </div>
+        </div>
+
+        {# ── Panel: Recuento UFC/g ── #}
+        <div class="card" id="panel-recuento" style="padding: 22px 26px; margin-bottom: 1.1rem;">
+            <div class="card-title"><i class="ti ti-chart-bar"></i> Recuento UFC/g por microorganismo</div>
+
+            <table class="bq-rec-table">
+                <thead>
+                    <tr>
+                        <th style="width:110px;">Tipo</th>
+                        <th>Microorganismo</th>
+                        <th style="width:100px;">Coeficiente</th>
+                        <th style="width:90px;">× 10^</th>
+                        <th style="width:110px;">&lt;1 UFC/g</th>
+                        <th style="width:32px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="rec-rows"></tbody>
+            </table>
+
+            <button type="button" class="btn btn-outline btn-sm" id="btn-add-rec" style="margin-top:.6rem;">
+                <i class="ti ti-plus"></i> Agregar fila
+            </button>
+        </div>
+
+        {# ── Panel: Aislamiento e Identificación ── #}
+        <div class="card" id="panel-aislamiento" style="padding: 22px 26px; margin-bottom: 1.1rem; display:none;">
+            <div class="card-title"><i class="ti ti-microscope"></i> Organismos Aislados</div>
+
+            <div id="org-cards" style="margin-top:.75rem;"></div>
+
+            <button type="button" class="btn btn-outline btn-sm" id="btn-add-org">
+                <i class="ti ti-plus"></i> Agregar organismo
+            </button>
+        </div>
+
+        <button type="submit" id="btn-guardar" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;">
+            <i class="ti ti-device-floppy" aria-hidden="true"></i> <span id="btn-guardar-label">Guardar Ensayo</span>
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+'use strict';
+
+/* ════════════════════════════════════════════════
+   1. RECUENTO — filas dinámicas
+   ════════════════════════════════════════════════ */
+var recBody = document.getElementById('rec-rows');
+var recCount = 0;
+
+function agregarFilaRecuento() {
+    var i = recCount++;
+    var tr = document.createElement('tr');
+    tr.className = 'bq-rec-row';
+    tr.innerHTML =
+        '<td><select name="rec_tipo[]" class="form-control">' +
+            '<option value="bacteria">Bacteria</option>' +
+            '<option value="hongo">Hongo</option>' +
+        '</select></td>' +
+        '<td><input type="text" name="rec_nombre[]" class="form-control" placeholder="Ej: Bacillus spp."></td>' +
+        '<td><input type="number" step="0.01" name="rec_coeficiente[]" class="form-control"></td>' +
+        '<td><input type="number" step="1" name="rec_exponente[]" class="form-control"></td>' +
+        '<td><select name="rec_menor[]" class="form-control">' +
+            '<option value="no">No</option>' +
+            '<option value="si">Sí</option>' +
+        '</select></td>' +
+        '<td><button type="button" class="btn-quitar" title="Quitar fila">✕</button></td>';
+    tr.querySelector('.btn-quitar').addEventListener('click', function () { tr.remove(); });
+    recBody.appendChild(tr);
+}
+document.getElementById('btn-add-rec').addEventListener('click', agregarFilaRecuento);
+
+/* ════════════════════════════════════════════════
+   2. AISLAMIENTO — organismos + pruebas dinámicas
+   ════════════════════════════════════════════════ */
+var orgCards = document.getElementById('org-cards');
+var orgCount = 0;
+
+function agregarPrueba(tbody) {
+    var tr = document.createElement('tr');
+    tr.className = 'bq-prueba-row';
+    tr.innerHTML =
+        '<td style="width:44px;"><input type="number" class="form-control prueba-numero" placeholder="N°"></td>' +
+        '<td><input type="text" class="form-control prueba-nombre" placeholder="Nombre de la prueba"></td>' +
+        '<td style="width:120px;"><input type="text" class="form-control prueba-resultado" placeholder="Resultado"></td>' +
+        '<td style="width:28px;"><button type="button" class="btn-quitar" title="Quitar prueba">✕</button></td>';
+    tr.querySelector('.btn-quitar').addEventListener('click', function () { tr.remove(); });
+    tbody.appendChild(tr);
+}
+
+function agregarOrganismo() {
+    var idx = orgCount++;
+    var card = document.createElement('div');
+    card.className = 'bq-org-card';
+    card.innerHTML =
+        '<div class="bq-org-card-hdr">' +
+            '<strong>Organismo #' + (idx + 1) + '</strong>' +
+            '<button type="button" class="btn-quitar-org">✕ Quitar organismo</button>' +
+        '</div>' +
+        '<div class="bq-form-grid">' +
+            '<div class="form-group">' +
+                '<label class="form-label">Tipo</label>' +
+                '<select name="org_tipo_' + idx + '" class="form-control">' +
+                    '<option value="bacteria">Bacteria</option>' +
+                    '<option value="hongo">Hongo</option>' +
+                '</select>' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label class="form-label">Nombre Científico</label>' +
+                '<input type="text" name="org_nombre_' + idx + '" class="form-control" placeholder="Ej: Pseudomonas spp.">' +
+            '</div>' +
+        '</div>' +
+        '<div class="bq-org-taxo-grid">' +
+            '<div class="form-group"><label class="form-label">Dominio</label><input type="text" name="org_dominio_' + idx + '" class="form-control"></div>' +
+            '<div class="form-group"><label class="form-label">Filo</label><input type="text" name="org_filo_' + idx + '" class="form-control"></div>' +
+            '<div class="form-group"><label class="form-label">Clase</label><input type="text" name="org_clase_' + idx + '" class="form-control"></div>' +
+            '<div class="form-group"><label class="form-label">Orden</label><input type="text" name="org_orden_' + idx + '" class="form-control"></div>' +
+            '<div class="form-group"><label class="form-label">Familia</label><input type="text" name="org_familia_' + idx + '" class="form-control"></div>' +
+            '<div class="form-group"><label class="form-label">Género</label><input type="text" name="org_genero_' + idx + '" class="form-control"></div>' +
+            '<div class="form-group"><label class="form-label">Especie</label><input type="text" name="org_especie_' + idx + '" class="form-control"></div>' +
+        '</div>' +
+        '<div style="margin-top:.6rem;">' +
+            '<label class="form-label">Pruebas Bioquímicas</label>' +
+            '<table class="bq-rec-table"><tbody class="pruebas-body"></tbody></table>' +
+            '<button type="button" class="btn btn-outline btn-sm btn-add-prueba" style="margin-top:.4rem;">' +
+                '<i class="ti ti-plus"></i> Agregar prueba' +
+            '</button>' +
+        '</div>';
+
+    var pruebasBody = card.querySelector('.pruebas-body');
+
+    // Los inputs de prueba no llevan name= fijo: se renombran justo antes
+    // de enviar el formulario (ver renombrarPruebas) para que el índice
+    // del organismo quede correcto incluso si se quitan/agregan tarjetas.
+    card.dataset.orgIdx = idx;
+
+    card.querySelector('.btn-add-prueba').addEventListener('click', function () {
+        agregarPrueba(pruebasBody);
+    });
+    card.querySelector('.btn-quitar-org').addEventListener('click', function () {
+        card.remove();
+    });
+
+    orgCards.appendChild(card);
+    agregarPrueba(pruebasBody);
+}
+document.getElementById('btn-add-org').addEventListener('click', agregarOrganismo);
+
+// Antes de enviar: a cada tarjeta de organismo aún presente en el DOM se le
+// asigna su índice final (0,1,2…) y se nombran sus inputs de prueba con ese
+// índice — así el servidor puede reconstruir qué pruebas pertenecen a qué
+// organismo aunque el usuario haya quitado tarjetas de en medio.
+function renombrarOrganismosYPruebas() {
+    var cards = orgCards.querySelectorAll('.bq-org-card');
+    cards.forEach(function (card, i) {
+        card.querySelectorAll('[name^="org_"]').forEach(function (input) {
+            var base = input.getAttribute('name').replace(/_\d+$/, '');
+            input.setAttribute('name', base + '_' + i);
+        });
+        card.querySelectorAll('.prueba-numero').forEach(function (input) {
+            input.setAttribute('name', 'prueba_numero_' + i + '[]');
+        });
+        card.querySelectorAll('.prueba-nombre').forEach(function (input) {
+            input.setAttribute('name', 'prueba_nombre_' + i + '[]');
+        });
+        card.querySelectorAll('.prueba-resultado').forEach(function (input) {
+            input.setAttribute('name', 'prueba_resultado_' + i + '[]');
+        });
+    });
+}
+
+/* ════════════════════════════════════════════════
+   3. Mostrar panel según Tipo de Ensayo
+   ════════════════════════════════════════════════ */
+var selTipo = document.getElementById('id_tipo');
+var panelRecuento    = document.getElementById('panel-recuento');
+var panelAislamiento = document.getElementById('panel-aislamiento');
+
+function actualizarPanel() {
+    var esRecuento = selTipo.value === 'recuento';
+    panelRecuento.style.display    = esRecuento ? 'block' : 'none';
+    panelAislamiento.style.display = esRecuento ? 'none'  : 'block';
+}
+selTipo.addEventListener('change', actualizarPanel);
+actualizarPanel();
+
+// Estado inicial: una fila de recuento y un organismo listos para llenar.
+agregarFilaRecuento();
+agregarOrganismo();
+
+/* ════════════════════════════════════════════════
+   4. Envío
+   ════════════════════════════════════════════════ */
+document.getElementById('form-manual').addEventListener('submit', function () {
+    renombrarOrganismosYPruebas();
+    var btn = document.getElementById('btn-guardar');
+    btn.disabled = true;
+    document.getElementById('btn-guardar-label').textContent = 'Guardando…';
+});
+
+})();
+</script>
+{% endblock extra_js %}

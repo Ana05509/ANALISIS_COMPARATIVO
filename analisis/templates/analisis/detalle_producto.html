@@ -1,4 +1,5 @@
 {% extends "analisis/base.html" %}
+{% load custom_filters %}
 
 {% block title %}Detalle de Muestra {{ producto.codigo }}{% endblock %}
 {% block nav_historial %}active{% endblock %}
@@ -6,7 +7,7 @@
 
 {% block topbar_actions %}
 <a href="{% url 'analisis:historial' %}" class="btn btn-outline btn-sm">
-    <i class="ti ti-arrow-left" aria-hidden="true"></i> Historial
+    <i class="ti ti-arrow-left" aria-hidden="true"></i> Registro de Muestras
 </a>
 <a href="{% url 'analisis:resultado_analisis' producto.id %}?tipo={{ tipo_actual }}" class="btn btn-outline btn-sm">
     <i class="ti ti-table-alias" aria-hidden="true"></i> Resultados Taxonómicos
@@ -97,7 +98,7 @@
                 <tr>
                     <td data-label="#" class="td-mono td-muted">{{ forloop.counter }}</td>
                     <td data-label="Taxonomía">
-                        <strong class="td-taxonomy">{{ a.genus|default:"Desconocido" }}</strong>
+                        <strong class="td-taxonomy">{{ a.genus|taxon_legible|default:"Desconocido" }}</strong>
                         {% if a.species and a.species != 'Unclassified' %}
                         <span class="td-italic">{{ a.species }}</span>
                         {% endif %}

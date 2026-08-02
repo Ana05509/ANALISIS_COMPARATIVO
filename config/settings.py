@@ -38,6 +38,19 @@ CSRF_TRUSTED_ORIGINS = [
 if _railway_domain:
     CSRF_TRUSTED_ORIGINS.append(f'https://{_railway_domain}')
 
+# Política de sesión: como en la mayoría de plataformas establecidas (banca,
+# sistemas universitarios, admin de SaaS) — dura mientras la persona sigue
+# activa (se renueva en cada request), pero expira sola tras 8h de inactividad
+# y también al cerrar el navegador, sin necesidad de "recordarme" porque esta
+# app no ofrece esa opción. Antes no había ningún límite explícito y Django
+# usaba su default de 2 semanas fijas, lo que hacía que el módulo de
+# Auditoría > Eventos de Acceso pareciera "no actualizarse": con la sesión
+# viva tanto tiempo, nadie volvía a autenticarse (y por lo tanto no se
+# generaba un evento nuevo) aunque sí estuviera usando el sistema a diario.
+SESSION_COOKIE_AGE = 60 * 60 * 8  # 8 horas
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
 # HTTPS/HSTS solo con DEBUG=False: en local (DEBUG=True) el servidor de
 # desarrollo no habla HTTPS, así que forzar el redirect rompería
 # runserver. Railway sí sirve todo detrás de HTTPS.

@@ -77,14 +77,7 @@ class SubirDatosForm(forms.Form):
 
 class _MuestraMultipleField(forms.ModelMultipleChoiceField):
     def label_from_instance(self, obj):
-        parts = [obj.codigo]
-        if obj.cultivo_id:
-            parts.append(obj.cultivo.nombre)
-        if obj.variedad_clon_id:
-            parts.append(obj.variedad_clon.nombre)
-        if obj.localidad:
-            parts.append(obj.localidad)
-        return " — ".join(parts)
+        return obj.codigo
 
 
 class _SelectMultipleSinValidacionNativa(forms.SelectMultiple):

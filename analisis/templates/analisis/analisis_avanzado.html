@@ -1,5 +1,6 @@
 {% extends "analisis/base.html" %}
 {% load custom_filters %}
+{% load static %}
 
 {% block title %}Análisis Avanzado Ecológico{% endblock %}
 {% block nav_analisis %}active{% endblock %}
@@ -126,7 +127,7 @@ table.av-top-table { min-width: 420px; }
                 {% for m in muestras %}
                 <option value="{{ m.id }}"
                     {% if m.id in muestra_ids_seleccionados %}selected{% endif %}>
-                    {{ m.codigo }}{% if m.cultivo %} · {{ m.cultivo.nombre }}{% endif %}{% if m.variedad_clon %} ({{ m.variedad_clon.nombre }}){% endif %}
+                    {{ m.codigo }}
                 </option>
                 {% endfor %}
             </select>
@@ -145,6 +146,9 @@ table.av-top-table { min-width: 420px; }
 
 <!-- Nota: diversidad beta/gamma y PERMANOVA viven solo en "Comparar Perfiles"
      (ver banner de esta página) — evita mostrar dos veces el mismo cálculo. -->
+
+<!-- CONTROL DE VISUALIZACIÓN (aplica a todas las gráficas de esta página) -->
+<div id="av-mode-selector-wrap" style="margin-bottom: 0.7rem;"></div>
 
 <!-- TABLA TOP MICROORGANISMOS Y DONUT -->
 {% if top_microorganismos %}
@@ -169,7 +173,7 @@ table.av-top-table { min-width: 420px; }
                     {% for item in top_microorganismos %}
                     <tr>
                         <td data-label="#" class="td-mono" style="color: var(--text-muted); font-size: 13px;">{{ forloop.counter }}</td>
-                        <td data-label="Taxonomía"><strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">{{ item.taxonomia|default:"—" }}</strong></td>
+                        <td data-label="Taxonomía"><strong style="color: var(--text-primary); font-family: 'DM Mono', monospace; font-weight: 500;">{{ item.taxonomia|taxon_legible|default:"—" }}</strong></td>
                         <td data-label="% Abundancia">
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <div style="flex: 1; height: 6px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden;">
@@ -197,8 +201,11 @@ table.av-top-table { min-width: 420px; }
     </div>
 
     <div class="card" style="margin-bottom: 0;">
-        <div class="card-title">Distribución Porcentual</div>
-        <div style="position: relative; height: 300px; width: 100%; margin-top: 1rem;">
+        <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Distribución Porcentual — Abundancia relativa (%) por {{ nivel_actual_label }}</span>
+            <span id="dl-donut"></span>
+        </div>
+        <div id="chart-donut-wrap" style="position: relative; height: 300px; width: 100%; margin-top: 1rem;">
             <canvas id="chart-donut"></canvas>
         </div>
 
@@ -253,8 +260,9 @@ table.av-top-table { min-width: 420px; }
         <!-- 1. Barras apiladas -->
         {% if graficos_avanzados.grafico_barras_apiladas %}
         <div>
-            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.25rem;">
-                <i class="ti ti-chart-bar"></i> Composición de la Comunidad Microbiana (Barras Apiladas)
+            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.25rem; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span><i class="ti ti-chart-bar"></i> Composición de la Comunidad Microbiana (Barras Apiladas)</span>
+                <span id="dl-barras-apiladas"></span>
             </h4>
             <p class="chart-desc">Muestra la proporción relativa de cada taxón en cada muestra. Las barras suman 100 %, permitiendo comparar la estructura de la comunidad entre muestras incluso cuando los volúmenes de secuenciación difieren. "Otros" agrupa todos los taxones fuera del Top N seleccionado.</p>
             <div class="av-chart-wrap"><div id="grafico-barras-apiladas" style="min-height: 540px;"></div></div>
@@ -264,8 +272,9 @@ table.av-top-table { min-width: 420px; }
         <!-- 2. Heatmap -->
         {% if graficos_avanzados.grafico_heatmap %}
         <div>
-            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.25rem;">
-                <i class="ti ti-grid-dots"></i> Mapa de Calor — Patrones de Abundancia
+            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.25rem; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span><i class="ti ti-grid-dots"></i> Mapa de Calor — Patrones de Abundancia</span>
+                <span id="dl-heatmap-av"></span>
             </h4>
             <p class="chart-desc">Representación matricial donde cada celda indica la abundancia de un taxón (fila) en una muestra (columna). Los colores más intensos revelan mayor presencia. Útil para identificar taxones dominantes consistentes y patrones diferenciales entre muestras.</p>
             <div class="av-chart-wrap"><div id="grafico-heatmap" style="min-height: 420px;"></div></div>
@@ -275,8 +284,9 @@ table.av-top-table { min-width: 420px; }
         <!-- 3. PCoA Bray-Curtis -->
         {% if graficos_avanzados.grafico_pca %}
         <div>
-            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.25rem;">
-                <i class="ti ti-radar"></i> PCoA — Beta Diversidad (Bray-Curtis)
+            <h4 style="font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 0.25rem; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span><i class="ti ti-radar"></i> PCoA — Beta Diversidad (Bray-Curtis)</span>
+                <span id="dl-pcoa"></span>
             </h4>
             <p class="chart-desc">Ordenación multivariante basada en distancias de Bray-Curtis, la métrica estándar de disimilitud microbiana. Muestras cercanas en el plano comparten una composición microbiana similar; las distantes tienen comunidades distintas. Requiere ≥ 3 muestras para calcular la matriz de distancias.</p>
             <div class="av-chart-wrap"><div id="grafico-pca" style="min-height: 560px;"></div></div>
@@ -302,6 +312,14 @@ table.av-top-table { min-width: 420px; }
 {% if analisis_diferencial %}
 <div class="card">
     <div class="card-title"><i class="ti ti-microscope"></i> Análisis y Comparación Diferencial</div>
+    <p style="font-size: 12.5px; color: var(--text-hint); margin: 0.35rem 0 0;">
+        Compara <strong>{{ analisis_diferencial.etiqueta_a|default:"la muestra seleccionada" }}</strong>
+        contra el perfil agregado de
+        <strong>las otras {{ analisis_diferencial.n_muestras_b|default:0 }} muestra{{ analisis_diferencial.n_muestras_b|pluralize:"s" }}
+        de {{ analisis_diferencial.cultivo_nombre|default:"este cultivo" }}</strong>
+        (no contra una segunda muestra individual) — indica si esta muestra es típica del cultivo
+        o se aparta de lo que normalmente se encuentra en él.
+    </p>
     {% if analisis_diferencial.beta %}
     <div style="display: flex; gap: .7rem; margin-top: 1rem; flex-wrap: wrap;">
         <div>
@@ -309,28 +327,40 @@ table.av-top-table { min-width: 420px; }
             <div class="td-mono" style="font-size: 26px; font-weight: 600; color: var(--verde-dark);">
                 {{ analisis_diferencial.beta.jaccard|default:0 }}
             </div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Grado de homología entre microbiomas</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                Qué tan parecidos son los dos conjuntos de taxa (0 = nada en común · 1 = idénticos)
+            </div>
         </div>
         <div>
             <div class="metric-label" style="margin-bottom: 4px;">Taxa Compartidos (Core)</div>
             <div class="td-mono" style="font-size: 26px; font-weight: 600; color: #185FA5;">
                 {{ analisis_diferencial.beta.compartidos|default:0 }}
             </div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Unidades taxonómicas operativas comunes</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                Taxa presentes tanto en esta muestra como en el resto del cultivo
+            </div>
         </div>
         <div>
-            <div class="metric-label" style="margin-bottom: 4px;">Exclusivos Muestra A</div>
+            <div class="metric-label" style="margin-bottom: 4px;">
+                Exclusivos de {{ analisis_diferencial.etiqueta_a|default:"esta muestra" }}
+            </div>
             <div class="td-mono" style="font-size: 26px; font-weight: 600; color: var(--amber);">
                 {{ analisis_diferencial.beta.exclusivos.exclusivos_a|length|default:0 }}
             </div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Peculiares del primer set</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                Taxa que aparecen SOLO en esta muestra, ausentes en el resto del cultivo
+            </div>
         </div>
         <div>
-            <div class="metric-label" style="margin-bottom: 4px;">Exclusivos Muestra B</div>
+            <div class="metric-label" style="margin-bottom: 4px;">
+                Exclusivos del resto de {{ analisis_diferencial.cultivo_nombre|default:"este cultivo" }}
+            </div>
             <div class="td-mono" style="font-size: 26px; font-weight: 600; color: #a32d2d;">
                 {{ analisis_diferencial.beta.exclusivos.exclusivos_b|length|default:0 }}
             </div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Peculiares del segundo set</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                Taxa que sí aparecen en otras muestras del cultivo pero faltan en esta
+            </div>
         </div>
     </div>
     {% endif %}
@@ -347,6 +377,7 @@ table.av-top-table { min-width: 420px; }
 
 <!-- Plotly para gráficas avanzadas -->
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="{% static 'analisis/js/chart_theme.js' %}"></script>
 
 <!-- PANEL MULTI-SELECCIÓN DE MUESTRAS -->
 <script>
@@ -453,82 +484,199 @@ table.av-top-table { min-width: 420px; }
 <!-- GRÁFICO DONUT -->
 {% if top_microorganismos %}
 <script>
-document.addEventListener("DOMContentLoaded", function() {
+var avDonutChart = null;
+
+function avRenderDonut(mode) {
     try {
-        const PALETA = ['#1D9E75','#0F6E56','#085041','#BA7517','#9E6515','#185FA5','#0C447C','#A32D2D','#6B4E9E','#2E8B57','#c7a640','#5F5E5A'];
-        const OTROS_COLOR = '#B0B8C1';
-        const topData = {{ top_microorganismos_json|json_embed }};
-        if (Array.isArray(topData) && topData.length > 0) {
-            const labels = topData.map(r => r.taxonomia || 'Desconocido');
-            const values = topData.map(r => parseFloat(r.total_porcentaje || 0));
-            let idx = 0;
-            const bgColors = labels.map(l =>
-                l.toLowerCase().includes('otros') ? OTROS_COLOR : PALETA[idx++ % PALETA.length]
-            );
-            const ctx = document.getElementById('chart-donut');
-            if (ctx) {
-                new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: labels,
-                        datasets: [{ data: values, backgroundColor: bgColors, borderWidth: 2, borderColor: '#ffffff' }]
-                    },
-                    options: {
-                        responsive: true, maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: 'Outfit, sans-serif', size: 11 }, padding: 12 } },
-                            tooltip: { callbacks: { label: function(ctx) {
-                                const val = typeof ctx.parsed === 'number' ? ctx.parsed.toFixed(4) : ctx.parsed;
-                                return ` ${ctx.label}: ${val}%`;
-                            }}}
-                        },
-                        cutout: '65%'
-                    }
-                });
+        var topData = {{ top_microorganismos_json|json_embed }};
+        if (!Array.isArray(topData) || topData.length === 0) return;
+        var OTROS_COLOR = '#B0B8C1';
+        // El % va junto al nombre en la leyenda (ej. "Enterobacter — 16.71%"),
+        // no como texto flotando sobre la porción del donut.
+        var labels = topData.map(function (r) {
+            var nombre = ChartTheme.taxonLegible(r.taxonomia) || 'Desconocido';
+            var pct = parseFloat(r.total_porcentaje || 0);
+            return nombre + ' — ' + pct.toFixed(2) + '%';
+        });
+        var values = topData.map(function (r) { return parseFloat(r.total_porcentaje || 0); });
+        var idx = 0;
+        var bgColors = labels.map(function (l) {
+            if (l.toLowerCase().indexOf('otros') !== -1) {
+                return ChartTheme.isGrayMode(mode) ? ChartTheme.toGrayscaleHex(OTROS_COLOR) : OTROS_COLOR;
             }
+            return ChartTheme.getColor(mode, idx++);
+        });
+        var ctx = document.getElementById('chart-donut');
+        if (!ctx) return;
+        if (avDonutChart) { avDonutChart.destroy(); }
+
+        // Con pocos taxón (ej. Top 10) la leyenda abajo se ve bien en 2-3
+        // filas. Con muchos (Top 25/50) esa misma leyenda se amontona en
+        // varias filas largas y difíciles de escanear — a partir de cierta
+        // cantidad se cambia a una sola columna vertical a la derecha (se
+        // lee de arriba a abajo, un ítem por línea) y el contenedor crece en
+        // alto para que quepan todos sin apretarse.
+        var muchosItems = labels.length > 10;
+        var wrap = document.getElementById('chart-donut-wrap');
+        if (wrap) {
+            wrap.style.height = muchosItems ? (Math.max(320, labels.length * 20 + 20) + 'px') : '300px';
         }
+
+        avDonutChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{ data: values, backgroundColor: bgColors, borderWidth: 2, borderColor: '#ffffff' }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                layout: { padding: muchosItems ? { right: 8 } : 0 },
+                plugins: {
+                    legend: muchosItems
+                        ? { position: 'right', align: 'start',
+                            labels: { boxWidth: 9, font: { family: 'Outfit, sans-serif', size: 10.5 }, padding: 7 } }
+                        : { position: 'bottom',
+                            labels: { boxWidth: 10, font: { family: 'Outfit, sans-serif', size: 11 }, padding: 12 } },
+                    // El nombre de la leyenda (ctx.label) ya incluye el % — no hace
+                    // falta repetirlo en el tooltip.
+                    tooltip: { callbacks: { label: function(ctx) { return ' ' + ctx.label; } } }
+                },
+                cutout: '65%'
+            },
+        });
     } catch (err) { console.error("Error en donut:", err); }
-});
+}
 </script>
 {% endif %}
 
 <!-- RENDERIZADO DE GRÁFICAS AVANZADAS (Plotly) -->
 {% if graficos_avanzados %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    var graficos = {{ graficos_avanzados_json|json_embed }};
-    
+var avGraficosRaw = {{ graficos_avanzados_json|json_embed }};
+
+function avRenderPlotly(mode) {
     var CFG = { responsive: true };
 
-    // Barras apiladas
-    if (graficos.grafico_barras_apiladas) {
-        Plotly.newPlot('grafico-barras-apiladas',
-            graficos.grafico_barras_apiladas.data,
-            graficos.grafico_barras_apiladas.layout, CFG);
+    // Barras apiladas — "Otros" conserva su gris propio (no es un taxón real)
+    if (avGraficosRaw.grafico_barras_apiladas) {
+        var fig = JSON.parse(JSON.stringify(avGraficosRaw.grafico_barras_apiladas));
+        var idxB = 0;
+
+        // % por taxón junto a su nombre en la leyenda (mismo dato agregado
+        // que usa el donut, ej. "Enterobacter — 16.71%") en vez de como texto
+        // flotando dentro de cada segmento — ahí el % varía por muestra y no
+        // cabe legible cuando hay varios taxones apilados; el valor exacto
+        // por muestra sigue disponible al pasar el cursor (hovertemplate).
+        var topDataBarras = {{ top_microorganismos_json|json_embed }};
+        var pctPorTaxon = {};
+        var pctOtros = null;
+        if (Array.isArray(topDataBarras)) {
+            topDataBarras.forEach(function (r) {
+                var nombre = r.taxonomia || '';
+                var pct = parseFloat(r.total_porcentaje || 0);
+                pctPorTaxon[nombre] = pct;
+                // La cubeta "Otros" trae distinto texto exacto entre el donut
+                // ("Otros microorganismos (< abundancia)") y las barras
+                // apiladas ("Otros (N taxa agrupados)") — se ubica por
+                // coincidencia de subcadena en vez de exigir el mismo string.
+                if (nombre.toLowerCase().indexOf('otros') !== -1) pctOtros = pct;
+            });
+        }
+
+        fig.data.forEach(function (trace) {
+            var nombreOriginal = trace.name || '';
+            var esOtros = nombreOriginal.toLowerCase().indexOf('otros') !== -1;
+            trace.marker = trace.marker || {};
+            if (esOtros) {
+                trace.marker.color = ChartTheme.isGrayMode(mode) ? '#9a9a9a' : '#B0B8C1';
+                trace.marker.pattern = undefined;
+            } else {
+                trace.marker.color = ChartTheme.getColor(mode, idxB);
+                trace.marker.pattern = ChartTheme.isGrayMode(mode)
+                    ? { shape: ChartTheme.getPattern(idxB), fgcolor: '#ffffff', bgcolor: trace.marker.color, size: 6 }
+                    : undefined;
+                idxB++;
+            }
+
+            var pct = esOtros
+                ? pctOtros
+                : (pctPorTaxon.hasOwnProperty(nombreOriginal) ? pctPorTaxon[nombreOriginal] : null);
+            var nombreLegible = ChartTheme.taxonLegible(nombreOriginal);
+            trace.name = pct == null ? nombreLegible : (nombreLegible + ' — ' + pct.toFixed(2) + '%');
+
+            // El % ya no se dibuja dentro del segmento (ver comentario arriba).
+            trace.texttemplate = undefined;
+            trace.textposition = 'none';
+        });
+        fig.layout = Object.assign({}, fig.layout, ChartTheme.baseLayout(mode));
+        fig.layout.yaxis = Object.assign({}, fig.layout.yaxis, ChartTheme.yAxisGrid(mode));
+        Plotly.newPlot('grafico-barras-apiladas', fig.data, fig.layout, CFG);
     }
 
     // Heatmap — responsive:false para respetar la altura dinámica calculada en Python
-    if (graficos.grafico_heatmap) {
-        Plotly.newPlot('grafico-heatmap',
-            graficos.grafico_heatmap.data,
-            graficos.grafico_heatmap.layout,
-            { responsive: false });
+    if (avGraficosRaw.grafico_heatmap) {
+        var figH = JSON.parse(JSON.stringify(avGraficosRaw.grafico_heatmap));
+        figH.data.forEach(function (trace) {
+            trace.colorscale = ChartTheme.heatmapColorscale(mode);
+            if (Array.isArray(trace.y)) trace.y = trace.y.map(ChartTheme.taxonLegible);
+        });
+        figH.layout = Object.assign({}, figH.layout, ChartTheme.baseLayout(mode));
+        Plotly.newPlot('grafico-heatmap', figH.data, figH.layout, { responsive: false });
         // Ajustar el contenedor a la altura real del gráfico
         var hmDiv = document.getElementById('grafico-heatmap');
-        if (hmDiv && graficos.grafico_heatmap.layout && graficos.grafico_heatmap.layout.height) {
-            hmDiv.style.height = graficos.grafico_heatmap.layout.height + 'px';
+        if (hmDiv && figH.layout && figH.layout.height) {
+            hmDiv.style.height = figH.layout.height + 'px';
         }
     }
 
-    // PCoA Bray-Curtis
-    if (graficos.grafico_pca) {
-        Plotly.newPlot('grafico-pca',
-            graficos.grafico_pca.data,
-            graficos.grafico_pca.layout, CFG);
+    // PCoA Bray-Curtis — el centroide conserva su estilo neutro propio
+    if (avGraficosRaw.grafico_pca) {
+        var figP = JSON.parse(JSON.stringify(avGraficosRaw.grafico_pca));
+        var idxP = 0;
+        figP.data.forEach(function (trace) {
+            if (trace.name === 'Centroide') return;
+            var color = ChartTheme.getColor(mode, idxP);
+            trace.marker = trace.marker || {};
+            trace.marker.color = color;
+            if (trace.textfont) trace.textfont.color = color;
+            if (ChartTheme.isGrayMode(mode)) trace.marker.symbol = ChartTheme.getSymbol(idxP);
+            idxP++;
+        });
+        figP.layout = Object.assign({}, figP.layout, ChartTheme.baseLayout(mode));
+        Plotly.newPlot('grafico-pca', figP.data, figP.layout, CFG);
+    }
+}
+</script>
+{% endif %}
+
+<!-- CONTROL DE MODO — único por página, aplica al donut y a las 3 gráficas Plotly -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var wrap = document.getElementById('av-mode-selector-wrap');
+    if (!wrap || typeof ChartTheme === 'undefined') return;
+
+    function renderTodo(mode) {
+        if (typeof avRenderDonut === 'function') avRenderDonut(mode);
+        if (typeof avRenderPlotly === 'function') avRenderPlotly(mode);
+    }
+
+    var modeCtl = ChartTheme.mountModeSelector(wrap, { initial: 'color', onChange: renderTodo });
+    renderTodo(modeCtl.getMode());
+
+    if (typeof avRenderDonut === 'function') {
+        ChartTheme.addCanvasDownloadButton('dl-donut', {
+            getChart: function () { return avDonutChart; },
+            filenameBase: 'distribucion_porcentual',
+            getMode: modeCtl.getMode,
+        });
+    }
+    if (typeof avRenderPlotly === 'function') {
+        ChartTheme.addPlotlyDownloadButtons('dl-barras-apiladas', { divId: 'grafico-barras-apiladas', filenameBase: 'barras_apiladas', getMode: modeCtl.getMode });
+        ChartTheme.addPlotlyDownloadButtons('dl-heatmap-av',      { divId: 'grafico-heatmap',         filenameBase: 'heatmap_avanzado', getMode: modeCtl.getMode });
+        ChartTheme.addPlotlyDownloadButtons('dl-pcoa',            { divId: 'grafico-pca',              filenameBase: 'pcoa_bray_curtis', getMode: modeCtl.getMode });
     }
 });
 </script>
-{% endif %}
 
 <script>
 (function () {

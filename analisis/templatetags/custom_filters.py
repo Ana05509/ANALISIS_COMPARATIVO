@@ -106,7 +106,29 @@ def split(value, arg=","):
     Si el valor no es una cadena, devuelve el valor original.
     """
     if isinstance(value, str):
-        # Usamos .split(arg) y si necesitas limpiar espacios, 
+        # Usamos .split(arg) y si necesitas limpiar espacios,
         # puedes usar una lista de comprensión:
         return [item.strip() for item in value.split(arg)]
     return value
+
+
+@register.filter(name='taxon_legible')
+def taxon_legible(valor):
+    """
+    Traduce SOLO para mostrar en pantalla el valor de relleno "Unclassified"
+    que el pipeline escribe en genus/species/taxonomia cuando el laboratorio
+    no identificó ese nivel taxonómico — en inglés tiene sentido para quien
+    ya conoce el pipeline, pero no para un estudiante que apenas ve la
+    palabra en una tabla de resultados.
+
+    No toca el dato real: la fila en la base de datos sigue guardando
+    literalmente "Unclassified" (así lo esperan los filtros de exclusión de
+    abundance.py/diversity.py/catalog_service.py, que hacen match exacto
+    contra ese string) — este filtro solo cambia lo que se pinta en el
+    HTML, nunca lo que se calcula ni lo que se compara.
+    """
+    if not valor:
+        return valor
+    if str(valor).strip().lower() == 'unclassified':
+        return 'Sin identificar'
+    return valor

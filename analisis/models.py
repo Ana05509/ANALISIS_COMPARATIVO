@@ -148,7 +148,7 @@ class CatalogoMicroorganismo(models.Model):
         ("benefico", "Benéfico"),
         ("fitopatogeno", "Potencial fitopatógeno"),
         ("neutral", "Neutral"),
-        ("sin_clasificar", "Sin clasificar"),
+        ("sin_clasificar", "Sin clasificación"),
     ]
 
     MARCADOR_CHOICES = [

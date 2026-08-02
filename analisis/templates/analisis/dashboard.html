@@ -1,5 +1,6 @@
 {% extends "analisis/base.html" %}
 {% load custom_filters %}
+{% load static %}
 
 {% block title %}Dashboard General{% endblock %}
 {% block nav_dashboard %}active{% endblock %}
@@ -23,10 +24,6 @@
 @keyframes bfloat    { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-5px)} }
 @keyframes pulseRing { 0%{transform:scale(1);opacity:.55} 70%{transform:scale(2.4);opacity:0} 100%{transform:scale(2.4);opacity:0} }
 @keyframes chipFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
-@keyframes skelShimmer {
-    0%  { background-position: 200% center }
-    100%{ background-position:-200% center }
-}
 @keyframes dotPulse  { 0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.6)} 50%{box-shadow:0 0 0 5px rgba(74,222,128,0)} }
 @keyframes fadeSlide { from{opacity:0;transform:translateY(22px)} to{opacity:1;transform:none} }
 
@@ -288,47 +285,6 @@
 .section-hdr-title i { font-size: 16px; color: var(--verde); }
 .section-hdr-meta  { font-size: 12px; color: var(--text-hint); }
 
-/* ─ Chart grid ─────────────────────────────────── */
-.charts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: .85rem;
-    margin-bottom: .85rem;
-}
-.chart-card {
-    background: var(--surface);
-    border: 1px solid var(--gris-border);
-    border-radius: var(--radius-lg);
-    padding: .85rem 1rem;
-    box-shadow: var(--shadow-card);
-    transition: box-shadow .25s;
-}
-.chart-card:hover { box-shadow: var(--shadow-md); }
-.chart-card-hdr {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: .5rem;
-    padding-bottom: .4rem;
-    border-bottom: 1px solid var(--gris-light);
-}
-.chart-card-hdr i { font-size: 16px; color: var(--verde); }
-
-/* Skeleton loader */
-.chart-skel {
-    height: 190px;
-    border-radius: 8px;
-    background: linear-gradient(90deg,
-        var(--gris-light) 25%,
-        color-mix(in srgb, var(--gris-light) 50%, var(--surface)) 50%,
-        var(--gris-light) 75%);
-    background-size: 200% 100%;
-    animation: skelShimmer 1.5s ease-in-out infinite;
-}
-
 /* ─ Cultivos cards ──────────────────────────────── */
 .cultivos-card {
     background: var(--surface);
@@ -348,7 +304,7 @@
     border-radius: var(--radius);
     overflow: hidden;
     transition: all .22s ease;
-    cursor: default;
+    cursor: pointer;
     background: var(--surface);
 }
 .cultivo-card:hover {
@@ -386,6 +342,41 @@
     font-family: 'DM Mono', monospace; font-variant-numeric: tabular-nums;
 }
 
+/* ─ Modal de variedades por cultivo ─────────────── */
+dialog#modal-variedades {
+    border: none; border-radius: 14px; padding: 1.5rem 1.75rem;
+    max-width: 420px; width: calc(100% - 2rem);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    font-family: 'Outfit', sans-serif; color: var(--text-primary);
+    background: var(--surface);
+}
+dialog#modal-variedades::backdrop { background: rgba(0,0,0,0.45); }
+.mv-hdr {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 1rem;
+}
+.mv-hdr-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: rgba(29,158,117,.12);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.mv-hdr-icon i { color: var(--verde); font-size: 18px; }
+.mv-hdr h3 { margin: 0; font-size: 15px; }
+.mv-hdr p { margin: 2px 0 0; font-size: 12px; color: var(--text-hint); }
+.mv-row { margin-bottom: .65rem; }
+.mv-row:last-child { margin-bottom: 0; }
+.mv-row-top {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 3px; gap: 8px;
+}
+.mv-row-name { font-size: 13px; font-weight: 500; }
+.mv-row-count { font-size: 11px; color: var(--text-hint); font-family: 'DM Mono', monospace; white-space: nowrap; }
+.mv-empty { font-size: 13px; color: var(--text-hint); text-align: center; padding: .5rem 0; }
+.mv-close {
+    margin-top: 1.1rem; display: flex; justify-content: flex-end;
+}
+
 /* ─ Ajuste de página: sin aire de sobra en el dashboard ─ */
 .page-content { padding: .75rem 1.25rem; }
 
@@ -393,7 +384,6 @@
 @media (max-width:1100px) { .dash-stats-grid { grid-template-columns:repeat(2,1fr); } }
 @media (max-width:640px)  {
     .dash-stats-grid { grid-template-columns:1fr 1fr; }
-    .charts-grid     { grid-template-columns:1fr; }
     .dash-hero-clock { display:none; }
     .dash-hero       { padding:.9rem 1.1rem; }
     .dash-hero-name  { font-size:18px; }
@@ -513,32 +503,6 @@
 
 </div>
 
-{# ══ GRÁFICOS ══ #}
-{% if graficos_json %}
-<div class="charts-grid">
-    {% if graficos_json.grafico_barras != "null" and graficos_json.grafico_barras %}
-    <div class="chart-card dash-reveal" style="transition-delay:.1s">
-        <div class="chart-card-hdr">
-            <i class="ti ti-chart-bar"></i>
-            Distribución por Género
-        </div>
-        <div class="chart-skel" id="skel-barras"></div>
-        <div id="grafico-barras" style="height:190px;width:100%;display:none;"></div>
-    </div>
-    {% endif %}
-    {% if graficos_json.grafico_pie != "null" and graficos_json.grafico_pie %}
-    <div class="chart-card dash-reveal" style="transition-delay:.18s">
-        <div class="chart-card-hdr">
-            <i class="ti ti-chart-donut"></i>
-            Proporción de Taxa
-        </div>
-        <div class="chart-skel" id="skel-pie"></div>
-        <div id="grafico-pie" style="height:190px;width:100%;display:none;"></div>
-    </div>
-    {% endif %}
-</div>
-{% endif %}
-
 {# ══ CULTIVOS ══ #}
 {% if productos_por_variedad %}
 <div class="cultivos-card dash-reveal" style="transition-delay:.14s">
@@ -553,7 +517,7 @@
     </div>
     <div class="cultivos-cards-grid">
         {% for v in productos_por_variedad %}
-        <div class="cultivo-card">
+        <div class="cultivo-card" data-cultivo-id="{{ v.cid }}" data-cultivo-nombre="{{ v.nombre_variedad }}" tabindex="0" role="button">
             <div class="cultivo-card-img">
                 {% if v.imagen_cultivo %}
                 <img src="{{ v.imagen_cultivo|as_media_url }}" alt="{{ v.nombre_variedad }}" loading="lazy">
@@ -576,10 +540,24 @@
 </div>
 {% endif %}
 
+<dialog id="modal-variedades" aria-labelledby="mv-title">
+    <div class="mv-hdr">
+        <div class="mv-hdr-icon"><i class="ti ti-plant-2" aria-hidden="true"></i></div>
+        <div>
+            <h3 id="mv-title">Variedades</h3>
+            <p id="mv-subtitle"></p>
+        </div>
+    </div>
+    <div id="mv-body"></div>
+    <div class="mv-close">
+        <button type="button" id="mv-btn-cerrar" class="btn btn-outline">Cerrar</button>
+    </div>
+</dialog>
+
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>var VARIEDADES_POR_CULTIVO = {{ variedades_por_cultivo_json|json_embed }};</script>
 <script>
 (function () {
 'use strict';
@@ -740,37 +718,57 @@ var io = new IntersectionObserver(function(entries){
 document.querySelectorAll('.dash-reveal').forEach(function(el){ io.observe(el); });
 
 /* ════════════════════════════════════════════════
-   5. CHARTS — skeleton → render
+   6. MODAL — variedades por cultivo
    ════════════════════════════════════════════════ */
-{% if graficos_json %}
-document.addEventListener('DOMContentLoaded', function(){
-    var gd = {{ graficos_json|json_embed }};
-    if(!gd) return;
-    var font = { family:'Outfit, sans-serif', size:12, color:'#5F5E5A' };
+(function initModalVariedades(){
+    var dlg = document.getElementById('modal-variedades');
+    if(!dlg) return;
+    var subtitleEl = document.getElementById('mv-subtitle');
+    var bodyEl     = document.getElementById('mv-body');
+    var btnCerrar  = document.getElementById('mv-btn-cerrar');
 
-    function renderChart(divId, skelId, dataObj){
-        if(!dataObj || dataObj === 'null') return;
-        var div  = document.getElementById(divId);
-        var skel = document.getElementById(skelId);
-        if(!div) return;
-        var layout = Object.assign({}, dataObj.layout || {});
-        layout.font = font;
-        layout.paper_bgcolor = 'rgba(0,0,0,0)';
-        layout.plot_bgcolor  = 'rgba(0,0,0,0)';
-        try {
-            Plotly.newPlot(divId, dataObj.data, layout, {responsive:true, displayModeBar:false});
-            if(skel){ skel.style.display = 'none'; }
-            div.style.display = 'block';
-            div.style.opacity = '0';
-            div.style.transition = 'opacity .5s ease';
-            requestAnimationFrame(function(){ div.style.opacity = '1'; });
-        } catch(err){ console.error('[chart]', err); }
+    function escapeHtml(str){
+        return String(str).replace(/[&<>"']/g, function(c){
+            return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+        });
     }
 
-    renderChart('grafico-barras', 'skel-barras', gd.grafico_barras);
-    renderChart('grafico-pie',    'skel-pie',    gd.grafico_pie);
-});
-{% endif %}
+    function abrirModal(cultivoId, cultivoNombre){
+        var variedades = (VARIEDADES_POR_CULTIVO && VARIEDADES_POR_CULTIVO[cultivoId]) || [];
+        subtitleEl.textContent = cultivoNombre;
+        if(!variedades.length){
+            bodyEl.innerHTML = '<p class="mv-empty">Sin variedades o clones registrados.</p>';
+        } else {
+            var totalCultivo = variedades.reduce(function(acc, v){ return acc + v.total; }, 0) || 1;
+            bodyEl.innerHTML = variedades.map(function(v){
+                var pct = Math.min((v.total / totalCultivo) * 100, 100);
+                return '' +
+                    '<div class="mv-row">' +
+                        '<div class="mv-row-top">' +
+                            '<span class="mv-row-name">' + escapeHtml(v.nombre) + '</span>' +
+                            '<span class="mv-row-count">' + v.total + ' muestra' + (v.total === 1 ? '' : 's') + '</span>' +
+                        '</div>' +
+                        '<div class="pct-bar-track"><div class="pct-bar-fill" style="width:' + pct.toFixed(1) + '%;"></div></div>' +
+                    '</div>';
+            }).join('');
+        }
+        dlg.showModal();
+    }
+
+    document.querySelectorAll('.cultivo-card').forEach(function(card){
+        card.addEventListener('click', function(){
+            abrirModal(card.dataset.cultivoId, card.dataset.cultivoNombre);
+        });
+        card.addEventListener('keydown', function(e){
+            if(e.key === 'Enter' || e.key === ' '){
+                e.preventDefault();
+                abrirModal(card.dataset.cultivoId, card.dataset.cultivoNombre);
+            }
+        });
+    });
+
+    if(btnCerrar) btnCerrar.addEventListener('click', function(){ dlg.close(); });
+})();
 
 })();
 </script>
