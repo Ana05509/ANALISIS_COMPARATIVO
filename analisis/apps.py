@@ -50,32 +50,47 @@ class AnalisisConfig(AppConfig):
         from allauth.account.signals import user_signed_up
 
         def enviar_bienvenida(sender, request, user, **kwargs):
-            from django.core.mail import EmailMultiAlternatives
-            from django.template.loader import render_to_string
-            from django.conf import settings
+            # user_signed_up.send() (allauth) no usa send_robust(): si esta
+            # función deja escapar una excepción, se propaga hasta
+            # complete_signup() y rompe el registro completo — la persona
+            # vería un error 500 en vez de quedar registrada, solo porque el
+            # correo de bienvenida falló. fail_silently=True en msg.send()
+            # de más abajo protege apenas el envío en sí (errores SMTP); todo
+            # lo anterior (armar la URL, renderizar las plantillas) queda
+            # bajo este try para que CUALQUIER falla aquí sea, como pretende
+            # el nombre, silenciosa — nunca a costa de bloquear el alta.
+            try:
+                from django.core.mail import EmailMultiAlternatives
+                from django.template.loader import render_to_string
+                from django.conf import settings
 
-            rol_display = dict(user.ROLES).get(user.rol, user.rol)
-            login_url = request.build_absolute_uri('/accounts/login/')
+                rol_display = dict(user.ROLES).get(user.rol, user.rol)
+                login_url = request.build_absolute_uri('/accounts/login/')
 
-            asunto = render_to_string(
-                'account/email/welcome_subject.txt',
-                {'user': user},
-            ).strip()
+                asunto = render_to_string(
+                    'account/email/welcome_subject.txt',
+                    {'user': user},
+                ).strip()
 
-            cuerpo_html = render_to_string(
-                'account/email/welcome_body.html',
-                {'user': user, 'rol': rol_display, 'login_url': login_url},
-                request=request,
-            )
+                cuerpo_html = render_to_string(
+                    'account/email/welcome_body.html',
+                    {'user': user, 'rol': rol_display, 'login_url': login_url},
+                    request=request,
+                )
 
-            msg = EmailMultiAlternatives(
-                subject=asunto,
-                body=f'Bienvenido/a {user.first_name} a BioMicro.',
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[user.email],
-            )
-            msg.attach_alternative(cuerpo_html, 'text/html')
-            msg.send(fail_silently=True)
+                msg = EmailMultiAlternatives(
+                    subject=asunto,
+                    body=f'Bienvenido/a {user.first_name} a BioMicro.',
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[user.email],
+                )
+                msg.attach_alternative(cuerpo_html, 'text/html')
+                msg.send(fail_silently=True)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "No se pudo enviar el correo de bienvenida a %s", getattr(user, 'email', '?')
+                )
 
         user_signed_up.connect(enviar_bienvenida)
 

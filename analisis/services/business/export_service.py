@@ -18,8 +18,10 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table as XLTable, TableStyleInfo
 from openpyxl.worksheet.hyperlink import Hyperlink
 from openpyxl.drawing.image import Image as XLImage
-
-import plotly.graph_objects as go
+from openpyxl.chart import BarChart, PieChart, DoughnutChart, RadarChart, Reference
+from openpyxl.chart.series import DataPoint
+from openpyxl.chart.label import DataLabelList
+from openpyxl.formatting.rule import ColorScaleRule
 
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -86,13 +88,11 @@ _NIVEL_COLORES = {
 }
 
 # ---------------------------------------------------------------------------
-# Identidad visual Plotly — gráficos del reporte Excel (Fase 1.2)
+# Identidad visual — gráficos nativos del reporte Excel
 # ---------------------------------------------------------------------------
 # Reusa los mismos tonos que ya usa el resto del reporte (CV/CAZUL/CA/CR de
 # generar_excel_multisheet), agregando un turquesa como puente visual entre
-# el verde y el azul. PLOTLY_FONT usa una familia ampliamente disponible en
-# el servidor: Kaleido renderiza server-side y no tiene garantizada ninguna
-# fuente web custom instalada.
+# el verde y el azul.
 PLOTLY_VERDE    = "#1D9E75"
 PLOTLY_VERDE_OS = "#0F6E56"
 PLOTLY_AZUL     = "#185FA5"
@@ -100,7 +100,6 @@ PLOTLY_TURQUESA = "#14B8A6"
 PLOTLY_AMBAR    = "#BA7517"
 PLOTLY_ROJO     = "#A32D2D"
 PLOTLY_GRIS     = "#94A3B8"
-PLOTLY_FONT     = "Arial, sans-serif"
 
 # Colores por clasificación ecológica — mismos usados en los íconos
 # 🟢🔴🔵⚪ del resto del reporte, para que los gráficos comuniquen el rol
@@ -122,7 +121,6 @@ COLOR_POR_CLAS = {
 # categoría para que la figura siga siendo legible sin depender del color
 # (requisito de tesis/publicación impresa en blanco y negro).
 _HATCHES = ['', '//', 'xx', '..', '||', '--', '++', 'oo']  # matplotlib (multi-char permitido)
-_HATCHES_PLOTLY = ['', '/', '\\', 'x', '-', '|', '+', '.']  # Plotly solo acepta 1 carácter
 
 
 def _hex_a_gris(hex_color):
@@ -135,55 +133,27 @@ def _hex_a_gris(hex_color):
     return '#{0:02x}{0:02x}{0:02x}'.format(max(0, min(255, y)))
 
 
-def _resolver_color(hex_color, modo):
+def _resolver_color(hex_color, modo) -> str:
     return hex_color if modo != "grises" else _hex_a_gris(hex_color)
 
 
-def _resolver_colores(hex_list, modo):
+def _resolver_colores(hex_list, modo) -> list:
     return [_resolver_color(c, modo) for c in hex_list]
 
 
 def _resolver_hatch(i, modo):
-    return _HATCHES[i % len(_HATCHES)] if modo == "grises" else None
+    return _HATCHES[i % len(_HATCHES)] if modo == "grises" else ""
 
 
-def _resolver_hatch_plotly(i, modo):
-    return _HATCHES_PLOTLY[i % len(_HATCHES_PLOTLY)] if modo == "grises" else ""
-
-
-def _plotly_layout_base(titulo="", subtitulo=None):
-    """Layout base compartido por todas las figuras del reporte: tipografía,
-    fondo blanco y título con estilo consistente, para no repetir estas
-    mismas líneas en cada gráfico."""
-    titulo_html = f"<b>{titulo}</b>"
-    if subtitulo:
-        titulo_html += f"<br><span style='font-size:12px;color:#6B7280'>{subtitulo}</span>"
-    return dict(
-        title=dict(text=titulo_html, font=dict(family=PLOTLY_FONT, size=16, color="#1F2937"),
-                   x=0.02, xanchor="left"),
-        font=dict(family=PLOTLY_FONT, size=13, color="#374151"),
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        margin=dict(l=60, r=30, t=70 if not subtitulo else 90, b=50),
-        showlegend=False,
-    )
-
-
-def _fig_a_imagen_xl(fig, ancho_px=900, alto_px=520, escala=3):
-    """Renderiza una figura Plotly a PNG (motor Kaleido) y la envuelve como
-    openpyxl.drawing.image.Image lista para ws.add_image(). escala=3 da
-    ~300 DPI equivalentes (partiendo de una base de pantalla de 96 DPI) para
-    que la imagen no se vea pixelada ni al ampliar en Excel ni si se
-    reutiliza en un informe impreso — mismo criterio de resolución que usa
-    este archivo para los gráficos matplotlib del PDF (dpi=300, ver
-    ExportService._chart_donut_taxa y similares)."""
-    fig.update_layout(width=ancho_px, height=alto_px)
-    buf = BytesIO()
-    fig.write_image(buf, format="png", scale=escala)
-    buf.seek(0)
-    img = XLImage(buf)
-    img.width, img.height = ancho_px, alto_px
-    return img
+def _agregar_grafico_seguro(ws, chart, celda):
+    """ws.add_chart(chart, celda), pero si chart es None (datos
+    insuficientes para construirlo, ver cada _fig_*) deja una nota de texto
+    visible en la celda en vez de dejar ese espacio en blanco sin
+    explicación."""
+    if chart is None:
+        ws[celda] = "⚠ Gráfico no disponible (datos insuficientes)."
+        return
+    ws.add_chart(chart, celda)
 
 
 # Colores ReportLab para clasificación
@@ -217,17 +187,21 @@ def _get_styles():
         'ScientificH2', parent=styles['Heading2'], fontSize=11, leading=14,
         textColor=_white, spaceBefore=0, spaceAfter=0, fontName='Helvetica-Bold',
     )
+    # Texto normal (títulos internos, cuerpo, tablas, valores) en negro puro
+    # para impresión/publicación académica — solo se deja en blanco/claro el
+    # texto que va DENTRO de una franja o banda con fondo de color (arriba:
+    # titulo/subtitle/h2/th/th_dark), donde negro sería ilegible.
     style_h3 = ParagraphStyle(
         'ScientificH3', parent=styles['Heading3'], fontSize=10.5, leading=14,
-        textColor=_C_PRIMARY, spaceBefore=10, spaceAfter=5, fontName='Helvetica-Bold',
+        textColor=colors.black, spaceBefore=10, spaceAfter=5, fontName='Helvetica-Bold',
     )
     style_body = ParagraphStyle(
         'ScientificBody', parent=styles['Normal'], fontSize=9.5, leading=13.5,
-        textColor=_gray,
+        textColor=colors.black,
     )
     style_body_sm = ParagraphStyle(
         'ScientificBodySm', parent=styles['Normal'], fontSize=8.5, leading=11.5,
-        textColor=_gray,
+        textColor=colors.black,
     )
     style_th = ParagraphStyle(
         'TableTh', parent=styles['Normal'], fontSize=8.5, leading=11,
@@ -239,15 +213,15 @@ def _get_styles():
     )
     style_center = ParagraphStyle(
         'CenteredBody', parent=styles['Normal'], fontSize=9.5, leading=13,
-        textColor=_gray, alignment=TA_CENTER,
+        textColor=colors.black, alignment=TA_CENTER,
     )
     style_italic = ParagraphStyle(
         'ItalicBody', parent=styles['Normal'], fontSize=8.5, leading=12,
-        textColor=_muted, fontName='Helvetica-Oblique',
+        textColor=colors.black, fontName='Helvetica-Oblique',
     )
     style_caption = ParagraphStyle(
         'Caption', parent=styles['Normal'], fontSize=7.5, leading=10,
-        textColor=_muted, fontName='Helvetica-Oblique', alignment=TA_CENTER,
+        textColor=colors.black, fontName='Helvetica-Oblique', alignment=TA_CENTER,
         spaceBefore=3, spaceAfter=6,
     )
     style_kpi_val = ParagraphStyle(
@@ -256,15 +230,15 @@ def _get_styles():
     )
     style_kpi_lbl = ParagraphStyle(
         'KpiLbl', parent=styles['Normal'], fontSize=7.5, leading=10,
-        textColor=_muted, alignment=TA_CENTER,
+        textColor=colors.black, alignment=TA_CENTER,
     )
     style_label = ParagraphStyle(
         'LabelDark', parent=styles['Normal'], fontSize=8.5, leading=11,
-        textColor=_C_PRIMARY, fontName='Helvetica-Bold',
+        textColor=colors.black, fontName='Helvetica-Bold',
     )
     style_muted = ParagraphStyle(
         'Muted', parent=styles['Normal'], fontSize=8, leading=11,
-        textColor=_muted,
+        textColor=colors.black,
     )
     return {
         "titulo":    style_titulo,
@@ -323,9 +297,13 @@ def _kpi_tiles(items, ancho_util, S):
 
     cells = []
     for it in items:
+        # El valor va en negro (texto normal) — antes tomaba it["color"]
+        # (verde/rojo/etc. según categoría); ese campo ya no se usa para el
+        # color del texto, se deja en items solo por compatibilidad con las
+        # llamadas existentes.
         kpi_style = ParagraphStyle(
             'KpiValDyn', parent=S["kpi_val"],
-            textColor=colors.HexColor(it.get("color", "#1b4332")),
+            textColor=colors.black,
         )
         sub_p = Paragraph(it.get("sub", ""), S["kpi_lbl"]) if it.get("sub") else Spacer(1, 2)
         cells.append(
@@ -435,9 +413,9 @@ def _retro_freeze_y_nav(ws, freeze_cell="A3", titulo_extra=None, offset=1,
             if getattr(s, "tx", None) and s.tx and s.tx.strRef:
                 s.tx.strRef.f = _shift_formula_rows(s.tx.strRef.f, offset)
 
-    # Los gráficos Plotly se embeben como imágenes (ws._images), no como
-    # ws._charts — su ancla es igual de una cadena tipo "G3" y necesita el
-    # mismo desplazamiento, si no quedan una fila más arriba de donde deben.
+    # Cualquier imagen suelta (ws._images, p.ej. un logo) usa el mismo tipo
+    # de ancla en string ("G3") que un chart — necesita el mismo
+    # desplazamiento o queda una fila más arriba de donde debería.
     for img in ws._images:
         img.anchor = _shift_anchor(img.anchor, offset)
 
@@ -915,11 +893,12 @@ class ExportService:
             fig, ax = plt.subplots(figsize=(width_pt / 72, height_pt / 72))
             fig.patch.set_facecolor('#ffffff')
 
-            wedges, _ = ax.pie(
+            _pie_result = ax.pie(
                 sizes, labels=None, colors=palette,
                 startangle=90, counterclock=False,
                 wedgeprops=dict(width=0.48, edgecolor='white', linewidth=0.8),
             )
+            wedges = _pie_result[0]
             if modo == "grises":
                 for i, w in enumerate(wedges):
                     w.set_hatch(_resolver_hatch(i, modo))
@@ -936,7 +915,7 @@ class ExportService:
             fig.text(0.5, 0.90, subtitulo,
                      ha='center', va='top', fontsize=6, color='#64748b', style='italic')
 
-            plt.tight_layout(pad=0.3, rect=[0, 0, 1, 0.88])
+            plt.tight_layout(pad=0.3, rect=(0, 0, 1, 0.88))
 
             buf = BytesIO()
             fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
@@ -944,6 +923,8 @@ class ExportService:
             buf.seek(0)
             return RLImage(buf, width=width_pt, height=height_pt)
         except Exception:
+            import logging
+            logging.getLogger(__name__).exception("No se pudo renderizar _chart_donut_taxa")
             return None
 
     @staticmethod
@@ -991,10 +972,12 @@ class ExportService:
             buf.seek(0)
             return RLImage(buf, width=width_pt, height=height_pt)
         except Exception:
+            import logging
+            logging.getLogger(__name__).exception("No se pudo renderizar _chart_barras_clas")
             return None
 
     @staticmethod
-    def _chart_ranked_bar_taxa(top_taxa, width_pt=440, height_pt=None,
+    def _chart_ranked_bar_taxa(top_taxa, width_pt: float = 440, height_pt=None,
                                titulo="Perfil de Abundancia Relativa",
                                subtitulo="Taxa ordenados de mayor a menor — color indica rol funcional",
                                modo="color"):
@@ -1018,7 +1001,7 @@ class ExportService:
                 return None
 
             CATS_ORDEN = ['benefico', 'fitopatogeno', 'neutral', 'sin_clasificar']
-            CLR_MAP = dict(zip(CATS_ORDEN, _resolver_colores(
+            CLR_MAP: dict = dict(zip(CATS_ORDEN, _resolver_colores(
                 ['#16a34a', '#dc2626', '#64748b', '#94a3b8'], modo)))
             HATCH_MAP = {cat: _resolver_hatch(i, modo) for i, cat in enumerate(CATS_ORDEN)}
 
@@ -1083,10 +1066,12 @@ class ExportService:
             buf.seek(0)
             return RLImage(buf, width=width_pt, height=dyn_h)
         except Exception:
+            import logging
+            logging.getLogger(__name__).exception("No se pudo renderizar _chart_ranked_bar_taxa")
             return None
 
     @staticmethod
-    def _chart_comparativo_shannon(datos_por_muestra, width_pt=460, height_pt=170, modo="color"):
+    def _chart_comparativo_shannon(datos_por_muestra, width_pt: float = 460, height_pt=170, modo="color"):
         """
         Dos subplots: Shannon H' (colores por umbral absoluto) e Índice de Salud por muestra.
         Umbrales Shannon: <1 rojo · 1-2 naranja · 2-3 amarillo · ≥3 verde.
@@ -1193,10 +1178,12 @@ class ExportService:
             buf.seek(0)
             return RLImage(buf, width=width_pt, height=height_pt)
         except Exception:
+            import logging
+            logging.getLogger(__name__).exception("No se pudo renderizar _chart_comparativo_shannon")
             return None
 
     @staticmethod
-    def _chart_barras_agrupadas_funcional(datos_por_muestra, width_pt=460, height_pt=175,
+    def _chart_barras_agrupadas_funcional(datos_por_muestra, width_pt: float = 460, height_pt=175,
                                           titulo="Composición Funcional Comparativa",
                                           subtitulo="N.° de taxa por categoría funcional en cada muestra",
                                           modo="color"):
@@ -1258,6 +1245,8 @@ class ExportService:
             buf.seek(0)
             return RLImage(buf, width=width_pt, height=height_pt)
         except Exception:
+            import logging
+            logging.getLogger(__name__).exception("No se pudo renderizar _chart_barras_agrupadas_funcional")
             return None
 
     # ------------------------------------------------------------------
@@ -1364,11 +1353,11 @@ class ExportService:
         # Título del reporte
         title_style = ParagraphStyle('ReportTitle', parent=S["body"],
             fontSize=17, fontName='Helvetica-Bold',
-            textColor=_C_PRIMARY, leading=21)
+            textColor=colors.black, leading=21)
         contenido.append(Paragraph("Análisis de Comunidad Microbiana de Suelo", title_style))
         contenido.append(Spacer(1, 4))
         sub_style = ParagraphStyle('ReportSub', parent=S["body_sm"],
-            textColor=colors.HexColor('#64748b'), fontSize=9.5)
+            textColor=colors.black, fontSize=9.5)
         contenido.append(Paragraph(
             f"Nivel taxonómico: <b>{nivel.capitalize()}</b> · "
             f"Top <b>{top_n}</b> taxa más abundantes · {fecha_gen}",
@@ -1412,7 +1401,7 @@ class ExportService:
 
         # Barra de metadatos del análisis
         meta_style = ParagraphStyle('MetaBar', parent=S["body_sm"],
-            textColor=colors.HexColor('#374151'), fontSize=8.5)
+            textColor=colors.black, fontSize=8.5)
         t_meta = Table([[
             Paragraph(f"<b>Analista:</b> {analista}", meta_style),
             Paragraph(f"<b>Marcador:</b> {marcador_lbl}", meta_style),
@@ -1467,13 +1456,16 @@ class ExportService:
             ('ROWHEIGHT',     (0, 0), (-1, -1), 12),
         ]))
 
+        # El color de nivel (verde/ámbar/rojo) se conserva en la barra y el
+        # borde de la tarjeta (nivel_color_rl más abajo); el número y las
+        # etiquetas van en negro como el resto del texto.
         salud_num_style = ParagraphStyle('SaludN', parent=S["body"],
             fontSize=40, fontName='Helvetica-Bold',
-            textColor=nivel_color_rl, alignment=TA_CENTER)
+            textColor=colors.black, alignment=TA_CENTER)
         salud_lbl_style = ParagraphStyle('SaludL', parent=S["body"],
-            fontSize=13, fontName='Helvetica-Bold', textColor=nivel_color_rl)
+            fontSize=13, fontName='Helvetica-Bold', textColor=colors.black)
         salud_sub_style = ParagraphStyle('SaludS', parent=S["body_sm"],
-            textColor=colors.HexColor('#64748b'))
+            textColor=colors.black)
 
         barra_data = [[
             Paragraph(str(indice_salud), salud_num_style),
@@ -1592,10 +1584,12 @@ class ExportService:
 
         # ── Tabla Top N taxa ────────────────────────────────────────────
         def _clas_badge(clas):
-            if clas == 'benefico':     return Paragraph("<font color='#16a34a'>&#9679; Benéfico</font>",    S["body_sm"])
-            if clas == 'fitopatogeno': return Paragraph("<font color='#dc2626'>&#9679; Fitopatógeno</font>", S["body_sm"])
-            if clas == 'neutral':      return Paragraph("<font color='#64748b'>&#9675; Neutral</font>",      S["body_sm"])
-            return Paragraph("<font color='#94a3b8'>· Sin clas.</font>", S["body_sm"])
+            # Texto en negro (S["body_sm"] ya es negro) — la distinción entre
+            # categorías queda en la palabra y el símbolo (●/○/·), no en color.
+            if clas == 'benefico':     return Paragraph("&#9679; Benéfico",    S["body_sm"])
+            if clas == 'fitopatogeno': return Paragraph("&#9679; Fitopatógeno", S["body_sm"])
+            if clas == 'neutral':      return Paragraph("&#9675; Neutral",      S["body_sm"])
+            return Paragraph("· Sin clas.", S["body_sm"])
 
         taxa_rows = [[
             Paragraph("<b>#</b>",           S["th"]),
@@ -1939,13 +1933,22 @@ class ExportService:
         contenido.append(t_franja)
         contenido.append(Spacer(1, 16))
 
+        # Título y subtítulo de portada sobre fondo BLANCO de página — no
+        # pueden reutilizar S["titulo"]/S["subtitle"] (blanco/verde claro,
+        # pensados para ir DENTRO de una franja de color como t_banner arriba)
+        # o quedarían invisibles; llevan su propio estilo negro, igual que el
+        # reporte individual (title_style/sub_style más arriba en este archivo).
+        titulo_portada_style = ParagraphStyle('ComparativeTitle', parent=S["body"],
+            fontSize=17, fontName='Helvetica-Bold', textColor=colors.black, leading=21)
+        subtitulo_portada_style = ParagraphStyle('ComparativeSub', parent=S["body_sm"],
+            textColor=colors.black, fontSize=9.5)
         contenido.append(Paragraph(
             "REPORTE COMPARATIVO DE COMUNIDADES MICROBIANAS DE SUELO",
-            S["titulo"],
+            titulo_portada_style,
         ))
         contenido.append(Paragraph(
             "Universidad Técnica de Cotopaxi — Laboratorio de Bioinformática de Suelos",
-            S["subtitle"],
+            subtitulo_portada_style,
         ))
         contenido.append(Spacer(1, 20))
 
@@ -2093,7 +2096,6 @@ class ExportService:
             contenido.append(Spacer(1, 8))
 
         # Tabla top taxa global
-        _clas_clr = {"benefico": "#16a34a", "fitopatogeno": "#dc2626", "neutral": "#64748b"}
         g_rows = [[
             Paragraph("<b>#</b>",             S["th_dark"]),
             Paragraph("<b>Taxón</b>",          S["th_dark"]),
@@ -2103,15 +2105,14 @@ class ExportService:
         ]]
         for i, r in enumerate(top_taxa, 1):
             clas = r.get("clasificacion", "sin_clasificar")
-            clas_color = _clas_clr.get(clas, "#94a3b8")
-            clas_txt   = {"benefico": "Benéfico", "fitopatogeno": "Fitopatógeno",
-                          "neutral": "Neutral"}.get(clas, "Sin clas.")
+            clas_txt = {"benefico": "Benéfico", "fitopatogeno": "Fitopatógeno",
+                        "neutral": "Neutral"}.get(clas, "Sin clas.")
             g_rows.append([
                 Paragraph(str(i), S["body_sm"]),
                 Paragraph(f"<i>{r.get('taxonomia', '?')}</i>", S["body_sm"]),
                 Paragraph(str(r.get("total_hits", 0)), S["body_sm"]),
                 Paragraph(f"{r.get('total_porcentaje', 0):.2f}%", S["body_sm"]),
-                Paragraph(f"<font color='{clas_color}'>{clas_txt}</font>", S["body_sm"]),
+                Paragraph(clas_txt, S["body_sm"]),
             ])
         col_g = [26, ancho_util * 0.42, 65, 75, 90]
         t_g = Table(g_rows, colWidths=col_g, repeatRows=1)
@@ -2303,10 +2304,9 @@ class ExportService:
         datos_por_muestra = datos.get("datos_por_muestra", [])
         analisis_dif     = datos.get("analisis_diferencial") or {}
         jerarquia_taxonomica  = datos.get("jerarquia_taxonomica", [])
-        nivel_campo_jerarquia = datos.get("nivel_campo_jerarquia", "genus")
         is_comparativo   = len(muestras) > 1
-        # Modo de color de los gráficos Plotly/Kaleido embebidos (no afecta
-        # el resto del formato de la hoja: encabezados, fills, tablas).
+        # Modo de color de los gráficos nativos del Excel (no afecta el
+        # resto del formato de la hoja: encabezados, fills, tablas).
         modo             = datos.get("modo_color", "color")
 
         # ── Constantes de estilo ──────────────────────────────────────────
@@ -2565,207 +2565,278 @@ class ExportService:
                 c.border = borde
             ws.cell(row=1, column=1).value = texto
 
-        # ── Gráficos Plotly → PNG embebido (Fase 1.2) ───────────────────────
-        # Reemplaza los gráficos nativos de openpyxl (BarChart/DoughnutChart)
-        # por imágenes Plotly de alta resolución, con el mismo criterio de
-        # lectura de datos que las versiones nativas: leen directamente de
-        # las celdas ya escritas en la hoja en vez de duplicar los datos.
+        # ── Gráficos nativos de Excel (openpyxl.chart) ──────────────────────
+        # Todos leen (o escriben primero) datos en celdas reales de la hoja —
+        # a diferencia de las imágenes PNG que usaba este bloque antes, un
+        # gráfico nativo queda conectado a esas celdas: si se edita un valor
+        # en Excel después de descargar el reporte, el gráfico se actualiza
+        # solo, y puede editarse (colores, tipo) directamente desde Excel.
 
         def _fig_barras_h(ws, n_filas, col_datos, col_cats, color_fill=None,
                           titulo_celda=None, titulo_txt="", col_clasif=None,
-                          ancho_px=820, fila_inicio=2):
-            """Barras horizontales (Top Taxa). Si col_clasif se indica,
-            colorea cada barra según la clasificación ecológica de esa fila.
-            fila_inicio es la primera fila de datos (por defecto 2, asumiendo
-            encabezado en la fila 1)."""
+                          fila_inicio=2):
+            """Barras horizontales nativas (Top Taxa), leyendo directo de las
+            celdas ya escritas. Si col_clasif se indica, colorea cada barra
+            según la clasificación ecológica de esa fila. fila_inicio es la
+            primera fila de datos (por defecto 2, encabezado en la fila 1)."""
+            if n_filas <= 0:
+                return None
             if titulo_celda:
                 _titulo_celda(ws, titulo_celda, titulo_txt)
-            categorias, valores, marker_colores, marker_hatches = [], [], [], []
-            _clas_orden = ["benefico", "fitopatogeno", "neutral", "sin_clasificar"]
-            for i in range(n_filas):
-                fila = fila_inicio + i
-                categorias.append(str(ws.cell(row=fila, column=col_cats).value or ""))
-                valores.append(float(ws.cell(row=fila, column=col_datos).value or 0))
-                if col_clasif:
-                    clas = str(ws.cell(row=fila, column=col_clasif).value or "sin_clasificar")
-                    marker_colores.append(_resolver_color(COLOR_POR_CLAS.get(clas, PLOTLY_GRIS), modo))
-                    marker_hatches.append(_resolver_hatch_plotly(
-                        _clas_orden.index(clas) if clas in _clas_orden else 3, modo))
-                else:
-                    marker_colores.append(_resolver_color(color_fill or PLOTLY_VERDE, modo))
-                    marker_hatches.append(_resolver_hatch_plotly(0, modo))
-            # Invertido: Plotly dibuja barras horizontales de abajo hacia
-            # arriba, así que el taxón más abundante debe ir al final de la
-            # lista para quedar arriba (igual que el gráfico nativo original).
-            categorias, valores, marker_colores, marker_hatches = (
-                categorias[::-1], valores[::-1], marker_colores[::-1], marker_hatches[::-1])
-            marker_kwargs = dict(color=marker_colores, line=dict(width=0))
-            if modo == "grises":
-                marker_kwargs["pattern"] = dict(shape=marker_hatches, fgcolor="#ffffff", size=6)
-            fig = go.Figure(go.Bar(
-                x=valores, y=categorias, orientation="h",
-                marker=marker_kwargs,
-                text=[f"{v:.2f}%" for v in valores], textposition="outside",
-                cliponaxis=False,
-            ))
-            layout = _plotly_layout_base(titulo_txt or "Abundancia relativa")
-            layout["xaxis"] = dict(title="Abundancia (%)", gridcolor="#c8c8c8", zeroline=False)
-            layout["yaxis"] = dict(title="Taxonomía", automargin=True)
-            fig.update_layout(layout)
-            alto_px = max(360, min(int(n_filas * 28) + 110, 900))
-            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+            fila_fin = fila_inicio + n_filas - 1
+            ch = BarChart()
+            ch.type = "bar"; ch.grouping = "clustered"
+            ch.title = None
+            ch.y_axis.title = "Taxonomía"
+            ch.x_axis.title = "Abundancia (%)"
+            ch.style = 10
+            ch.height = max(9, min(n_filas * 0.5, 20))
+            ch.width = 20
+            ch.legend = None
+            dat = Reference(ws, min_col=col_datos, max_col=col_datos, min_row=fila_inicio, max_row=fila_fin)
+            cat = Reference(ws, min_col=col_cats, max_col=col_cats, min_row=fila_inicio, max_row=fila_fin)
+            ch.add_data(dat, titles_from_data=False)
+            ch.set_categories(cat)
+            if col_clasif:
+                for i in range(n_filas):
+                    clas = str(ws.cell(row=fila_inicio + i, column=col_clasif).value or "sin_clasificar")
+                    dp = DataPoint(idx=i)
+                    dp.graphicalProperties.solidFill = _resolver_color(
+                        COLOR_POR_CLAS.get(clas, PLOTLY_GRIS), modo).lstrip("#")
+                    ch.series[0].dPt.append(dp)
+            else:
+                ch.series[0].graphicalProperties.solidFill = _resolver_color(
+                    color_fill or PLOTLY_VERDE, modo).lstrip("#")
+            return ch
 
         def _fig_barras_v(ws, col_datos, col_cats, min_row, max_row,
                           colores=None, color_fill=None, titulo_celda=None,
-                          titulo_txt="", y_titulo="Valor", y_max=None,
-                          ancho_px=760, alto_px=440):
-            """Barras verticales. `colores` es una lista paralela a las
-            categorías (para pintar por nivel/umbral); si no se indica,
-            usa `color_fill` como color único."""
+                          titulo_txt="", y_titulo="Valor", y_max=None):
+            """Barras verticales nativas, leyendo directo de las celdas ya
+            escritas. `colores` es una lista paralela a las categorías (para
+            pintar por nivel/umbral); si no se indica, usa `color_fill` como
+            color único."""
+            n = max_row - min_row + 1
+            if n <= 0:
+                return None
             if titulo_celda:
                 _titulo_celda(ws, titulo_celda, titulo_txt)
-            categorias, valores = [], []
-            for fila in range(min_row, max_row + 1):
-                categorias.append(str(ws.cell(row=fila, column=col_cats).value or ""))
-                valores.append(float(ws.cell(row=fila, column=col_datos).value or 0))
-            marker_colores = colores if colores else [color_fill or PLOTLY_VERDE] * len(valores)
-            marker_colores = _resolver_colores(marker_colores, modo)
-            marker_kwargs = dict(color=marker_colores, line=dict(width=0))
-            if modo == "grises":
-                marker_kwargs["pattern"] = dict(
-                    shape=[_resolver_hatch_plotly(i, modo) for i in range(len(valores))],
-                    fgcolor="#ffffff", size=6)
-            fig = go.Figure(go.Bar(
-                x=categorias, y=valores,
-                marker=marker_kwargs,
-                text=[f"{v:.2f}" for v in valores], textposition="outside",
-                cliponaxis=False,
-            ))
-            layout = _plotly_layout_base(titulo_txt)
-            layout["yaxis"] = dict(title=y_titulo, gridcolor="#c8c8c8", zeroline=False,
-                                    range=[0, y_max] if y_max else None)
-            layout["xaxis"] = dict(showgrid=False)
-            fig.update_layout(layout)
-            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+            ch = BarChart()
+            ch.type = "col"; ch.grouping = "clustered"
+            ch.title = None
+            ch.y_axis.title = y_titulo
+            ch.style = 10
+            ch.width = 18; ch.height = 11
+            ch.legend = None
+            if y_max:
+                ch.y_axis.scaling.min = 0
+                ch.y_axis.scaling.max = y_max
+            dat = Reference(ws, min_col=col_datos, max_col=col_datos, min_row=min_row, max_row=max_row)
+            cat = Reference(ws, min_col=col_cats, max_col=col_cats, min_row=min_row, max_row=max_row)
+            ch.add_data(dat, titles_from_data=False)
+            ch.set_categories(cat)
+            marker_colores = (_resolver_colores(colores, modo) if colores
+                               else [_resolver_color(color_fill or PLOTLY_VERDE, modo)] * n)
+            for i, color in enumerate(marker_colores):
+                dp = DataPoint(idx=i)
+                dp.graphicalProperties.solidFill = color.lstrip("#")
+                ch.series[0].dPt.append(dp)
+            return ch
 
         def _fig_donut(ws, col_datos, col_cats, min_row, max_row,
-                       titulo_celda=None, titulo_txt="", colores=None,
-                       ancho_px=560, alto_px=420):
-            """Donut de clasificación funcional — reemplaza el pastel nativo."""
+                       titulo_celda=None, titulo_txt="", colores=None):
+            """Donut nativo de clasificación funcional, leyendo directo de
+            las celdas ya escritas."""
+            n = max_row - min_row + 1
+            if n <= 0:
+                return None
             if titulo_celda:
                 _titulo_celda(ws, titulo_celda, titulo_txt)
-            categorias, valores = [], []
-            for fila in range(min_row, max_row + 1):
-                categorias.append(str(ws.cell(row=fila, column=col_cats).value or ""))
-                valores.append(float(ws.cell(row=fila, column=col_datos).value or 0))
+            ch = DoughnutChart()
+            ch.title = None
+            ch.style = 10
+            ch.width = 12; ch.height = 9
+            ch.holeSize = 55
+            dat = Reference(ws, min_col=col_datos, max_col=col_datos, min_row=min_row, max_row=max_row)
+            cat = Reference(ws, min_col=col_cats, max_col=col_cats, min_row=min_row, max_row=max_row)
+            ch.add_data(dat, titles_from_data=False)
+            ch.set_categories(cat)
             palette = colores or [PLOTLY_VERDE, PLOTLY_ROJO, PLOTLY_AMBAR, PLOTLY_GRIS]
-            palette = _resolver_colores(palette[:len(categorias)], modo)
-            marker_kwargs = dict(colors=palette, line=dict(color="white", width=2))
-            if modo == "grises":
-                marker_kwargs["pattern"] = dict(
-                    shape=[_resolver_hatch_plotly(i, modo) for i in range(len(categorias))])
-            fig = go.Figure(go.Pie(
-                labels=categorias, values=valores, hole=0.55,
-                marker=marker_kwargs,
-                textinfo="percent", textfont=dict(size=13),
-            ))
-            layout = _plotly_layout_base(titulo_txt)
-            layout["showlegend"] = True
-            layout["legend"] = dict(orientation="h", yanchor="bottom", y=-0.18,
-                                     x=0.5, xanchor="center")
-            fig.update_layout(layout)
-            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+            palette = _resolver_colores(palette[:n], modo)
+            for i, color in enumerate(palette):
+                dp = DataPoint(idx=i)
+                dp.graphicalProperties.solidFill = color.lstrip("#")
+                ch.series[0].dPt.append(dp)
+            ch.dataLabels = DataLabelList()
+            ch.dataLabels.showPercent = True
+            return ch
 
-        def _fig_treemap(ids, labels, parents, values, colores=None,
-                         titulo_txt="Treemap de Abundancias",
-                         ancho_px=820, alto_px=520):
-            """Los valores de los nodos padre (categorías) se pasan como
-            None a propósito: Plotly los calcula automáticamente como la
-            suma de sus hijos en vez de exigir que coincidan manualmente."""
-            gris_scale = [[0, "#F3F4F6"], [1, "#4B5563"]]
-            fig = go.Figure(go.Treemap(
-                ids=ids, labels=labels, parents=parents, values=values,
-                marker=(dict(colors=_resolver_colores(colores, modo)) if colores else
-                        dict(colorscale=gris_scale if modo == "grises"
-                             else [[0, PLOTLY_TURQUESA], [1, PLOTLY_VERDE_OS]])),
-                textinfo="label+percent parent",
-                root_color="white",
-            ))
-            fig.update_layout(_plotly_layout_base(titulo_txt))
-            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+        def _fig_pie_categoria(ws, registros, fila_datos, col_datos,
+                               titulo_txt="Abundancia por Categoría Funcional"):
+            """Sustituto nativo del treemap: pie de abundancia total (suma de
+            Total_Hits) agrupada por categoría funcional — complementa el
+            ranking de taxa individuales de al lado en vez de duplicarlo.
+            Escribe una tabla de apoyo de 4 filas porque PieChart necesita
+            una Reference a celdas reales, no listas Python."""
+            totales = {"benefico": 0.0, "fitopatogeno": 0.0, "neutral": 0.0, "sin_clasificar": 0.0}
+            for r in registros:
+                clas = r.get("Clasificación", "sin_clasificar")
+                totales[clas] = totales.get(clas, 0.0) + float(r.get("Total_Hits", 0) or 0)
+            if not any(totales.values()):
+                return None
+            etiquetas = [_CLASES_LBL.get(c, c) for c in totales]
+            valores = list(totales.values())
+            for i, (lbl, val) in enumerate(zip(etiquetas, valores)):
+                ws.cell(row=fila_datos + i, column=col_datos, value=lbl)
+                ws.cell(row=fila_datos + i, column=col_datos + 1, value=val)
+            n = len(etiquetas)
+            ch = PieChart()
+            ch.title = None
+            ch.style = 10
+            ch.width = 13; ch.height = 10
+            dat = Reference(ws, min_col=col_datos + 1, max_col=col_datos + 1,
+                            min_row=fila_datos, max_row=fila_datos + n - 1)
+            cat = Reference(ws, min_col=col_datos, max_col=col_datos,
+                            min_row=fila_datos, max_row=fila_datos + n - 1)
+            ch.add_data(dat, titles_from_data=False)
+            ch.set_categories(cat)
+            palette = _resolver_colores([COLOR_POR_CLAS.get(c, PLOTLY_GRIS) for c in totales], modo)
+            for i, color in enumerate(palette):
+                dp = DataPoint(idx=i)
+                dp.graphicalProperties.solidFill = color.lstrip("#")
+                ch.series[0].dPt.append(dp)
+            ch.dataLabels = DataLabelList()
+            ch.dataLabels.showPercent = True
+            return ch
 
-        def _fig_sunburst(ids, labels, parents, values,
-                          titulo_txt="Jerarquía Taxonómica",
-                          ancho_px=760, alto_px=680):
-            """ids compuestos (no solo labels) para no fusionar nodos con
-            el mismo nombre en ramas distintas del árbol taxonómico."""
-            colorscale_sb = ([[0, "#F3F4F6"], [0.5, "#9CA3AF"], [1, "#374151"]] if modo == "grises"
-                              else [[0, PLOTLY_TURQUESA], [0.5, PLOTLY_VERDE], [1, PLOTLY_VERDE_OS]])
-            fig = go.Figure(go.Sunburst(
-                ids=ids, labels=labels, parents=parents, values=values,
-                marker=dict(colorscale=colorscale_sb),
-            ))
-            fig.update_layout(_plotly_layout_base(titulo_txt))
-            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+        def _fig_pie_reino(ws, jerarquia, fila_datos, col_datos,
+                           titulo_txt="Distribución por Reino"):
+            """Sustituto nativo del sunburst: pie de abundancia total (suma
+            de hits) agrupada por reino (kingdom) — el detalle de
+            phylum/nivel sigue disponible en la tabla de datos de la misma
+            hoja, solo se pierde como gráfico interactivo."""
+            totales: dict = {}
+            for r in jerarquia:
+                reino = str(r.get("kingdom") or "Sin clasificar")
+                totales[reino] = totales.get(reino, 0.0) + float(r.get("hits", 0) or 0)
+            if not totales:
+                return None
+            etiquetas = list(totales.keys())
+            valores = list(totales.values())
+            n = len(etiquetas)
+            for i, (lbl, val) in enumerate(zip(etiquetas, valores)):
+                ws.cell(row=fila_datos + i, column=col_datos, value=lbl)
+                ws.cell(row=fila_datos + i, column=col_datos + 1, value=val)
+            ch = PieChart()
+            ch.title = None
+            ch.style = 10
+            ch.width = 13; ch.height = 10
+            dat = Reference(ws, min_col=col_datos + 1, max_col=col_datos + 1,
+                            min_row=fila_datos, max_row=fila_datos + n - 1)
+            cat = Reference(ws, min_col=col_datos, max_col=col_datos,
+                            min_row=fila_datos, max_row=fila_datos + n - 1)
+            ch.add_data(dat, titles_from_data=False)
+            ch.set_categories(cat)
+            palette = _resolver_colores(
+                [_DONUT_PALETTE[i % len(_DONUT_PALETTE)] for i in range(n)], modo)
+            for i, color in enumerate(palette):
+                dp = DataPoint(idx=i)
+                dp.graphicalProperties.solidFill = color.lstrip("#")
+                ch.series[0].dPt.append(dp)
+            ch.dataLabels = DataLabelList()
+            ch.dataLabels.showPercent = True
+            return ch
 
-        def _fig_heatmap(matriz, filas, columnas,
-                         titulo_txt="Distribución de Abundancia por Muestra",
-                         ancho_px=900, alto_px=520):
-            colorscale_hm = ([[0, "#F9FAFB"], [0.5, "#9CA3AF"], [1, "#1F2937"]] if modo == "grises"
-                              else [[0, "#F0FDF9"], [0.5, PLOTLY_TURQUESA], [1, PLOTLY_VERDE_OS]])
-            fig = go.Figure(go.Heatmap(
-                z=matriz, x=columnas, y=filas,
-                colorscale=colorscale_hm,
-                colorbar=dict(title="Abundancia (%)"),
-            ))
-            layout = _plotly_layout_base(titulo_txt)
-            layout["xaxis"] = dict(title="Muestra", side="bottom")
-            layout["yaxis"] = dict(title="Taxón", automargin=True)
-            fig.update_layout(layout)
-            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
-
-        def _fig_radar(categorias, valores, titulo_txt="Indicadores Ecológicos",
-                       ancho_px=560, alto_px=520):
-            linea_color  = _resolver_color(PLOTLY_TURQUESA, modo)
-            marker_color = _resolver_color(PLOTLY_VERDE_OS, modo)
-            fill_color   = "rgba(107,114,128,0.25)" if modo == "grises" else "rgba(20,184,166,0.25)"
-            fig = go.Figure(go.Scatterpolar(
-                r=valores + valores[:1], theta=categorias + categorias[:1],
-                fill="toself", fillcolor=fill_color,
-                line=dict(color=linea_color, width=2),
-                marker=dict(color=marker_color, size=6),
-            ))
-            layout = _plotly_layout_base(titulo_txt)
-            layout["polar"] = dict(
-                radialaxis=dict(visible=True, range=[0, 1], gridcolor="#E5E7EB"),
-                angularaxis=dict(gridcolor="#E5E7EB"),
+        def _fig_heatmap_celdas(ws, matriz, filas, columnas, fila_datos, col_datos):
+            """Sustituto nativo del heatmap: escribe la matriz muestra×taxón
+            real en celdas y aplica un ColorScaleRule (formato condicional
+            nativo de 3 colores) sobre ese rango — a diferencia de la imagen
+            anterior, esta versión sí reacciona si se edita un valor.
+            Devuelve True si escribió algo, False si no había datos."""
+            if not matriz:
+                return False
+            ws.cell(row=fila_datos, column=col_datos, value="Taxón")
+            for j, col_nombre in enumerate(columnas):
+                ws.cell(row=fila_datos, column=col_datos + 1 + j, value=col_nombre)
+            for i, fila_nombre in enumerate(filas):
+                r = fila_datos + 1 + i
+                ws.cell(row=r, column=col_datos, value=fila_nombre)
+                for j, val in enumerate(matriz[i]):
+                    ws.cell(row=r, column=col_datos + 1 + j, value=round(float(val), 4))
+            n_filas, n_cols = len(filas), len(columnas)
+            rango = (f"{get_column_letter(col_datos + 1)}{fila_datos + 1}:"
+                     f"{get_column_letter(col_datos + n_cols)}{fila_datos + n_filas}")
+            claro, medio, oscuro = (
+                ("F3F4F6", "9CA3AF", "374151") if modo == "grises"
+                else ("F9FAFB", "6EE7B7", "0F6E56")
             )
-            fig.update_layout(layout)
-            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
-
-        def _fig_gauge(valor, nivel_salud_g="N/A", titulo_txt="Índice de Salud del Suelo",
-                      ancho_px=520, alto_px=380):
-            color_aguja = _resolver_color(_NIVEL_COLORES.get(nivel_salud_g, "#64748b"), modo)
-            pasos_color = _resolver_colores(["#FEE2E2", "#FEF3C7", "#D1FAE5", "#A7F3D0"], modo)
-            fig = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=valor,
-                number=dict(font=dict(size=36, color=color_aguja)),
-                gauge=dict(
-                    axis=dict(range=[0, 100], tickcolor="#9CA3AF"),
-                    bar=dict(color=color_aguja, thickness=0.28),
-                    bgcolor="white",
-                    borderwidth=0,
-                    steps=[
-                        dict(range=[0, 40],   color=pasos_color[0]),
-                        dict(range=[40, 60],  color=pasos_color[1]),
-                        dict(range=[60, 80],  color=pasos_color[2]),
-                        dict(range=[80, 100], color=pasos_color[3]),
-                    ],
-                ),
+            ws.conditional_formatting.add(rango, ColorScaleRule(
+                start_type="min", start_color=claro,
+                mid_type="percentile", mid_value=50, mid_color=medio,
+                end_type="max", end_color=oscuro,
             ))
-            fig.update_layout(_plotly_layout_base(titulo_txt, subtitulo=nivel_salud_g))
-            return _fig_a_imagen_xl(fig, ancho_px, alto_px)
+            return True
+
+        def _fig_radar(ws, categorias, valores, fila_datos, col_datos,
+                       titulo_txt="Indicadores Ecológicos"):
+            """Radar nativo. Escribe categorías/valores en celdas de apoyo
+            (col_datos y col_datos+1, a partir de fila_datos) porque
+            RadarChart necesita una Reference a celdas reales, no listas
+            Python."""
+            n = len(categorias)
+            if n == 0:
+                return None
+            for i, (cat_lbl, val) in enumerate(zip(categorias, valores)):
+                ws.cell(row=fila_datos + i, column=col_datos, value=cat_lbl)
+                ws.cell(row=fila_datos + i, column=col_datos + 1, value=val)
+            ch = RadarChart()
+            ch.type = "filled"
+            ch.title = None
+            ch.style = 10
+            ch.width = 14; ch.height = 12
+            ch.legend = None
+            dat = Reference(ws, min_col=col_datos + 1, max_col=col_datos + 1,
+                            min_row=fila_datos, max_row=fila_datos + n - 1)
+            cat = Reference(ws, min_col=col_datos, max_col=col_datos,
+                            min_row=fila_datos, max_row=fila_datos + n - 1)
+            ch.add_data(dat, titles_from_data=False)
+            ch.set_categories(cat)
+            color = _resolver_color(PLOTLY_TURQUESA, modo).lstrip("#")
+            ch.series[0].graphicalProperties.solidFill = color
+            ch.series[0].graphicalProperties.line.solidFill = color
+            return ch
+
+        def _fig_gauge(ws, valor, nivel_salud_g, fila_datos, col_datos,
+                      celda_texto=None, titulo_txt="Índice de Salud del Suelo"):
+            """Sustituto nativo del gauge: DoughnutChart de 2 segmentos
+            (valor vs. 100-valor) coloreado según el nivel de salud —
+            openpyxl no soporta un gauge/velocímetro nativo. celda_texto: si
+            se indica, escribe ahí el valor numérico grande, porque el
+            DoughnutChart ya no puede "hornear" el número en el centro como
+            hacía el go.Indicator de Plotly."""
+            color = _resolver_color(_NIVEL_COLORES.get(nivel_salud_g, "#64748b"), modo)
+            valor = float(valor or 0)
+            ws.cell(row=fila_datos, column=col_datos, value="Valor")
+            ws.cell(row=fila_datos, column=col_datos + 1, value=valor)
+            ws.cell(row=fila_datos + 1, column=col_datos, value="Restante")
+            ws.cell(row=fila_datos + 1, column=col_datos + 1, value=max(0.0, 100.0 - valor))
+            ch = DoughnutChart()
+            ch.title = None
+            ch.style = 10
+            ch.width = 9; ch.height = 9
+            ch.holeSize = 70
+            ch.legend = None
+            dat = Reference(ws, min_col=col_datos + 1, max_col=col_datos + 1,
+                            min_row=fila_datos, max_row=fila_datos + 1)
+            ch.add_data(dat, titles_from_data=False)
+            dp0 = DataPoint(idx=0); dp0.graphicalProperties.solidFill = color.lstrip("#")
+            dp1 = DataPoint(idx=1); dp1.graphicalProperties.solidFill = "E5E7EB"
+            ch.series[0].dPt.extend([dp0, dp1])
+            if celda_texto:
+                c = ws[celda_texto]
+                c.value = f"{valor:.0f}/100 — {nivel_salud_g}"
+                c.font = Font(bold=True, size=16, color=color.lstrip("#"))
+            return ch
 
         # ── Datos para las visualizaciones nuevas (Fase 1.2) ────────────────
         _CLASES_LBL = {
@@ -2774,58 +2845,6 @@ class ExportService:
             "neutral":        "🔵 Neutrales",
             "sin_clasificar": "⚪ Sin clasificación",
         }
-
-        def _datos_treemap_taxa(registros, top=20):
-            """A partir de una lista de dicts con Taxón/Total_Hits/Clasificación
-            (misma forma que top_rec/todos_rec), arma ids/labels/parents/values
-            para un treemap de 2 niveles: Clasificación → Taxón."""
-            regs = sorted(registros, key=lambda r: r.get("Total_Hits", 0) or 0,
-                          reverse=True)[:top]
-            ids, labels, parents, values, colores = [], [], [], [], []
-            clases_usadas = {}
-            for i, r in enumerate(regs):
-                clas = r.get("Clasificación", "sin_clasificar")
-                lbl_clas = _CLASES_LBL.get(clas, clas)
-                clases_usadas.setdefault(lbl_clas, clas)
-                ids.append(f"T::{i}::{r.get('Taxón','?')}")
-                labels.append(str(r.get("Taxón", "?"))[:40])
-                parents.append(lbl_clas)
-                values.append(max(float(r.get("Total_Hits", 0) or 0), 0))
-                colores.append(COLOR_POR_CLAS.get(clas, PLOTLY_GRIS))
-            for lbl_clas, clas in clases_usadas.items():
-                ids.append(lbl_clas)
-                labels.append(lbl_clas)
-                parents.append("")
-                values.append(None)
-                colores.append(COLOR_POR_CLAS.get(clas, PLOTLY_GRIS))
-            return ids, labels, parents, values, colores
-
-        def _datos_sunburst_taxonomia(jerarquia, nivel_campo):
-            """A partir de datos['jerarquia_taxonomica'] (agregación
-            kingdom→phylum→<nivel>), arma ids/labels/parents/values."""
-            ids, labels, parents, values = ["Todos"], ["Todos"], [""], [None]
-            vistos = set()
-            for r in jerarquia:
-                reino = str(r.get("kingdom") or "Sin clasificar")
-                filo  = str(r.get("phylum") or "Sin clasificar")
-                hoja  = str(r.get(nivel_campo) or "Sin clasificar")
-                hits  = float(r.get("hits", 0) or 0)
-                if hits <= 0:
-                    continue
-                id_reino = f"R::{reino}"
-                if id_reino not in vistos:
-                    vistos.add(id_reino)
-                    ids.append(id_reino); labels.append(reino)
-                    parents.append("Todos"); values.append(None)
-                id_filo = f"F::{reino}::{filo}"
-                if id_filo not in vistos:
-                    vistos.add(id_filo)
-                    ids.append(id_filo); labels.append(filo)
-                    parents.append(id_reino); values.append(None)
-                id_hoja = f"H::{reino}::{filo}::{hoja}::{len(ids)}"
-                ids.append(id_hoja); labels.append(hoja)
-                parents.append(id_filo); values.append(hits)
-            return ids, labels, parents, values
 
         def _datos_heatmap_muestras(datos_por_muestra_local, top=15):
             """Matriz muestra × taxón (Top N por abundancia máxima entre
@@ -3013,9 +3032,12 @@ class ExportService:
 
                 for col in range(4, 20):
                     ws_r.column_dimensions[get_column_letter(col)].width = 4
-                ws_r.add_image(_fig_gauge(indice_salud, nivel_salud),
-                                f"{get_column_letter(4)}{fila_hs}")
-                fila_hs += 2
+                _agregar_grafico_seguro(ws_r, _fig_gauge(
+                    ws_r, indice_salud, nivel_salud,
+                    fila_datos=fila_hs, col_datos=60,
+                    celda_texto=f"{get_column_letter(4)}{fila_hs}",
+                ), f"{get_column_letter(4)}{fila_hs + 1}")
+                fila_hs += 3
 
                 for parrafo in _generar_interpretacion_ejecutiva(datos):
                     c_par = ws_r.cell(row=fila_hs, column=1, value=parrafo)
@@ -3045,15 +3067,14 @@ class ExportService:
                 _caption_top_taxa(ws_top, len(df_top), top_rec[0]["Taxón"] if top_rec else None)
 
                 if len(df_top) > 0:
-                    ws_top.add_image(_fig_barras_h(
+                    _agregar_grafico_seguro(ws_top, _fig_barras_h(
                         ws_top, n_filas=len(df_top), col_datos=4, col_cats=2, col_clasif=5,
                         titulo_celda="G2",
                         titulo_txt=f"Top {top_n} Taxa — Abundancia (%) · Marcador {tipo}",
                     ), "G3")
-                    ids_tm, lbl_tm, par_tm, val_tm, col_tm = _datos_treemap_taxa(top_rec)
-                    ws_top.add_image(_fig_treemap(
-                        ids_tm, lbl_tm, par_tm, val_tm, colores=col_tm,
-                        titulo_txt="Treemap de Abundancias por Clasificación",
+                    _titulo_celda(ws_top, "V2", "Abundancia por Categoría Funcional", CV_OSC)
+                    _agregar_grafico_seguro(ws_top, _fig_pie_categoria(
+                        ws_top, top_rec, fila_datos=2, col_datos=30,
                     ), "V3")
 
                 # ─────────────────────────────────────────────────────
@@ -3074,10 +3095,10 @@ class ExportService:
                 ws_tod = writer.sheets["Taxonomia_Completa"]
                 _formatear_tabla(ws_tod, df_tod, "TablaTaxonomia", col_clasif="Clasificación")
                 if jerarquia_taxonomica:
-                    ids_sb, lbl_sb, par_sb, val_sb = _datos_sunburst_taxonomia(
-                        jerarquia_taxonomica, nivel_campo_jerarquia)
-                    _titulo_celda(ws_tod, "G1", "Jerarquía Taxonómica", CV_OSC)
-                    ws_tod.add_image(_fig_sunburst(ids_sb, lbl_sb, par_sb, val_sb), "G2")
+                    _titulo_celda(ws_tod, "G1", "Distribución por Reino", CV_OSC)
+                    _agregar_grafico_seguro(ws_tod, _fig_pie_reino(
+                        ws_tod, jerarquia_taxonomica, fila_datos=2, col_datos=30,
+                    ), "G2")
 
                 # ─────────────────────────────────────────────────────
                 # H-04  DIVERSIDAD ALFA
@@ -3116,7 +3137,7 @@ class ExportService:
                 _caption_diversidad(ws_div, 7, shanval, simpval)
 
                 # Gráfico 4 índices (sin N° muestras)
-                ws_div.add_image(_fig_barras_v(
+                _agregar_grafico_seguro(ws_div, _fig_barras_v(
                     ws_div, col_datos=2, col_cats=1, min_row=2, max_row=5,
                     colores=[PLOTLY_AZUL, PLOTLY_VERDE, PLOTLY_AMBAR, PLOTLY_TURQUESA],
                     titulo_celda="F2", titulo_txt="Índices de Diversidad Alfa",
@@ -3157,7 +3178,7 @@ class ExportService:
                 _caption_clasificacion(ws_clf, 6, totales_clas)
 
                 # Donut funcional
-                ws_clf.add_image(_fig_donut(
+                _agregar_grafico_seguro(ws_clf, _fig_donut(
                     ws_clf, col_datos=2, col_cats=1, min_row=2, max_row=5,
                     titulo_celda="F1", titulo_txt="Distribución Funcional de Taxa",
                     colores=[PLOTLY_VERDE, PLOTLY_ROJO, PLOTLY_AMBAR, PLOTLY_GRIS],
@@ -3331,9 +3352,12 @@ class ExportService:
 
                 for col in range(4, 20):
                     ws_rc.column_dimensions[get_column_letter(col)].width = 4
-                ws_rc.add_image(_fig_gauge(indice_salud, nivel_salud),
-                                 f"{get_column_letter(4)}{fila_hsc}")
-                fila_hsc += 2
+                _agregar_grafico_seguro(ws_rc, _fig_gauge(
+                    ws_rc, indice_salud, nivel_salud,
+                    fila_datos=fila_hsc, col_datos=60,
+                    celda_texto=f"{get_column_letter(4)}{fila_hsc}",
+                ), f"{get_column_letter(4)}{fila_hsc + 1}")
+                fila_hsc += 3
 
                 for parrafo in _generar_interpretacion_ejecutiva(datos):
                     c_par = ws_rc.cell(row=fila_hsc, column=1, value=parrafo)
@@ -3382,7 +3406,7 @@ class ExportService:
                 if len(df_cuad) > 0:
                     colores_sal = [_NIVEL_COLORES.get(f.get("Nivel"), PLOTLY_VERDE)
                                    for f in cuad_rec]
-                    ws_cuad.add_image(_fig_barras_v(
+                    _agregar_grafico_seguro(ws_cuad, _fig_barras_v(
                         ws_cuad, col_datos=5, col_cats=1, min_row=2, max_row=len(df_cuad) + 1,
                         colores=colores_sal, titulo_celda="P2",
                         titulo_txt="Índice de Salud por Muestra",
@@ -3449,7 +3473,7 @@ class ExportService:
                         elif sv >= 2.0: colores_sh.append("#EAB308")
                         elif sv >= 1.0: colores_sh.append("#F97316")
                         else:           colores_sh.append("#DC2626")
-                    ws_alfa.add_image(_fig_barras_v(
+                    _agregar_grafico_seguro(ws_alfa, _fig_barras_v(
                         ws_alfa, col_datos=3, col_cats=1, min_row=2, max_row=n_data + 1,
                         colores=colores_sh, titulo_celda="H2",
                         titulo_txt="Shannon H' por Muestra (colores por umbral)",
@@ -3533,10 +3557,11 @@ class ExportService:
                 # solo tiene sentido en modo comparativo, con 2+ muestras.
                 matriz_hm, taxa_hm, cols_hm = _datos_heatmap_muestras(datos_por_muestra)
                 if matriz_hm:
-                    col_hm = get_column_letter(len(codigos_m) + 3)
-                    _titulo_celda(ws_beta, f"{col_hm}1", "Distribución de Abundancia (Top taxa)", CV_OSC)
-                    ws_beta.add_image(
-                        _fig_heatmap(matriz_hm, taxa_hm, cols_hm), f"{col_hm}2")
+                    col_hm = len(codigos_m) + 3
+                    _titulo_celda(ws_beta, f"{get_column_letter(col_hm)}1",
+                                  "Distribución de Abundancia (Top taxa)", CV_OSC)
+                    _fig_heatmap_celdas(ws_beta, matriz_hm, taxa_hm, cols_hm,
+                                        fila_datos=2, col_datos=col_hm)
 
                 # — Sección 2: Taxa compartidos por par —
                 fila_shared = fila + len(codigos_m) + 3
@@ -3629,15 +3654,14 @@ class ExportService:
                 _formatear_tabla(ws_top, df_top, "TablaTopNGlobal", col_clasif="Clasificación")
                 _caption_top_taxa(ws_top, len(df_top), top_rec[0]["Taxón"] if top_rec else None)
                 if len(df_top) > 0:
-                    ws_top.add_image(_fig_barras_h(
+                    _agregar_grafico_seguro(ws_top, _fig_barras_h(
                         ws_top, n_filas=len(df_top), col_datos=4, col_cats=2, col_clasif=5,
                         titulo_celda="G2",
                         titulo_txt=f"Top {top_n} Taxa Global — Abundancia (%) · {tipo}",
                     ), "G3")
-                    ids_tm2, lbl_tm2, par_tm2, val_tm2, col_tm2 = _datos_treemap_taxa(top_rec)
-                    ws_top.add_image(_fig_treemap(
-                        ids_tm2, lbl_tm2, par_tm2, val_tm2, colores=col_tm2,
-                        titulo_txt="Treemap de Abundancias por Clasificación",
+                    _titulo_celda(ws_top, "V2", "Abundancia por Categoría Funcional", CV_OSC)
+                    _agregar_grafico_seguro(ws_top, _fig_pie_categoria(
+                        ws_top, top_rec, fila_datos=2, col_datos=30,
                     ), "V3")
 
                 # ─────────────────────────────────────────────────────
@@ -3658,10 +3682,10 @@ class ExportService:
                 ws_tod = writer.sheets["Taxonomia_Completa"]
                 _formatear_tabla(ws_tod, df_tod, "TablaTaxonomia", col_clasif="Clasificación")
                 if jerarquia_taxonomica:
-                    ids_sb, lbl_sb, par_sb, val_sb = _datos_sunburst_taxonomia(
-                        jerarquia_taxonomica, nivel_campo_jerarquia)
-                    _titulo_celda(ws_tod, "G1", "Jerarquía Taxonómica", CV_OSC)
-                    ws_tod.add_image(_fig_sunburst(ids_sb, lbl_sb, par_sb, val_sb), "G2")
+                    _titulo_celda(ws_tod, "G1", "Distribución por Reino", CV_OSC)
+                    _agregar_grafico_seguro(ws_tod, _fig_pie_reino(
+                        ws_tod, jerarquia_taxonomica, fila_datos=2, col_datos=30,
+                    ), "G2")
 
                 # ─────────────────────────────────────────────────────
                 # H-07  CLASIFICACIÓN POR MUESTRA
@@ -3757,16 +3781,21 @@ class ExportService:
             _kpi_card(3, 16, "Taxa Benéficos", totales_clas.get("benefico", 0), PLOTLY_VERDE)
             _kpi_card(3, 21, "Taxa Fitopatógenos", totales_clas.get("fitopatogeno", 0), PLOTLY_ROJO)
 
-            # Gauge + Radar
-            ws_dash.add_image(_fig_gauge(indice_salud, nivel_salud), "A8")
-            cat_radar, val_radar = _datos_radar_diversidad(
-                riqval, shanval, simpval, equival, indice_salud)
-            ws_dash.add_image(_fig_radar(cat_radar, val_radar), "N8")
-
             # ── Tablas de apoyo (no visibles en el panel, alimentan los
             # gráficos de abajo con el mismo criterio de lectura-desde-celda
             # que usa el resto del reporte) ─────────────────────────────
             fila_ap = 160
+
+            # Gauge + Radar
+            _agregar_grafico_seguro(ws_dash, _fig_gauge(
+                ws_dash, indice_salud, nivel_salud,
+                fila_datos=fila_ap, col_datos=5, celda_texto="A6",
+            ), "A8")
+            cat_radar, val_radar = _datos_radar_diversidad(
+                riqval, shanval, simpval, equival, indice_salud)
+            _agregar_grafico_seguro(ws_dash, _fig_radar(
+                ws_dash, cat_radar, val_radar, fila_datos=fila_ap, col_datos=8,
+            ), "N8")
             ws_dash.cell(row=fila_ap, column=1,
                          value="Datos de apoyo (alimentan los gráficos de este panel)").font = fnt_gris
             fila_ap += 1
@@ -3781,7 +3810,7 @@ class ExportService:
                 ws_dash.cell(row=fila_clf0 + i, column=2, value=totales_clas.get(cod, 0))
 
             # Donut + Top 20 microorganismos
-            ws_dash.add_image(_fig_donut(
+            _agregar_grafico_seguro(ws_dash, _fig_donut(
                 ws_dash, col_datos=2, col_cats=1, min_row=fila_clf0, max_row=fila_clf0 + 3,
                 titulo_txt="Distribución Funcional",
             ), "A36")
@@ -3797,36 +3826,35 @@ class ExportService:
                                                 r.get("porcentaje", 0)) or 0), 4))
                 ws_dash.cell(row=fr, column=3, value=r.get("clasificacion", "sin_clasificar"))
             if top20:
-                ws_dash.add_image(_fig_barras_h(
+                _agregar_grafico_seguro(ws_dash, _fig_barras_h(
                     ws_dash, n_filas=len(top20), col_datos=2, col_cats=1, col_clasif=3,
                     fila_inicio=fila_top0, titulo_txt="Top 20 Microorganismos — Abundancia (%)",
                 ), "N36")
 
-            # Sunburst taxonómico + Treemap de abundancias
+            # Distribución por reino + Abundancia por categoría funcional
             if jerarquia_taxonomica:
-                ids_sb_d, lbl_sb_d, par_sb_d, val_sb_d = _datos_sunburst_taxonomia(
-                    jerarquia_taxonomica, nivel_campo_jerarquia)
-                ws_dash.add_image(_fig_sunburst(ids_sb_d, lbl_sb_d, par_sb_d, val_sb_d), "A72")
+                _titulo_celda(ws_dash, "A70", "Distribución por Reino", CV_OSC)
+                _agregar_grafico_seguro(ws_dash, _fig_pie_reino(
+                    ws_dash, jerarquia_taxonomica, fila_datos=fila_ap, col_datos=11,
+                ), "A72")
             if todos_taxa:
                 todos_rec_dash = [{
                     "Taxón": r.get("taxonomia", r.get("nombre", "?")),
                     "Total_Hits": int(r.get("total_hits", r.get("hits", 0)) or 0),
                     "Clasificación": r.get("clasificacion", "sin_clasificar"),
                 } for r in todos_taxa]
-                ids_tm_d, lbl_tm_d, par_tm_d, val_tm_d, col_tm_d = _datos_treemap_taxa(
-                    todos_rec_dash, top=25)
-                ws_dash.add_image(_fig_treemap(
-                    ids_tm_d, lbl_tm_d, par_tm_d, val_tm_d, colores=col_tm_d,
-                    titulo_txt="Treemap de Abundancias",
+                _titulo_celda(ws_dash, "N70", "Abundancia por Categoría Funcional", CV_OSC)
+                _agregar_grafico_seguro(ws_dash, _fig_pie_categoria(
+                    ws_dash, todos_rec_dash, fila_datos=fila_ap, col_datos=14,
                 ), "N72")
 
             # Heatmap de distribución — solo modo comparativo (2+ muestras)
             if is_comparativo:
                 matriz_hm_d, taxa_hm_d, cols_hm_d = _datos_heatmap_muestras(datos_por_muestra)
                 if matriz_hm_d:
-                    ws_dash.add_image(_fig_heatmap(
-                        matriz_hm_d, taxa_hm_d, cols_hm_d, ancho_px=1600, alto_px=520,
-                    ), "A108")
+                    _titulo_celda(ws_dash, "A106", "Distribución de Abundancia por Muestra", CV_OSC)
+                    _fig_heatmap_celdas(ws_dash, matriz_hm_d, taxa_hm_d, cols_hm_d,
+                                        fila_datos=108, col_datos=1)
 
             ws_dash.cell(row=157, column=1,
                          value="Generado por BioMicro").font = fnt_gris
@@ -3925,7 +3953,7 @@ class ExportService:
     @staticmethod
     def generar_pdf_completo(titulo, datos_analisis, df_datos=None,
                              usuario=None, formato_pagina="A4", muestra_obj=None,
-                             chart_images=None):
+                             chart_images: dict[str, str] | None = None):
         """Genera un reporte PDF formal de calidad científica utilizando ReportLab Platypus."""
         pagesize = A4 if formato_pagina == "A4" else letter
         buffer = BytesIO()
