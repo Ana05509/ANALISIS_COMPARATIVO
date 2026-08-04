@@ -86,6 +86,27 @@ class CustomAccountAdapter(DefaultAccountAdapter):
 
         return email
 
+    def send_mail(self, template_prefix, email, context):
+        """
+        Punto único por el que allauth manda TODOS sus correos (recuperar
+        contraseña, confirmación de email, etc.) — ver
+        DefaultAccountAdapter.send_mail(). msg.send() es una llamada SMTP
+        síncrona y bloqueante dentro del propio request; sin este try/except,
+        si el envío falla o tarda (EMAIL_TIMEOUT en settings.py acota esto a
+        10s) la excepción sube sin capturar y el usuario ve un error
+        genérico ("algo salió mal") en vez de la pantalla normal de "revisa
+        tu correo" — igual de mal si el correo sí se pudo enviar como si no,
+        ya que por seguridad esa pantalla no debe delatar si el envío
+        falló. Mismo criterio que enviar_bienvenida() en apps.py.
+        """
+        try:
+            super().send_mail(template_prefix, email, context)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "No se pudo enviar el correo '%s' a %s", template_prefix, email
+            )
+
     def pre_login(self, request, user, **kwargs):
         """Tras registrarse, no autentica automáticamente: redirige a login
         con un mensaje de éxito para que el usuario ingrese con sus propias

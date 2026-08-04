@@ -483,6 +483,12 @@ UNFOLD = {
 EMAIL_HOST      = 'smtp.gmail.com'
 EMAIL_PORT      = 587
 EMAIL_USE_TLS   = True
+# Sin esto, smtplib no tiene timeout (None) y se queda esperando
+# indefinidamente si el puerto SMTP saliente está lento/filtrado en
+# producción (Railway) — el worker de gunicorn quedaba colgado hasta su
+# propio timeout de 180s en vez de fallar rápido y dejar que
+# CustomAccountAdapter.send_mail() (analisis/adapter.py) lo capture.
+EMAIL_TIMEOUT   = 10
 EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL  = 'BioMicro <{}>'.format(os.environ.get('EMAIL_HOST_USER', 'noreply@biomicro.ec'))
