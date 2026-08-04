@@ -35,6 +35,18 @@
             --text-primary: #17171A;
             --text-muted:   #5F5E5A;
             --text-hint:    #888780;
+            --amber-dark:   #5a3a00;
+            --slate-light:  #f1f5f9;
+            --slate-dark:   #475569;
+            /* Escala de nivel de salud del suelo (ÓPTIMO → CRÍTICO) — en modo
+               claro va de más oscuro (mejor) a más oscuro (peor) porque el
+               fondo es blanco; en modo oscuro se invierte a tonos claros
+               saturados para que sigan siendo legibles sobre --surface. */
+            --nivel-optimo:    #14532d;
+            --nivel-favorable: #16a34a;
+            --nivel-moderado:  #ca8a04;
+            --nivel-riesgo:    #dc2626;
+            --nivel-critico:   #7f1d1d;
             --sidebar-w:    210px;
             --topbar-h:     52px;
             --radius:       10px;
@@ -58,6 +70,14 @@
             --text-primary: #edecea;
             --text-muted:   #a09e96;
             --text-hint:    #706e68;
+            --amber-dark:   #e8b458;
+            --slate-light:  #252b33;
+            --slate-dark:   #94a3b8;
+            --nivel-optimo:    #34d399;
+            --nivel-favorable: #4ade80;
+            --nivel-moderado:  #facc15;
+            --nivel-riesgo:    #f87171;
+            --nivel-critico:   #ef4444;
             --shadow-sm:    0 1px 3px rgba(0,0,0,0.35);
             --shadow-md:    0 4px 16px rgba(0,0,0,0.45);
             --shadow-card:  0 1px 4px rgba(0,0,0,0.28), 0 4px 14px rgba(0,0,0,0.22);
@@ -665,15 +685,15 @@
         }
 
         .badge-benefico    { background: var(--verde-light); color: var(--verde-dark); }
-        .badge-fitopatogeno{ background: var(--amber-light);  color: #5a3a00; }
-        .badge-neutral     { background: #f1f5f9; color: #475569; }
+        .badge-fitopatogeno{ background: var(--amber-light);  color: var(--amber-dark); }
+        .badge-neutral     { background: var(--slate-light); color: var(--slate-dark); }
         .badge-sin-clas    { background: var(--gris-light);  color: var(--gris); }
         .badge-positivo    { background: var(--verde-light); color: var(--verde-dark); font-weight: 700; }
-        .badge-negativo    { background: var(--amber-light);  color: #5a3a00; font-weight: 700; }
+        .badge-negativo    { background: var(--amber-light);  color: var(--amber-dark); font-weight: 700; }
 
         /* Tipo de organismo (bioquímica) */
         .tipo-bacteria { background: var(--verde-light); color: var(--verde-dark); }
-        .tipo-hongo    { background: var(--amber-light);  color: #5a3a00; }
+        .tipo-hongo    { background: var(--amber-light);  color: var(--amber-dark); }
 
         /* Metric card — variantes de color adicionales */
         .metric-card.azul  { border-left: 3px solid #1565C0; }
@@ -711,7 +731,7 @@
                                  color: var(--text-hint); padding: 6px 10px; text-align: left; }
         .table-inner tbody tr { border-bottom: 1px solid var(--gris-light); transition: background var(--transition); }
         .table-inner tbody tr:last-child { border-bottom: none; }
-        .table-inner tbody tr:hover { background: #f5f4f0; }
+        .table-inner tbody tr:hover { background: var(--gris-light); }
         .table-inner tbody td { padding: 6px 10px; color: var(--text-primary); }
         .table-inner tfoot td { padding: 6px 10px; font-size: 12px;
                                  background: var(--gris-light); border-top: 2px solid var(--gris-border); }
@@ -721,21 +741,21 @@
         .td-center { text-align: center !important; }
 
         /* Índice de salud — borde izquierdo por nivel */
-        .card-optimo    { border-left: 4px solid #14532d !important; }
-        .card-favorable { border-left: 4px solid #16a34a !important; }
-        .card-moderado  { border-left: 4px solid #ca8a04 !important; }
-        .card-riesgo    { border-left: 4px solid #dc2626 !important; }
-        .card-critico   { border-left: 4px solid #7f1d1d !important; }
-        .text-optimo    { color: #14532d; }
-        .text-favorable { color: #16a34a; }
-        .text-moderado  { color: #ca8a04; }
-        .text-riesgo    { color: #dc2626; }
-        .text-critico   { color: #7f1d1d; }
-        .fill-optimo    { background: #14532d; }
-        .fill-favorable { background: #16a34a; }
-        .fill-moderado  { background: #ca8a04; }
-        .fill-riesgo    { background: #dc2626; }
-        .fill-critico   { background: #7f1d1d; }
+        .card-optimo    { border-left: 4px solid var(--nivel-optimo) !important; }
+        .card-favorable { border-left: 4px solid var(--nivel-favorable) !important; }
+        .card-moderado  { border-left: 4px solid var(--nivel-moderado) !important; }
+        .card-riesgo    { border-left: 4px solid var(--nivel-riesgo) !important; }
+        .card-critico   { border-left: 4px solid var(--nivel-critico) !important; }
+        .text-optimo    { color: var(--nivel-optimo); }
+        .text-favorable { color: var(--nivel-favorable); }
+        .text-moderado  { color: var(--nivel-moderado); }
+        .text-riesgo    { color: var(--nivel-riesgo); }
+        .text-critico   { color: var(--nivel-critico); }
+        .fill-optimo    { background: var(--nivel-optimo); }
+        .fill-favorable { background: var(--nivel-favorable); }
+        .fill-moderado  { background: var(--nivel-moderado); }
+        .fill-riesgo    { background: var(--nivel-riesgo); }
+        .fill-critico   { background: var(--nivel-critico); }
 
         /* Barras de progreso — cap implícito */
         .progress-bar-inner { max-width: 100%; }
@@ -892,7 +912,7 @@
 
         tbody tr { border-bottom: 1px solid var(--gris-light); transition: background var(--transition); }
         tbody tr:last-child { border-bottom: none; }
-        tbody tr:hover { background: #f5f4f0; }
+        tbody tr:hover { background: var(--gris-light); }
 
         tbody td { padding: 0.75rem 1rem; color: var(--text-primary); }
         .td-mono { font-family: 'DM Mono', monospace; font-size: 13px; }
@@ -920,14 +940,14 @@
         .alert { padding: 0.9rem 1.1rem; border-radius: var(--radius); font-size: 14px; display: flex; align-items: flex-start; gap: 10px; margin-bottom: 1rem; }
         .alert-success { background: var(--verde-light); color: var(--verde-dark); border: 1px solid rgba(29,158,117,0.2); }
         .alert-error { background: var(--rojo-light); color: var(--rojo); border: 1px solid rgba(163,45,45,0.2); }
-        .alert-warning { background: var(--amber-light); color: #5a3a00; border: 1px solid rgba(186,117,23,0.2); }
+        .alert-warning { background: var(--amber-light); color: var(--amber-dark); border: 1px solid rgba(186,117,23,0.2); }
 
         .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-hint); }
         .empty-state i { font-size: 48px; margin-bottom: 1rem; display: block; opacity: 0.5; }
         .empty-state p { font-size: 14.5px; margin-top: 0.5rem; }
 
         .pill-16s { display: inline-block; background: var(--verde-light); color: var(--verde-dark); font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; }
-        .pill-its { display: inline-block; background: var(--amber-light); color: #5a3a00; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; }
+        .pill-its { display: inline-block; background: var(--amber-light); color: var(--amber-dark); font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; }
 
         /* ════════════════════════════════════════
            1. SISTEMA DE TOASTS FLOTANTES
@@ -1014,7 +1034,7 @@
             transition: background 0.12s, color 0.12s;
         }
         .table-wrap table thead th:hover {
-            background: #e8e6df;
+            background: var(--gris-border);
             color: var(--text-primary);
         }
         .table-wrap table thead th[data-no-sort] {
@@ -1364,7 +1384,12 @@
                 : mode;
         }
         function applyTheme(mode) {
-            document.documentElement.setAttribute('data-theme', getEffective(mode));
+            var effective = getEffective(mode);
+            document.documentElement.setAttribute('data-theme', effective);
+            // Permite que contenido dibujado en JS (gráficas Plotly, etc.) que
+            // no reacciona a variables CSS se vuelva a pintar con el tema
+            // nuevo sin recargar la página.
+            window.dispatchEvent(new CustomEvent('biomicro:theme-change', { detail: { theme: effective } }));
         }
         function updateBtn(btn, mode) {
             var icon = btn.querySelector('i');

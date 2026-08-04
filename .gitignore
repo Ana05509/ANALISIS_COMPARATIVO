@@ -198,3 +198,6 @@ vscode/
 # Permitir cultivos
 !/media/cultivos/
 !/media/cultivos/**
+
+.docs/
+docs**

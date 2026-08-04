@@ -28,6 +28,26 @@ def json_embed(json_str):
         return json_str
     return mark_safe(json_str.translate(_JSON_SCRIPT_ESCAPES))
 
+
+_NIVEL_SALUD_SLUGS = {
+    "ÓPTIMO":    "optimo",
+    "FAVORABLE": "favorable",
+    "MODERADO":  "moderado",
+    "EN RIESGO": "riesgo",
+    "CRÍTICO":   "critico",
+}
+
+
+@register.filter(name="nivel_slug")
+def nivel_slug(nivel_salud):
+    """
+    Traduce un nivel de salud del suelo ('ÓPTIMO', 'FAVORABLE', ...) al sufijo
+    de clase CSS correspondiente (.card-optimo, .text-optimo, .fill-optimo,
+    definidas en templates_base.html) — evita repetir la misma cadena de
+    if/elif en cada plantilla que muestra el índice de salud.
+    """
+    return _NIVEL_SALUD_SLUGS.get(nivel_salud, "critico")
+
 _CULTIVOS_MAP = {
     'cacao':     ('🍫', '#7B3F00', '#F7EDE2'),
     'banano':    ('🍌', '#854D0E', '#FEF9C3'),

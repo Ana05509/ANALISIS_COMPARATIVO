@@ -2,9 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from simple_history.models import HistoricalRecords
 
-# -------------------------------
 # Modelos de Catálogo Agronómico
-# -------------------------------
 
 class Cultivo(models.Model):
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Cultivo")
@@ -320,7 +318,7 @@ class EventoAcceso(models.Model):
         ordering = ["-fecha"]
 
     def __str__(self):
-        quien = self.usuario.username if self.usuario_id else (self.username_intentado or "desconocido")
+        quien = self.usuario.username if self.usuario is not None else (self.username_intentado or "desconocido")
         return f"{self.get_tipo_display()} — {quien} — {self.fecha:%Y-%m-%d %H:%M}"
 
     @property

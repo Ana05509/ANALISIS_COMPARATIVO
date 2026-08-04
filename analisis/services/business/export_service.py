@@ -3905,7 +3905,7 @@ class ExportService:
     def exportar_json(datos, nombre_archivo=None):
         """Exporta estructuras de datos o DataFrames a formato JSON unificado."""
         if isinstance(datos, pd.DataFrame):
-            json_str = datos.to_json(orient='records', indent=2)
+            json_str = datos.to_json(orient='records', indent=2) or "null"
         elif isinstance(datos, dict):
             json_str = json.dumps(datos, indent=2, default=str)
         elif isinstance(datos, list):
@@ -4186,7 +4186,7 @@ class ExportService:
 
         if df_datos is not None and not df_datos.empty:
             html += "<h2>Matriz de Distribución Coherente Basal</h2>"
-            html += df_datos.to_html(index=False, classes='data-table')
+            html += str(df_datos.to_html(index=False, classes='data-table') or "")
 
         html += """
                 <div class="footer">

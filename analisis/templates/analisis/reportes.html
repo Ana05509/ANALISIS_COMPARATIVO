@@ -15,20 +15,17 @@
 {% block extra_css %}
 <style>
 /* ── Barra de progreso del índice de salud ── */
-.indice-bar  { height:13px; border-radius:7px; background:#e2e8f0; overflow:hidden; margin-top:6px; }
+.indice-bar  { height:13px; border-radius:7px; background:var(--gris-border); overflow:hidden; margin-top:6px; }
 .indice-fill { height:100%; border-radius:7px; transition:width .5s ease; }
 
-/* ── Colores por nivel de salud ── */
-.c-optimo   { color:#14532d; } .bg-optimo   { background:#dcfce7; border-color:#14532d; }
-.c-favorable{ color:#16a34a; } .bg-favorable{ background:#f0fdf4; border-color:#16a34a; }
-.c-moderado { color:#ca8a04; } .bg-moderado { background:#fefce8; border-color:#ca8a04; }
-.c-riesgo   { color:#dc2626; } .bg-riesgo   { background:#fef2f2; border-color:#dc2626; }
-.c-critico  { color:#7f1d1d; } .bg-critico  { background:#fee2e2; border-color:#7f1d1d; }
+/* Nota: los colores por nivel de salud (óptimo/favorable/moderado/riesgo/
+   crítico) usan las clases .card-*/.text-*/.fill-* de templates_base.html
+   (theme-aware), no clases propias de esta página. */
 
 /* ── Tabla de taxones (overrides puntuales) ── */
 #tabla-reporte th, #tabla-reporte td { padding: 6px 10px; font-size:13px; }
-#tabla-reporte thead th { background:var(--verde-oscuro,#1b4332); color:#fff; }
-#tabla-reporte tbody tr:nth-child(even) { background:var(--bg-light,#f8fafc); }
+#tabla-reporte thead th { background:var(--verde); color:#fff; }
+#tabla-reporte tbody tr:nth-child(even) { background:var(--gris-light); }
 
 /* ── Panel de filtros: lista de muestras (mismo patrón que Comparar/Análisis Avanzado) ── */
 .rpt-sample-row { border-bottom: 1px solid var(--gris-light); }
@@ -105,7 +102,11 @@
 .rpt-guide-title { font-family:'Fraunces',serif; font-size:20px; font-weight:500; color:var(--text-primary); margin-bottom:8px; }
 .rpt-guide-desc  { font-size:13.5px; color:var(--text-muted); max-width:420px; margin:0 auto; line-height:1.65; }
 
-@media (max-width: 700px) {
+/* Mismo breakpoint "móvil" que usa templates_base.html (640px) — antes esta
+   página usaba 700px propio, así que entre 641-700px el resto del sitio ya
+   estaba en modo móvil pero el formulario de filtros seguía en 2 columnas:
+   un salto de layout "disparejo" entre esta página y las demás. */
+@media (max-width: 640px) {
     .rpt-guide       { padding: 2rem .9rem; }
     .rpt-guide-steps { flex-wrap: wrap; gap: .75rem 0; max-width: 100%; }
     .rpt-guide-arrow { display: none; }
@@ -114,6 +115,15 @@
     .rpt-guide-desc  { font-size: 12.5px; }
 
     #rpt-filter-form { grid-template-columns: 1fr !important; }
+    /* La columna "Marcador/Nivel/Filtrar" tenía un ancho fijo en px que no
+       se estiraba al caer a 1 columna — quedaba angosta y desalineada
+       respecto a la columna "Muestras", que sí ocupa todo el ancho. */
+    #rpt-filter-right-col { width: 100% !important; }
+    /* Barra de tabs/Top N/checkbox/botones: en vez de depender solo de
+       flex-wrap genérico (que apila los ~5 grupos de forma impredecible en
+       pantallas angostas), se fuerza un layout vertical prolijo. */
+    #rpt-toolbar { flex-direction: column; align-items: stretch !important; }
+    #rpt-toolbar > * { width: 100%; justify-content: center; }
 }
 </style>
 {% endblock %}
@@ -173,7 +183,7 @@
         <!-- Columna derecha: Marcador solo arriba; Nivel + Filtrar comparten
              fila (el botón "sube" junto a Nivel en vez de agregar una fila
              extra abajo que solo sumaba alto sin necesidad). -->
-        <div style="display:flex; flex-direction:column; gap:9px; width:190px;">
+        <div id="rpt-filter-right-col" style="display:flex; flex-direction:column; gap:9px; width:190px;">
             <div>
                 <label class="form-label">Marcador</label>
                 <select name="tipo" class="form-control" style="width:100%;">
@@ -213,7 +223,7 @@
      Envuelta en una card angosta para que el espacio entre los tabs y las
      acciones se lea como una barra de herramientas, no como hueco vacío.
 ═══════════════════════════════════════════════════════════════════════ -->
-<div class="card card-sm" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:.85rem;">
+<div id="rpt-toolbar" class="card card-sm" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:.85rem;">
     <div class="rpt-tabs" style="margin-bottom:0;">
         <button type="button" class="rpt-tab active" data-tab="resumen">
             <i class="ti ti-layout-dashboard"></i> Resumen
@@ -274,16 +284,10 @@
      ÍNDICE DE SALUD DEL SUELO
 ═══════════════════════════════════════════════════════════════════════ -->
 {% if indice_salud is not None %}
-{% with ns=nivel_salud|default:"" %}
-<div class="card card-sm" style="margin-bottom:1rem; border-left:4px solid
-    {% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
-    {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
-    {% else %}#7f1d1d{% endif %};">
+{% with ns=nivel_salud|default:"" slug=nivel_salud|default:""|nivel_slug %}
+<div class="card card-sm card-{{ slug }}" style="margin-bottom:1rem;">
     <div style="display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap;">
-        <div style="font-size:2.6rem; font-weight:800; line-height:1;
-            color:{% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
-                  {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
-                  {% else %}#7f1d1d{% endif %};">
+        <div class="text-{{ slug }}" style="font-size:2.6rem; font-weight:800; line-height:1;">
             {{ indice_salud }}
         </div>
         <div style="flex:1; min-width:180px;">
@@ -291,18 +295,11 @@
                         color:var(--text-muted); margin-bottom:2px;">
                 Índice de Salud del Suelo
             </div>
-            <div style="font-size:1rem; font-weight:700; margin-bottom:5px;
-                color:{% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
-                      {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
-                      {% else %}#7f1d1d{% endif %};">
+            <div class="text-{{ slug }}" style="font-size:1rem; font-weight:700; margin-bottom:5px;">
                 {{ ns }}
             </div>
             <div class="indice-bar">
-                <div class="indice-fill" style="width:{{ indice_salud }}%; background:
-                    {% if ns == 'ÓPTIMO' %}#14532d{% elif ns == 'FAVORABLE' %}#16a34a
-                    {% elif ns == 'MODERADO' %}#ca8a04{% elif ns == 'EN RIESGO' %}#dc2626
-                    {% else %}#7f1d1d{% endif %};">
-                </div>
+                <div class="indice-fill fill-{{ slug }}" style="width:{{ indice_salud }}%;"></div>
             </div>
         </div>
         <div style="font-size:12px; color:var(--text-hint);">/ 100</div>
@@ -314,7 +311,7 @@
 <!-- ══════════════════════════════════════════════════════════════════════
      KPI — DIVERSIDAD Y CLASIFICACIÓN FUNCIONAL
 ═══════════════════════════════════════════════════════════════════════ -->
-<div class="metrics-grid" style="margin-bottom:1rem; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">
+<div class="metrics-grid" style="margin-bottom:1rem;">
     <div class="metric-card">
         <div class="metric-label">Taxa detectados</div>
         <div class="metric-value">{{ resumen|length }}</div>
@@ -430,7 +427,7 @@
             {% endif %}
         </span>
     </div>
-    <div class="table-wrap" style="margin-top:0.8rem;">
+    <div class="table-wrap cards-mobile" style="margin-top:0.8rem;">
         <table id="tabla-reporte" style="width:100%;">
             <thead>
                 <tr>
@@ -447,19 +444,19 @@
                     <td class="td-mono" style="color:var(--text-muted); font-size:12px;">
                         {{ forloop.counter }}
                     </td>
-                    <td>
+                    <td data-label="Taxón">
                         <strong style="font-family:'DM Mono',monospace; font-weight:500; font-size:13px;">
                             {{ item.taxonomia|taxon_legible|default:"Desconocido" }}
                         </strong>
                     </td>
-                    <td class="td-mono" style="font-size:13px;">
+                    <td class="td-mono" data-label="Hits" style="font-size:13px;">
                         {{ item.total_hits|default:"0" }}
                     </td>
-                    <td>
+                    <td data-label="Abundancia">
                         <div style="display:flex; align-items:center; gap:10px;">
-                            <div style="flex:1; height:7px; background:var(--border-color,#e2e8f0);
+                            <div style="flex:1; height:7px; background:var(--gris-border);
                                         border-radius:4px; overflow:hidden;">
-                                <div style="height:100%; background:var(--verde,#16a34a);
+                                <div style="height:100%; background:var(--verde);
                                             border-radius:4px;
                                             width:{{ item.total_porcentaje|default:0|floatformat:2 }}%;"></div>
                             </div>
@@ -468,7 +465,7 @@
                             </span>
                         </div>
                     </td>
-                    <td>
+                    <td data-label="Clasificación">
                         {% if item.clasificacion == 'benefico' %}
                             <span class="badge badge-benefico">
                                 <i class="ti ti-shield-check"></i> Benéfico
@@ -478,7 +475,7 @@
                                 <i class="ti ti-alert-triangle"></i> Fitopatógeno
                             </span>
                         {% elif item.clasificacion == 'neutral' %}
-                            <span class="badge" style="background:#f1f5f9; color:#475569;">
+                            <span class="badge badge-neutral">
                                 Neutral
                             </span>
                         {% else %}
@@ -635,7 +632,7 @@ function renderPerfil(mode) {
     Plotly.newPlot(div, traces, Object.assign({}, ChartTheme.baseLayout(mode), {
         title: {
             text: 'Perfil de Abundancia Relativa por {{ nivel_actual|capfirst }}',
-            font: { size: 14, color: '#1e293b', family: 'Arial, sans-serif' },
+            font: { size: 14, color: ChartTheme.isDarkTheme() ? '#edecea' : '#1e293b', family: 'Arial, sans-serif' },
             x: 0.5, xanchor: 'center',
         },
         xaxis: {
@@ -718,6 +715,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Sin selector Color/Escala de grises en esta página — siempre a color.
     renderTodo('color');
+
+    // Si el usuario cambia el tema claro/oscuro sin recargar, la gráfica ya
+    // dibujada no reacciona sola a las variables CSS (Plotly la pinta una
+    // vez a canvas/SVG) — se vuelve a dibujar con los colores del tema nuevo.
+    window.addEventListener('biomicro:theme-change', function () { renderTodo('color'); });
 
     ChartTheme.addPlotlyDownloadButtons('dl-rpt-principal', {
         divId: 'rpt-grafico-principal',

@@ -13,7 +13,7 @@ class EmailOrUsernameBackend(ModelBackend):
         User = get_user_model()
         user = None
 
-        if username is None:
+        if username is None or password is None:
             return None
 
         # 1) Buscar por username exacto (cubre 'admin' y usuarios nuevos donde username=email)

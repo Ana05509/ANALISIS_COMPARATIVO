@@ -149,17 +149,29 @@
      * ancho en pantalla — sin margen extra, el texto quedaría ilegible una vez
      * reducido a tamaño de columna.
      */
+    /**
+     * El modo "publicación" siempre fuerza fondo blanco (es para exportar a
+     * un documento impreso/científico, independiente del tema de la UI).
+     * Para "color"/"grises" en cambio la gráfica debe seguir el tema activo
+     * del sitio (claro/oscuro) — si no, queda un rectángulo blanco fijo
+     * sobre una página oscura, ilegible/desentonado con el resto de la UI.
+     */
+    function isDarkTheme() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+
     function baseLayout(mode) {
         var pub = mode === MODES.PUBLICACION;
+        var dark = !pub && isDarkTheme();
         return {
             template: 'plotly_white',
             font: {
                 family: pub ? 'Arial, Helvetica, sans-serif' : 'Outfit, sans-serif',
                 size: pub ? 15 : 12,
-                color: pub ? '#000000' : '#374151'
+                color: pub ? '#000000' : (dark ? '#edecea' : '#374151')
             },
-            paper_bgcolor: pub ? '#ffffff' : undefined,
-            plot_bgcolor: pub ? '#ffffff' : undefined,
+            paper_bgcolor: pub ? '#ffffff' : (dark ? '#1c1b19' : undefined),
+            plot_bgcolor: pub ? '#ffffff' : (dark ? '#1c1b19' : undefined),
         };
     }
 
@@ -272,13 +284,16 @@
 
     /** Overrides de eje Y para asegurar cuadrícula completa y sobria. */
     function yAxisGrid(mode) {
+        var pub = mode === MODES.PUBLICACION;
         return {
             showgrid: true,
             // Gris sólido y opaco — el valor anterior (rgba con 35% de opacidad)
             // quedaba casi invisible sobre el fondo blanco. Sigue siendo sobrio,
             // pero ahora se nota a simple vista sin tener que acercarse a la
-            // pantalla.
-            gridcolor: '#c8c8c8',
+            // pantalla. En modo oscuro (fuera de "publicación", que siempre es
+            // fondo blanco) se usa un gris más tenue para que no compita con
+            // el fondo oscuro del gráfico.
+            gridcolor: (!pub && isDarkTheme()) ? '#3a3833' : '#c8c8c8',
             gridwidth: 1,
             zeroline: false,
         };
@@ -510,6 +525,7 @@
         getDash: getDash,
         toGrayscaleHex: toGrayscaleHex,
         taxonLegible: taxonLegible,
+        isDarkTheme: isDarkTheme,
         contrastTextColor: contrastTextColor,
         styleTracesByIndex: styleTracesByIndex,
         styleSingleTraceByPoint: styleSingleTraceByPoint,

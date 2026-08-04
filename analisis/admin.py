@@ -224,7 +224,7 @@ def _leer_archivo_molecular(archivo_field):
 def _disparar_pipeline(archivo_mol, request):
     ResultadoTaxonomico.objects.filter(archivo=archivo_mol).delete()
     df_raw = _leer_archivo_molecular(archivo_mol.archivo)
-    resultado = PipelineProcesamiento.procesar_archivo_df(df_raw, nivel="genus")
+    resultado = PipelineProcesamiento.procesar_archivo_df(df_raw)
     
     if not resultado or not resultado.get("data"):
         raise ValueError("El archivo no contiene datos taxonómicos válidos.")
