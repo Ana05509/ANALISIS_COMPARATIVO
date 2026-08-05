@@ -10,6 +10,36 @@ class AnalisisConfig(AppConfig):
     verbose_name = 'BioMicro'
 
     def ready(self):
+        # ── Diagnóstico temporal: por qué no llegan los correos en producción ──
+        # Se imprime UNA vez en cada arranque de la app (incluye los que
+        # corre Railway antes de levantar el server: migrate, collectstatic,
+        # y el propio gunicorn) — no hace ninguna conexión SMTP, solo lee la
+        # configuración ya resuelta. Buscar "DIAGNOSTICO EMAIL" en los logs
+        # de Railway. Quitar este bloque una vez resuelto el problema.
+        try:
+            from django.conf import settings as dj_settings
+            import logging
+            logger = logging.getLogger(__name__)
+            user_set = bool(getattr(dj_settings, 'EMAIL_HOST_USER', ''))
+            pass_set = bool(getattr(dj_settings, 'EMAIL_HOST_PASSWORD', ''))
+            logger.warning(
+                "=== DIAGNOSTICO EMAIL === EMAIL_BACKEND=%s | EMAIL_HOST_USER definido=%s | "
+                "EMAIL_HOST_PASSWORD definido=%s | EMAIL_HOST=%s | EMAIL_PORT=%s | EMAIL_TIMEOUT=%s",
+                getattr(dj_settings, 'EMAIL_BACKEND', '?'),
+                user_set, pass_set,
+                getattr(dj_settings, 'EMAIL_HOST', '?'),
+                getattr(dj_settings, 'EMAIL_PORT', '?'),
+                getattr(dj_settings, 'EMAIL_TIMEOUT', '?'),
+            )
+            if not (user_set and pass_set):
+                logger.warning(
+                    "=== DIAGNOSTICO EMAIL === EMAIL_HOST_USER o EMAIL_HOST_PASSWORD "
+                    "está vacío en este entorno -> cae al backend de consola, NO envía "
+                    "correos reales aunque la app no muestre ningún error."
+                )
+        except Exception:
+            pass
+
         # ── Sincronizar el dominio del Site con Railway automáticamente ──
         # Mismo problema que ya resuelven ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS
         # en settings.py: Railway puede regenerar el dominio público en
