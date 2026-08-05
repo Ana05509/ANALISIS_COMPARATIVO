@@ -149,25 +149,52 @@ class AnalisisConfig(AppConfig):
                 return ''
             return request.META.get('HTTP_USER_AGENT', '')[:255]
 
+        # user_logged_in/user_logged_out/user_login_failed tampoco usan
+        # send_robust() — si EventoAcceso.objects.create() lanza una
+        # excepción (p. ej. la tabla desincronizada con una migración, o un
+        # corte puntual de conexión a la base), sin este try/except esa
+        # excepción se propagaría hasta la vista de login/logout y rompería
+        # el acceso mismo solo porque falló la bitácora de auditoría — el
+        # registro debe ser best-effort, nunca a costa de bloquear el login.
         def registrar_login(sender, request, user, **kwargs):
-            EventoAcceso.objects.create(
-                tipo='login_ok', usuario=user,
-                ip_address=_ip_cliente(request), user_agent=_user_agent(request),
-            )
+            try:
+                EventoAcceso.objects.create(
+                    tipo='login_ok', usuario=user,
+                    ip_address=_ip_cliente(request), user_agent=_user_agent(request),
+                )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "No se pudo registrar el evento de acceso (login_ok) de %s",
+                    getattr(user, 'email', getattr(user, 'username', '?')),
+                )
 
         def registrar_logout(sender, request, user, **kwargs):
             # user puede venir None si la sesión ya había expirado
-            EventoAcceso.objects.create(
-                tipo='logout', usuario=user,
-                ip_address=_ip_cliente(request), user_agent=_user_agent(request),
-            )
+            try:
+                EventoAcceso.objects.create(
+                    tipo='logout', usuario=user,
+                    ip_address=_ip_cliente(request), user_agent=_user_agent(request),
+                )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "No se pudo registrar el evento de acceso (logout) de %s",
+                    getattr(user, 'email', getattr(user, 'username', '?')),
+                )
 
         def registrar_login_fallido(sender, credentials, request=None, **kwargs):
-            username = str(credentials.get('username', ''))[:150]
-            EventoAcceso.objects.create(
-                tipo='login_fallido', username_intentado=username,
-                ip_address=_ip_cliente(request), user_agent=_user_agent(request),
-            )
+            try:
+                username = str(credentials.get('username', ''))[:150]
+                EventoAcceso.objects.create(
+                    tipo='login_fallido', username_intentado=username,
+                    ip_address=_ip_cliente(request), user_agent=_user_agent(request),
+                )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "No se pudo registrar el evento de acceso (login_fallido)"
+                )
 
         user_logged_in.connect(registrar_login)
         user_logged_out.connect(registrar_logout)
