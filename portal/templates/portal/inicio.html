@@ -174,7 +174,7 @@
         .btn-nav-login:hover { background:var(--p-dark); transform:translateY(-1px); }
         .nav-toggle {
             display:none; background:none; border:1px solid var(--border); border-radius:9px;
-            width:38px; height:38px; align-items:center; justify-content:center;
+            width:44px; height:44px; align-items:center; justify-content:center;
             font-size:19px; color:var(--text); cursor:pointer;
         }
 
@@ -188,7 +188,7 @@
         .mobile-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:2.5rem; }
         .mobile-menu-close {
             background:none; border:1px solid var(--border); border-radius:9px;
-            width:38px; height:38px; font-size:19px; cursor:pointer; color:var(--text);
+            width:44px; height:44px; font-size:19px; cursor:pointer; color:var(--text);
         }
         .mobile-menu nav { display:flex; flex-direction:column; gap:1.75rem; }
         .mobile-menu nav a {
@@ -506,15 +506,24 @@
         @media (max-width: 900px) {
             .nav-links { display:none; }
             .nav-toggle { display:flex; }
+            /* El botón de login de la barra ya está duplicado dentro del
+               menú hamburguesa (.mobile-menu .btn-nav-login) — mostrarlo
+               también aquí solo aprieta la barra en pantallas angostas. */
+            .nav-right .btn-nav-login { display:none; }
             .hero-grid { grid-template-columns:1fr; text-align:center; }
             .hero p { margin-left:auto; margin-right:auto; }
             .hero-ctas { justify-content:center; }
             .hero-visual { margin-top:2.5rem; max-width:340px; }
             .grid-2, .grid-3, .pain-row, .benefits-grid, .who-grid { grid-template-columns:1fr; }
-            .feat-bento { grid-template-columns:repeat(2,1fr); grid-auto-rows:200px; }
+            /* minmax en vez de un alto fijo: a 2 columnas el texto de cada
+               tarjeta puede necesitar más líneas que a 3 columnas — un alto
+               fijo arriesgaba que el contenido se solapara con la fila de
+               abajo. */
+            .feat-bento { grid-template-columns:repeat(2,1fr); grid-auto-rows:minmax(200px, auto); }
             .feat-card.feat-lg { grid-column:span 2; }
         }
         @media (max-width: 640px) {
+            .nav { padding:0.7rem 1.1rem; }
             section { padding:3.75rem 1.25rem; }
             .hero { padding-top:6.5rem; }
             .feat-bento { grid-template-columns:1fr; grid-auto-rows:auto; }
