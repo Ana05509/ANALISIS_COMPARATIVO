@@ -49,12 +49,8 @@
     .aud-stat-usuarios { --aud-color: var(--tb-morado); }
 
     .aud-charts-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-        gap: 14px;
         margin-bottom: 4px;
     }
-    @media (max-width: 1300px) { .aud-charts-grid { grid-template-columns: minmax(0, 1fr); } }
 
     .aud-chart-card {
         background: #fff; border: 1px solid var(--tb-border); border-radius: 14px;
@@ -116,10 +112,6 @@
 
     <div class="aud-charts-grid">
         <div class="aud-chart-card">
-            <div class="aud-chart-title">Eventos por día (últimos 14 días)</div>
-            <div id="aud-grafico-dias"></div>
-        </div>
-        <div class="aud-chart-card">
             <div class="aud-chart-title">Intentos fallidos por usuario (top 10)</div>
             <div id="aud-grafico-fallidos"></div>
         </div>
@@ -155,7 +147,6 @@
     }
 
     var FIGURAS = {
-        dias:     {{ grafico_eventos_json|default:"null"|safe }},
         fallidos: {{ grafico_fallidos_json|default:"null"|safe }},
     };
 
@@ -172,7 +163,6 @@
 
     function dibujar() {
         if (typeof Plotly === 'undefined') { setTimeout(dibujar, 100); return; }
-        pintar('aud-grafico-dias', FIGURAS.dias, 'Sin eventos en los últimos 14 días.');
         pintar('aud-grafico-fallidos', FIGURAS.fallidos, 'Sin intentos fallidos registrados.');
     }
     // Esperar al siguiente frame (layout ya calculado) en vez de dibujar

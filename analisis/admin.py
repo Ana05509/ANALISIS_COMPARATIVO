@@ -979,11 +979,13 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
 
         import json
 
-        stats, por_dia, fallidos_por_usuario = _calcular_auditoria(qs)
+        # El gráfico "Eventos por día (últimos 14 días)" se sacó del
+        # dashboard en pantalla (confuso: dejaba pensar que solo existían
+        # eventos de las últimas dos semanas) — por_dia ya no se usa acá,
+        # pero _calcular_auditoria() lo sigue devolviendo porque
+        # exportar_excel() sí arma ese gráfico en la hoja de Excel.
+        stats, _por_dia, fallidos_por_usuario = _calcular_auditoria(qs)
         response.context_data["auditoria_stats"] = stats
-        response.context_data["grafico_eventos_json"] = json.dumps(
-            _figura_eventos_por_dia(por_dia), default=str
-        )
         response.context_data["grafico_fallidos_json"] = json.dumps(
             _figura_fallidos_por_usuario(fallidos_por_usuario), default=str
         )
