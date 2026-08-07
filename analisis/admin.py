@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.contrib.admin.models import LogEntry
+from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html, mark_safe
 from django.db import transaction
@@ -1009,9 +1009,11 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
     def exportar_excel(self, request):
         from django.http import HttpResponse
         from django.utils import timezone
+        from typing import cast
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.worksheet import Worksheet
         from openpyxl.worksheet.table import Table as XLTable, TableStyleInfo
         from openpyxl.chart import BarChart, Reference
         from openpyxl.chart.series import DataPoint
@@ -1030,7 +1032,11 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         wb = Workbook()
 
         # ── Hoja 1: Resumen ──────────────────────────────────────────
-        ws = wb.active
+        # Workbook.active está tipado Worksheet | None en los stubs de
+        # openpyxl (una hoja de cálculo podría técnicamente no tener
+        # ninguna) pero un Workbook() recién creado siempre trae una hoja
+        # activa por defecto — el cast no cambia nada en runtime.
+        ws = cast(Worksheet, wb.active)
         ws.title = "Resumen"
         ws.sheet_view.showGridLines = False
 
@@ -1364,6 +1370,158 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
 
 
 # =========================================================
+# REGISTRO DE ACCIONES — Datos + gráficos compartidos (dashboard/exports)
+# =========================================================
+def _calcular_logs_stats(qs):
+    """A partir del queryset ya filtrado por el changelist: estadísticas +
+    eventos por día (14 días) + los 10 campos que más se editan. Este último
+    es el dato que de verdad sirve para decidir qué mejorar: si un campo
+    aparece constantemente en "cambió X", probablemente su formulario/
+    validación de origen necesita ajuste (mal defecto, difícil de acertar
+    a la primera, etc.)."""
+    from datetime import timedelta
+    from django.db.models import Count
+    from django.db.models.functions import TruncDate
+    from django.utils import timezone
+    from collections import Counter
+    import json
+
+    stats = {
+        "total":         qs.count(),
+        "creaciones":    qs.filter(action_flag=ADDITION).count(),
+        "ediciones":     qs.filter(action_flag=CHANGE).count(),
+        "eliminaciones": qs.filter(action_flag=DELETION).count(),
+    }
+
+    desde = timezone.now() - timedelta(days=14)
+    por_dia = list(
+        qs.filter(action_time__gte=desde)
+          .annotate(dia=TruncDate("action_time"))
+          .values("dia", "action_flag")
+          .annotate(total=Count("id"))
+          .order_by("dia")
+    )
+
+    # change_message es texto (Django serializa el JSON a mano ahí, no es
+    # un JSONField) — no se puede agregar en la BD, se cuenta en Python
+    # sobre el queryset ya filtrado por el changelist.
+    contador = Counter()
+    for msg in qs.filter(action_flag=CHANGE).values_list("change_message", flat=True):
+        if not msg or not msg.startswith("["):
+            continue
+        try:
+            partes = json.loads(msg)
+        except (ValueError, TypeError):
+            continue
+        for parte in partes:
+            campos = (parte.get("changed") or {}).get("fields")
+            if campos:
+                contador.update(campos)
+    campos_top = [{"campo": c, "total": n} for c, n in contador.most_common(10)]
+
+    return stats, por_dia, campos_top
+
+
+# Mismo criterio que _AUD_COLOR (auditoría de accesos): verde/azul/rojo son
+# semántica de estado (creó/editó/eliminó, igual que accion_badge más abajo),
+# no una paleta categórica arbitraria — y el rojo/azul de modo claro no
+# llegan a 3:1 sobre una tarjeta oscura, así que el modo oscuro usa
+# variantes más claras de la misma familia (medido con el validador de la
+# skill dataviz: azul 3.03→4.08, rojo 2.46→3.98; el verde no necesitó ajuste).
+_LOG_COLOR = {
+    "light": {ADDITION: "#1D9E75", CHANGE: "#1565C0", DELETION: "#A32D2D",
+              "bg": "#ffffff", "grid": "#EEF0EC", "text": "#5F5E5A", "line": "#ffffff",
+              "hover_bg": "#ffffff", "hover_text": "#1a1a18", "hover_border": "#D3D1C7"},
+    "dark":  {ADDITION: "#1D9E75", CHANGE: "#2E7BD6", DELETION: "#D64545",
+              "bg": "#1a1a19", "grid": "rgba(255,255,255,0.08)", "text": "#A0A09A", "line": "#1a1a19",
+              "hover_bg": "#1e1e1c", "hover_text": "#e5e5e0", "hover_border": "#333330"},
+}
+
+
+def _figura_acciones_por_dia(filas):
+    """filas: [{'dia': date, 'action_flag': int, 'total': int}, ...] ->
+    {"light": <figura Plotly>, "dark": <figura Plotly>}."""
+    import plotly.graph_objects as go
+    from collections import defaultdict
+
+    dias = sorted({str(f["dia"]) for f in filas})
+    por_tipo = defaultdict(lambda: {d: 0 for d in dias})
+    for f in filas:
+        por_tipo[f["action_flag"]][str(f["dia"])] = f["total"]
+
+    nombres = {ADDITION: "Creaciones", CHANGE: "Ediciones", DELETION: "Eliminaciones"}
+    etiquetas_x = [_fecha_corta_es(d) for d in dias]
+
+    figuras = {}
+    for modo, C in _LOG_COLOR.items():
+        fig = go.Figure()
+        for tipo in (ADDITION, CHANGE, DELETION):
+            valores = [por_tipo[tipo][d] for d in dias]
+            fig.add_trace(go.Bar(
+                name=nombres[tipo], x=etiquetas_x, y=valores,
+                marker=dict(
+                    color=C[tipo],
+                    line=dict(color=C["line"], width=2),
+                    cornerradius=4 if tipo == DELETION else 0,
+                ),
+                hovertemplate=f"<b>{nombres[tipo]}</b>: %{{y}}<extra></extra>",
+            ))
+        fig.update_layout(
+            autosize=True,
+            barmode="stack", bargap=0.35, height=300, margin=dict(t=30, b=10, l=36, r=10),
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Outfit, sans-serif", size=11, color=C["text"]),
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
+                font=dict(color=C["text"]),
+            ),
+            xaxis=dict(showgrid=False, zeroline=False, linecolor=C["grid"], tickfont=dict(color=C["text"])),
+            yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, tickfont=dict(color=C["text"])),
+            hoverlabel=dict(bgcolor=C["hover_bg"], font=dict(color=C["hover_text"]), bordercolor=C["hover_border"]),
+            hovermode="x unified",
+        )
+        figuras[modo] = fig.to_dict()
+    return figuras
+
+
+def _figura_campos_modificados(filas):
+    """filas: [{'campo': str, 'total': int}, ...] ->
+    {"light": <figura Plotly>, "dark": <figura Plotly>}."""
+    import plotly.graph_objects as go
+
+    if not filas:
+        vacio = {"data": [], "layout": {"height": 220}}
+        return {"light": vacio, "dark": vacio}
+
+    nombres = [f["campo"] for f in filas]
+    valores = [f["total"] for f in filas]
+
+    figuras = {}
+    for modo, C in _LOG_COLOR.items():
+        fig = go.Figure(go.Bar(
+            x=valores, y=nombres, orientation="h",
+            marker=dict(color=C[CHANGE], cornerradius=4),
+            text=valores, texttemplate="%{x}", textposition="outside",
+            textfont=dict(color=C["text"], size=11),
+            cliponaxis=False,
+            hovertemplate="<b>%{y}</b>: %{x} cambio(s)<extra></extra>",
+        ))
+        fig.update_layout(
+            autosize=True,
+            bargap=0.35,
+            height=max(220, len(nombres) * 32 + 60),
+            margin=dict(t=10, b=30, l=170, r=30),
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Outfit, sans-serif", size=11, color=C["text"]),
+            yaxis=dict(autorange="reversed", showgrid=False, tickfont=dict(color=C["text"])),
+            xaxis=dict(dtick=1, showgrid=True, gridcolor=C["grid"], zeroline=False, tickfont=dict(color=C["text"])),
+            hoverlabel=dict(bgcolor=C["hover_bg"], font=dict(color=C["hover_text"]), bordercolor=C["hover_border"]),
+        )
+        figuras[modo] = fig.to_dict()
+    return figuras
+
+
+# =========================================================
 # AUDITORÍA — Registro de Acciones del Admin (LogEntry nativo)
 # =========================================================
 @admin.register(LogEntry)
@@ -1382,13 +1540,17 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
 
     Igual que EventoAcceso, es de solo lectura.
     """
-    list_display  = ("accion_badge", "user", "content_type", "object_repr", "change_message", "action_time_corta", "acciones")
+    list_display  = ("accion_badge", "user", "content_type", "object_repr", "detalle_legible", "action_time_corta", "acciones")
     list_filter   = ("action_flag", "content_type", "action_time")
     search_fields = ("object_repr", "change_message", "user__username")
     date_hierarchy = "action_time"
     ordering       = ("-action_time",)
     list_per_page  = 30
     list_fullwidth = True
+
+    # Inyecta tarjetas de estadísticas + gráficos antes de la tabla, mismo
+    # gancho que usa EventoAcceso (ver changelist_view/get_urls debajo).
+    list_before_template = "admin/admin/logentry/dashboard_stats.html"
 
     def has_add_permission(self, request):
         return False
@@ -1416,3 +1578,389 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
             '<span style="background:{};color:{};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;">{}</span>',
             bg, color, texto
         )
+
+    @admin.display(description="Detalle")
+    def detalle_legible(self, obj):
+        # change_message crudo es el JSON que arma Django internamente
+        # (p.ej. [{"changed": {"fields": ["Altitud (msnm)"]}}]) — nunca
+        # pensado para mostrarse tal cual. get_change_message() lo traduce
+        # a texto legible ("Modificado Altitud (msnm)."), ya en español
+        # porque LANGUAGE_CODE='es' usa las traducciones que Django trae
+        # incluidas; si no es JSON (los mensajes propios de registrar_accion
+        # en audit.py, que ya son texto plano) lo devuelve tal cual.
+        try:
+            return obj.get_change_message() or "—"
+        except Exception:
+            return obj.change_message or "—"
+
+    # ── URLs propias: exportación ──────────────────────────────────────
+    def get_urls(self):
+        urls = super().get_urls()
+        propias = [
+            path("exportar/excel/", self.admin_site.admin_view(self.exportar_excel),
+                 name="admin_logentry_exportar_excel"),
+            path("exportar/pdf/", self.admin_site.admin_view(self.exportar_pdf),
+                 name="admin_logentry_exportar_pdf"),
+        ]
+        return propias + urls
+
+    # ── Dashboard: estadísticas + datos de gráficos ─────────────────────
+    def changelist_view(self, request, extra_context=None):
+        response = super().changelist_view(request, extra_context=extra_context)
+        try:
+            qs = response.context_data["cl"].queryset
+        except (AttributeError, KeyError, TypeError):
+            return response
+
+        import json
+
+        stats, por_dia, campos_top = _calcular_logs_stats(qs)
+        response.context_data["logs_stats"] = stats
+        response.context_data["grafico_dias_json"] = json.dumps(
+            _figura_acciones_por_dia(por_dia), default=str
+        )
+        response.context_data["grafico_campos_json"] = json.dumps(
+            _figura_campos_modificados(campos_top), default=str
+        )
+        return response
+
+    # ── Exportación ──────────────────────────────────────────────────
+    _KPI_ESTILO = (
+        # clave,           etiqueta,          bg claro,  texto oscuro
+        ("total",          "Total de acciones",   "EEE8F5", "4A3369"),
+        ("creaciones",     "Creaciones",           "E1F5EE", "085041"),
+        ("ediciones",      "Ediciones",            "E3F2FD", "0D3E8C"),
+        ("eliminaciones",  "Eliminaciones",        "FCEBEB", "6b1212"),
+    )
+    _ACCION_BADGE_XLSX = {
+        ADDITION: ("Creó", "E1F5EE", "085041"),
+        CHANGE:   ("Editó", "E6F1FB", "0C447C"),
+        DELETION: ("Eliminó", "FCEBEB", "A32D2D"),
+    }
+
+    def exportar_excel(self, request):
+        from django.http import HttpResponse
+        from django.utils import timezone
+        from typing import cast
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.worksheet import Worksheet
+        from openpyxl.worksheet.table import Table as XLTable, TableStyleInfo
+        from openpyxl.chart import BarChart, Reference
+        from openpyxl.chart.series import DataPoint
+
+        cl = self.get_changelist_instance(request)
+        qs = cl.queryset
+        stats, por_dia, campos_top = _calcular_logs_stats(qs)
+        ahora = timezone.now()
+
+        CV_OSC, CV = "0F6E56", "1D9E75"
+        _side = Side(style="thin", color="D9D9D9")
+        BORDE = Border(left=_side, right=_side, top=_side, bottom=_side)
+        al_c  = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        al_l  = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+        wb = Workbook()
+
+        # ── Hoja 1: Resumen ──────────────────────────────────────────
+        # Workbook.active está tipado Worksheet | None en los stubs de
+        # openpyxl (una hoja de cálculo podría técnicamente no tener
+        # ninguna) pero un Workbook() recién creado siempre trae una hoja
+        # activa por defecto — el cast no cambia nada en runtime.
+        ws = cast(Worksheet, wb.active)
+        ws.title = "Resumen"
+        ws.sheet_view.showGridLines = False
+
+        ws.merge_cells("A1:H1")
+        c = ws["A1"]; c.value = "BioMicro — Registro de Acciones"
+        c.font = Font(bold=True, size=16, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor=CV_OSC)
+        c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        ws.row_dimensions[1].height = 32
+
+        ws.merge_cells("A2:H2")
+        c = ws["A2"]
+        filtro_txt = " (con filtros aplicados)" if request.GET else " (todas las acciones)"
+        c.value = f"Generado el {ahora:%d/%m/%Y %H:%M} — {stats['total']} registro(s){filtro_txt}"
+        c.font = Font(italic=True, size=10, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor=CV)
+        c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        ws.row_dimensions[2].height = 20
+
+        fila_kpi_val, fila_kpi_lbl = 4, 5
+        for i, (clave, etiqueta, bg, fg) in enumerate(self._KPI_ESTILO):
+            col_ini = get_column_letter(i * 2 + 1)
+            col_fin = get_column_letter(i * 2 + 2)
+            for fila, val, tam, negrita in (
+                (fila_kpi_val, stats[clave], 22, True),
+                (fila_kpi_lbl, etiqueta.upper(), 8.5, False),
+            ):
+                ws.merge_cells(f"{col_ini}{fila}:{col_fin}{fila}")
+                cc = ws[f"{col_ini}{fila}"]
+                cc.value = val
+                cc.font = Font(bold=negrita, size=tam, color=fg)
+                cc.fill = PatternFill("solid", fgColor=bg)
+                cc.alignment = al_c
+            ws.row_dimensions[fila_kpi_val].height = 34
+            ws.row_dimensions[fila_kpi_lbl].height = 16
+
+        for col in "ABCDEFGH":
+            ws.column_dimensions[col].width = 13
+
+        # ── Serie: acciones por día (últimos 14 días) + gráfico nativo ──
+        fila = 8
+        ws.cell(row=fila, column=1, value="Acciones por día (últimos 14 días)").font = Font(bold=True, size=12, color=CV_OSC)
+        fila += 1
+        cab_dia = fila
+        for j, txt in enumerate(("Día", "Creaciones", "Ediciones", "Eliminaciones"), start=1):
+            cc = ws.cell(row=cab_dia, column=j, value=txt)
+            cc.font = Font(bold=True, color="FFFFFF")
+            cc.fill = PatternFill("solid", fgColor=CV_OSC)
+            cc.alignment = al_c
+            cc.border = BORDE
+
+        dias = sorted({str(f["dia"]) for f in por_dia})
+        from collections import defaultdict
+        por_tipo = defaultdict(lambda: {d: 0 for d in dias})
+        for f in por_dia:
+            por_tipo[f["action_flag"]][str(f["dia"])] = f["total"]
+        for i, d in enumerate(dias):
+            r = cab_dia + 1 + i
+            valores = [d, por_tipo[ADDITION][d], por_tipo[CHANGE][d], por_tipo[DELETION][d]]
+            for j, v in enumerate(valores, start=1):
+                cc = ws.cell(row=r, column=j, value=v)
+                cc.border = BORDE
+                cc.alignment = al_c if j > 1 else al_l
+        fila_fin_dia = cab_dia + len(dias)
+
+        if dias:
+            ch = BarChart()
+            ch.type, ch.grouping, ch.overlap = "col", "stacked", 100
+            ch.title, ch.style = "Acciones por día", 10
+            ch.width, ch.height = 22, 9
+            ch.y_axis.title = "Acciones"
+            for j, color in ((2, "085041"), (3, "0C447C"), (4, "A32D2D")):
+                dat = Reference(ws, min_col=j, max_col=j, min_row=cab_dia, max_row=fila_fin_dia)
+                ch.add_data(dat, titles_from_data=True)
+                ch.series[-1].graphicalProperties.solidFill = color
+            cat = Reference(ws, min_col=1, min_row=cab_dia + 1, max_row=fila_fin_dia)
+            ch.set_categories(cat)
+            ws.add_chart(ch, f"A{fila_fin_dia + 3}")
+        else:
+            ws.cell(row=cab_dia + 1, column=1, value="Sin acciones en los últimos 14 días.").font = Font(italic=True, color="888888")
+            fila_fin_dia = cab_dia + 1
+
+        # ── Serie: campos más modificados + gráfico nativo ──────────────
+        fila_top = max(fila_fin_dia + 22, cab_dia + 2)
+        ws.cell(row=fila_top, column=1, value="Campos más modificados (top 10)").font = Font(bold=True, size=12, color=CV_OSC)
+        fila_top += 1
+        cab_top = fila_top
+        for j, txt in enumerate(("Campo", "Veces modificado"), start=1):
+            cc = ws.cell(row=cab_top, column=j, value=txt)
+            cc.font = Font(bold=True, color="FFFFFF")
+            cc.fill = PatternFill("solid", fgColor="0C447C")
+            cc.alignment = al_c
+            cc.border = BORDE
+
+        for i, f in enumerate(campos_top):
+            r = cab_top + 1 + i
+            ws.cell(row=r, column=1, value=f["campo"]).border = BORDE
+            ws.cell(row=r, column=1).alignment = al_l
+            ws.cell(row=r, column=2, value=f["total"]).border = BORDE
+            ws.cell(row=r, column=2).alignment = al_c
+        fila_fin_top = cab_top + len(campos_top)
+
+        if campos_top:
+            ch2 = BarChart()
+            ch2.type, ch2.grouping = "bar", "clustered"
+            ch2.title, ch2.style, ch2.legend = "Campos más modificados", 10, None
+            ch2.width, ch2.height = 22, max(7, len(campos_top) * 0.8)
+            dat = Reference(ws, min_col=2, min_row=cab_top, max_row=fila_fin_top)
+            ch2.add_data(dat, titles_from_data=True)
+            cat = Reference(ws, min_col=1, min_row=cab_top + 1, max_row=fila_fin_top)
+            ch2.set_categories(cat)
+            for i in range(len(campos_top)):
+                dp = DataPoint(idx=i)
+                dp.graphicalProperties.solidFill = "0C447C"
+                ch2.series[0].dPt.append(dp)
+            ws.add_chart(ch2, f"A{fila_fin_top + 3}")
+        else:
+            ws.cell(row=cab_top + 1, column=1, value="Sin ediciones registradas.").font = Font(italic=True, color="888888")
+
+        # ── Hoja 2: detalle completo de acciones ─────────────────────────
+        ws2 = wb.create_sheet("Registro de Acciones")
+        columnas = ["Acción", "Usuario", "Modelo", "Objeto", "Detalle", "Fecha"]
+        for j, txt in enumerate(columnas, start=1):
+            cc = ws2.cell(row=1, column=j, value=txt)
+            cc.font = Font(bold=True, color="FFFFFF")
+            cc.fill = PatternFill("solid", fgColor=CV_OSC)
+            cc.alignment = al_c
+            cc.border = BORDE
+
+        qs_detalle = qs.select_related("user", "content_type")
+        for i, e in enumerate(qs_detalle):
+            r = i + 2
+            try:
+                detalle = e.get_change_message() or "—"
+            except Exception:
+                detalle = e.change_message or "—"
+            valores = [
+                self._ACCION_BADGE_XLSX.get(e.action_flag, ("—", "", ""))[0],
+                e.user.username if e.user_id else "—",
+                str(e.content_type) if e.content_type_id else "—",
+                e.object_repr,
+                detalle,
+                e.action_time.strftime("%Y-%m-%d %H:%M:%S"),
+            ]
+            for j, v in enumerate(valores, start=1):
+                cc = ws2.cell(row=r, column=j, value=v)
+                cc.border = BORDE
+                cc.alignment = al_l
+            bg, fg = self._ACCION_BADGE_XLSX.get(e.action_flag, ("—", "F1EFE8", "5F5E5A"))[1:]
+            cc_accion = ws2.cell(row=r, column=1)
+            cc_accion.fill = PatternFill("solid", fgColor=bg)
+            cc_accion.font = Font(bold=True, color=fg)
+
+        n = qs.count()
+        if n:
+            ref = f"A1:{get_column_letter(len(columnas))}{n + 1}"
+            tabla = XLTable(displayName="TablaRegistroAcciones", ref=ref)
+            tabla.tableStyleInfo = TableStyleInfo(
+                name="TableStyleMedium7", showFirstColumn=False, showLastColumn=False,
+                showRowStripes=True, showColumnStripes=False,
+            )
+            ws2.add_table(tabla)
+        ws2.freeze_panes = "A2"
+        anchos = {"A": 14, "B": 16, "C": 22, "D": 26, "E": 40, "F": 20}
+        for col, w in anchos.items():
+            ws2.column_dimensions[col].width = w
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        resp = HttpResponse(
+            buffer.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        nombre = ahora.strftime("registro_acciones_%Y%m%d_%H%M%S.xlsx")
+        resp["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        return resp
+
+    def exportar_pdf(self, request):
+        from django.http import HttpResponse
+        from django.utils import timezone
+        from xml.sax.saxutils import escape as _xml_escape
+        from reportlab.lib import colors as rl_colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from analisis.services.business.export_service import (
+            _get_styles, _pdf_footer, _seccion_hdr, _kpi_tiles, _C_PRIMARY, _C_SECONDARY,
+        )
+
+        cl = self.get_changelist_instance(request)
+        qs = cl.queryset
+        stats, _por_dia, _campos = _calcular_logs_stats(qs)
+        ahora = timezone.now()
+        S = _get_styles()
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, pagesize=landscape(A4),
+            topMargin=30, bottomMargin=40, leftMargin=30, rightMargin=30,
+        )
+        ancho_util = landscape(A4)[0] - 60
+        contenido = []
+
+        t_banner = Table(
+            [[Paragraph("<b>BioMicro — Registro de Acciones</b>", S["titulo"])],
+             [Paragraph("Bitácora de altas, ediciones y bajas hechas desde el sistema", S["subtitle"])]],
+            colWidths=[ancho_util],
+        )
+        t_banner.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), _C_PRIMARY),
+            ("TOPPADDING",    (0, 0), (-1, -1), 14),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 14),
+            ("BOTTOMPADDING", (0, 0), (0, 0), 3),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 16),
+        ]))
+        contenido.append(t_banner)
+
+        filtro_txt = "con filtros aplicados" if request.GET else "todas las acciones registradas"
+        t_meta = Table(
+            [[Paragraph(f"  Generado: {ahora:%d/%m/%Y %H:%M} · {stats['total']} registro(s) · {filtro_txt}", S["body_sm"])]],
+            colWidths=[ancho_util],
+        )
+        t_meta.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), _C_SECONDARY),
+            ("TEXTCOLOR",     (0, 0), (-1, -1), rl_colors.white),
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        contenido.append(t_meta)
+        contenido.append(Spacer(1, 14))
+
+        contenido.append(_kpi_tiles([
+            {"val": stats["total"],         "lbl": "TOTAL DE ACCIONES"},
+            {"val": stats["creaciones"],    "lbl": "CREACIONES"},
+            {"val": stats["ediciones"],     "lbl": "EDICIONES"},
+            {"val": stats["eliminaciones"], "lbl": "ELIMINACIONES"},
+        ], ancho_util, S))
+        contenido.append(Spacer(1, 14))
+
+        contenido.append(_seccion_hdr("Detalle de acciones", ancho_util, S))
+        contenido.append(Spacer(1, 6))
+
+        LIMITE = 3000  # límite razonable: un PDF con más filas deja de ser legible
+        ACCION_COLOR = {ADDITION: "#085041", CHANGE: "#0C447C", DELETION: "#A32D2D"}
+        ACCION_TXT   = {ADDITION: "Creó", CHANGE: "Editó", DELETION: "Eliminó"}
+        cabecera = ["Acción", "Usuario", "Modelo", "Objeto", "Detalle", "Fecha"]
+        filas = [[Paragraph(t, S["th_dark"]) for t in cabecera]]
+        qs_detalle = qs.select_related("user", "content_type")[:LIMITE]
+        for e in qs_detalle:
+            try:
+                detalle = e.get_change_message() or "—"
+            except Exception:
+                detalle = e.change_message or "—"
+            color = ACCION_COLOR.get(e.action_flag, "#5F5E5A")
+            texto_accion = ACCION_TXT.get(e.action_flag, "—")
+            filas.append([
+                Paragraph(f'<font color="{color}"><b>{texto_accion}</b></font>', S["body_sm"]),
+                Paragraph(_xml_escape(e.user.username) if e.user_id else "—", S["body_sm"]),
+                Paragraph(_xml_escape(str(e.content_type)) if e.content_type_id else "—", S["body_sm"]),
+                # object_repr y el detalle (get_change_message) pueden llevar
+                # texto libre que alguien escribió en un formulario (p. ej. el
+                # nombre de un Cultivo) — se escapan antes de Paragraph() para
+                # que no se interprete como markup de reportlab (mismo motivo
+                # que username_intentado en EventoAccesoAdmin.exportar_pdf).
+                Paragraph(_xml_escape(e.object_repr or "—"), S["body_sm"]),
+                Paragraph(_xml_escape(detalle), S["body_sm"]),
+                Paragraph(e.action_time.strftime("%d/%m/%Y %H:%M"), S["body_sm"]),
+            ])
+        if qs.count() > LIMITE:
+            contenido.append(Paragraph(
+                f"Mostrando los primeros {LIMITE} registros de {qs.count()}. "
+                "Usa los filtros del listado antes de exportar para acotar el rango.",
+                S["italic"],
+            ))
+            contenido.append(Spacer(1, 6))
+
+        tabla = Table(filas, repeatRows=1, colWidths=[ancho_util * w for w in (0.09, 0.13, 0.15, 0.17, 0.32, 0.14)])
+        tabla.setStyle(TableStyle([
+            ("BACKGROUND",     (0, 0), (-1, 0), _C_PRIMARY),
+            ("GRID",           (0, 0), (-1, -1), 0.5, rl_colors.HexColor("#e2e8f0")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor("#f8fafc")]),
+            ("VALIGN",         (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",     (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING",  (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",    (0, 0), (-1, -1), 6),
+        ]))
+        contenido.append(tabla)
+        doc.build(contenido, onFirstPage=_pdf_footer, onLaterPages=_pdf_footer)
+        buffer.seek(0)
+
+        resp = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+        nombre = ahora.strftime("registro_acciones_%Y%m%d_%H%M%S.pdf")
+        resp["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        return resp

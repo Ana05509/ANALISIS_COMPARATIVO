@@ -1,0 +1,177 @@
+{% load i18n %}
+<style>
+    .rl-dash { margin-bottom: 1.5rem; font-family: 'Outfit', sans-serif; }
+
+    .rl-toolbar {
+        display: flex; align-items: center; justify-content: flex-end;
+        gap: 10px; margin-bottom: 14px;
+    }
+    .rl-btn-export {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 16px; border-radius: 8px;
+        font-size: 13px; font-weight: 600; text-decoration: none;
+        transition: opacity .15s;
+    }
+    .rl-btn-export:hover { opacity: .85; }
+    .rl-btn-excel { background: var(--tb-verde); color: #fff; }
+    .rl-btn-pdf   { background: var(--tb-rojo); color: #fff; }
+
+    .rl-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 14px;
+        margin-bottom: 16px;
+    }
+
+    .rl-stat-card {
+        background: #fff; border: 1px solid var(--tb-border); border-radius: 14px;
+        padding: 16px 18px; position: relative; overflow: hidden;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .rl-stat-card::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        background: var(--rl-color);
+    }
+    .rl-stat-label {
+        font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
+        color: var(--tb-hint); margin-bottom: 6px;
+    }
+    .rl-stat-value {
+        font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 600;
+        color: var(--rl-color); line-height: 1;
+    }
+    .rl-stat-total         { --rl-color: var(--tb-morado); }
+    .rl-stat-creaciones    { --rl-color: var(--tb-verde); }
+    .rl-stat-ediciones     { --rl-color: var(--tb-azul); }
+    .rl-stat-eliminaciones { --rl-color: var(--tb-rojo); }
+
+    .rl-charts-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+        gap: 14px;
+        margin-bottom: 4px;
+    }
+    @media (max-width: 1300px) { .rl-charts-grid { grid-template-columns: minmax(0, 1fr); } }
+
+    .rl-chart-card {
+        background: #fff; border: 1px solid var(--tb-border); border-radius: 14px;
+        padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .rl-chart-title {
+        font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+        color: var(--tb-muted); margin-bottom: 8px;
+    }
+    .rl-chart-empty {
+        color: var(--tb-hint); font-size: 13px; text-align: center; padding: 40px 0;
+    }
+
+    /* Ver dashboard_stats.html de EventoAcceso para la explicación completa
+       de por qué hace falta esto: Unfold pone .dark en <html> sin recargar
+       la página, y los --tb-* de admin_personalizado.css solo cubren modo
+       claro. */
+    .dark .rl-stat-card,
+    .dark .rl-chart-card {
+        background: #1a1a19; border-color: #333330;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    }
+    .dark .rl-stat-label,
+    .dark .rl-chart-title { color: #8a8880; }
+    .dark .rl-chart-empty { color: #6b6a65; }
+</style>
+
+<div class="rl-dash">
+    <div class="rl-toolbar">
+        <a class="rl-btn-export rl-btn-excel" href="exportar/excel/?{{ request.GET.urlencode }}">
+            <span class="material-symbols-outlined" style="font-size:16px;">grid_on</span>
+            Exportar Excel
+        </a>
+        <a class="rl-btn-export rl-btn-pdf" href="exportar/pdf/?{{ request.GET.urlencode }}">
+            <span class="material-symbols-outlined" style="font-size:16px;">picture_as_pdf</span>
+            Exportar PDF
+        </a>
+    </div>
+
+    <div class="rl-stats-grid">
+        <div class="rl-stat-card rl-stat-total">
+            <div class="rl-stat-label">Total de acciones</div>
+            <div class="rl-stat-value">{{ logs_stats.total }}</div>
+        </div>
+        <div class="rl-stat-card rl-stat-creaciones">
+            <div class="rl-stat-label">Creaciones</div>
+            <div class="rl-stat-value">{{ logs_stats.creaciones }}</div>
+        </div>
+        <div class="rl-stat-card rl-stat-ediciones">
+            <div class="rl-stat-label">Ediciones</div>
+            <div class="rl-stat-value">{{ logs_stats.ediciones }}</div>
+        </div>
+        <div class="rl-stat-card rl-stat-eliminaciones">
+            <div class="rl-stat-label">Eliminaciones</div>
+            <div class="rl-stat-value">{{ logs_stats.eliminaciones }}</div>
+        </div>
+    </div>
+
+    <div class="rl-charts-grid">
+        <div class="rl-chart-card">
+            <div class="rl-chart-title">Acciones por día (últimos 14 días)</div>
+            <div id="rl-grafico-dias"></div>
+        </div>
+        <div class="rl-chart-card">
+            <div class="rl-chart-title">Campos más modificados (top 10)</div>
+            <div id="rl-grafico-campos"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js" defer></script>
+<script>
+(function () {
+    // Ver el mismo bloque en dashboard_stats.html de EventoAcceso para el
+    // porqué de cada pieza (ResizeObserver, doble rAF, MutationObserver de
+    // tema) — es exactamente el mismo patrón, solo con otros IDs/datos.
+    function observarResize(id) {
+        var el = document.getElementById(id);
+        if (!el || typeof ResizeObserver === 'undefined') return;
+        var obs = new ResizeObserver(function () {
+            if (el.data) { Plotly.Plots.resize(el); }
+        });
+        obs.observe(el);
+    }
+
+    function modoActual() {
+        return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    }
+
+    var FIGURAS = {
+        dias:    {{ grafico_dias_json|default:"null"|safe }},
+        campos:  {{ grafico_campos_json|default:"null"|safe }},
+    };
+
+    function pintar(id, porModo, vacioTexto) {
+        var fig = porModo && porModo[modoActual()];
+        var el = document.getElementById(id);
+        if (fig && fig.data && fig.data.length) {
+            Plotly.react(id, fig.data, fig.layout, {responsive: true, displayModeBar: false})
+                .then(function () { observarResize(id); });
+        } else {
+            el.innerHTML = '<p class="rl-chart-empty">' + vacioTexto + '</p>';
+        }
+    }
+
+    function dibujar() {
+        if (typeof Plotly === 'undefined') { setTimeout(dibujar, 100); return; }
+        pintar('rl-grafico-dias', FIGURAS.dias, 'Sin acciones en los últimos 14 días.');
+        pintar('rl-grafico-campos', FIGURAS.campos, 'Sin ediciones registradas.');
+    }
+    requestAnimationFrame(function () { requestAnimationFrame(dibujar); });
+
+    if (typeof MutationObserver !== 'undefined') {
+        var ultimoModo = modoActual();
+        new MutationObserver(function () {
+            if (modoActual() !== ultimoModo) {
+                ultimoModo = modoActual();
+                if (typeof Plotly !== 'undefined') dibujar();
+            }
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    }
+})();
+</script>
