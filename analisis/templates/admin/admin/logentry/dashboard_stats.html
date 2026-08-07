@@ -45,13 +45,15 @@
     .rl-stat-ediciones     { --rl-color: var(--tb-azul); }
     .rl-stat-eliminaciones { --rl-color: var(--tb-rojo); }
 
+    .rl-chart-wide { margin-bottom: 14px; }
+
     .rl-charts-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 14px;
         margin-bottom: 4px;
     }
-    @media (max-width: 1300px) { .rl-charts-grid { grid-template-columns: minmax(0, 1fr); } }
+    @media (max-width: 1100px) { .rl-charts-grid { grid-template-columns: minmax(0, 1fr); } }
 
     .rl-chart-card {
         background: #fff; border: 1px solid var(--tb-border); border-radius: 14px;
@@ -110,14 +112,21 @@
         </div>
     </div>
 
-    <div class="rl-charts-grid">
+    <div class="rl-chart-wide">
         <div class="rl-chart-card">
             <div class="rl-chart-title">Acciones por día (últimos 14 días)</div>
             <div id="rl-grafico-dias"></div>
         </div>
+    </div>
+
+    <div class="rl-charts-grid">
         <div class="rl-chart-card">
             <div class="rl-chart-title">Campos más modificados (top 10)</div>
             <div id="rl-grafico-campos"></div>
+        </div>
+        <div class="rl-chart-card">
+            <div class="rl-chart-title">Usuarios más activos (top 10)</div>
+            <div id="rl-grafico-usuarios"></div>
         </div>
     </div>
 </div>
@@ -142,8 +151,9 @@
     }
 
     var FIGURAS = {
-        dias:    {{ grafico_dias_json|default:"null"|safe }},
-        campos:  {{ grafico_campos_json|default:"null"|safe }},
+        dias:      {{ grafico_dias_json|default:"null"|safe }},
+        campos:    {{ grafico_campos_json|default:"null"|safe }},
+        usuarios:  {{ grafico_usuarios_json|default:"null"|safe }},
     };
 
     function pintar(id, porModo, vacioTexto) {
@@ -161,6 +171,7 @@
         if (typeof Plotly === 'undefined') { setTimeout(dibujar, 100); return; }
         pintar('rl-grafico-dias', FIGURAS.dias, 'Sin acciones en los últimos 14 días.');
         pintar('rl-grafico-campos', FIGURAS.campos, 'Sin ediciones registradas.');
+        pintar('rl-grafico-usuarios', FIGURAS.usuarios, 'Sin acciones con usuario registrado.');
     }
     requestAnimationFrame(function () { requestAnimationFrame(dibujar); });
 

@@ -1374,11 +1374,11 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
 # =========================================================
 def _calcular_logs_stats(qs):
     """A partir del queryset ya filtrado por el changelist: estadísticas +
-    eventos por día (14 días) + los 10 campos que más se editan. Este último
-    es el dato que de verdad sirve para decidir qué mejorar: si un campo
-    aparece constantemente en "cambió X", probablemente su formulario/
-    validación de origen necesita ajuste (mal defecto, difícil de acertar
-    a la primera, etc.)."""
+    eventos por día (14 días) + los 10 campos que más se editan + los 10
+    usuarios más activos. Los campos más editados son el dato que de verdad
+    sirve para decidir qué mejorar: si un campo aparece constantemente en
+    "cambió X", probablemente su formulario/validación de origen necesita
+    ajuste (mal defecto, difícil de acertar a la primera, etc.)."""
     from datetime import timedelta
     from django.db.models import Count
     from django.db.models.functions import TruncDate
@@ -1419,7 +1419,18 @@ def _calcular_logs_stats(qs):
                 contador.update(campos)
     campos_top = [{"campo": c, "total": n} for c, n in contador.most_common(10)]
 
-    return stats, por_dia, campos_top
+    # A diferencia de "campos más modificados" (texto libre, hay que
+    # contarlo en Python), esto sí es una columna real (user_id) — se agrega
+    # directo en la BD. exclude(user__isnull=True): las acciones sin usuario
+    # (p. ej. un script de datos) no aportan a un ranking de "quién edita más".
+    usuarios_top = list(
+        qs.exclude(user__isnull=True)
+          .values("user__username")
+          .annotate(total=Count("id"))
+          .order_by("-total")[:10]
+    )
+
+    return stats, por_dia, campos_top, usuarios_top
 
 
 # Mismo criterio que _AUD_COLOR (auditoría de accesos): verde/azul/rojo son
@@ -1428,11 +1439,14 @@ def _calcular_logs_stats(qs):
 # llegan a 3:1 sobre una tarjeta oscura, así que el modo oscuro usa
 # variantes más claras de la misma familia (medido con el validador de la
 # skill dataviz: azul 3.03→4.08, rojo 2.46→3.98; el verde no necesitó ajuste).
+# "morado" es aparte: no es un tipo de acción, es el acento neutro que ya usa
+# EventoAcceso para "usuarios activos" — mismo criterio acá para "usuarios
+# más activos" (2.54→4.06 en modo oscuro).
 _LOG_COLOR = {
-    "light": {ADDITION: "#1D9E75", CHANGE: "#1565C0", DELETION: "#A32D2D",
+    "light": {ADDITION: "#1D9E75", CHANGE: "#1565C0", DELETION: "#A32D2D", "morado": "#6A4C93",
               "bg": "#ffffff", "grid": "#EEF0EC", "text": "#5F5E5A", "line": "#ffffff",
               "hover_bg": "#ffffff", "hover_text": "#1a1a18", "hover_border": "#D3D1C7"},
-    "dark":  {ADDITION: "#1D9E75", CHANGE: "#2E7BD6", DELETION: "#D64545",
+    "dark":  {ADDITION: "#1D9E75", CHANGE: "#2E7BD6", DELETION: "#D64545", "morado": "#8B6BB8",
               "bg": "#1a1a19", "grid": "rgba(255,255,255,0.08)", "text": "#A0A09A", "line": "#1a1a19",
               "hover_bg": "#1e1e1c", "hover_text": "#e5e5e0", "hover_border": "#333330"},
 }
@@ -1515,6 +1529,43 @@ def _figura_campos_modificados(filas):
             font=dict(family="Outfit, sans-serif", size=11, color=C["text"]),
             yaxis=dict(autorange="reversed", showgrid=False, tickfont=dict(color=C["text"])),
             xaxis=dict(dtick=1, showgrid=True, gridcolor=C["grid"], zeroline=False, tickfont=dict(color=C["text"])),
+            hoverlabel=dict(bgcolor=C["hover_bg"], font=dict(color=C["hover_text"]), bordercolor=C["hover_border"]),
+        )
+        figuras[modo] = fig.to_dict()
+    return figuras
+
+
+def _figura_usuarios_activos(filas):
+    """filas: [{'user__username': str, 'total': int}, ...] ->
+    {"light": <figura Plotly>, "dark": <figura Plotly>}."""
+    import plotly.graph_objects as go
+
+    if not filas:
+        vacio = {"data": [], "layout": {"height": 220}}
+        return {"light": vacio, "dark": vacio}
+
+    nombres = [f["user__username"] for f in filas]
+    valores = [f["total"] for f in filas]
+
+    figuras = {}
+    for modo, C in _LOG_COLOR.items():
+        fig = go.Figure(go.Bar(
+            x=valores, y=nombres, orientation="h",
+            marker=dict(color=C["morado"], cornerradius=4),
+            text=valores, texttemplate="%{x}", textposition="outside",
+            textfont=dict(color=C["text"], size=11),
+            cliponaxis=False,
+            hovertemplate="<b>%{y}</b>: %{x} acción(es)<extra></extra>",
+        ))
+        fig.update_layout(
+            autosize=True,
+            bargap=0.35,
+            height=max(220, len(nombres) * 32 + 60),
+            margin=dict(t=10, b=30, l=170, r=30),
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Outfit, sans-serif", size=11, color=C["text"]),
+            yaxis=dict(autorange="reversed", showgrid=False, tickfont=dict(color=C["text"])),
+            xaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, tickfont=dict(color=C["text"])),
             hoverlabel=dict(bgcolor=C["hover_bg"], font=dict(color=C["hover_text"]), bordercolor=C["hover_border"]),
         )
         figuras[modo] = fig.to_dict()
@@ -1614,13 +1665,16 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
 
         import json
 
-        stats, por_dia, campos_top = _calcular_logs_stats(qs)
+        stats, por_dia, campos_top, usuarios_top = _calcular_logs_stats(qs)
         response.context_data["logs_stats"] = stats
         response.context_data["grafico_dias_json"] = json.dumps(
             _figura_acciones_por_dia(por_dia), default=str
         )
         response.context_data["grafico_campos_json"] = json.dumps(
             _figura_campos_modificados(campos_top), default=str
+        )
+        response.context_data["grafico_usuarios_json"] = json.dumps(
+            _figura_usuarios_activos(usuarios_top), default=str
         )
         return response
 
@@ -1652,7 +1706,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
 
         cl = self.get_changelist_instance(request)
         qs = cl.queryset
-        stats, por_dia, campos_top = _calcular_logs_stats(qs)
+        stats, por_dia, campos_top, usuarios_top = _calcular_logs_stats(qs)
         ahora = timezone.now()
 
         CV_OSC, CV = "0F6E56", "1D9E75"
@@ -1788,6 +1842,45 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
         else:
             ws.cell(row=cab_top + 1, column=1, value="Sin ediciones registradas.").font = Font(italic=True, color="888888")
 
+        # fila_fin_top ya quedó en cab_top (+ 0 filas) si campos_top venía
+        # vacío — se calculó antes del if/else de arriba, sirve igual acá.
+        # ── Serie: usuarios más activos + gráfico nativo ─────────────────
+        fila_usr = max(fila_fin_top + 22, cab_top + 2)
+        ws.cell(row=fila_usr, column=1, value="Usuarios más activos (top 10)").font = Font(bold=True, size=12, color=CV_OSC)
+        fila_usr += 1
+        cab_usr = fila_usr
+        for j, txt in enumerate(("Usuario", "Total de acciones"), start=1):
+            cc = ws.cell(row=cab_usr, column=j, value=txt)
+            cc.font = Font(bold=True, color="FFFFFF")
+            cc.fill = PatternFill("solid", fgColor="4A3369")
+            cc.alignment = al_c
+            cc.border = BORDE
+
+        for i, f in enumerate(usuarios_top):
+            r = cab_usr + 1 + i
+            ws.cell(row=r, column=1, value=f["user__username"]).border = BORDE
+            ws.cell(row=r, column=1).alignment = al_l
+            ws.cell(row=r, column=2, value=f["total"]).border = BORDE
+            ws.cell(row=r, column=2).alignment = al_c
+        fila_fin_usr = cab_usr + len(usuarios_top)
+
+        if usuarios_top:
+            ch3 = BarChart()
+            ch3.type, ch3.grouping = "bar", "clustered"
+            ch3.title, ch3.style, ch3.legend = "Usuarios más activos", 10, None
+            ch3.width, ch3.height = 22, max(7, len(usuarios_top) * 0.8)
+            dat = Reference(ws, min_col=2, min_row=cab_usr, max_row=fila_fin_usr)
+            ch3.add_data(dat, titles_from_data=True)
+            cat = Reference(ws, min_col=1, min_row=cab_usr + 1, max_row=fila_fin_usr)
+            ch3.set_categories(cat)
+            for i in range(len(usuarios_top)):
+                dp = DataPoint(idx=i)
+                dp.graphicalProperties.solidFill = "4A3369"
+                ch3.series[0].dPt.append(dp)
+            ws.add_chart(ch3, f"A{fila_fin_usr + 3}")
+        else:
+            ws.cell(row=cab_usr + 1, column=1, value="Sin acciones con usuario registrado.").font = Font(italic=True, color="888888")
+
         # ── Hoja 2: detalle completo de acciones ─────────────────────────
         ws2 = wb.create_sheet("Registro de Acciones")
         columnas = ["Acción", "Usuario", "Modelo", "Objeto", "Detalle", "Fecha"]
@@ -1861,7 +1954,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
 
         cl = self.get_changelist_instance(request)
         qs = cl.queryset
-        stats, _por_dia, _campos = _calcular_logs_stats(qs)
+        stats, _por_dia, _campos, _usuarios = _calcular_logs_stats(qs)
         ahora = timezone.now()
         S = _get_styles()
 
