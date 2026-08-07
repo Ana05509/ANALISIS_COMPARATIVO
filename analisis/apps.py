@@ -137,12 +137,27 @@ class AnalisisConfig(AppConfig):
         from .models import EventoAcceso
 
         def _ip_cliente(request):
+            # ip_address es un GenericIPAddressField -> columna "inet" en
+            # Postgres, que no acepta cualquier texto. Algunos proxys/redes
+            # (institucionales, VPN, ciertas extensiones de privacidad)
+            # meten valores no-IP en X-Forwarded-For como "unknown" o un
+            # hostname; sin validar, el INSERT entero fallaba con DataError
+            # y —desde que el create() quedó en try/except— ese evento de
+            # login/logout se perdía en silencio, sin avisar a nadie. Mejor
+            # guardar sin IP que no guardar el evento.
+            import ipaddress
+
             if request is None:
                 return None
             xff = request.META.get('HTTP_X_FORWARDED_FOR')
-            if xff:
-                return xff.split(',')[0].strip()
-            return request.META.get('REMOTE_ADDR')
+            candidato = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR')
+            if not candidato:
+                return None
+            try:
+                ipaddress.ip_address(candidato)
+            except ValueError:
+                return None
+            return candidato
 
         def _user_agent(request):
             if request is None:

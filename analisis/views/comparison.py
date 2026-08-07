@@ -83,8 +83,15 @@ def comparar(request):
 
     if request.GET and form.is_valid():
         muestras_seleccionadas = form.cleaned_data.get("muestras")
-        marcador = form.cleaned_data.get("marcador")
-        nivel = form.cleaned_data.get("nivel")
+        # marcador/nivel son ChoiceField requeridos (ver CompararForm en
+        # forms.py) — con form.is_valid() ya en True, cleaned_data siempre
+        # trae ambas claves con un valor no vacío. Se indexan con [] en vez
+        # de .get() para que el tipo sea el del campo (str) y no "Any | None":
+        # mismo valor en runtime, pero sin arrastrar un Optional falso a
+        # cada función de abajo que espera str (nivel.capitalize(),
+        # get_taxonomia_annotation(nivel), obtener_diversidad_beta_inter(...), etc.).
+        marcador = form.cleaned_data["marcador"]
+        nivel = form.cleaned_data["nivel"]
         try:
             top_n_form = int(form.cleaned_data.get("top_n", 10))
             TOP_N_VISUALIZACION = top_n_form if top_n_form in OPCIONES_TOP_N else 10
@@ -226,7 +233,7 @@ def comparar(request):
         # muestras seleccionadas) — sin esto, el usuario no recibía ningún
         # aviso y la página simplemente volvía al estado vacío en silencio.
         primer_error = next(
-            (err for errs in form.errors.values() for err in errs), None
+            (str(err) for errs in form.errors.values() for err in errs), None
         )
         messages.error(request, primer_error or "Revise los campos del formulario.")
 

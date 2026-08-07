@@ -703,10 +703,77 @@ def dashboard_callback(request, context):
 
 
 # =========================================================
+# AUDITORÍA — Datos compartidos entre el dashboard y las exportaciones
+# =========================================================
+def _calcular_auditoria(qs):
+    """A partir del queryset ya filtrado por el changelist, arma las
+    estadísticas + las dos series de datos (eventos por día, fallidos por
+    usuario) que usan tanto el dashboard del admin como Excel/PDF — un solo
+    lugar donde tocar la lógica en vez de tenerla repetida tres veces."""
+    from datetime import timedelta
+    from django.db.models import Count
+    from django.db.models.functions import TruncDate
+    from django.utils import timezone
+
+    stats = {
+        "total":            qs.count(),
+        "exitosos":         qs.filter(tipo="login_ok").count(),
+        "fallidos":         qs.filter(tipo="login_fallido").count(),
+        "usuarios_activos": qs.filter(tipo="login_ok").exclude(usuario__isnull=True)
+                                .values("usuario").distinct().count(),
+    }
+
+    desde = timezone.now() - timedelta(days=14)
+    por_dia = list(
+        qs.filter(fecha__gte=desde)
+          .annotate(dia=TruncDate("fecha"))
+          .values("dia", "tipo")
+          .annotate(total=Count("id"))
+          .order_by("dia")
+    )
+
+    fallidos_por_usuario = list(
+        qs.filter(tipo="login_fallido")
+          .values("username_intentado")
+          .annotate(total=Count("id"))
+          .order_by("-total")[:10]
+    )
+
+    return stats, por_dia, fallidos_por_usuario
+
+
+# =========================================================
 # AUDITORÍA — Gráficos (funciones libres para poder probarlas solas)
 # =========================================================
+# Paleta de estado (no categórica arbitraria): verde=éxito, rojo=crítico,
+# gris=neutral — las mismas tres que ya usan tipo_badge/KPIs/Excel/PDF, así
+# que se validan como escala de estado fija (WCAG por color, no CVD/chroma
+# de paleta categórica: swapping el orden SÍ cambiaría el significado).
+# El rojo y el gris de modo claro no alcanzan 3:1 sobre una tarjeta oscura
+# (2.46:1 y 2.68:1 medidos con el validador de la skill dataviz), así que
+# el modo oscuro usa variantes más claras de la misma familia — el verde
+# no necesitó ajuste (ya da 5.14:1 en ambos fondos).
+_AUD_COLOR = {
+    "light": {"login_ok": "#1D9E75", "login_fallido": "#A32D2D", "logout": "#5F5E5A",
+              "bg": "#ffffff", "grid": "#EEF0EC", "text": "#5F5E5A", "line": "#ffffff",
+              "hover_bg": "#ffffff", "hover_text": "#1a1a18", "hover_border": "#D3D1C7"},
+    "dark":  {"login_ok": "#1D9E75", "login_fallido": "#D64545", "logout": "#8A8880",
+              "bg": "#1a1a19", "grid": "rgba(255,255,255,0.08)", "text": "#A0A09A", "line": "#1a1a19",
+              "hover_bg": "#1e1e1c", "hover_text": "#e5e5e0", "hover_border": "#333330"},
+}
+_MESES_ES = {1: "ene", 2: "feb", 3: "mar", 4: "abr", 5: "may", 6: "jun",
+             7: "jul", 8: "ago", 9: "sep", 10: "oct", 11: "nov", 12: "dic"}
+
+
+def _fecha_corta_es(iso):
+    """'2026-07-16' -> '16 jul' (evita depender del locale del servidor)."""
+    y, m, d = (int(p) for p in iso.split("-"))
+    return f"{d} {_MESES_ES[m]}"
+
+
 def _figura_eventos_por_dia(filas):
-    """filas: [{'dia': date, 'tipo': str, 'total': int}, ...] -> dict de figura Plotly."""
+    """filas: [{'dia': date, 'tipo': str, 'total': int}, ...] ->
+    {"light": <figura Plotly>, "dark": <figura Plotly>}."""
     import plotly.graph_objects as go
     from collections import defaultdict
 
@@ -716,46 +783,79 @@ def _figura_eventos_por_dia(filas):
         por_tipo[f["tipo"]][str(f["dia"])] = f["total"]
 
     nombres = {"login_ok": "Exitosos", "login_fallido": "Fallidos", "logout": "Cierres de sesión"}
-    colores = {"login_ok": "#1D9E75", "login_fallido": "#A32D2D", "logout": "#5F5E5A"}
+    etiquetas_x = [_fecha_corta_es(d) for d in dias]
 
-    fig = go.Figure()
-    for tipo in ("login_ok", "login_fallido", "logout"):
-        fig.add_trace(go.Bar(
-            name=nombres[tipo], x=dias, y=[por_tipo[tipo][d] for d in dias],
-            marker_color=colores[tipo],
-        ))
-    fig.update_layout(
-        autosize=True,
-        barmode="stack", height=300, margin=dict(t=30, b=10, l=40, r=10),
-        plot_bgcolor="white", paper_bgcolor="white",
-        font=dict(family="Outfit, sans-serif", size=11),
-        # Centrada arriba (no anclada a la derecha): con poco ancho, un
-        # legend "right-anchored" empuja el primer ítem fuera del panel
-        # por la izquierda en vez de envolver.
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
-    )
-    return fig.to_dict()
+    figuras = {}
+    for modo, C in _AUD_COLOR.items():
+        fig = go.Figure()
+        tipos = ("login_ok", "login_fallido", "logout")
+        for i, tipo in enumerate(tipos):
+            valores = [por_tipo[tipo][d] for d in dias]
+            fig.add_trace(go.Bar(
+                name=nombres[tipo], x=etiquetas_x, y=valores,
+                marker=dict(
+                    color=C[tipo],
+                    line=dict(color=C["line"], width=2),  # separa visualmente los segmentos apilados
+                    # Solo el segmento de arriba (logout, el último en dibujarse)
+                    # lleva esquinas redondeadas: es el único "extremo libre"
+                    # de la barra apilada; los de abajo quedan rectos.
+                    cornerradius=4 if tipo == "logout" else 0,
+                ),
+                hovertemplate=f"<b>{nombres[tipo]}</b>: %{{y}}<extra></extra>",
+            ))
+        fig.update_layout(
+            autosize=True,
+            barmode="stack", bargap=0.35, height=300, margin=dict(t=30, b=10, l=36, r=10),
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Outfit, sans-serif", size=11, color=C["text"]),
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
+                font=dict(color=C["text"]),
+            ),
+            xaxis=dict(showgrid=False, zeroline=False, linecolor=C["grid"], tickfont=dict(color=C["text"])),
+            yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, tickfont=dict(color=C["text"])),
+            hoverlabel=dict(bgcolor=C["hover_bg"], font=dict(color=C["hover_text"]), bordercolor=C["hover_border"]),
+            hovermode="x unified",
+        )
+        figuras[modo] = fig.to_dict()
+    return figuras
 
 
 def _figura_fallidos_por_usuario(filas):
-    """filas: [{'username_intentado': str, 'total': int}, ...] -> dict de figura Plotly."""
+    """filas: [{'username_intentado': str, 'total': int}, ...] ->
+    {"light": <figura Plotly>, "dark": <figura Plotly>}."""
     import plotly.graph_objects as go
 
     if not filas:
-        return {"data": [], "layout": {"height": 220}}
+        vacio = {"data": [], "layout": {"height": 220}}
+        return {"light": vacio, "dark": vacio}
+
     nombres = [f["username_intentado"] or "(vacío)" for f in filas]
     valores = [f["total"] for f in filas]
-    fig = go.Figure(go.Bar(x=valores, y=nombres, orientation="h", marker_color="#A32D2D"))
-    fig.update_layout(
-        autosize=True,
-        height=max(220, len(nombres) * 32 + 60),
-        margin=dict(t=10, b=30, l=140, r=10),
-        plot_bgcolor="white", paper_bgcolor="white",
-        font=dict(family="Outfit, sans-serif", size=11),
-        yaxis=dict(autorange="reversed"),
-        xaxis=dict(dtick=1),
-    )
-    return fig.to_dict()
+
+    figuras = {}
+    for modo, C in _AUD_COLOR.items():
+        fig = go.Figure(go.Bar(
+            x=valores, y=nombres, orientation="h",
+            marker=dict(color=C["login_fallido"], cornerradius=4),
+            text=valores, texttemplate="%{x}", textposition="outside",
+            textfont=dict(color=C["text"], size=11),
+            cliponaxis=False,  # que la etiqueta del valor más alto no se corte contra el borde
+            hovertemplate="<b>%{y}</b>: %{x} intento(s) fallido(s)<extra></extra>",
+        ))
+        fig.update_layout(
+            autosize=True,
+            bargap=0.35,
+            height=max(220, len(nombres) * 32 + 60),
+            margin=dict(t=10, b=30, l=140, r=30),
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Outfit, sans-serif", size=11, color=C["text"]),
+            yaxis=dict(autorange="reversed", showgrid=False, tickfont=dict(color=C["text"])),
+            xaxis=dict(dtick=1, showgrid=True, gridcolor=C["grid"], zeroline=False, tickfont=dict(color=C["text"])),
+            hoverlabel=dict(bgcolor=C["hover_bg"], font=dict(color=C["hover_text"]), bordercolor=C["hover_border"]),
+        )
+        figuras[modo] = fig.to_dict()
+    return figuras
 
 
 def _figura_catalogo_distribucion(conteos):
@@ -878,38 +978,11 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
             return response
 
         import json
-        from datetime import timedelta
-        from django.db.models import Count
-        from django.db.models.functions import TruncDate
-        from django.utils import timezone
 
-        response.context_data["auditoria_stats"] = {
-            "total":             qs.count(),
-            "exitosos":          qs.filter(tipo="login_ok").count(),
-            "fallidos":          qs.filter(tipo="login_fallido").count(),
-            "usuarios_activos":  qs.filter(tipo="login_ok").exclude(usuario__isnull=True)
-                                    .values("usuario").distinct().count(),
-        }
-
-        # Gráfico 1: eventos por día (últimos 14 días del conjunto ya filtrado)
-        desde = timezone.now() - timedelta(days=14)
-        por_dia = list(
-            qs.filter(fecha__gte=desde)
-              .annotate(dia=TruncDate("fecha"))
-              .values("dia", "tipo")
-              .annotate(total=Count("id"))
-              .order_by("dia")
-        )
+        stats, por_dia, fallidos_por_usuario = _calcular_auditoria(qs)
+        response.context_data["auditoria_stats"] = stats
         response.context_data["grafico_eventos_json"] = json.dumps(
             _figura_eventos_por_dia(por_dia), default=str
-        )
-
-        # Gráfico 2: intentos fallidos por usuario/correo intentado (top 10)
-        fallidos_por_usuario = list(
-            qs.filter(tipo="login_fallido")
-              .values("username_intentado")
-              .annotate(total=Count("id"))
-              .order_by("-total")[:10]
         )
         response.context_data["grafico_fallidos_json"] = json.dumps(
             _figura_fallidos_por_usuario(fallidos_por_usuario), default=str
@@ -917,98 +990,339 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         return response
 
     # ── Exportación ──────────────────────────────────────────────────
+    # Paleta institucional (misma que dashboard_stats.html y admin_personalizado.css
+    # --tb-*, y el motor de reportes de export_service.py) para que ambos
+    # archivos se vean como parte del mismo sistema, no como algo aparte.
+    _KPI_ESTILO = (
+        # clave,               etiqueta,             bg claro,  texto oscuro
+        ("total",             "Total de eventos",    "E3F2FD", "0D3E8C"),
+        ("exitosos",          "Inicios exitosos",     "E1F5EE", "085041"),
+        ("fallidos",          "Intentos fallidos",    "FCEBEB", "6b1212"),
+        ("usuarios_activos",  "Usuarios activos",     "EEE8F5", "4A3369"),
+    )
+    _TIPO_BADGE_XLSX = {
+        "login_ok":      ("E1F5EE", "085041"),
+        "login_fallido": ("FCEBEB", "A32D2D"),
+        "logout":        ("F1EFE8", "5F5E5A"),
+    }
+
     def exportar_excel(self, request):
         from django.http import HttpResponse
         from django.utils import timezone
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.table import Table as XLTable, TableStyleInfo
+        from openpyxl.chart import BarChart, Reference
+        from openpyxl.chart.series import DataPoint
 
-        qs = self.get_changelist_instance(request).queryset
-        filas = [{
-            "Tipo":       e.get_tipo_display(),
-            "Usuario":    e.usuario.username if e.usuario_id else "",
-            "Intento":    e.username_intentado,
-            "IP":         e.ip_address or "",
-            "Navegador":  e.navegador,
-            "Sistema operativo": e.sistema_operativo,
-            "Fecha":      e.fecha.strftime("%Y-%m-%d %H:%M:%S"),
-        } for e in qs]
-        df = pd.DataFrame(filas, columns=[
-            "Tipo", "Usuario", "Intento", "IP", "Navegador", "Sistema operativo", "Fecha",
-        ])
+        cl = self.get_changelist_instance(request)
+        qs = cl.queryset
+        stats, por_dia, fallidos_por_usuario = _calcular_auditoria(qs)
+        ahora = timezone.now()
+
+        CV_OSC, CV = "0F6E56", "1D9E75"
+        _side = Side(style="thin", color="D9D9D9")
+        BORDE = Border(left=_side, right=_side, top=_side, bottom=_side)
+        al_c  = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        al_l  = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+        wb = Workbook()
+
+        # ── Hoja 1: Resumen ──────────────────────────────────────────
+        ws = wb.active
+        ws.title = "Resumen"
+        ws.sheet_view.showGridLines = False
+
+        ws.merge_cells("A1:H1")
+        c = ws["A1"]; c.value = "BioMicro — Auditoría de Accesos"
+        c.font = Font(bold=True, size=16, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor=CV_OSC)
+        c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        ws.row_dimensions[1].height = 32
+
+        ws.merge_cells("A2:H2")
+        c = ws["A2"]
+        filtro_txt = " (con filtros aplicados)" if request.GET else " (todos los eventos)"
+        c.value = f"Generado el {ahora:%d/%m/%Y %H:%M} — {stats['total']} registro(s){filtro_txt}"
+        c.font = Font(italic=True, size=10, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor=CV)
+        c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        ws.row_dimensions[2].height = 20
+
+        # Tarjetas KPI: 4 tarjetas de 2 columnas cada una (A-B, C-D, E-F, G-H)
+        fila_kpi_val, fila_kpi_lbl = 4, 5
+        for i, (clave, etiqueta, bg, fg) in enumerate(self._KPI_ESTILO):
+            col_ini = get_column_letter(i * 2 + 1)
+            col_fin = get_column_letter(i * 2 + 2)
+            for fila, val, tam, negrita in (
+                (fila_kpi_val, stats[clave], 22, True),
+                (fila_kpi_lbl, etiqueta.upper(), 8.5, False),
+            ):
+                ws.merge_cells(f"{col_ini}{fila}:{col_fin}{fila}")
+                cc = ws[f"{col_ini}{fila}"]
+                cc.value = val
+                cc.font = Font(bold=negrita, size=tam, color=fg)
+                cc.fill = PatternFill("solid", fgColor=bg)
+                cc.alignment = al_c
+            ws.row_dimensions[fila_kpi_val].height = 34
+            ws.row_dimensions[fila_kpi_lbl].height = 16
+
+        for col in "ABCDEFGH":
+            ws.column_dimensions[col].width = 13
+
+        # ── Serie: eventos por día (últimos 14 días) + gráfico nativo ──
+        fila = 8
+        ws.cell(row=fila, column=1, value="Eventos por día (últimos 14 días)").font = Font(bold=True, size=12, color=CV_OSC)
+        fila += 1
+        cab_dia = fila
+        for j, txt in enumerate(("Día", "Exitosos", "Fallidos", "Cierres de sesión"), start=1):
+            cc = ws.cell(row=cab_dia, column=j, value=txt)
+            cc.font = Font(bold=True, color="FFFFFF")
+            cc.fill = PatternFill("solid", fgColor=CV_OSC)
+            cc.alignment = al_c
+            cc.border = BORDE
+
+        dias = sorted({str(f["dia"]) for f in por_dia})
+        from collections import defaultdict
+        por_tipo = defaultdict(lambda: {d: 0 for d in dias})
+        for f in por_dia:
+            por_tipo[f["tipo"]][str(f["dia"])] = f["total"]
+        for i, d in enumerate(dias):
+            r = cab_dia + 1 + i
+            valores = [d, por_tipo["login_ok"][d], por_tipo["login_fallido"][d], por_tipo["logout"][d]]
+            for j, v in enumerate(valores, start=1):
+                cc = ws.cell(row=r, column=j, value=v)
+                cc.border = BORDE
+                cc.alignment = al_c if j > 1 else al_l
+        fila_fin_dia = cab_dia + len(dias)
+
+        if dias:
+            ch = BarChart()
+            ch.type, ch.grouping, ch.overlap = "col", "stacked", 100
+            ch.title, ch.style = "Eventos por día", 10
+            ch.width, ch.height = 22, 9
+            ch.y_axis.title = "Eventos"
+            for j, color in ((2, "085041"), (3, "A32D2D"), (4, "5F5E5A")):
+                dat = Reference(ws, min_col=j, max_col=j, min_row=cab_dia, max_row=fila_fin_dia)
+                ch.add_data(dat, titles_from_data=True)
+                ch.series[-1].graphicalProperties.solidFill = color
+            cat = Reference(ws, min_col=1, min_row=cab_dia + 1, max_row=fila_fin_dia)
+            ch.set_categories(cat)
+            ws.add_chart(ch, f"A{fila_fin_dia + 3}")
+        else:
+            ws.cell(row=cab_dia + 1, column=1, value="Sin eventos en los últimos 14 días.").font = Font(italic=True, color="888888")
+            fila_fin_dia = cab_dia + 1
+
+        # ── Serie: top 10 fallidos por usuario + gráfico nativo ─────────
+        fila_top = max(fila_fin_dia + 22, cab_dia + 2)
+        ws.cell(row=fila_top, column=1, value="Intentos fallidos por usuario (top 10)").font = Font(bold=True, size=12, color=CV_OSC)
+        fila_top += 1
+        cab_top = fila_top
+        for j, txt in enumerate(("Usuario / correo intentado", "Intentos fallidos"), start=1):
+            cc = ws.cell(row=cab_top, column=j, value=txt)
+            cc.font = Font(bold=True, color="FFFFFF")
+            cc.fill = PatternFill("solid", fgColor="A32D2D")
+            cc.alignment = al_c
+            cc.border = BORDE
+
+        for i, f in enumerate(fallidos_por_usuario):
+            r = cab_top + 1 + i
+            ws.cell(row=r, column=1, value=f["username_intentado"] or "(vacío)").border = BORDE
+            ws.cell(row=r, column=1).alignment = al_l
+            ws.cell(row=r, column=2, value=f["total"]).border = BORDE
+            ws.cell(row=r, column=2).alignment = al_c
+        fila_fin_top = cab_top + len(fallidos_por_usuario)
+
+        if fallidos_por_usuario:
+            ch2 = BarChart()
+            ch2.type, ch2.grouping = "bar", "clustered"
+            ch2.title, ch2.style, ch2.legend = "Top 10 intentos fallidos", 10, None
+            ch2.width, ch2.height = 22, max(7, len(fallidos_por_usuario) * 0.8)
+            dat = Reference(ws, min_col=2, min_row=cab_top, max_row=fila_fin_top)
+            ch2.add_data(dat, titles_from_data=True)
+            cat = Reference(ws, min_col=1, min_row=cab_top + 1, max_row=fila_fin_top)
+            ch2.set_categories(cat)
+            for i in range(len(fallidos_por_usuario)):
+                dp = DataPoint(idx=i)
+                dp.graphicalProperties.solidFill = "A32D2D"
+                ch2.series[0].dPt.append(dp)
+            ws.add_chart(ch2, f"A{fila_fin_top + 3}")
+        else:
+            ws.cell(row=cab_top + 1, column=1, value="Sin intentos fallidos registrados.").font = Font(italic=True, color="888888")
+
+        # ── Hoja 2: detalle completo de eventos ─────────────────────────
+        ws2 = wb.create_sheet("Eventos de Acceso")
+        columnas = ["Tipo", "Usuario", "Intento", "IP", "Navegador", "Sistema operativo", "Fecha"]
+        for j, txt in enumerate(columnas, start=1):
+            cc = ws2.cell(row=1, column=j, value=txt)
+            cc.font = Font(bold=True, color="FFFFFF")
+            cc.fill = PatternFill("solid", fgColor=CV_OSC)
+            cc.alignment = al_c
+            cc.border = BORDE
+
+        for i, e in enumerate(qs):
+            r = i + 2
+            valores = [
+                e.get_tipo_display(),
+                e.usuario.username if e.usuario_id else "",
+                e.username_intentado,
+                e.ip_address or "—",
+                e.navegador,
+                e.sistema_operativo,
+                e.fecha.strftime("%Y-%m-%d %H:%M:%S"),
+            ]
+            for j, v in enumerate(valores, start=1):
+                cc = ws2.cell(row=r, column=j, value=v)
+                cc.border = BORDE
+                cc.alignment = al_l
+            bg, fg = self._TIPO_BADGE_XLSX.get(e.tipo, ("F1EFE8", "5F5E5A"))
+            cc_tipo = ws2.cell(row=r, column=1)
+            cc_tipo.fill = PatternFill("solid", fgColor=bg)
+            cc_tipo.font = Font(bold=True, color=fg)
+
+        n = qs.count()
+        if n:
+            ref = f"A1:{get_column_letter(len(columnas))}{n + 1}"
+            tabla = XLTable(displayName="TablaEventosAcceso", ref=ref)
+            tabla.tableStyleInfo = TableStyleInfo(
+                name="TableStyleMedium7", showFirstColumn=False, showLastColumn=False,
+                showRowStripes=True, showColumnStripes=False,
+            )
+            ws2.add_table(tabla)
+        ws2.freeze_panes = "A2"
+        anchos = {"A": 20, "B": 18, "C": 26, "D": 16, "E": 26, "F": 20, "G": 20}
+        for col, w in anchos.items():
+            ws2.column_dimensions[col].width = w
 
         buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False, sheet_name="Eventos de Acceso")
+        wb.save(buffer)
         buffer.seek(0)
 
         resp = HttpResponse(
             buffer.getvalue(),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        nombre = timezone.now().strftime("eventos_acceso_%Y%m%d_%H%M%S.xlsx")
+        nombre = ahora.strftime("auditoria_accesos_%Y%m%d_%H%M%S.xlsx")
         resp["Content-Disposition"] = f'attachment; filename="{nombre}"'
         return resp
 
     def exportar_pdf(self, request):
         from django.http import HttpResponse
         from django.utils import timezone
+        from xml.sax.saxutils import escape as _xml_escape
         from reportlab.lib import colors as rl_colors
         from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib.styles import getSampleStyleSheet
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from analisis.services.business.export_service import (
+            _get_styles, _pdf_footer, _seccion_hdr, _kpi_tiles, _C_PRIMARY, _C_SECONDARY,
+        )
 
-        qs = self.get_changelist_instance(request).queryset
-        styles = getSampleStyleSheet()
+        cl = self.get_changelist_instance(request)
+        qs = cl.queryset
+        stats, _por_dia, _fallidos = _calcular_auditoria(qs)
+        ahora = timezone.now()
+        S = _get_styles()
 
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
             buffer, pagesize=landscape(A4),
-            topMargin=30, bottomMargin=30, leftMargin=30, rightMargin=30,
+            topMargin=30, bottomMargin=40, leftMargin=30, rightMargin=30,
         )
-        contenido = [
-            Paragraph("BioMicro — Bitácora de Eventos de Acceso", styles["Title"]),
-            Paragraph(
-                f"Generado: {timezone.now():%d/%m/%Y %H:%M} — {qs.count()} registro(s)",
-                styles["Normal"],
-            ),
-            Spacer(1, 14),
-        ]
+        ancho_util = landscape(A4)[0] - 60
+        contenido = []
+
+        # ── Banner de portada (mismo lenguaje visual que el resto de reportes) ──
+        t_banner = Table(
+            [[Paragraph("<b>BioMicro — Auditoría de Accesos</b>", S["titulo"])],
+             [Paragraph("Bitácora de inicios de sesión, cierres y accesos fallidos", S["subtitle"])]],
+            colWidths=[ancho_util],
+        )
+        t_banner.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), _C_PRIMARY),
+            ("TOPPADDING",    (0, 0), (-1, -1), 14),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 14),
+            ("BOTTOMPADDING", (0, 0), (0, 0), 3),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 16),
+        ]))
+        contenido.append(t_banner)
+
+        filtro_txt = "con filtros aplicados" if request.GET else "todos los eventos registrados"
+        t_meta = Table(
+            [[Paragraph(f"  Generado: {ahora:%d/%m/%Y %H:%M} · {stats['total']} registro(s) · {filtro_txt}", S["body_sm"])]],
+            colWidths=[ancho_util],
+        )
+        t_meta.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), _C_SECONDARY),
+            ("TEXTCOLOR",     (0, 0), (-1, -1), rl_colors.white),
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        contenido.append(t_meta)
+        contenido.append(Spacer(1, 14))
+
+        contenido.append(_kpi_tiles([
+            {"val": stats["total"],             "lbl": "TOTAL DE EVENTOS"},
+            {"val": stats["exitosos"],          "lbl": "INICIOS EXITOSOS"},
+            {"val": stats["fallidos"],          "lbl": "INTENTOS FALLIDOS"},
+            {"val": stats["usuarios_activos"],  "lbl": "USUARIOS ACTIVOS"},
+        ], ancho_util, S))
+        contenido.append(Spacer(1, 14))
+
+        contenido.append(_seccion_hdr("Detalle de eventos", ancho_util, S))
+        contenido.append(Spacer(1, 6))
 
         LIMITE = 3000  # límite razonable: un PDF con más filas deja de ser legible
-        filas = [["Tipo", "Usuario", "IP", "Navegador", "S.O.", "Fecha"]]
+        TIPO_COLOR = {"login_ok": "#085041", "login_fallido": "#A32D2D", "logout": "#5F5E5A"}
+        cabecera = ["Tipo", "Usuario", "IP", "Navegador", "S.O.", "Fecha"]
+        filas = [[Paragraph(t, S["th_dark"]) for t in cabecera]]
         for e in qs[:LIMITE]:
+            # username_intentado es texto libre escrito por quien sea que
+            # intentó loguearse (válido también para anónimos que fallan el
+            # login) — a diferencia de navegador/sistema_operativo (que
+            # _parsear_user_agent() en models.py reduce a una whitelist fija
+            # de valores como "Chrome"/"Windows"/"Otro"), esto llega tal cual
+            # se escribió. Paragraph() de reportlab SÍ interpreta markup
+            # (<font>, <a href>, hasta <img src> con fetch remoto), así que
+            # sin escapar, cualquiera podía inyectar HTML/XML en el PDF de
+            # auditoría que después abre un admin: texto oculto, enlaces de
+            # phishing embebidos o SSRF ciego vía <img src="http://...">.
+            usuario_txt = (
+                e.usuario.username if e.usuario_id
+                else _xml_escape(e.username_intentado or "—")
+            )
             filas.append([
-                e.get_tipo_display(),
-                e.usuario.username if e.usuario_id else (e.username_intentado or "—"),
-                e.ip_address or "—",
-                e.navegador,
-                e.sistema_operativo,
-                e.fecha.strftime("%d/%m/%Y %H:%M"),
+                Paragraph(f'<font color="{TIPO_COLOR.get(e.tipo, "#5F5E5A")}"><b>{e.get_tipo_display()}</b></font>', S["body_sm"]),
+                Paragraph(usuario_txt, S["body_sm"]),
+                Paragraph(e.ip_address or "—", S["body_sm"]),
+                Paragraph(e.navegador or "—", S["body_sm"]),
+                Paragraph(e.sistema_operativo or "—", S["body_sm"]),
+                Paragraph(e.fecha.strftime("%d/%m/%Y %H:%M"), S["body_sm"]),
             ])
         if qs.count() > LIMITE:
             contenido.append(Paragraph(
                 f"Mostrando los primeros {LIMITE} registros de {qs.count()}. "
-                "Usa los filtros para acotar el rango antes de exportar el resto.",
-                styles["Italic"],
+                "Usa los filtros del listado antes de exportar para acotar el rango.",
+                S["italic"],
             ))
-            contenido.append(Spacer(1, 8))
+            contenido.append(Spacer(1, 6))
 
-        tabla = Table(filas, repeatRows=1)
+        tabla = Table(filas, repeatRows=1, colWidths=[ancho_util * w for w in (0.14, 0.20, 0.14, 0.22, 0.16, 0.14)])
         tabla.setStyle(TableStyle([
-            ("BACKGROUND",     (0, 0), (-1, 0), rl_colors.HexColor("#1D9E75")),
-            ("TEXTCOLOR",      (0, 0), (-1, 0), rl_colors.white),
-            ("FONTSIZE",       (0, 0), (-1, -1), 8),
-            ("GRID",           (0, 0), (-1, -1), 0.5, rl_colors.HexColor("#D3D1C7")),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor("#F7F6F2")]),
+            ("BACKGROUND",     (0, 0), (-1, 0), _C_PRIMARY),
+            ("GRID",           (0, 0), (-1, -1), 0.5, rl_colors.HexColor("#e2e8f0")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor("#f8fafc")]),
             ("VALIGN",         (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING",     (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING",  (0, 0), (-1, -1), 4),
+            ("TOPPADDING",     (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING",  (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",    (0, 0), (-1, -1), 6),
         ]))
         contenido.append(tabla)
-        doc.build(contenido)
+        doc.build(contenido, onFirstPage=_pdf_footer, onLaterPages=_pdf_footer)
         buffer.seek(0)
 
         resp = HttpResponse(buffer.getvalue(), content_type="application/pdf")
-        nombre = timezone.now().strftime("eventos_acceso_%Y%m%d_%H%M%S.pdf")
+        nombre = ahora.strftime("auditoria_accesos_%Y%m%d_%H%M%S.pdf")
         resp["Content-Disposition"] = f'attachment; filename="{nombre}"'
         return resp
 

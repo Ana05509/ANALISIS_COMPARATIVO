@@ -1,6 +1,7 @@
 import json
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from typing import cast
 
 import plotly.graph_objects as go
 from django.contrib import messages
@@ -54,7 +55,11 @@ def _grafico_recuento(ensayo):
         height=420,
     )
 
-    return json.loads(fig.to_json())
+    # fig.to_json() no está anotado en los stubs de plotly y Pylance infiere
+    # un retorno "str | Any | None" — en runtime, para una Figure ya armada
+    # con datos (como acá) siempre devuelve el JSON como str; el cast no
+    # cambia nada en tiempo de ejecución, solo se lo aclara al chequeador.
+    return json.loads(cast(str, fig.to_json()))
 
 
 def _grafico_heatmap_pruebas(ensayo):
@@ -121,7 +126,11 @@ def _grafico_heatmap_pruebas(ensayo):
         height=max(300, len(organismos) * 60 + 180),
     )
 
-    return json.loads(fig.to_json())
+    # fig.to_json() no está anotado en los stubs de plotly y Pylance infiere
+    # un retorno "str | Any | None" — en runtime, para una Figure ya armada
+    # con datos (como acá) siempre devuelve el JSON como str; el cast no
+    # cambia nada en tiempo de ejecución, solo se lo aclara al chequeador.
+    return json.loads(cast(str, fig.to_json()))
 
 
 @login_required

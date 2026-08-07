@@ -67,6 +67,20 @@
     .aud-chart-empty {
         color: var(--tb-hint); font-size: 13px; text-align: center; padding: 40px 0;
     }
+
+    /* Unfold pone la clase "dark" en <html> (Alpine, sin recarga) — estos
+       tokens --tb-* solo están definidos para modo claro en
+       admin_personalizado.css, así que sin esto las tarjetas se quedan
+       blancas sobre el fondo oscuro. Los gráficos Plotly se resuelven
+       aparte en el <script> de abajo (SVG, no CSS). */
+    .dark .aud-stat-card,
+    .dark .aud-chart-card {
+        background: #1a1a19; border-color: #333330;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    }
+    .dark .aud-stat-label,
+    .dark .aud-chart-title { color: #8a8880; }
+    .dark .aud-chart-empty { color: #6b6a65; }
 </style>
 
 <div class="aud-dash">
@@ -115,23 +129,69 @@
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" defer></script>
 <script>
 (function () {
-    function dibujar() {
-        if (typeof Plotly === 'undefined') { setTimeout(dibujar, 100); return; }
+    // Redibuja/reajusta cuando el contenedor cambia de tamaño por algo que
+    // no es un resize de ventana (sidebar que se colapsa, webfont que
+    // termina de cargar y reacomoda la grid, etc.). Con "responsive: true"
+    // Plotly solo escucha el evento 'resize' de window, así que si el
+    // contenedor mide distinto al dibujar (p. ej. 0 o muy angosto porque
+    // el layout de la página todavía no se asentó) el gráfico queda
+    // "congelado" en ese tamaño incorrecto —ejes visibles, barras
+    // invisibles o amontonadas— y nunca se corrige solo.
+    function observarResize(id) {
+        var el = document.getElementById(id);
+        if (!el || typeof ResizeObserver === 'undefined') return;
+        var obs = new ResizeObserver(function () {
+            if (el.data) { Plotly.Plots.resize(el); }
+        });
+        obs.observe(el);
+    }
 
-        var dias = {{ grafico_eventos_json|default:"null"|safe }};
-        if (dias && dias.data && dias.data.length) {
-            Plotly.newPlot('aud-grafico-dias', dias.data, dias.layout, {responsive: true, displayModeBar: false});
-        } else {
-            document.getElementById('aud-grafico-dias').innerHTML = '<p class="aud-chart-empty">Sin eventos en los últimos 14 días.</p>';
-        }
+    // El backend manda una figura completa por modo ({light, dark}) en vez
+    // de un solo color parcheable: así el fondo, la grilla, el texto y los
+    // tonos de rojo/gris (ajustados para dar >=3:1 sobre tarjeta oscura,
+    // ver _AUD_COLOR en admin.py) quedan siempre coherentes entre sí.
+    function modoActual() {
+        return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    }
 
-        var fallidos = {{ grafico_fallidos_json|default:"null"|safe }};
-        if (fallidos && fallidos.data && fallidos.data.length) {
-            Plotly.newPlot('aud-grafico-fallidos', fallidos.data, fallidos.layout, {responsive: true, displayModeBar: false});
+    var FIGURAS = {
+        dias:     {{ grafico_eventos_json|default:"null"|safe }},
+        fallidos: {{ grafico_fallidos_json|default:"null"|safe }},
+    };
+
+    function pintar(id, porModo, vacioTexto) {
+        var fig = porModo && porModo[modoActual()];
+        var el = document.getElementById(id);
+        if (fig && fig.data && fig.data.length) {
+            Plotly.react(id, fig.data, fig.layout, {responsive: true, displayModeBar: false})
+                .then(function () { observarResize(id); });
         } else {
-            document.getElementById('aud-grafico-fallidos').innerHTML = '<p class="aud-chart-empty">Sin intentos fallidos registrados.</p>';
+            el.innerHTML = '<p class="aud-chart-empty">' + vacioTexto + '</p>';
         }
     }
-    dibujar();
+
+    function dibujar() {
+        if (typeof Plotly === 'undefined') { setTimeout(dibujar, 100); return; }
+        pintar('aud-grafico-dias', FIGURAS.dias, 'Sin eventos en los últimos 14 días.');
+        pintar('aud-grafico-fallidos', FIGURAS.fallidos, 'Sin intentos fallidos registrados.');
+    }
+    // Esperar al siguiente frame (layout ya calculado) en vez de dibujar
+    // apenas Plotly esté disponible: evita medir el contenedor a mitad de
+    // un reflow (p. ej. mientras el sidebar de Unfold todavía se está
+    // acomodando) y quedarse con ese tamaño incorrecto para siempre.
+    requestAnimationFrame(function () { requestAnimationFrame(dibujar); });
+
+    // El botón de tema de Unfold alterna la clase "dark" en <html> sin
+    // recargar la página (Alpine.js) — sin este observer, el gráfico se
+    // queda pintado con los colores del modo anterior hasta el próximo F5.
+    if (typeof MutationObserver !== 'undefined') {
+        var ultimoModo = modoActual();
+        new MutationObserver(function () {
+            if (modoActual() !== ultimoModo) {
+                ultimoModo = modoActual();
+                if (typeof Plotly !== 'undefined') dibujar();
+            }
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    }
 })();
 </script>

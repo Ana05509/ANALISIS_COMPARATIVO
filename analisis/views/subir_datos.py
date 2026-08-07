@@ -1,7 +1,8 @@
+from typing import cast
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, QueryDict
 from django.urls import reverse
 from analisis.services.business.upload_service import procesar_upload, MuestraDuplicadaError
 from analisis.services.processing.pipeline import ColumnasInvalidasError
@@ -59,8 +60,14 @@ def subir_datos(request):
                 if form.is_valid():
                     form.cleaned_data['variedad_clon'] = variedad
                 else:
-                    form.data = form.data.copy()
-                    form.data['variedad_clon'] = variedad.id
+                    # form.data está tipado como el genérico _DataT de
+                    # BaseForm (Pylance no sabe que en runtime es un
+                    # QueryDict mutable tras .copy()) — el cast no cambia
+                    # nada en runtime, solo le dice al chequeador de tipos
+                    # qué es realmente este objeto.
+                    datos_mutables = cast(QueryDict, form.data.copy())
+                    datos_mutables['variedad_clon'] = variedad.id
+                    form.data = datos_mutables
                 if created:
                     messages.info(request, f"Variedad '{variedad_manual}' creada automáticamente.")
             except Cultivo.DoesNotExist:
