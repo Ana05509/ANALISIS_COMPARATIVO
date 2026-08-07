@@ -4,6 +4,76 @@ from django.apps import AppConfig
 from django.db.models.signals import pre_save
 
 
+def _ip_cliente(request):
+    # ip_address es un GenericIPAddressField -> columna "inet" en
+    # Postgres, que no acepta cualquier texto. Algunos proxys/redes
+    # (institucionales, VPN, ciertas extensiones de privacidad) meten
+    # valores no-IP en X-Forwarded-For como "unknown" o un hostname; sin
+    # validar, el INSERT entero fallaba con DataError y —desde que el
+    # create() quedó en try/except— ese evento de login/logout se perdía
+    # en silencio, sin avisar a nadie. Mejor guardar sin IP que no guardar
+    # el evento. A nivel de módulo (no dentro de AnalisisConfig.ready())
+    # para poder reusarla también desde _AdminAuthFormAuditada más abajo.
+    import ipaddress
+
+    if request is None:
+        return None
+    xff = request.META.get('HTTP_X_FORWARDED_FOR')
+    candidato = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR')
+    if not candidato:
+        return None
+    try:
+        ipaddress.ip_address(candidato)
+    except ValueError:
+        return None
+    return candidato
+
+
+def _user_agent(request):
+    if request is None:
+        return ''
+    return request.META.get('HTTP_USER_AGENT', '')[:255]
+
+
+class _AdminAuthFormAuditada:
+    """Mixin sobre AdminAuthenticationForm (se combina con ella en
+    ready(), no puede heredar de ella acá arriba: importar
+    django.contrib.admin al nivel del módulo, antes de que la app registry
+    termine de cargar, puede romper el arranque).
+
+    El caso que tapa: alguien con credenciales VÁLIDAS pero cuenta sin
+    is_staff (docente/estudiante) prueba /admin/login/. Django lo rechaza
+    en confirm_login_allowed() — pero eso pasa DESPUÉS de que authenticate()
+    ya tuvo éxito, así que user_login_failed nunca se dispara (no fueron
+    credenciales incorrectas), y como el form nunca queda válido tampoco se
+    llama a login(), así que user_logged_in tampoco. Sin este parche, ese
+    intento de entrar al panel admin sin permiso no deja NINGÚN rastro en
+    la auditoría — ideal para no detectarlo si alguien está probando
+    cuentas contra el panel de administración."""
+
+    def confirm_login_allowed(self, user):
+        from django.core.exceptions import ValidationError
+        try:
+            super().confirm_login_allowed(user)
+        except ValidationError:
+            if not user.is_staff:
+                try:
+                    from .models import EventoAcceso
+                    EventoAcceso.objects.create(
+                        tipo='login_fallido', usuario=user,
+                        username_intentado=user.get_username()[:150],
+                        ip_address=_ip_cliente(getattr(self, 'request', None)),
+                        user_agent=_user_agent(getattr(self, 'request', None)),
+                    )
+                except Exception:
+                    import logging
+                    logging.getLogger(__name__).exception(
+                        "No se pudo registrar el intento de acceso admin denegado de %s",
+                        user.get_username(),
+                    )
+            raise
+
+
 class AnalisisConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'analisis'
@@ -136,34 +206,6 @@ class AnalisisConfig(AppConfig):
         )
         from .models import EventoAcceso
 
-        def _ip_cliente(request):
-            # ip_address es un GenericIPAddressField -> columna "inet" en
-            # Postgres, que no acepta cualquier texto. Algunos proxys/redes
-            # (institucionales, VPN, ciertas extensiones de privacidad)
-            # meten valores no-IP en X-Forwarded-For como "unknown" o un
-            # hostname; sin validar, el INSERT entero fallaba con DataError
-            # y —desde que el create() quedó en try/except— ese evento de
-            # login/logout se perdía en silencio, sin avisar a nadie. Mejor
-            # guardar sin IP que no guardar el evento.
-            import ipaddress
-
-            if request is None:
-                return None
-            xff = request.META.get('HTTP_X_FORWARDED_FOR')
-            candidato = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR')
-            if not candidato:
-                return None
-            try:
-                ipaddress.ip_address(candidato)
-            except ValueError:
-                return None
-            return candidato
-
-        def _user_agent(request):
-            if request is None:
-                return ''
-            return request.META.get('HTTP_USER_AGENT', '')[:255]
-
         # user_logged_in/user_logged_out/user_login_failed tampoco usan
         # send_robust() — si EventoAcceso.objects.create() lanza una
         # excepción (p. ej. la tabla desincronizada con una migración, o un
@@ -214,3 +256,15 @@ class AnalisisConfig(AppConfig):
         user_logged_in.connect(registrar_login)
         user_logged_out.connect(registrar_logout)
         user_login_failed.connect(registrar_login_fallido)
+
+        # ── Auditoría: acceso al panel /admin/ con cuenta sin permiso ───────
+        # Cubre el hueco que las tres señales de arriba no ven: alguien con
+        # contraseña correcta pero is_staff=False probando /admin/login/
+        # (docente/estudiante) — ver el docstring de _AdminAuthFormAuditada.
+        from django.contrib import admin as django_admin
+        from django.contrib.admin.forms import AdminAuthenticationForm
+
+        class _FormLoginAdminAuditado(_AdminAuthFormAuditada, AdminAuthenticationForm):
+            pass
+
+        django_admin.site.login_form = _FormLoginAdminAuditado
