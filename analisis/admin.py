@@ -1541,7 +1541,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
     Igual que EventoAcceso, es de solo lectura.
     """
     list_display  = ("accion_badge", "user", "content_type", "object_repr", "detalle_legible", "action_time_corta", "acciones")
-    list_filter   = ("action_flag", "content_type", "action_time")
+    list_filter   = ("action_flag", "user", "content_type", "action_time")
     search_fields = ("object_repr", "change_message", "user__username")
     date_hierarchy = "action_time"
     ordering       = ("-action_time",)
