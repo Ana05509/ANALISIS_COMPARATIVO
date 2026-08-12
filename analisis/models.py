@@ -302,11 +302,11 @@ class EventoAcceso(models.Model):
     usuario = models.ForeignKey(
         Usuario, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="eventos_acceso", verbose_name="Usuario",
-        help_text="Vacío en login_fallido cuando el usuario/correo ingresado no existe."
+        help_text="Queda vacío cuando fue un intento fallido con una cuenta que no existe."
     )
     username_intentado = models.CharField(
         max_length=150, blank=True, verbose_name="Usuario/correo ingresado",
-        help_text="Tal como se escribió en el formulario; útil para login_fallido."
+        help_text="Lo que la persona escribió al intentar ingresar, exista o no esa cuenta."
     )
     ip_address = models.GenericIPAddressField(null=True, blank=True, db_index=True, verbose_name="Dirección IP")
     user_agent = models.CharField(max_length=255, blank=True, verbose_name="Navegador / Dispositivo")
