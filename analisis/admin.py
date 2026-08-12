@@ -966,8 +966,84 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
                  name="analisis_eventoacceso_exportar_excel"),
             path("exportar/pdf/", self.admin_site.admin_view(self.exportar_pdf),
                  name="analisis_eventoacceso_exportar_pdf"),
+            path("diagnostico/", self.admin_site.admin_view(self.diagnostico),
+                 name="analisis_eventoacceso_diagnostico"),
         ]
         return propias + urls
+
+    # ── Diagnóstico: por qué en producción no aparecen logins recientes ──
+    # Página de una sola vista, sin filtros/orden/paginación de por medio
+    # (fuente de confusión en varias vueltas de este mismo problema) — dice
+    # con hechos crudos del PROCESO que está respondiendo esta petición:
+    # 1) si la señal user_logged_in está realmente conectada a
+    #    registrar_login en este worker (si ready() falló en silencio en
+    #    producción, acá no aparecería y sería la causa),
+    # 2) el total y las últimas filas reales de EventoAcceso comparadas
+    #    contra la hora del propio servidor,
+    # 3) a qué host de Postgres está conectado realmente.
+    def diagnostico(self, request):
+        from django.http import HttpResponse
+        from django.utils import timezone
+        from django.conf import settings as dj_settings
+        from django.contrib.auth.signals import user_logged_in, user_logged_out, user_login_failed
+        import weakref
+        import os
+
+        def _listar_receivers(signal):
+            out = []
+            for entry in signal.receivers:
+                # (lookup_key, receiver) en Django clásico, o
+                # (lookup_key, receiver, is_async) desde que Django soporta
+                # señales async — desempacar por posición, no por cantidad,
+                # para no depender de la versión exacta.
+                receiver = entry[1]
+                try:
+                    r = receiver() if isinstance(receiver, weakref.ReferenceType) else receiver
+                except Exception:
+                    r = None
+                if r is None:
+                    out.append("(referencia muerta / recolectada por el GC)")
+                else:
+                    modulo = getattr(r, "__module__", "?")
+                    nombre = getattr(r, "__qualname__", getattr(r, "__name__", str(r)))
+                    out.append(f"{modulo}.{nombre}")
+            return out or ["(NINGUNA — no hay receptores conectados a esta señal en este proceso)"]
+
+        ahora = timezone.now()
+        total = EventoAcceso.objects.count()
+        ultimos = list(EventoAcceso.objects.order_by("-fecha")[:10])
+
+        db = dj_settings.DATABASES.get("default", {})
+        db_host = db.get("HOST") or "(vacío — probablemente viene de DATABASE_URL parseada)"
+
+        lineas = []
+        lineas.append("=== DIAGNÓSTICO EVENTOACCESO ===")
+        lineas.append(f"Hora del servidor (timezone.now()): {ahora.isoformat()}")
+        lineas.append(f"TIME_ZONE configurado: {dj_settings.TIME_ZONE} | USE_TZ: {dj_settings.USE_TZ}")
+        lineas.append(f"Commit desplegado (RAILWAY_GIT_COMMIT_SHA): {os.environ.get('RAILWAY_GIT_COMMIT_SHA', '(no seteado)')}")
+        lineas.append(f"Host de base de datos activo: {db_host}")
+        lineas.append("")
+        lineas.append(f"Total EventoAcceso en la tabla: {total}")
+        lineas.append("")
+        lineas.append("--- Receptores conectados a user_logged_in (login exitoso) ---")
+        lineas.extend(_listar_receivers(user_logged_in))
+        lineas.append("")
+        lineas.append("--- Receptores conectados a user_logged_out ---")
+        lineas.extend(_listar_receivers(user_logged_out))
+        lineas.append("")
+        lineas.append("--- Receptores conectados a user_login_failed ---")
+        lineas.extend(_listar_receivers(user_login_failed))
+        lineas.append("")
+        lineas.append("--- Últimas 10 filas reales de EventoAcceso (id, tipo, usuario, fecha) ---")
+        if ultimos:
+            for e in ultimos:
+                lineas.append(
+                    f"#{e.id} | {e.tipo} | usuario={e.usuario_id or e.username_intentado or '—'} | fecha={e.fecha.isoformat()}"
+                )
+        else:
+            lineas.append("(la tabla está completamente vacía)")
+
+        return HttpResponse("\n".join(lineas).encode("utf-8"), content_type="text/plain; charset=utf-8")
 
     # ── Dashboard: estadísticas + datos de gráficos ─────────────────────
     def changelist_view(self, request, extra_context=None):
