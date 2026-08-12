@@ -1,14 +1,35 @@
 /**
- * Sidebar del admin siempre fijo y visible.
+ * Sidebar del admin siempre fijo y visible — pero SOLO en escritorio
+ * (>=1024px, mismo umbral que el @media de admin_personalizado.css que
+ * fuerza el sidebar visible desde ese ancho). Por debajo de eso, Unfold
+ * lo maneja como cajón móvil (oculto + botón de hamburguesa) — este
+ * script no debe tocarlo, o queda permanentemente abierto tapando todo
+ * el contenido en un celular, sin ninguna forma de cerrarlo.
  * Se carga en <head> antes de Alpine.js.
  */
 (function () {
 
-    /* ── 1. Bloquear cierre desde localStorage ── */
-    localStorage.setItem('sidebarDesktopOpen', '1');
+    function esEscritorio() {
+        return window.innerWidth >= 1024;
+    }
+
+    /* ── 1. Bloquear cierre desde localStorage — solo aplica en escritorio.
+       Alpine usa una clave aparte (sidebarMobileOpen) para el cajón móvil,
+       pero interceptar setItem de forma incondicional igual competía con
+       cualquier lógica que dependiera de sidebarDesktopOpen en pantallas
+       chicas — se re-evalúa el ancho en cada llamada, no solo una vez al
+       cargar el script, para que responda bien si alguien rota una
+       tablet o cambia el tamaño de la ventana. ── */
+    if (esEscritorio()) {
+        localStorage.setItem('sidebarDesktopOpen', '1');
+    }
     var _set = localStorage.setItem.bind(localStorage);
     localStorage.setItem = function (k, v) {
-        _set(k, k === 'sidebarDesktopOpen' ? '1' : v);
+        if (k === 'sidebarDesktopOpen' && esEscritorio()) {
+            _set(k, '1');
+        } else {
+            _set(k, v);
+        }
     };
 
     /* sidebarWidth: Unfold usa 288px por defecto, y ese ancho es el que le
@@ -19,11 +40,17 @@
        carga de página; los ítems del menú ya truncan con "…" así que un
        sidebar angosto no corta ni superpone nada. Quien lo necesite más
        ancho puede seguir arrastrando el borde derecho del sidebar — vuelve
-       a 220px en la siguiente página, no queda "roto" para el resto. */
+       a 220px en la siguiente página, no queda "roto" para el resto.
+       Esto no afecta el cajón móvil (que no usa este ancho), así que se
+       deja sin condicionar. */
     localStorage.setItem('sidebarWidth', '220');
 
-    /* ── 2. Aplicar estilos al sidebar (inline > !important de Tailwind) ── */
+    /* ── 2. Aplicar estilos al sidebar (inline > !important de Tailwind) ──
+       Solo en escritorio: es la parte que lo vuelve "siempre visible", así
+       que en móvil directamente no se ejecuta y Alpine queda a cargo. */
     function fixSidebar() {
+        if (!esEscritorio()) return;
+
         var page = document.getElementById('page');
         if (!page) return;
 
@@ -93,16 +120,44 @@
         });
     }
 
+    /* Deshace los estilos forzados si la ventana cruza a móvil (p. ej. se
+       gira una tablet, o se achica la ventana) — sin esto, alguien que
+       abre el panel en escritorio y después achica la ventana se queda
+       con el sidebar trabado en el estado de escritorio. */
+    function restaurarEnMovil() {
+        var page = document.getElementById('page');
+        if (!page || !page.firstElementChild || !page.firstElementChild.firstElementChild) return;
+        var alpineWrap = page.firstElementChild;
+        var ghostWrap = alpineWrap.firstElementChild;
+        [alpineWrap, ghostWrap, document.getElementById('nav-sidebar')].forEach(function (el) {
+            if (el) {
+                el.style.removeProperty('position');
+                el.style.removeProperty('top');
+                el.style.removeProperty('bottom');
+                el.style.removeProperty('left');
+                el.style.removeProperty('height');
+                el.style.removeProperty('align-self');
+                el.style.removeProperty('flex-shrink');
+                el.style.removeProperty('display');
+            }
+        });
+    }
+
+    var estabaEnEscritorio = esEscritorio();
+
     /* ── 3. Ejecutar al cargar el DOM ── */
     document.addEventListener('DOMContentLoaded', function () {
         fixSidebar();
 
-        /* Observar si Alpine intenta cambiar clases/estilos del ghost wrapper */
+        /* Observar si Alpine intenta cambiar clases/estilos del ghost wrapper
+           — solo se re-fuerza en escritorio; en móvil se deja que Alpine
+           controle el cajón (abrir/cerrar) sin interferencia. */
         var page = document.getElementById('page');
         if (!page || !page.firstElementChild || !page.firstElementChild.firstElementChild) return;
         var ghostWrap = page.firstElementChild.firstElementChild;
 
         var obs = new MutationObserver(function (mutations) {
+            if (!esEscritorio()) return;
             mutations.forEach(function (m) {
                 if (m.attributeName === 'class' || m.attributeName === 'style') {
                     /* Re-forzar display:block si Alpine intentó ocultarlo */
@@ -113,6 +168,16 @@
             });
         });
         obs.observe(ghostWrap, { attributes: true, attributeFilter: ['class', 'style'] });
+
+        window.addEventListener('resize', function () {
+            var ahoraEscritorio = esEscritorio();
+            if (ahoraEscritorio && !estabaEnEscritorio) {
+                fixSidebar();
+            } else if (!ahoraEscritorio && estabaEnEscritorio) {
+                restaurarEnMovil();
+            }
+            estabaEnEscritorio = ahoraEscritorio;
+        });
     });
 
 })();

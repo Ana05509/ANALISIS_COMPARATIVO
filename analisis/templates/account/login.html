@@ -385,14 +385,20 @@
             .bio-deco   { display: none; }
         }
 
-        /* Móvil (< 768 px): solo el formulario */
+        /* Móvil (< 768 px): solo el formulario, pero la tarjeta conserva
+           sombra/borde para no fundirse con el fondo blanco */
         @media (max-width: 767px) {
             html, body { height: auto; overflow: auto; }
             .split { flex-direction: column; height: auto; }
             .panel-l { display: none; }
-            .panel-r { padding: 1.5rem; background: #fff; min-height: 100vh; }
+            .panel-r { padding: 1.5rem; background: var(--bg); min-height: 100vh; }
             .panel-r::before, .panel-r::after { display: none; }
-            .card { box-shadow: none; border: none; padding: 1.5rem 1.25rem; animation: none; }
+            .card {
+                box-shadow: 0 10px 30px -8px rgba(15,38,28,.12), 0 1px 3px rgba(0,0,0,.05);
+                border: 1px solid rgba(214,228,221,.8);
+                border-radius: 20px;
+                padding: 1.5rem 1.25rem;
+            }
             .card.shake { animation: shake .4s var(--ease); }
         }
 
