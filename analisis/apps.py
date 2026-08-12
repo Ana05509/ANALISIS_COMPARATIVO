@@ -35,6 +35,146 @@ def _user_agent(request):
     return request.META.get('HTTP_USER_AGENT', '')[:255]
 
 
+# =========================================================
+# Receptores de señales — a nivel de MÓDULO, no anidados dentro de
+# AnalisisConfig.ready() (como estaban antes).
+#
+# Motivo: signal.connect() por defecto usa weak=True, que guarda una
+# referencia DÉBIL al receptor. Si el receptor es una función anidada
+# definida dentro de ready(), una vez que ready() termina de ejecutarse
+# nada más en el programa mantiene una referencia FUERTE a esa función —
+# queda a merced de cuándo el recolector de basura decida liberarla. En un
+# proceso de gunicorn de larga duración, con tráfico real, eventualmente
+# se recolecta y la señal se desconecta sola, en silencio, sin ningún
+# error — el login/logout sigue funcionando perfecto, pero deja de
+# registrarse en la auditoría. Esto es justo lo que se vio en producción:
+# la página de diagnóstico (ver EventoAccesoAdmin.diagnostico en admin.py)
+# mostró CERO receptores conectados a user_logged_out/user_login_failed
+# después de un tiempo corriendo, aunque local (procesos cortos de
+# `manage.py shell`) nunca alcanzaba a mostrar el problema.
+#
+# Es la misma causa raíz, muy probablemente, del bloque "DIAGNOSTICO
+# EMAIL" de acá abajo (correos de bienvenida que a veces no salían en
+# producción): enviar_bienvenida también estaba anidada dentro de ready().
+#
+# Al definirlas acá, el propio módulo (que Python mantiene cargado en
+# sys.modules mientras el proceso viva) es la referencia fuerte permanente
+# — no dependen de recolección de basura para seguir vivas. Además se
+# pasa weak=False explícito en cada connect() como cinturón de seguridad.
+# =========================================================
+
+def _sincronizar_dominio_site(sender, **kwargs):
+    from django.conf import settings as dj_settings
+    from django.contrib.sites.models import Site
+    railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+    if railway_domain:
+        Site.objects.filter(id=dj_settings.SITE_ID).update(domain=railway_domain)
+
+
+def _capitalizar_nombre_y_apellido(sender, instance, **kwargs):
+    if instance.first_name:
+        instance.first_name = instance.first_name.strip().title()
+    if instance.last_name:
+        instance.last_name = instance.last_name.strip().title()
+
+
+def _enviar_bienvenida(sender, request, user, **kwargs):
+    # user_signed_up.send() (allauth) no usa send_robust(): si esta
+    # función deja escapar una excepción, se propaga hasta
+    # complete_signup() y rompe el registro completo — la persona vería
+    # un error 500 en vez de quedar registrada, solo porque el correo de
+    # bienvenida falló. fail_silently=True en msg.send() de más abajo
+    # protege apenas el envío en sí (errores SMTP); todo lo anterior
+    # (armar la URL, renderizar las plantillas) queda bajo este try para
+    # que CUALQUIER falla acá sea, como pretende el nombre, silenciosa —
+    # nunca a costa de bloquear el alta.
+    try:
+        from django.core.mail import EmailMultiAlternatives
+        from django.template.loader import render_to_string
+        from django.conf import settings
+
+        rol_display = dict(user.ROLES).get(user.rol, user.rol)
+        login_url = request.build_absolute_uri('/accounts/login/')
+
+        asunto = render_to_string(
+            'account/email/welcome_subject.txt',
+            {'user': user},
+        ).strip()
+
+        cuerpo_html = render_to_string(
+            'account/email/welcome_body.html',
+            {'user': user, 'rol': rol_display, 'login_url': login_url},
+            request=request,
+        )
+
+        msg = EmailMultiAlternatives(
+            subject=asunto,
+            body=f'Bienvenido/a {user.first_name} a BioMicro.',
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[user.email],
+        )
+        msg.attach_alternative(cuerpo_html, 'text/html')
+        msg.send(fail_silently=True)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "No se pudo enviar el correo de bienvenida a %s", getattr(user, 'email', '?')
+        )
+
+
+# user_logged_in/user_logged_out/user_login_failed tampoco usan
+# send_robust() — si EventoAcceso.objects.create() lanza una excepción
+# (p. ej. la tabla desincronizada con una migración, o un corte puntual
+# de conexión a la base), sin este try/except esa excepción se
+# propagaría hasta la vista de login/logout y rompería el acceso mismo
+# solo porque falló la bitácora de auditoría — el registro debe ser
+# best-effort, nunca a costa de bloquear el login.
+def _registrar_login(sender, request, user, **kwargs):
+    try:
+        from .models import EventoAcceso
+        EventoAcceso.objects.create(
+            tipo='login_ok', usuario=user,
+            ip_address=_ip_cliente(request), user_agent=_user_agent(request),
+        )
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "No se pudo registrar el evento de acceso (login_ok) de %s",
+            getattr(user, 'email', getattr(user, 'username', '?')),
+        )
+
+
+def _registrar_logout(sender, request, user, **kwargs):
+    # user puede venir None si la sesión ya había expirado
+    try:
+        from .models import EventoAcceso
+        EventoAcceso.objects.create(
+            tipo='logout', usuario=user,
+            ip_address=_ip_cliente(request), user_agent=_user_agent(request),
+        )
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "No se pudo registrar el evento de acceso (logout) de %s",
+            getattr(user, 'email', getattr(user, 'username', '?')),
+        )
+
+
+def _registrar_login_fallido(sender, credentials, request=None, **kwargs):
+    try:
+        from .models import EventoAcceso
+        username = str(credentials.get('username', ''))[:150]
+        EventoAcceso.objects.create(
+            tipo='login_fallido', username_intentado=username,
+            ip_address=_ip_cliente(request), user_agent=_user_agent(request),
+        )
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "No se pudo registrar el evento de acceso (login_fallido)"
+        )
+
+
 class _AdminAuthFormAuditada:
     """Mixin sobre AdminAuthenticationForm (se combina con ella en
     ready(), no puede heredar de ella acá arriba: importar
@@ -122,77 +262,16 @@ class AnalisisConfig(AppConfig):
         # Google Cloud Console tenga el URI correcto configurado. Se
         # sincroniza después de cada migrate (Railway corre migrate en
         # cada deploy); en local RAILWAY_PUBLIC_DOMAIN no existe, así que
-        # esto no hace nada.
-        railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
-        if railway_domain:
-            from django.db.models.signals import post_migrate
-
-            def sincronizar_dominio_site(sender, **kwargs):
-                from django.conf import settings as dj_settings
-                from django.contrib.sites.models import Site
-                Site.objects.filter(id=dj_settings.SITE_ID).update(domain=railway_domain)
-
-            post_migrate.connect(sincronizar_dominio_site, sender=self)
+        # esto no hace nada (el propio receptor revisa la env var).
+        from django.db.models.signals import post_migrate
+        post_migrate.connect(_sincronizar_dominio_site, sender=self, weak=False)
 
         from django.contrib.auth import get_user_model
         User = get_user_model()
+        pre_save.connect(_capitalizar_nombre_y_apellido, sender=User, weak=False)
 
-        # ── Capitalizar nombres al guardar ──────────────────────────────────
-        def capitalizar_nombre_y_apellido(sender, instance, **kwargs):
-            if instance.first_name:
-                instance.first_name = instance.first_name.strip().title()
-            if instance.last_name:
-                instance.last_name = instance.last_name.strip().title()
-
-        pre_save.connect(capitalizar_nombre_y_apellido, sender=User)
-
-        # ── Correo de bienvenida al completar el registro ───────────────────
         from allauth.account.signals import user_signed_up
-
-        def enviar_bienvenida(sender, request, user, **kwargs):
-            # user_signed_up.send() (allauth) no usa send_robust(): si esta
-            # función deja escapar una excepción, se propaga hasta
-            # complete_signup() y rompe el registro completo — la persona
-            # vería un error 500 en vez de quedar registrada, solo porque el
-            # correo de bienvenida falló. fail_silently=True en msg.send()
-            # de más abajo protege apenas el envío en sí (errores SMTP); todo
-            # lo anterior (armar la URL, renderizar las plantillas) queda
-            # bajo este try para que CUALQUIER falla aquí sea, como pretende
-            # el nombre, silenciosa — nunca a costa de bloquear el alta.
-            try:
-                from django.core.mail import EmailMultiAlternatives
-                from django.template.loader import render_to_string
-                from django.conf import settings
-
-                rol_display = dict(user.ROLES).get(user.rol, user.rol)
-                login_url = request.build_absolute_uri('/accounts/login/')
-
-                asunto = render_to_string(
-                    'account/email/welcome_subject.txt',
-                    {'user': user},
-                ).strip()
-
-                cuerpo_html = render_to_string(
-                    'account/email/welcome_body.html',
-                    {'user': user, 'rol': rol_display, 'login_url': login_url},
-                    request=request,
-                )
-
-                msg = EmailMultiAlternatives(
-                    subject=asunto,
-                    body=f'Bienvenido/a {user.first_name} a BioMicro.',
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    to=[user.email],
-                )
-                msg.attach_alternative(cuerpo_html, 'text/html')
-                msg.send(fail_silently=True)
-            except Exception:
-                import logging
-                logging.getLogger(__name__).exception(
-                    "No se pudo enviar el correo de bienvenida a %s", getattr(user, 'email', '?')
-                )
-
-        user_signed_up.connect(enviar_bienvenida)
+        user_signed_up.connect(_enviar_bienvenida, weak=False)
 
         # ── Auditoría: registrar login / login fallido / logout ─────────────
         # Cubre las tres vías de entrada del sistema por igual: el LoginView
@@ -204,58 +283,9 @@ class AnalisisConfig(AppConfig):
         from django.contrib.auth.signals import (
             user_logged_in, user_logged_out, user_login_failed,
         )
-        from .models import EventoAcceso
-
-        # user_logged_in/user_logged_out/user_login_failed tampoco usan
-        # send_robust() — si EventoAcceso.objects.create() lanza una
-        # excepción (p. ej. la tabla desincronizada con una migración, o un
-        # corte puntual de conexión a la base), sin este try/except esa
-        # excepción se propagaría hasta la vista de login/logout y rompería
-        # el acceso mismo solo porque falló la bitácora de auditoría — el
-        # registro debe ser best-effort, nunca a costa de bloquear el login.
-        def registrar_login(sender, request, user, **kwargs):
-            try:
-                EventoAcceso.objects.create(
-                    tipo='login_ok', usuario=user,
-                    ip_address=_ip_cliente(request), user_agent=_user_agent(request),
-                )
-            except Exception:
-                import logging
-                logging.getLogger(__name__).exception(
-                    "No se pudo registrar el evento de acceso (login_ok) de %s",
-                    getattr(user, 'email', getattr(user, 'username', '?')),
-                )
-
-        def registrar_logout(sender, request, user, **kwargs):
-            # user puede venir None si la sesión ya había expirado
-            try:
-                EventoAcceso.objects.create(
-                    tipo='logout', usuario=user,
-                    ip_address=_ip_cliente(request), user_agent=_user_agent(request),
-                )
-            except Exception:
-                import logging
-                logging.getLogger(__name__).exception(
-                    "No se pudo registrar el evento de acceso (logout) de %s",
-                    getattr(user, 'email', getattr(user, 'username', '?')),
-                )
-
-        def registrar_login_fallido(sender, credentials, request=None, **kwargs):
-            try:
-                username = str(credentials.get('username', ''))[:150]
-                EventoAcceso.objects.create(
-                    tipo='login_fallido', username_intentado=username,
-                    ip_address=_ip_cliente(request), user_agent=_user_agent(request),
-                )
-            except Exception:
-                import logging
-                logging.getLogger(__name__).exception(
-                    "No se pudo registrar el evento de acceso (login_fallido)"
-                )
-
-        user_logged_in.connect(registrar_login)
-        user_logged_out.connect(registrar_logout)
-        user_login_failed.connect(registrar_login_fallido)
+        user_logged_in.connect(_registrar_login, weak=False)
+        user_logged_out.connect(_registrar_logout, weak=False)
+        user_login_failed.connect(_registrar_login_fallido, weak=False)
 
         # ── Auditoría: acceso al panel /admin/ con cuenta sin permiso ───────
         # Cubre el hueco que las tres señales de arriba no ven: alguien con
