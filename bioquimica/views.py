@@ -11,7 +11,7 @@ from django.shortcuts import redirect, render, get_object_or_404
 
 from .forms import EnsayoManualForm
 from .models import (
-    EnsayoMicrobiologico, RecuentoUFC,
+    EnsayoMicrobiologico, RecuentoUFC, ParametroRecuento,
     MicroorganismoAislado, PruebaBioquimica,
 )
 from analisis.audit import registrar_accion
@@ -19,7 +19,13 @@ from django.contrib.admin.models import ADDITION
 
 
 def _grafico_recuento(ensayo):
-    recuentos = list(ensayo.recuentos.all())
+    # Filas sin valor UFC estándar (tipo_organismo='otro', o cualquier fila
+    # cargada solo con ParametroRecuento libres) no tienen nada que graficar
+    # en escala logarítmica — antes caían igual con valor_numerico=0 (piso
+    # artificial de 0.1 más abajo) y aparecían como una barra fantasma con
+    # etiqueta "—". Se descartan acá, no en el JS: sus datos reales se ven
+    # en la tabla de detalle, no en este gráfico.
+    recuentos = [r for r in ensayo.recuentos.all() if r.menor_que_limite or r.coeficiente is not None]
     if not recuentos:
         return None
 
@@ -212,8 +218,9 @@ def detalle_ensayo(request, pk):
         'ensayo': ensayo,
         'grafico_recuento_json': grafico_recuento_json,
         'grafico_heatmap_json': grafico_heatmap_json,
-        'recuentos_hongos': ensayo.recuentos.filter(tipo_organismo='hongo') if ensayo.tipo == 'recuento' else None,
-        'recuentos_bacterias': ensayo.recuentos.filter(tipo_organismo='bacteria') if ensayo.tipo == 'recuento' else None,
+        'recuentos_hongos': ensayo.recuentos.filter(tipo_organismo='hongo').prefetch_related('parametros') if ensayo.tipo == 'recuento' else None,
+        'recuentos_bacterias': ensayo.recuentos.filter(tipo_organismo='bacteria').prefetch_related('parametros') if ensayo.tipo == 'recuento' else None,
+        'recuentos_otros': ensayo.recuentos.filter(tipo_organismo='otro').prefetch_related('parametros') if ensayo.tipo == 'recuento' else None,
         'aislados_con_pruebas': aislados_con_pruebas,
         'aislados_sin_pruebas': aislados_sin_pruebas,
     }
@@ -371,26 +378,49 @@ def _int_o_none(valor):
 
 
 def _parsear_recuento_manual(post):
-    """Filas de recuento UFC/g ingresadas a mano (arrays paralelos por índice)."""
-    tipos   = post.getlist('rec_tipo[]')
-    nombres = post.getlist('rec_nombre[]')
-    coefs   = post.getlist('rec_coeficiente[]')
-    exps    = post.getlist('rec_exponente[]')
-    menores = post.getlist('rec_menor[]')
-
+    """
+    Filas de recuento UFC/g ingresadas a mano. Cada fila tiene sus campos
+    fijos sufijados por índice (rec_nombre_0, rec_coeficiente_0, …) y sus
+    parámetros adicionales libres en arrays paralelos sufijados con el mismo
+    índice (recparam_nombre_0[], recparam_valor_0[], …) — mismo patrón
+    indexado que _parsear_aislamiento_manual usa para organismo/pruebas,
+    generado por el JS del template al agregar/quitar tarjetas y parámetros.
+    """
     filas = []
-    for i, nombre in enumerate(nombres):
-        nombre = (nombre or '').strip()
+    i = 0
+    while f'rec_nombre_{i}' in post:
+        nombre = (post.get(f'rec_nombre_{i}') or '').strip()
         if not nombre:
+            i += 1
             continue
-        menor = (menores[i] if i < len(menores) else 'no') == 'si'
-        filas.append({
-            'tipo_organismo':   tipos[i] if i < len(tipos) else 'bacteria',
+
+        menor = post.get(f'rec_menor_{i}', 'no') == 'si'
+        fila = {
+            'tipo_organismo':   post.get(f'rec_tipo_{i}', 'bacteria'),
             'nombre':           nombre,
-            'coeficiente':      None if menor else _decimal_o_none(coefs[i] if i < len(coefs) else ''),
-            'exponente':        None if menor else _int_o_none(exps[i] if i < len(exps) else ''),
+            'coeficiente':      None if menor else _decimal_o_none(post.get(f'rec_coeficiente_{i}', '')),
+            'exponente':        None if menor else _int_o_none(post.get(f'rec_exponente_{i}', '')),
             'menor_que_limite': menor,
-        })
+        }
+
+        numeros = post.getlist(f'recparam_numero_{i}[]')
+        nombres_p = post.getlist(f'recparam_nombre_{i}[]')
+        valores_p = post.getlist(f'recparam_valor_{i}[]')
+        parametros = []
+        siguiente = 1
+        for j, nombre_param in enumerate(nombres_p):
+            nombre_param = (nombre_param or '').strip()
+            if not nombre_param:
+                continue
+            valor = (valores_p[j] or '').strip() if j < len(valores_p) else ''
+            numero = _int_o_none(numeros[j] if j < len(numeros) else '') or siguiente
+            parametros.append({'numero': numero, 'nombre': nombre_param, 'valor': valor or '—'})
+            siguiente += 1
+        fila['parametros'] = parametros
+
+        filas.append(fila)
+        i += 1
+
     return filas
 
 
@@ -491,9 +521,14 @@ def ingreso_manual(request):
                 filas = _parsear_recuento_manual(request.POST)
                 if not filas:
                     raise ValueError("Agrega al menos un microorganismo con su recuento UFC/g.")
-                RecuentoUFC.objects.bulk_create([
-                    RecuentoUFC(ensayo=ensayo, orden=i, **f) for i, f in enumerate(filas)
-                ])
+                for i, f in enumerate(filas):
+                    parametros = f.pop('parametros')
+                    r = RecuentoUFC(ensayo=ensayo, orden=i, **f)
+                    r.save()
+                    if parametros:
+                        ParametroRecuento.objects.bulk_create([
+                            ParametroRecuento(recuento=r, **p) for p in parametros
+                        ])
             else:
                 organismos = _parsear_aislamiento_manual(request.POST)
                 if not organismos:

@@ -176,23 +176,17 @@
         {# ── Panel: Recuento UFC/g ── #}
         <div class="card" id="panel-recuento" style="padding: 22px 26px; margin-bottom: 1.1rem;">
             <div class="card-title"><i class="ti ti-chart-bar"></i> Recuento UFC/g por microorganismo</div>
+            <p style="color:#5F5E5A; font-size:12.5px; margin-top:2px;">
+                Para el caso estándar, completa Coeficiente/× 10^. Si el laboratorio reporta otra
+                unidad, otra escala, o varias mediciones por fila (ej. Bacterias + Hongos +
+                Actinomicetes juntos), dejá esos campos vacíos y agregá "Parámetros Adicionales" —
+                elegí "Otro / Mixto" como Tipo si la fila no es puntualmente una bacteria u hongo.
+            </p>
 
-            <table class="bq-rec-table">
-                <thead>
-                    <tr>
-                        <th style="width:110px;">Tipo</th>
-                        <th>Microorganismo</th>
-                        <th style="width:100px;">Coeficiente</th>
-                        <th style="width:90px;">× 10^</th>
-                        <th style="width:110px;">&lt;1 UFC/g</th>
-                        <th style="width:32px;"></th>
-                    </tr>
-                </thead>
-                <tbody id="rec-rows"></tbody>
-            </table>
+            <div id="rec-cards" style="margin-top:.75rem;"></div>
 
-            <button type="button" class="btn btn-outline btn-sm" id="btn-add-rec" style="margin-top:.6rem;">
-                <i class="ti ti-plus"></i> Agregar fila
+            <button type="button" class="btn btn-outline btn-sm" id="btn-add-rec">
+                <i class="ti ti-plus"></i> Agregar recuento
             </button>
         </div>
 
@@ -220,50 +214,116 @@
 'use strict';
 
 /* ════════════════════════════════════════════════
-   1. RECUENTO — filas dinámicas
+   Helper genérico: fila de parámetro libre (N° + nombre + valor) —
+   usado tanto por "Pruebas Bioquímicas" (aislamiento) como por
+   "Parámetros Adicionales" (recuento). `prefix` + `campoValor` arman las
+   clases CSS que renombrarTarjetas() usa después para reconstruir los
+   arrays *_numero_i[]/*_nombre_i[]/*_<campoValor>_i[] antes de enviar —
+   el nombre del tercer campo cambia entre "resultado" (aislamiento, ya
+   esperado así por _parsear_aislamiento_manual) y "valor" (recuento).
    ════════════════════════════════════════════════ */
-var recBody = document.getElementById('rec-rows');
+function agregarFilaParametro(tbody, prefix, campoValor, placeholderNombre, placeholderValor) {
+    var tr = document.createElement('tr');
+    tr.className = 'bq-prueba-row';
+    tr.innerHTML =
+        '<td style="width:44px;"><input type="number" class="form-control ' + prefix + '-numero" placeholder="N°"></td>' +
+        '<td><input type="text" class="form-control ' + prefix + '-nombre" placeholder="' + placeholderNombre + '"></td>' +
+        '<td style="width:150px;"><input type="text" class="form-control ' + prefix + '-' + campoValor + '" placeholder="' + placeholderValor + '"></td>' +
+        '<td style="width:28px;"><button type="button" class="btn-quitar" title="Quitar">✕</button></td>';
+    tr.querySelector('.btn-quitar').addEventListener('click', function () { tr.remove(); });
+    tbody.appendChild(tr);
+}
+
+// Antes de enviar: a cada tarjeta aún presente en el DOM (de cualquiera de
+// los dos paneles) se le asigna su índice final (0,1,2…) y se nombran sus
+// inputs anidados con ese índice — así el servidor puede reconstruir qué
+// parámetros/pruebas pertenecen a qué fila/organismo aunque el usuario haya
+// quitado tarjetas de en medio. `prefijoFijo` cubre los campos propios de la
+// tarjeta (org_*/rec_*); `prefijoAnidado`+`campoValor` cubren la tabla de
+// parámetros libres de adentro.
+function renombrarTarjetas(cards, prefijoFijo, prefijoAnidado, campoValor) {
+    cards.forEach(function (card, i) {
+        card.querySelectorAll('[name^="' + prefijoFijo + '"]').forEach(function (input) {
+            var base = input.getAttribute('name').replace(/_\d+$/, '');
+            input.setAttribute('name', base + '_' + i);
+        });
+        card.querySelectorAll('.' + prefijoAnidado + '-numero').forEach(function (input) {
+            input.setAttribute('name', prefijoAnidado + '_numero_' + i + '[]');
+        });
+        card.querySelectorAll('.' + prefijoAnidado + '-nombre').forEach(function (input) {
+            input.setAttribute('name', prefijoAnidado + '_nombre_' + i + '[]');
+        });
+        card.querySelectorAll('.' + prefijoAnidado + '-' + campoValor).forEach(function (input) {
+            input.setAttribute('name', prefijoAnidado + '_' + campoValor + '_' + i + '[]');
+        });
+    });
+}
+
+/* ════════════════════════════════════════════════
+   1. RECUENTO — tarjetas dinámicas
+   ════════════════════════════════════════════════ */
+var recCards = document.getElementById('rec-cards');
 var recCount = 0;
 
-function agregarFilaRecuento() {
-    var i = recCount++;
-    var tr = document.createElement('tr');
-    tr.className = 'bq-rec-row';
-    tr.innerHTML =
-        '<td><select name="rec_tipo[]" class="form-control">' +
-            '<option value="bacteria">Bacteria</option>' +
-            '<option value="hongo">Hongo</option>' +
-        '</select></td>' +
-        '<td><input type="text" name="rec_nombre[]" class="form-control" placeholder="Ej: Bacillus spp."></td>' +
-        '<td><input type="number" step="0.01" name="rec_coeficiente[]" class="form-control"></td>' +
-        '<td><input type="number" step="1" name="rec_exponente[]" class="form-control"></td>' +
-        '<td><select name="rec_menor[]" class="form-control">' +
-            '<option value="no">No</option>' +
-            '<option value="si">Sí</option>' +
-        '</select></td>' +
-        '<td><button type="button" class="btn-quitar" title="Quitar fila">✕</button></td>';
-    tr.querySelector('.btn-quitar').addEventListener('click', function () { tr.remove(); });
-    recBody.appendChild(tr);
+function agregarTarjetaRecuento() {
+    var idx = recCount++;
+    var card = document.createElement('div');
+    card.className = 'bq-org-card';
+    card.innerHTML =
+        '<div class="bq-org-card-hdr">' +
+            '<strong>Recuento #' + (idx + 1) + '</strong>' +
+            '<button type="button" class="btn-quitar-org">✕ Quitar</button>' +
+        '</div>' +
+        '<div class="bq-form-grid">' +
+            '<div class="form-group">' +
+                '<label class="form-label">Tipo</label>' +
+                '<select name="rec_tipo_' + idx + '" class="form-control">' +
+                    '<option value="bacteria">Bacteria</option>' +
+                    '<option value="hongo">Hongo</option>' +
+                    '<option value="otro">Otro / Mixto</option>' +
+                '</select>' +
+            '</div>' +
+            '<div class="form-group">' +
+                '<label class="form-label">Microorganismo / Muestra</label>' +
+                '<input type="text" name="rec_nombre_' + idx + '" class="form-control" placeholder="Ej: Bacillus spp., o m1 - Brachiaria + Clitoria">' +
+            '</div>' +
+        '</div>' +
+        '<div class="bq-form-grid-3">' +
+            '<div class="form-group"><label class="form-label">Coeficiente</label><input type="number" step="0.01" name="rec_coeficiente_' + idx + '" class="form-control"></div>' +
+            '<div class="form-group"><label class="form-label">× 10^</label><input type="number" step="1" name="rec_exponente_' + idx + '" class="form-control"></div>' +
+            '<div class="form-group">' +
+                '<label class="form-label">&lt;1 UFC/g</label>' +
+                '<select name="rec_menor_' + idx + '" class="form-control">' +
+                    '<option value="no">No</option>' +
+                    '<option value="si">Sí</option>' +
+                '</select>' +
+            '</div>' +
+        '</div>' +
+        '<div style="margin-top:.6rem;">' +
+            '<label class="form-label">Parámetros Adicionales</label>' +
+            '<table class="bq-rec-table"><tbody class="param-body"></tbody></table>' +
+            '<button type="button" class="btn btn-outline btn-sm btn-add-param" style="margin-top:.4rem;">' +
+                '<i class="ti ti-plus"></i> Agregar parámetro' +
+            '</button>' +
+        '</div>';
+
+    var paramBody = card.querySelector('.param-body');
+    card.querySelector('.btn-add-param').addEventListener('click', function () {
+        agregarFilaParametro(paramBody, 'recparam', 'valor', 'Ej: pH, NMP/g, Colonización %', 'Ej: 6.5, <10, 48.48');
+    });
+    card.querySelector('.btn-quitar-org').addEventListener('click', function () {
+        card.remove();
+    });
+
+    recCards.appendChild(card);
 }
-document.getElementById('btn-add-rec').addEventListener('click', agregarFilaRecuento);
+document.getElementById('btn-add-rec').addEventListener('click', agregarTarjetaRecuento);
 
 /* ════════════════════════════════════════════════
    2. AISLAMIENTO — organismos + pruebas dinámicas
    ════════════════════════════════════════════════ */
 var orgCards = document.getElementById('org-cards');
 var orgCount = 0;
-
-function agregarPrueba(tbody) {
-    var tr = document.createElement('tr');
-    tr.className = 'bq-prueba-row';
-    tr.innerHTML =
-        '<td style="width:44px;"><input type="number" class="form-control prueba-numero" placeholder="N°"></td>' +
-        '<td><input type="text" class="form-control prueba-nombre" placeholder="Nombre de la prueba"></td>' +
-        '<td style="width:120px;"><input type="text" class="form-control prueba-resultado" placeholder="Resultado"></td>' +
-        '<td style="width:28px;"><button type="button" class="btn-quitar" title="Quitar prueba">✕</button></td>';
-    tr.querySelector('.btn-quitar').addEventListener('click', function () { tr.remove(); });
-    tbody.appendChild(tr);
-}
 
 function agregarOrganismo() {
     var idx = orgCount++;
@@ -307,44 +367,21 @@ function agregarOrganismo() {
     var pruebasBody = card.querySelector('.pruebas-body');
 
     // Los inputs de prueba no llevan name= fijo: se renombran justo antes
-    // de enviar el formulario (ver renombrarPruebas) para que el índice
+    // de enviar el formulario (ver renombrarTarjetas) para que el índice
     // del organismo quede correcto incluso si se quitan/agregan tarjetas.
     card.dataset.orgIdx = idx;
 
     card.querySelector('.btn-add-prueba').addEventListener('click', function () {
-        agregarPrueba(pruebasBody);
+        agregarFilaParametro(pruebasBody, 'prueba', 'resultado', 'Nombre de la prueba', 'Resultado');
     });
     card.querySelector('.btn-quitar-org').addEventListener('click', function () {
         card.remove();
     });
 
     orgCards.appendChild(card);
-    agregarPrueba(pruebasBody);
+    agregarFilaParametro(pruebasBody, 'prueba', 'resultado', 'Nombre de la prueba', 'Resultado');
 }
 document.getElementById('btn-add-org').addEventListener('click', agregarOrganismo);
-
-// Antes de enviar: a cada tarjeta de organismo aún presente en el DOM se le
-// asigna su índice final (0,1,2…) y se nombran sus inputs de prueba con ese
-// índice — así el servidor puede reconstruir qué pruebas pertenecen a qué
-// organismo aunque el usuario haya quitado tarjetas de en medio.
-function renombrarOrganismosYPruebas() {
-    var cards = orgCards.querySelectorAll('.bq-org-card');
-    cards.forEach(function (card, i) {
-        card.querySelectorAll('[name^="org_"]').forEach(function (input) {
-            var base = input.getAttribute('name').replace(/_\d+$/, '');
-            input.setAttribute('name', base + '_' + i);
-        });
-        card.querySelectorAll('.prueba-numero').forEach(function (input) {
-            input.setAttribute('name', 'prueba_numero_' + i + '[]');
-        });
-        card.querySelectorAll('.prueba-nombre').forEach(function (input) {
-            input.setAttribute('name', 'prueba_nombre_' + i + '[]');
-        });
-        card.querySelectorAll('.prueba-resultado').forEach(function (input) {
-            input.setAttribute('name', 'prueba_resultado_' + i + '[]');
-        });
-    });
-}
 
 /* ════════════════════════════════════════════════
    3. Mostrar panel según Tipo de Ensayo
@@ -361,15 +398,16 @@ function actualizarPanel() {
 selTipo.addEventListener('change', actualizarPanel);
 actualizarPanel();
 
-// Estado inicial: una fila de recuento y un organismo listos para llenar.
-agregarFilaRecuento();
+// Estado inicial: un recuento y un organismo listos para llenar.
+agregarTarjetaRecuento();
 agregarOrganismo();
 
 /* ════════════════════════════════════════════════
    4. Envío
    ════════════════════════════════════════════════ */
 document.getElementById('form-manual').addEventListener('submit', function () {
-    renombrarOrganismosYPruebas();
+    renombrarTarjetas(recCards.querySelectorAll('.bq-org-card'), 'rec_', 'recparam', 'valor');
+    renombrarTarjetas(orgCards.querySelectorAll('.bq-org-card'), 'org_', 'prueba', 'resultado');
     var btn = document.getElementById('btn-guardar');
     btn.disabled = true;
     document.getElementById('btn-guardar-label').textContent = 'Guardando…';

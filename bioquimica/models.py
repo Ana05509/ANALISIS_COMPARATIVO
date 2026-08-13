@@ -53,6 +53,12 @@ class RecuentoUFC(models.Model):
     TIPO_ORGANISMO = [
         ('hongo', 'Hongo'),
         ('bacteria', 'Bacteria'),
+        # Para filas que no son un microorganismo puntual sino una muestra/
+        # tratamiento con varias mediciones a la vez (ej. un laboratorio que
+        # reporta Bacterias + Hongos + Actinomicetes + grupos funcionales en
+        # una sola fila) — esas mediciones van como ParametroRecuento en vez
+        # de forzarlas a "bacteria" o "hongo".
+        ('otro', 'Otro / Mixto'),
     ]
 
     ensayo = models.ForeignKey(EnsayoMicrobiologico, on_delete=models.CASCADE,
@@ -97,6 +103,31 @@ class RecuentoUFC(models.Model):
         if self.coeficiente is None:
             return 0
         return float(self.coeficiente) * (10 ** (self.exponente or 0))
+
+    def tiene_parametros(self):
+        return self.parametros.exists()
+
+
+class ParametroRecuento(models.Model):
+    """Mediciones adicionales de un recuento, con nombre y valor libres —
+    mismo rol que PruebaBioquimica para Aislamiento, pero del lado de
+    Recuento: para laboratorios que reportan otra unidad, otra escala, o
+    varias mediciones a la vez por fila (ver TIPO_ORGANISMO='otro' arriba)."""
+    recuento = models.ForeignKey(RecuentoUFC, on_delete=models.CASCADE,
+                                 related_name='parametros', verbose_name="Recuento")
+    numero = models.PositiveSmallIntegerField(default=0, verbose_name="N°")
+    nombre = models.CharField(max_length=200, verbose_name="Parámetro",
+                              help_text="Ej: Coliformes totales, pH, Humedad, NMP/g…")
+    valor = models.CharField(max_length=200, verbose_name="Valor",
+                             help_text="Ej: 5.2 log UFC/g, <10 NMP/g, 6.8…")
+
+    class Meta:
+        ordering = ['numero']
+        verbose_name = "Parámetro Adicional de Recuento"
+        verbose_name_plural = "Parámetros Adicionales de Recuento"
+
+    def __str__(self):
+        return f"{self.numero}. {self.nombre}: {self.valor}"
 
 
 class MicroorganismoAislado(models.Model):

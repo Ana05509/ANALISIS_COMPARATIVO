@@ -106,6 +106,18 @@
                         <td style="font-style:italic; word-break:break-word;">{{ r.nombre }}</td>
                         <td class="td-mono td-right" style="color:var(--verde-dark); font-weight:600; white-space:nowrap;">{{ r.valor_display }}</td>
                     </tr>
+                    {% if r.parametros.all %}
+                    <tr>
+                        <td colspan="2" style="padding:2px 6px 10px 18px;">
+                            <table style="width:100%; font-size:12px;">
+                                {% for p in r.parametros.all %}
+                                <tr><td style="color:var(--text-hint);">{{ p.nombre }}</td>
+                                    <td class="td-right td-mono">{{ p.valor }}</td></tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -130,6 +142,54 @@
                         <td style="font-style:italic; word-break:break-word;">{{ r.nombre }}</td>
                         <td class="td-mono td-right" style="color:#5a3a00; font-weight:600; white-space:nowrap;">{{ r.valor_display }}</td>
                     </tr>
+                    {% if r.parametros.all %}
+                    <tr>
+                        <td colspan="2" style="padding:2px 6px 10px 18px;">
+                            <table style="width:100%; font-size:12px;">
+                                {% for p in r.parametros.all %}
+                                <tr><td style="color:var(--text-hint);">{{ p.nombre }}</td>
+                                    <td class="td-right td-mono">{{ p.valor }}</td></tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if recuentos_otros %}
+    <div class="card">
+        <div class="card-title" style="color:var(--text-hint);">📋 Otros / Mixtos</div>
+        <div style="margin-top:0.6rem; overflow-x:visible;">
+            <table class="table-inner" style="min-width:0; width:100%;">
+                <thead>
+                    <tr>
+                        <th>Muestra / Tratamiento</th>
+                        <th class="td-right" style="white-space:nowrap; width:110px;">UFC/g</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in recuentos_otros %}
+                    <tr>
+                        <td style="font-style:italic; word-break:break-word;">{{ r.nombre }}</td>
+                        <td class="td-mono td-right" style="color:var(--text-hint); font-weight:600; white-space:nowrap;">{{ r.valor_display }}</td>
+                    </tr>
+                    {% if r.parametros.all %}
+                    <tr>
+                        <td colspan="2" style="padding:2px 6px 10px 18px;">
+                            <table style="width:100%; font-size:12px;">
+                                {% for p in r.parametros.all %}
+                                <tr><td style="color:var(--text-hint);">{{ p.nombre }}</td>
+                                    <td class="td-right td-mono">{{ p.valor }}</td></tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>

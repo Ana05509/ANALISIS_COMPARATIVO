@@ -5,7 +5,7 @@ from django.contrib import messages
 from unfold.admin import ModelAdmin, TabularInline
 
 from .models import (
-    EnsayoMicrobiologico, RecuentoUFC,
+    EnsayoMicrobiologico, RecuentoUFC, ParametroRecuento,
     MicroorganismoAislado, PruebaBioquimica,
 )
 from analisis.admin import AccionesColumnaMixin
@@ -20,6 +20,14 @@ class RecuentoUFCInline(TabularInline):
     extra = 3
     fields = ('tipo_organismo', 'nombre', 'coeficiente', 'exponente', 'menor_que_limite', 'orden')
     ordering = ['orden']
+    show_change_link = True
+
+
+class ParametroRecuentoInline(TabularInline):
+    model = ParametroRecuento
+    extra = 3
+    fields = ('numero', 'nombre', 'valor')
+    ordering = ['numero']
 
 
 class PruebaBioquimicaInline(TabularInline):
@@ -47,6 +55,7 @@ class RecuentoUFCAdmin(AccionesColumnaMixin, ModelAdmin):
     search_fields = ('nombre', 'ensayo__codigo')
     list_per_page = 25
     list_fullwidth = True
+    inlines = [ParametroRecuentoInline]
 
     fieldsets = (
         ("Vínculo", {"fields": ("ensayo",)}),
