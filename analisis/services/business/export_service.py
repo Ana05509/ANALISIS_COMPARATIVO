@@ -1,18 +1,16 @@
 # services/business/export_service.py
 # Módulo de exportación avanzada (PDF, JSON, CSV, HTML) optimizado para consistencia de biodiversidad.
 
-import json
 import re
 import pandas as pd
 from datetime import datetime
-from pathlib import Path
 from io import BytesIO
 from django.conf import settings
 from django.http import HttpResponse
-from django.utils.text import slugify
 
-import base64
+from analisis.constants import NIVELES_VALIDOS, NIVELES_ES
 
+from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table as XLTable, TableStyleInfo
@@ -23,11 +21,11 @@ from openpyxl.chart.series import DataPoint
 from openpyxl.chart.label import DataLabelList
 from openpyxl.formatting.rule import ColorScaleRule
 
-from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    Image as RLImage, PageBreak, HRFlowable,
+    Image as RLImage, HRFlowable, KeepTogether,
 )
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
@@ -326,6 +324,54 @@ def _kpi_tiles(items, ancho_util, S):
         ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
     ]))
     return t
+
+
+def _banner_reporte(etiqueta_franja, ancho_util, S):
+    """
+    Encabezado de portada compacto: fondo verde claro y texto negro, en vez
+    de un banner sólido oscuro de ancho completo (~50pt de alto). Un banner
+    así de grande es la franja que más tinta/tóner consume al imprimir un
+    reporte de varias páginas, y ocupaba media página en algunos casos —
+    `etiqueta_franja` es el texto de la línea inferior (ej. "REPORTE
+    INDIVIDUAL DE SALUD MICROBIOLÓGICA · MARCADOR 16S"). Se usa en los tres
+    generadores de PDF (individual, comparativo, informe general) para que
+    los tres tengan el mismo encabezado — antes solo el informe general lo
+    tenía así y los otros dos quedaban con el banner oscuro viejo.
+    """
+    header_h1 = ParagraphStyle(
+        'BannerH1', parent=S["body"], fontSize=15, leading=18,
+        fontName='Helvetica-Bold', textColor=colors.black,
+    )
+    header_sub = ParagraphStyle(
+        'BannerSub', parent=S["body_sm"], fontSize=9, leading=12,
+        textColor=colors.HexColor('#3A3934'),
+    )
+    header_tag = ParagraphStyle(
+        'BannerTag', parent=S["body_sm"], fontSize=8.5, leading=11,
+        fontName='Helvetica-Bold', textColor=colors.HexColor('#0F6E56'),
+    )
+    banner_rows = [
+        [Paragraph("<b>BioMicro UTC</b>", header_h1)],
+        [Paragraph(
+            "Universidad Técnica de Cotopaxi · Laboratorio de Bioinformática de Suelos",
+            header_sub,
+        )],
+        [Paragraph(etiqueta_franja, header_tag)],
+    ]
+    t_banner = Table(banner_rows, colWidths=[ancho_util])
+    t_banner.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, -1), colors.HexColor('#E8F5EF')),
+        ('TOPPADDING',    (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 1),
+        ('TOPPADDING',    (0, 1), (-1, 1), 0),
+        ('BOTTOMPADDING', (0, 1), (-1, 1), 6),
+        ('TOPPADDING',    (0, 2), (-1, 2), 4),
+        ('BOTTOMPADDING', (0, 2), (-1, 2), 10),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 16),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 16),
+        ('LINEBELOW',     (0, 2), (-1, 2), 1.2, colors.HexColor('#1D9E75')),
+    ]))
+    return t_banner
 
 
 def _nivel_color_rl(nivel_salud: str):
@@ -1312,43 +1358,10 @@ class ExportService:
         # ================================================================
         # PÁGINA 1 — Portada
         # ================================================================
-        # Banner superior de institución (ancho completo)
-        banner_rows = [
-            [Paragraph(
-                "<font size='16'><b>BioMicro UTC</b></font>",
-                S["titulo"],
-            )],
-            [Paragraph(
-                "Universidad Técnica de Cotopaxi · Laboratorio de Bioinformática de Suelos",
-                S["subtitle"],
-            )],
-        ]
-        t_banner = Table(banner_rows, colWidths=[ancho_util])
-        t_banner.setStyle(TableStyle([
-            ('BACKGROUND',    (0, 0), (-1, -1), _C_PRIMARY),
-            ('TOPPADDING',    (0, 0), (-1, -1), 22),
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 22),
-            ('BOTTOMPADDING', (0, 0), (0, 0), 4),
-            ('LEFTPADDING',   (0, 0), (-1, -1), 18),
-            ('RIGHTPADDING',  (0, 0), (-1, -1), 18),
-        ]))
-        contenido.append(t_banner)
-
-        # Franja de tipo de reporte (verde medio)
-        tipo_style = ParagraphStyle('TipoBanner', parent=S["body_sm"],
-            textColor=colors.white, fontName='Helvetica-Bold', fontSize=9)
-        t_tipo = Table([[Paragraph(
-            f"  REPORTE INDIVIDUAL DE SALUD MICROBIOLÓGICA · MARCADOR {marcador_lbl}",
-            tipo_style,
-        )]], colWidths=[ancho_util])
-        t_tipo.setStyle(TableStyle([
-            ('BACKGROUND',    (0, 0), (-1, -1), _C_SECONDARY),
-            ('TOPPADDING',    (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('LEFTPADDING',   (0, 0), (-1, -1), 18),
-        ]))
-        contenido.append(t_tipo)
-        contenido.append(Spacer(1, 20))
+        contenido.append(_banner_reporte(
+            f"REPORTE INDIVIDUAL DE SALUD MICROBIOLÓGICA · MARCADOR {marcador_lbl}", ancho_util, S,
+        ))
+        contenido.append(Spacer(1, 16))
 
         # Título del reporte
         title_style = ParagraphStyle('ReportTitle', parent=S["body"],
@@ -1430,7 +1443,10 @@ class ExportService:
             S["muted"],
         ))
 
-        contenido.append(PageBreak())
+        # Sin PageBreak entre secciones: el reporte fluye continuo en vez de
+        # forzar una página nueva y dejar hueco en blanco al pie de la
+        # anterior — mismo criterio que generar_pdf_informe_general.
+        contenido.append(Spacer(1, 18))
 
         # ================================================================
         # PÁGINA 2 — Resumen Ejecutivo
@@ -1527,8 +1543,7 @@ class ExportService:
             f"<b>{totales_clas.get('fitopatogeno', 0)}</b> fitopatógenos potenciales."
         )
         contenido.append(Paragraph(conclusion, S["body"]))
-
-        contenido.append(PageBreak())
+        contenido.append(Spacer(1, 18))
 
         # ================================================================
         # PÁGINA 3 — Perfil Taxonómico
@@ -1622,8 +1637,7 @@ class ExportService:
             ('ALIGN',         (2, 1), (3, -1),  'RIGHT'),
         ]))
         contenido.append(t_taxa)
-
-        contenido.append(PageBreak())
+        contenido.append(Spacer(1, 18))
 
         # ================================================================
         # PÁGINA 4 — Diversidad Alfa
@@ -1723,8 +1737,7 @@ class ExportService:
             ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ]))
         contenido.append(t_concl)
-
-        contenido.append(PageBreak())
+        contenido.append(Spacer(1, 18))
 
         # ================================================================
         # PÁGINA 5 — Perfil Funcional
@@ -1811,8 +1824,7 @@ class ExportService:
             contenido.append(Paragraph("Organismos Neutrales", S["h3"]))
             noms = ", ".join(f"<i>{n.get('nombre','?')}</i>" for n in neutrales)
             contenido.append(Paragraph(noms, S["body_sm"]))
-
-        contenido.append(PageBreak())
+        contenido.append(Spacer(1, 18))
 
         # ================================================================
         # PÁGINA 6 — Trazabilidad
@@ -1906,51 +1918,24 @@ class ExportService:
         # ================================================================
         # PORTADA — Comparativo
         # ================================================================
-        # Banda superior oscura
-        t_banner = Table([[Paragraph(
-            "<font color='#ffffff'><b>BioMicro UTC</b></font>",
-            S["titulo"],
-        )]], colWidths=[ancho_util])
-        t_banner.setStyle(TableStyle([
-            ('BACKGROUND',    (0, 0), (-1, -1), _C_PRIMARY),
-            ('TOPPADDING',    (0, 0), (-1, -1), 16),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 16),
-            ('LEFTPADDING',   (0, 0), (-1, -1), 16),
-        ]))
-        contenido.append(t_banner)
-
-        # Franja tipo comparativo
-        t_franja = Table([[Paragraph(
-            f"<font color='#ffffff'>Análisis Comparativo  ·  {marcador_lbl}  ·  {len(muestras)} muestras</font>",
-            S["h2"],
-        )]], colWidths=[ancho_util])
-        t_franja.setStyle(TableStyle([
-            ('BACKGROUND',    (0, 0), (-1, -1), colors.HexColor('#0d7a5f')),
-            ('TOPPADDING',    (0, 0), (-1, -1), 7),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
-            ('LEFTPADDING',   (0, 0), (-1, -1), 16),
-        ]))
-        contenido.append(t_franja)
+        contenido.append(_banner_reporte(
+            f"ANÁLISIS COMPARATIVO · MARCADOR {marcador_lbl} · {len(muestras)} MUESTRAS", ancho_util, S,
+        ))
         contenido.append(Spacer(1, 16))
 
-        # Título y subtítulo de portada sobre fondo BLANCO de página — no
-        # pueden reutilizar S["titulo"]/S["subtitle"] (blanco/verde claro,
-        # pensados para ir DENTRO de una franja de color como t_banner arriba)
-        # o quedarían invisibles; llevan su propio estilo negro, igual que el
-        # reporte individual (title_style/sub_style más arriba en este archivo).
+        # Título de portada sobre fondo BLANCO de página — no puede reusar
+        # S["titulo"] (blanco, pensado para ir DENTRO de una franja de color)
+        # o quedaría invisible; lleva su propio estilo negro, igual que el
+        # reporte individual (title_style más arriba en este archivo). El
+        # nombre de la universidad ya va en la franja de _banner_reporte, así
+        # que no se repite acá como subtítulo.
         titulo_portada_style = ParagraphStyle('ComparativeTitle', parent=S["body"],
             fontSize=17, fontName='Helvetica-Bold', textColor=colors.black, leading=21)
-        subtitulo_portada_style = ParagraphStyle('ComparativeSub', parent=S["body_sm"],
-            textColor=colors.black, fontSize=9.5)
         contenido.append(Paragraph(
             "REPORTE COMPARATIVO DE COMUNIDADES MICROBIANAS DE SUELO",
             titulo_portada_style,
         ))
-        contenido.append(Paragraph(
-            "Universidad Técnica de Cotopaxi — Laboratorio de Bioinformática de Suelos",
-            subtitulo_portada_style,
-        ))
-        contenido.append(Spacer(1, 20))
+        contenido.append(Spacer(1, 16))
 
         # Tabla de muestras incluidas
         muestras_hdr = [[
@@ -2006,8 +1991,7 @@ class ExportService:
             ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         contenido.append(meta_bar)
-
-        contenido.append(PageBreak())
+        contenido.append(Spacer(1, 18))
 
         # ================================================================
         # PÁGINA 2 — Cuadro comparativo de salud
@@ -2070,8 +2054,7 @@ class ExportService:
                 "Colores Shannon: verde H'≥3 · amarillo 2-3 · naranja 1-2 · rojo <1.",
                 S["caption"],
             ))
-
-        contenido.append(PageBreak())
+        contenido.append(Spacer(1, 18))
 
         # ================================================================
         # PÁGINA 3 — Composición global (Top N)
@@ -2129,8 +2112,7 @@ class ExportService:
             ('ALIGN',         (2, 1), (3, -1),  'RIGHT'),
         ]))
         contenido.append(t_g)
-
-        contenido.append(PageBreak())
+        contenido.append(Spacer(1, 18))
 
         # ================================================================
         # PÁGINA 4 — Perfil funcional comparativo
@@ -2194,8 +2176,7 @@ class ExportService:
             ('ALIGN',         (1, 1), (-1, -1), 'RIGHT'),
         ]))
         contenido.append(t_pm)
-
-        contenido.append(PageBreak())
+        contenido.append(Spacer(1, 18))
 
         # ================================================================
         # PÁGINA 5 — Trazabilidad
@@ -3898,204 +3879,220 @@ class ExportService:
         return response
 
     # ------------------------------------------------------------------
-    # Métodos legacy
+    # Informe General — los 7 niveles taxonómicos de UNA muestra, en un
+    # solo documento (resumen por nivel, no el detalle completo que ya
+    # trae cada reporte individual). No toca generar_pdf_individual,
+    # generar_pdf_comparativo ni generar_excel_multisheet de arriba.
     # ------------------------------------------------------------------
 
     @staticmethod
-    def exportar_json(datos, nombre_archivo=None):
-        """Exporta estructuras de datos o DataFrames a formato JSON unificado."""
-        if isinstance(datos, pd.DataFrame):
-            json_str = datos.to_json(orient='records', indent=2) or "null"
-        elif isinstance(datos, dict):
-            json_str = json.dumps(datos, indent=2, default=str)
-        elif isinstance(datos, list):
-            json_str = json.dumps(datos, indent=2, default=str)
-        else:
-            return None
-
-        if nombre_archivo is None:
-            return json_str
-
-        nombre_seguro = slugify(nombre_archivo.replace('.json', '')) + '.json'
-        response = HttpResponse(json_str, content_type='application/json')
-        response['Content-Disposition'] = f'attachment; filename="{nombre_seguro}"'
-        return response
-
-    @staticmethod
-    def exportar_csv_avanzado(df, nombre_archivo=None, incluir_estadisticas=False):
-        """Exporta DataFrames biológicos a CSV."""
-        if df.empty:
-            return None
+    def generar_pdf_informe_general(datos) -> bytes:
+        """
+        datos keys: datos_por_nivel ({nivel: dict con top_taxa/diversidad/
+        indice_salud/nivel_salud, uno por cada NIVELES_VALIDOS que tenga
+        datos}), muestra, tipo, top_n, usuario.
+        """
+        datos_por_nivel = datos.get("datos_por_nivel", {})
+        muestra = datos.get("muestra")
+        tipo    = datos.get("tipo", "16S")
+        top_n   = datos.get("top_n", 25)
+        usuario = datos.get("usuario")
 
         buffer = BytesIO()
-        df.to_csv(buffer, index=False, encoding='utf-8')
-
-        if incluir_estadisticas:
-            stats_data = {}
-            for col in df.columns:
-                if df[col].dtype in ['float64', 'int64']:
-                    stats_data[col] = [f"Media: {df[col].mean():.4f}"]
-                else:
-                    stats_data[col] = ["N/A"]
-            stats_df = pd.DataFrame(stats_data)
-            stats_df.to_csv(buffer, index=False, encoding='utf-8', mode='a')
-
-        buffer.seek(0)
-
-        if nombre_archivo is None:
-            return buffer.getvalue()
-
-        nombre_seguro = slugify(nombre_archivo.replace('.csv', '')) + '.csv'
-        response = HttpResponse(buffer.getvalue(), content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="{nombre_seguro}"'
-        return response
-
-    @staticmethod
-    def generar_pdf_completo(titulo, datos_analisis, df_datos=None,
-                             usuario=None, formato_pagina="A4", muestra_obj=None,
-                             chart_images: dict[str, str] | None = None):
-        """Genera un reporte PDF formal de calidad científica utilizando ReportLab Platypus."""
-        pagesize = A4 if formato_pagina == "A4" else letter
-        buffer = BytesIO()
-
         doc = SimpleDocTemplate(
-            buffer,
-            pagesize=pagesize,
-            rightMargin=36, leftMargin=36,
-            topMargin=40, bottomMargin=40
+            buffer, pagesize=A4,
+            rightMargin=40, leftMargin=40,
+            topMargin=36, bottomMargin=36,
         )
-
-        styles = getSampleStyleSheet()
-
-        COLOR_PRIMARY   = colors.HexColor('#1b4332')
-        COLOR_SECONDARY = colors.HexColor('#2d6a4f')
-        COLOR_LIGHT     = colors.HexColor('#f8f9fa')
-
-        style_titulo = ParagraphStyle(
-            'ScientificTitle', parent=styles['Heading1'], fontSize=20, leading=24,
-            textColor=COLOR_PRIMARY, spaceAfter=15, alignment=TA_LEFT, fontName='Helvetica-Bold',
-        )
-        style_heading = ParagraphStyle(
-            'ScientificHeading', parent=styles['Heading2'], fontSize=12, leading=16,
-            textColor=COLOR_SECONDARY, spaceBefore=12, spaceAfter=6, fontName='Helvetica-Bold',
-        )
-        style_body = ParagraphStyle(
-            'ScientificBody', parent=styles['Normal'], fontSize=9.5, leading=13,
-            textColor=colors.HexColor('#212529'),
-        )
-        style_th = ParagraphStyle(
-            'TableTh', parent=styles['Normal'], fontSize=9, leading=11,
-            textColor=colors.white, fontName='Helvetica-Bold',
-        )
-
+        S = _get_styles()
         contenido = []
+        ancho_util = A4[0] - 80
 
-        contenido.append(Paragraph(titulo, style_titulo))
-        contenido.append(Paragraph(f"<b>Fecha de Generación:</b> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", style_body))
-        contenido.append(Paragraph(f"<b>Investigador/Analista:</b> {usuario or 'Sistema Central'}", style_body))
+        def _safe(obj, attr, default="N/A"):
+            val = getattr(obj, attr, None) if obj else None
+            return str(val) if val not in (None, "") else default
+
+        fecha_gen    = datetime.now().strftime("%d/%m/%Y %H:%M")
+        marcador_lbl = "BACTERIA 16S" if tipo == "16S" else "HONGOS ITS"
+        niveles_con_datos = [n for n in NIVELES_VALIDOS if n in datos_por_nivel]
+
+        # ================================================================
+        # Portada — mismo encabezado compacto que generar_pdf_individual y
+        # generar_pdf_comparativo (ver _banner_reporte).
+        # ================================================================
+        contenido.append(_banner_reporte(
+            f"INFORME GENERAL · TODOS LOS NIVELES TAXONÓMICOS · MARCADOR {marcador_lbl}", ancho_util, S,
+        ))
+        contenido.append(Spacer(1, 16))
+
+        title_style = ParagraphStyle('ReportTitle', parent=S["body"],
+            fontSize=17, fontName='Helvetica-Bold', textColor=colors.black, leading=21)
+        contenido.append(Paragraph("Perfil Taxonómico Completo de la Muestra", title_style))
+        contenido.append(Spacer(1, 4))
+        sub_style = ParagraphStyle('ReportSub', parent=S["body_sm"], textColor=colors.black, fontSize=9.5)
+        contenido.append(Paragraph(
+            f"{len(niveles_con_datos)} de 7 niveles taxonómicos con datos · "
+            f"Top <b>{top_n}</b> taxa por nivel · {fecha_gen}",
+            sub_style,
+        ))
+        contenido.append(Spacer(1, 16))
+
+        cultivo_nom = (muestra.cultivo.nombre if muestra and getattr(muestra, 'cultivo', None) else "N/A")
+        var_nom     = (muestra.variedad_clon.nombre if muestra and getattr(muestra, 'variedad_clon', None) else "N/A")
+        lbl_col = ancho_util * 0.28
+        val_col = ancho_util * 0.22
+        info_rows = [
+            ("Código de muestra", _safe(muestra, "codigo"), "Cultivo", cultivo_nom),
+            ("Variedad / Clon", var_nom, "Tipo de muestra", _safe(muestra, "tipo_muestra")),
+            ("Localidad", _safe(muestra, "localidad"), "Finca / Lote", _safe(muestra, "finca_lote")),
+            ("Analista", str(usuario) if usuario else "Sistema", "Fecha de generación", fecha_gen),
+        ]
+        tbl_info_data = [
+            [Paragraph(f"<b>{r[0]}</b>", S["body_sm"]), Paragraph(r[1], S["body_sm"]),
+             Paragraph(f"<b>{r[2]}</b>", S["body_sm"]), Paragraph(r[3], S["body_sm"])]
+            for r in info_rows
+        ]
+        t_info = Table(tbl_info_data, colWidths=[lbl_col, val_col, lbl_col, val_col])
+        t_info.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (0, -1), colors.HexColor('#e8f5ef')),
+            ('BACKGROUND',    (2, 0), (2, -1), colors.HexColor('#e8f5ef')),
+            ('BACKGROUND',    (1, 0), (1, -1), colors.white),
+            ('BACKGROUND',    (3, 0), (3, -1), colors.white),
+            ('BOX',           (0, 0), (-1, -1), 1, _C_BORDER),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+            ('TOPPADDING',    (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 7),
+        ]))
+        contenido.append(t_info)
+        contenido.append(Spacer(1, 18))
+
+        # ================================================================
+        # Tabla comparativa: Índice de Salud por nivel
+        # ================================================================
+        # Sin PageBreak: el informe fluye continuo, sin dejar hueco en
+        # blanco al final de cada página solo para arrancar la siguiente
+        # sección — ReportLab ya pagina solo cuando el contenido no entra.
+        contenido.append(_seccion_hdr("ÍNDICE DE SALUD POR NIVEL TAXONÓMICO", ancho_util, S, numero=1))
         contenido.append(Spacer(1, 10))
+        resumen_rows = [[
+            Paragraph("<b>Nivel</b>",         S["th"]),
+            Paragraph("<b>Índice</b>",        S["th"]),
+            Paragraph("<b>Estado</b>",        S["th"]),
+            Paragraph("<b>Shannon H'</b>",    S["th"]),
+            Paragraph("<b>Riqueza (S)</b>",   S["th"]),
+            Paragraph("<b>Taxa (Top N)</b>",  S["th"]),
+        ]]
+        for nivel in niveles_con_datos:
+            d   = datos_por_nivel[nivel]
+            div = d.get("diversidad") or {}
+            resumen_rows.append([
+                Paragraph(NIVELES_ES.get(nivel, nivel.capitalize()), S["body_sm"]),
+                Paragraph(str(d.get("indice_salud", 0)), S["center"]),
+                Paragraph(d.get("nivel_salud", "N/A"), S["center"]),
+                Paragraph(f"{float(div.get('shannon', 0) or 0):.4f}", S["center"]),
+                Paragraph(str(div.get("riqueza", 0)), S["center"]),
+                Paragraph(str(len(d.get("top_taxa", []))), S["center"]),
+            ])
+        col_resumen = [ancho_util * 0.22] + [ancho_util * 0.156] * 5
+        t_resumen = Table(resumen_rows, colWidths=col_resumen, repeatRows=1)
+        t_resumen.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, 0),  _C_PRIMARY),
+            ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor('#f8faf9')]),
+            ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+            ('BOX',           (0, 0), (-1, -1), 1,   _C_BORDER),
+            ('TOPPADDING',    (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        contenido.append(t_resumen)
+        contenido.append(Spacer(1, 18))
 
-        if muestra_obj is not None:
-            contenido.append(Paragraph("Control de Trazabilidad Geoclimática", style_heading))
+        # ================================================================
+        # Una sección por nivel: KPIs + tabla Top N
+        # ================================================================
+        def _clas_badge(clas):
+            if clas == 'benefico':     return Paragraph("&#9679; Benéfico",     S["body_sm"])
+            if clas == 'fitopatogeno': return Paragraph("&#9679; Fitopatógeno", S["body_sm"])
+            if clas == 'neutral':      return Paragraph("&#9675; Neutral",      S["body_sm"])
+            return Paragraph("· Sin clas.", S["body_sm"])
 
-            cultivo_nom = muestra_obj.cultivo.nombre if hasattr(muestra_obj, 'cultivo') and muestra_obj.cultivo else "N/A"
-            var_nom = muestra_obj.variedad_clon.nombre if hasattr(muestra_obj, 'variedad_clon') and muestra_obj.variedad_clon else "N/A"
-            obs_text = muestra_obj.observaciones if getattr(muestra_obj, 'observaciones', None) else "Sin novedades"
+        for idx, nivel in enumerate(niveles_con_datos, 1):
+            d   = datos_por_nivel[nivel]
+            div = d.get("diversidad") or {}
+            indice_salud = d.get("indice_salud", 0)
+            nivel_salud  = d.get("nivel_salud", "MODERADO")
+            top_taxa     = d.get("top_taxa", [])
 
-            meta_tabla = [
-                [Paragraph("<b>Muestra Código:</b>", style_body), Paragraph(str(muestra_obj.codigo), style_body),
-                 Paragraph("<b>Cultivo Base:</b>", style_body), Paragraph(str(cultivo_nom), style_body)],
-                [Paragraph("<b>Variedad / Clon:</b>", style_body), Paragraph(str(var_nom), style_body),
-                 Paragraph("<b>Tipo de Muestra:</b>", style_body), Paragraph(str(getattr(muestra_obj, 'tipo_muestra', 'N/A')), style_body)],
-                [Paragraph("<b>Localidad:</b>", style_body), Paragraph(str(getattr(muestra_obj, 'localidad', 'N/A')), style_body),
-                 Paragraph("<b>Finca / Lote:</b>", style_body), Paragraph(str(getattr(muestra_obj, 'finca_lote', 'N/A')), style_body)],
-                [Paragraph("<b>Altitud:</b>", style_body), Paragraph(f"{getattr(muestra_obj, 'altitud', 0)} msnm", style_body),
-                 Paragraph("<b>Observaciones:</b>", style_body), Paragraph(str(obs_text), style_body)],
-            ]
-            t_meta = Table(meta_tabla, colWidths=[100, 160, 100, 160])
-            t_meta.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, -1), COLOR_LIGHT),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e9ecef')),
-                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#dee2e6')),
-                ('TOPPADDING', (0, 0), (-1, -1), 5),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            shannon_v = float(div.get("shannon", 0.0) or 0.0)
+            simpson_v = float(div.get("simpson", 0.0) or 0.0)
+            riqueza_v = div.get("riqueza", len(top_taxa))
+
+            # KeepTogether solo del encabezado + KPIs (bloque chico): evita
+            # que el título de la sección quede solo al pie de una página
+            # con sus tarjetas empujadas a la siguiente. La tabla de abajo
+            # NO va adentro — son hasta 25 filas, envolverla forzaría todo
+            # el bloque a la página siguiente y dejaría un hueco en blanco
+            # bajo el título, justo lo que se quiere evitar acá.
+            contenido.append(KeepTogether([
+                _seccion_hdr(
+                    f"NIVEL: {NIVELES_ES.get(nivel, nivel.upper()).upper()}", ancho_util, S, numero=idx + 1,
+                ),
+                Spacer(1, 10),
+                _kpi_tiles([
+                    {"val": str(indice_salud), "lbl": "Índice de Salud", "sub": nivel_salud},
+                    {"val": str(riqueza_v),     "lbl": "Riqueza (S)",    "sub": "Taxa únicos"},
+                    {"val": f"{shannon_v:.4f}", "lbl": "Shannon H'",     "sub": "Diversidad"},
+                    {"val": f"{simpson_v:.4f}", "lbl": "Simpson (1-D)",  "sub": "Gini-Simpson"},
+                ], ancho_util, S),
             ]))
-            contenido.append(t_meta)
             contenido.append(Spacer(1, 10))
 
-        if datos_analisis:
-            contenido.append(Paragraph("Métricas Analíticas de la Comunidad Microbiana", style_heading))
-            for seccion, valores in datos_analisis.items():
-                contenido.append(Paragraph(f"<b>• {seccion}:</b>", style_body))
-                if isinstance(valores, dict):
-                    for k, v in valores.items():
-                        contenido.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;- {k}: {v}", style_body))
-                elif isinstance(valores, list):
-                    for item in valores:
-                        contenido.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;- {item}", style_body))
-                else:
-                    contenido.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;{str(valores)}", style_body))
-            contenido.append(Spacer(1, 10))
-
-        if df_datos is not None and not df_datos.empty:
-            contenido.append(Paragraph("Distribución de Abundancia Taxonómica Relativa", style_heading))
-
-            num_cols = len(df_datos.columns)
-            anchura_disponible = pagesize[0] - 72
-            ancho_tax = 180
-            ancho_resto = (anchura_disponible - ancho_tax) / (num_cols - 1) if num_cols > 1 else anchura_disponible
-            col_widths = [ancho_tax] + [ancho_resto] * (num_cols - 1)
-
-            tabla_header = [Paragraph(str(col), style_th) for col in df_datos.columns]
-            tabla_filas = []
-            for _, fila in df_datos.iterrows():
-                fila_convertida = []
-                for val in fila:
-                    texto_celda = f"{val:.4f}%" if isinstance(val, (float, int)) and val <= 100.0 and val > 0.0 else str(val)
-                    fila_convertida.append(Paragraph(texto_celda, style_body))
-                tabla_filas.append(fila_convertida)
-
-            datos_reportlab = [tabla_header] + tabla_filas
-            tabla_datos = Table(datos_reportlab, colWidths=col_widths, repeatRows=1)
-            tabla_datos.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), COLOR_SECONDARY),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f4f9f4')]),
-                ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
-                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#94a3b8')),
-                ('TOPPADDING', (0, 0), (-1, -1), 4),
+            taxa_rows = [[
+                Paragraph("<b>#</b>",             S["th"]),
+                Paragraph(f"<b>{NIVELES_ES.get(nivel, nivel.capitalize())}</b>", S["th"]),
+                Paragraph("<b>Reads</b>",         S["th"]),
+                Paragraph("<b>Abundancia %</b>",  S["th"]),
+                Paragraph("<b>Rol funcional</b>", S["th"]),
+            ]]
+            for i, r in enumerate(top_taxa, 1):
+                taxa_rows.append([
+                    Paragraph(str(i), S["body_sm"]),
+                    Paragraph(f"<i>{r.get('taxonomia', '?')}</i>", S["body_sm"]),
+                    Paragraph(str(r.get("total_hits", 0)), S["body_sm"]),
+                    Paragraph(f"{r.get('total_porcentaje', 0):.2f}%", S["body_sm"]),
+                    _clas_badge(r.get("clasificacion", "sin_clasificar")),
+                ])
+            col_taxa = [26, ancho_util * 0.40, 55, 75, 100]
+            t_taxa = Table(taxa_rows, colWidths=col_taxa, repeatRows=1)
+            t_taxa.setStyle(TableStyle([
+                ('BACKGROUND',    (0, 0), (-1, 0),  _C_PRIMARY),
+                ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor('#f8faf9')]),
+                ('INNERGRID',     (0, 0), (-1, -1), 0.4, _C_INNER),
+                ('BOX',           (0, 0), (-1, -1), 1,   _C_BORDER),
+                ('TOPPADDING',    (0, 0), (-1, -1), 4),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+                ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN',         (0, 0), (0, -1),  'CENTER'),
+                ('ALIGN',         (2, 1), (3, -1),  'RIGHT'),
             ]))
-            contenido.append(tabla_datos)
+            contenido.append(t_taxa)
 
-        if chart_images:
-            TITULOS_GRAFICAS = {
-                'clasificacion': 'Microorganismos por Muestra y Clasificación Funcional',
-            }
-            ancho_disponible = pagesize[0] - 72
-            for clave, b64_str in chart_images.items():
-                if not b64_str or ',' not in b64_str:
-                    continue
-                try:
-                    titulo_graf = TITULOS_GRAFICAS.get(clave, clave.replace('_', ' ').title())
-                    contenido.append(Spacer(1, 18))
-                    contenido.append(Paragraph(titulo_graf, style_heading))
-                    img_data = base64.b64decode(b64_str.split(',')[1])
-                    img_buf = BytesIO(img_data)
-                    rl_img = RLImage(img_buf, width=ancho_disponible, height=ancho_disponible * 0.38)
-                    contenido.append(rl_img)
-                except Exception as exc:
-                    contenido.append(Paragraph(f"[Error al renderizar gráfica: {exc}]", style_body))
+            if idx < len(niveles_con_datos):
+                # Separador liviano en vez de PageBreak: el siguiente nivel
+                # arranca en el espacio que quede en la página actual —
+                # solo pasa a la página siguiente si de verdad no entra.
+                contenido.append(Spacer(1, 16))
+                contenido.append(HRFlowable(width="100%", thickness=0.6, color=_C_BORDER, spaceAfter=16))
 
         contenido.append(Spacer(1, 15))
         contenido.append(Paragraph(
-            "<font color='#64748b'><i>Nota: Este documento constituye un reporte técnico automatizado emitido por el "
-            "Pipeline Bioinformático de Análisis de Suelos. Los resultados están sujetos al umbral del Top N seleccionado "
-            "y las taxonomías remanentes han sido consolidadas de forma proporcional.</i></font>",
-            style_body,
+            "<font color='#64748b'><i>Nota: Este Informe General resume los 7 niveles taxonómicos con sus "
+            "indicadores clave (Top N, Índice de Salud, Diversidad Alfa). Para el detalle completo de un "
+            "nivel específico (gráficas, interpretación, conclusiones y recomendaciones), genere el reporte "
+            "individual de ese nivel desde la sección Reportes.</i></font>",
+            S["body_sm"],
         ))
 
         doc.build(contenido, onFirstPage=_pdf_footer, onLaterPages=_pdf_footer)
@@ -4103,127 +4100,168 @@ class ExportService:
         return buffer.getvalue()
 
     @staticmethod
-    def exportar_pdf_response(titulo, datos_analisis, df_datos=None,
-                              usuario=None, nombre_archivo=None, muestra_obj=None,
-                              chart_images=None):
-        """Envuelve el binario del PDF en una respuesta de descarga HTTP protegida para Django."""
-        pdf_bytes = ExportService.generar_pdf_completo(
-            titulo, datos_analisis, df_datos, usuario,
-            muestra_obj=muestra_obj, chart_images=chart_images,
+    def generar_excel_informe_general(datos) -> HttpResponse:
+        """
+        Un libro Excel con una hoja "Resumen" (los 7 niveles comparados) más
+        una hoja por cada nivel taxonómico con datos (Top N + clasificación).
+        datos keys: igual que generar_pdf_informe_general.
+        """
+        datos_por_nivel = datos.get("datos_por_nivel", {})
+        muestra = datos.get("muestra")
+        tipo    = datos.get("tipo", "16S")
+        top_n   = datos.get("top_n", 25)
+        usuario = datos.get("usuario")
+        niveles_con_datos = [n for n in NIVELES_VALIDOS if n in datos_por_nivel]
+
+        CV_OSC  = "0F6E56"
+        CV_CLAR = "E8F5EF"
+        CBLANCO = "FFFFFF"
+        fill_hdr     = PatternFill("solid", fgColor=CV_OSC)
+        fill_seccion = PatternFill("solid", fgColor=CV_CLAR)
+        fnt_hdr      = Font(bold=True, color=CBLANCO, size=11)
+        fnt_seccion  = Font(bold=True, color=CV_OSC, size=10)
+        fnt_normal   = Font(size=10)
+        fnt_bold     = Font(bold=True, size=10)
+        al_c = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        al_l = Alignment(horizontal="left",   vertical="center", wrap_text=True)
+        borde = Border(
+            left=Side(style="thin", color="D0D0D0"), right=Side(style="thin", color="D0D0D0"),
+            top=Side(style="thin", color="D0D0D0"),  bottom=Side(style="thin", color="D0D0D0"),
         )
 
-        if nombre_archivo is None:
-            fecha = datetime.now().strftime("%Y%m%d_%H%M%S")
-            nombre_archivo = f"reporte_microbioma_{fecha}.pdf"
+        def _escribir_encabezado_muestra(ws, fila_inicio, titulo_hoja):
+            ws.merge_cells(f"A{fila_inicio}:F{fila_inicio}")
+            c = ws.cell(row=fila_inicio, column=1, value=titulo_hoja)
+            c.font = Font(bold=True, color=CBLANCO, size=13)
+            c.fill = PatternFill("solid", fgColor="1D9E75")
+            c.alignment = al_l
+            ws.row_dimensions[fila_inicio].height = 22
 
-        nombre_seguro = slugify(nombre_archivo.replace('.pdf', '')) + '.pdf'
-        response = HttpResponse(pdf_bytes, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="{nombre_seguro}"'
-        return response
+            fila = fila_inicio + 1
+            codigo = getattr(muestra, "codigo", "N/A") if muestra else "N/A"
+            marcador_lbl = "16S · Bacterias" if tipo == "16S" else "ITS · Hongos"
+            info = f"Muestra: {codigo}   ·   Marcador: {marcador_lbl}   ·   Top {top_n} taxa por nivel   ·   Generado por: {usuario or 'Sistema'}"
+            ws.merge_cells(f"A{fila}:F{fila}")
+            c = ws.cell(row=fila, column=1, value=info)
+            c.font = Font(italic=True, size=9, color="5F5E5A")
+            c.alignment = al_l
+            return fila + 2  # próxima fila libre
 
-    @staticmethod
-    def generar_html_reporte(titulo, datos_analisis, df_datos=None,
-                             usuario=None, nombre_archivo=None, muestra_obj=None):
-        """Genera un reporte interpretativo interactivo en HTML limpio estructurado."""
-        html = f"""
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <title>{titulo}</title>
-            <style>
-                body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 30px; background-color: #f1f5f9; color: #1e293b; }}
-                .container {{ max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }}
-                h1 {{ color: #1b4332; text-align: center; border-bottom: 4px solid #2d6a4f; padding-bottom: 12px; margin-bottom: 25px; }}
-                h2 {{ color: #2d6a4f; margin-top: 25px; border-left: 5px solid #2d6a4f; padding-left: 12px; font-size: 1.3em; }}
-                .grid-meta {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; background: #f8f9fa; padding: 20px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 20px; }}
-                .meta-item {{ font-size: 14px; }}
-                table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }}
-                th {{ background-color: #2d6a4f; color: white; padding: 10px; text-align: left; font-weight: 600; }}
-                td {{ border: 1px solid #e2e8f0; padding: 10px; }}
-                tr:nth-child(even) {{ background-color: #f8fafc; }}
-                tr:hover {{ background-color: #f1f5f9; }}
-                .footer {{ margin-top: 40px; text-align: center; color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 15px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>{titulo}</h1>
-                <div class="grid-meta">
-                    <div class="meta-item"><strong>Fecha de Reporte:</strong> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</div>
-                    <div class="meta-item"><strong>Usuario:</strong> {usuario or 'Sistema Central'}</div>
-        """
+        def _tabla_taxa(ws, fila_inicio, d):
+            headers = ["#", "Taxón", "Reads", "Abundancia %", "Clasificación"]
+            for col, h in enumerate(headers, 1):
+                c = ws.cell(row=fila_inicio, column=col, value=h)
+                c.font = fnt_hdr
+                c.fill = fill_hdr
+                c.alignment = al_c
+                c.border = borde
+            ws.row_dimensions[fila_inicio].height = 20
 
-        if muestra_obj is not None:
-            cultivo_nom = muestra_obj.cultivo.nombre if hasattr(muestra_obj, 'cultivo') and muestra_obj.cultivo else "N/A"
-            var_nom = muestra_obj.variedad_clon.nombre if hasattr(muestra_obj, 'variedad_clon') and muestra_obj.variedad_clon else "N/A"
+            fila = fila_inicio + 1
+            for i, r in enumerate(d.get("top_taxa", []), 1):
+                vals = [
+                    i,
+                    str(r.get("taxonomia", "?")),
+                    int(r.get("total_hits", 0) or 0),
+                    round(float(r.get("total_porcentaje", 0) or 0), 2),
+                    {
+                        "benefico": "Benéfico", "fitopatogeno": "Fitopatógeno",
+                        "neutral": "Neutral", "sin_clasificar": "Sin clasificar",
+                    }.get(r.get("clasificacion", "sin_clasificar"), "Sin clasificar"),
+                ]
+                for col, v in enumerate(vals, 1):
+                    c = ws.cell(row=fila, column=col, value=v)
+                    c.font = fnt_normal
+                    c.alignment = al_c if col != 2 else al_l
+                    c.border = borde
+                fila += 1
 
-            html += f"""
-                    <div class="meta-item"><strong>Localidad:</strong> {getattr(muestra_obj, 'localidad', 'N/A')}</div>
-                    <div class="meta-item"><strong>Finca / Lote:</strong> {getattr(muestra_obj, 'finca_lote', 'N/A')}</div>
-                    <div class="meta-item"><strong>Altitud:</strong> {getattr(muestra_obj, 'altitud', 0)} msnm</div>
-                    <div class="meta-item"><strong>Cultivo / Variedad:</strong> {cultivo_nom} ({var_nom})</div>
-            """
+            anchos = [6, 42, 12, 16, 18]
+            for col, w in enumerate(anchos, 1):
+                ws.column_dimensions[get_column_letter(col)].width = w
+            return fila + 1
 
-        html += """
-                </div>
-        """
+        def _kpis_nivel(ws, fila_inicio, d):
+            div = d.get("diversidad") or {}
+            kpis = [
+                ("Índice de Salud", d.get("indice_salud", 0)),
+                ("Estado",          d.get("nivel_salud", "N/A")),
+                ("Shannon H'",      round(float(div.get("shannon", 0) or 0), 4)),
+                ("Simpson (1-D)",   round(float(div.get("simpson", 0) or 0), 4)),
+                ("Riqueza (S)",     div.get("riqueza", 0)),
+                ("Equitatividad J'", round(float(div.get("equitatividad", 0) or 0), 4)),
+            ]
+            for i, (lbl, val) in enumerate(kpis):
+                col = 1 + i
+                c_lbl = ws.cell(row=fila_inicio, column=col, value=lbl)
+                c_lbl.font = fnt_seccion
+                c_lbl.fill = fill_seccion
+                c_lbl.alignment = al_c
+                c_lbl.border = borde
+                c_val = ws.cell(row=fila_inicio + 1, column=col, value=val)
+                c_val.font = fnt_bold
+                c_val.alignment = al_c
+                c_val.border = borde
+            ws.row_dimensions[fila_inicio].height = 16
+            ws.row_dimensions[fila_inicio + 1].height = 18
+            return fila_inicio + 3
 
-        for seccion, valores in datos_analisis.items():
-            html += f"<h2>{seccion}</h2>"
-            if isinstance(valores, dict):
-                html += "<table>"
-                for k, v in valores.items():
-                    html += f"<tr><td style='width:30%; font-weight:600;'>{k}</td><td>{v}</td></tr>"
-                html += "</table>"
-            elif isinstance(valores, list):
-                html += "<ul style='padding-left:20px; line-height: 1.6;'>"
-                for item in valores:
-                    html += f"<li>{item}</li>"
-                html += "</ul>"
-            else:
-                html += f"<p style='padding-left:5px;'>{valores}</p>"
+        wb = Workbook()
+        ws_resumen = wb.active
+        ws_resumen.title = "Resumen"
 
-        if df_datos is not None and not df_datos.empty:
-            html += "<h2>Matriz de Distribución Coherente Basal</h2>"
-            html += str(df_datos.to_html(index=False, classes='data-table') or "")
+        fila = _escribir_encabezado_muestra(ws_resumen, 1, "INFORME GENERAL — ÍNDICE DE SALUD POR NIVEL")
+        headers = ["Nivel", "Índice de Salud", "Estado", "Shannon H'", "Riqueza (S)", "Taxa (Top N)"]
+        for col, h in enumerate(headers, 1):
+            c = ws_resumen.cell(row=fila, column=col, value=h)
+            c.font = fnt_hdr
+            c.fill = fill_hdr
+            c.alignment = al_c
+            c.border = borde
+        ws_resumen.row_dimensions[fila].height = 20
+        fila += 1
+        for nivel in niveles_con_datos:
+            d   = datos_por_nivel[nivel]
+            div = d.get("diversidad") or {}
+            vals = [
+                NIVELES_ES.get(nivel, nivel.capitalize()),
+                d.get("indice_salud", 0),
+                d.get("nivel_salud", "N/A"),
+                round(float(div.get("shannon", 0) or 0), 4),
+                div.get("riqueza", 0),
+                len(d.get("top_taxa", [])),
+            ]
+            for col, v in enumerate(vals, 1):
+                c = ws_resumen.cell(row=fila, column=col, value=v)
+                c.font = fnt_normal
+                c.alignment = al_c if col != 1 else al_l
+                c.border = borde
+            fila += 1
+        anchos_resumen = [16, 16, 14, 14, 14, 14]
+        for col, w in enumerate(anchos_resumen, 1):
+            ws_resumen.column_dimensions[get_column_letter(col)].width = w
 
-        html += """
-                <div class="footer">
-                    <p>Reporte Técnico Generado de forma Atómica por el Módulo de Salida de Resultados.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-
-        if nombre_archivo is None:
-            return html
-
-        nombre_seguro = slugify(nombre_archivo.replace('.html', '')) + '.html'
-        response = HttpResponse(html, content_type='text/html')
-        response['Content-Disposition'] = f'attachment; filename="{nombre_seguro}"'
-        return response
-
-    @staticmethod
-    def exportar_zip_completo(datos_dict, nombre_base=None):
-        """Empaqueta los archivos generados en un archivo comprimido ZIP para descarga masiva."""
-        import zipfile
-
-        if nombre_base is None:
-            nombre_base = f"paquete_analisis_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        NOMBRES_HOJA = {
+            "kingdom": "Reino", "phylum": "Filo", "class": "Clase", "order": "Orden",
+            "family": "Familia", "genus": "Genero", "species": "Especie",
+        }
+        for nivel in niveles_con_datos:
+            d = datos_por_nivel[nivel]
+            ws = wb.create_sheet(title=NOMBRES_HOJA.get(nivel, nivel.capitalize())[:31])
+            fila = _escribir_encabezado_muestra(ws, 1, f"NIVEL: {NIVELES_ES.get(nivel, nivel.upper()).upper()}")
+            fila = _kpis_nivel(ws, fila, d)
+            _tabla_taxa(ws, fila, d)
 
         buffer = BytesIO()
-        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for formato, datos in datos_dict.items():
-                if formato == 'json':
-                    json_str = json.dumps(datos, indent=2, default=str)
-                    zf.writestr(f"{nombre_base}.json", json_str)
-                elif formato == 'csv' and isinstance(datos, pd.DataFrame):
-                    csv_str = datos.to_csv(index=False)
-                    zf.writestr(f"{nombre_base}.csv", csv_str)
-                elif formato == 'html':
-                    zf.writestr(f"{nombre_base}.html", datos)
-
+        wb.save(buffer)
         buffer.seek(0)
-        return buffer.getvalue()
+        fecha  = datetime.now().strftime("%Y%m%d_%H%M%S")
+        codigo = getattr(muestra, "codigo", "muestra") if muestra else "muestra"
+        nombre = f"informe_general_{tipo}_{codigo}_{fecha}.xlsx"
+        response = HttpResponse(
+            buffer.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        return response
+

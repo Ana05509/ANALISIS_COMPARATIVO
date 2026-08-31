@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import datetime
 import json
 
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import F, Sum
@@ -12,7 +12,7 @@ from django.views.decorators.http import require_POST
 from analisis.models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo
 from analisis.services.business.analysis_service import obtener_analisis_avanzado, obtener_diversidad, _filtrar_catalogo_por_nivel
 from analisis.services.business.export_service import ExportService
-from analisis.constants import MARCADORES_VALIDOS, OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES, get_taxonomia_annotation, clasificar_taxon, buscar_en_catalogo, NIVELES_ES, MARCADORES_ES, NIVELES_CHOICES, MARCADORES_CHOICES, normalizar_nombre_catalogo
+from analisis.constants import MARCADORES_VALIDOS, OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES, get_taxonomia_annotation, clasificar_taxon, buscar_en_catalogo, NIVELES_ES, NIVELES_CHOICES, MARCADORES_CHOICES, normalizar_nombre_catalogo
 from analisis.audit import registrar_accion
 from django.contrib.admin.models import CHANGE
 
@@ -126,6 +126,27 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
         "nivel_campo_jerarquia": campo_db,
         "tipo": tipo, "nivel": nivel, "top_n": top_n,
     }
+
+
+def _construir_datos_informe_general(tipo, top_n, muestra_id):
+    """
+    Para el Informe General (todos los niveles taxonómicos en un solo
+    documento, una sola muestra): arma un resumen por cada uno de los 7
+    niveles de NIVELES_VALIDOS (Reino→Especie), reutilizando
+    _construir_datos_reporte sin modificarlo — los reportes de un solo
+    nivel (generar_reporte de arriba) siguen exactamente igual.
+
+    Retorna {nivel: datos_dict, ...} — solo con los niveles que sí tienen
+    datos para esta muestra (un nivel puede no traer resultados si, por
+    ejemplo, el pipeline de clasificación no llegó a resolver esa
+    profundidad para ningún taxón). Si ningún nivel tiene datos, {}.
+    """
+    resultado = {}
+    for nivel in NIVELES_VALIDOS:
+        datos_nivel = _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=[muestra_id])
+        if datos_nivel:
+            resultado[nivel] = datos_nivel
+    return resultado
 
 
 def _construir_datos_por_muestra(tipo, nivel, top_n, muestras_list):
@@ -398,7 +419,73 @@ def generar_reporte(request) -> HttpResponseBase:
 
 
 @login_required
-def detalle_reporte(request, reporte_id):
-    """Placeholder — redirige al listado hasta que se implemente la vista de detalle."""
-    messages.info(request, "Vista de detalle pendiente de implementación.")
-    return redirect("analisis:reportes")
+@require_POST
+def generar_reporte_general(request) -> HttpResponseBase:
+    """
+    Informe General: los 7 niveles taxonómicos (Reino→Especie) de UNA sola
+    muestra en un solo documento — resumen por nivel (Top N + Índice de
+    Salud + Diversidad Alfa), sin las gráficas/narrativa completa de los
+    reportes de un solo nivel. No reemplaza generar_reporte de arriba, que
+    sigue intacto para reportes de un nivel específico (individual o
+    comparativo entre muestras).
+    """
+    tipo = request.POST.get("tipo", "16S")
+    if tipo not in MARCADORES_VALIDOS:
+        tipo = "16S"
+
+    formato = request.POST.get("formato", "excel")
+    if formato not in FORMATOS_VALIDOS:
+        return JsonResponse({"ok": False, "error": "Formato no soportado."}, status=400)
+
+    try:
+        top_n = int(request.POST.get("top_n", 25))
+        top_n = top_n if top_n in OPCIONES_TOP_N else 25
+    except (ValueError, TypeError):
+        top_n = 25
+
+    modo_color = request.POST.get("modo_color", "color")
+    if modo_color not in ("color", "grises"):
+        modo_color = "color"
+
+    muestra_id_raw = request.POST.get("muestra_id", "")
+    if not muestra_id_raw.isdigit():
+        return JsonResponse({"ok": False, "error": "Debe seleccionar una muestra."}, status=400)
+    muestra_id = int(muestra_id_raw)
+
+    muestra = MuestraSuelo.objects.select_related("cultivo", "variedad_clon").filter(id=muestra_id).first()
+    if not muestra:
+        return JsonResponse({"ok": False, "error": "Muestra no encontrada."}, status=404)
+
+    try:
+        datos_por_nivel = _construir_datos_informe_general(tipo, top_n, muestra_id)
+        if not datos_por_nivel:
+            return JsonResponse({"ok": False, "error": "No hay datos para esta muestra."}, status=404)
+
+        fecha = datetime.now().strftime("%Y%m%d_%H%M%S")
+        datos = {
+            "datos_por_nivel": datos_por_nivel,
+            "muestra":  muestra,
+            "tipo":     tipo,
+            "top_n":    top_n,
+            "usuario":  request.user,
+            "modo_color": modo_color,
+        }
+
+        registrar_accion(
+            request, muestra,
+            f"Informe general generado (todos los niveles, {tipo}, top {top_n}).",
+            accion=CHANGE,
+        )
+
+        if formato == "excel":
+            return ExportService.generar_excel_informe_general(datos)
+
+        pdf_bytes = ExportService.generar_pdf_informe_general(datos)
+        nombre = f"informe_general_{tipo}_{muestra.codigo}_{fecha}.pdf"
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        return response
+
+    except Exception as exc:
+        import traceback; traceback.print_exc()
+        return JsonResponse({"ok": False, "error": str(exc)}, status=500)

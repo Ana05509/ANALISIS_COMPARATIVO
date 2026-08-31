@@ -13,6 +13,15 @@
 {% endblock %}
 
 {% block extra_css %}
+/* ── Informe General: deshabilitado cuando no hay exactamente 1 muestra ──
+   (a diferencia de PDF/Excel, que solo se deshabilitan un instante durante
+   la descarga, este botón puede quedar deshabilitado un buen rato en modo
+   Comparativo/Global — necesita quedar visualmente claro, no solo con el
+   atributo disabled). */
+#btn-informe-general-pdf:disabled, #btn-informe-general-excel:disabled {
+    opacity: .4; cursor: not-allowed;
+}
+
 /* ── Barra de progreso del índice de salud ── */
 .indice-bar  { height:13px; border-radius:7px; background:var(--gris-border); overflow:hidden; margin-top:6px; }
 .indice-fill { height:100%; border-radius:7px; transition:width .5s ease; }
@@ -270,6 +279,28 @@
             </button>
             <button id="btn-excel" onclick="descargar('excel')"
                     class="btn btn-excel btn-sm" title="Excel completo (todos los taxones, multi-hoja)">
+                <i class="ti ti-table-export"></i> Excel
+            </button>
+        </div>
+
+        <!-- Informe General: los 7 niveles taxonómicos (Reino→Especie) de UNA
+             sola muestra en un solo documento — resumen por nivel (Top N +
+             Índice de Salud + Diversidad Alfa), sin repetir el detalle
+             completo de los reportes de un solo nivel de arriba. Solo tiene
+             sentido con exactamente 1 muestra seleccionada (ver
+             _MODO_MUESTRA / actualizarEstadoInformeGeneral más abajo) —
+             igual que "Vista previa PDF" ya distingue Individual/Comparativo. -->
+        <div style="display:flex; align-items:center; gap:6px; padding-left:10px; border-left:1px solid var(--gris-border, #e2e8f0);">
+            <span class="bs-tip" data-tip="Un solo documento con los 7 niveles taxonómicos (Reino→Especie) de la muestra seleccionada: Top N, Índice de Salud y Diversidad Alfa de cada nivel. Requiere seleccionar exactamente 1 muestra."
+                  style="font-size:12px; color:var(--text-muted); white-space:nowrap;">
+                Informe General <i class="ti ti-help-circle bs-tip-ico"></i>
+            </span>
+            <button id="btn-informe-general-pdf" onclick="descargarInformeGeneral('pdf')"
+                    class="btn btn-outline btn-sm" title="Informe General en PDF (todos los niveles taxonómicos)">
+                <i class="ti ti-file-pdf"></i> PDF
+            </button>
+            <button id="btn-informe-general-excel" onclick="descargarInformeGeneral('excel')"
+                    class="btn btn-outline btn-sm" title="Informe General en Excel (una hoja por nivel taxonómico)">
                 <i class="ti ti-table-export"></i> Excel
             </button>
         </div>
@@ -858,6 +889,87 @@ async function descargar(formato) {
         }
     }
 }
+
+// ── Informe General: los 7 niveles taxonómicos de UNA sola muestra ────
+// Reusa parametrosReporteActual() para tipo/topN/modoColor/ids, pero pega
+// a un endpoint distinto (generar_reporte_general) que no recibe `nivel`
+// — ese parámetro no aplica acá, el informe ya cubre los 7 niveles.
+async function pedirBlobInformeGeneral(formato) {
+    var p    = parametrosReporteActual();
+    var body = new URLSearchParams({
+        tipo: p.tipo, top_n: p.topN, formato: formato, modo_color: p.modoColor,
+        muestra_id: p.ids[0] || '',
+    });
+
+    var resp = await fetch("{% url 'analisis:generar_reporte_general' %}", {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body,
+    });
+
+    if (!resp.ok) {
+        var err = await resp.json().catch(function(){ return { error: 'Error desconocido' }; });
+        throw new Error(err.error || ('Error ' + resp.status));
+    }
+    return resp.blob();
+}
+
+async function descargarInformeGeneral(formato) {
+    var p = parametrosReporteActual();
+    if (p.ids.length !== 1) {
+        alert('El Informe General necesita exactamente 1 muestra seleccionada.');
+        return;
+    }
+
+    var btnPdf   = document.getElementById('btn-informe-general-pdf');
+    var btnExcel = document.getElementById('btn-informe-general-excel');
+    var btn      = formato === 'pdf' ? btnPdf : btnExcel;
+    var iconoOriginal = btn ? btn.innerHTML : '';
+
+    if (btnPdf)   btnPdf.disabled   = true;
+    if (btnExcel) btnExcel.disabled = true;
+    if (btn)      btn.innerHTML     = '<i class="ti ti-loader-2" style="animation:rpt-spin 1s linear infinite;"></i>';
+
+    try {
+        var blob = await pedirBlobInformeGeneral(formato);
+        var url  = window.URL.createObjectURL(blob);
+        var a    = document.createElement('a');
+        a.href   = url;
+        var ext  = formato === 'excel' ? 'xlsx' : 'pdf';
+        a.download = 'informe_general_' + p.tipo + '_' + p.ids[0] + '.' + ext;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+    } catch (err) {
+        alert('Error al descargar el Informe General: ' + err.message);
+        console.error(err);
+    } finally {
+        actualizarEstadoInformeGeneral();
+        if (btn) btn.innerHTML = iconoOriginal;
+    }
+}
+
+// Habilita los botones de Informe General solo cuando hay exactamente 1
+// muestra seleccionada — mismo criterio que ya usa "Vista previa PDF"
+// (_MODO_MUESTRA) para distinguir Individual de Comparativo/Global.
+function actualizarEstadoInformeGeneral() {
+    var btnPdf   = document.getElementById('btn-informe-general-pdf');
+    var btnExcel = document.getElementById('btn-informe-general-excel');
+    var habilitado = _MODO_MUESTRA === 1;
+    [btnPdf, btnExcel].forEach(function (btn) {
+        if (!btn) return;
+        btn.disabled = !habilitado;
+        btn.title = habilitado
+            ? btn.title.replace(' (seleccione exactamente 1 muestra)', '')
+            : btn.title + (btn.title.indexOf('(seleccione exactamente 1 muestra)') === -1 ? ' (seleccione exactamente 1 muestra)' : '');
+    });
+}
+document.addEventListener('DOMContentLoaded', actualizarEstadoInformeGeneral);
 
 // ── Tabs: Resumen / Vista previa PDF ──────────────────────────────────
 function initTabs() {

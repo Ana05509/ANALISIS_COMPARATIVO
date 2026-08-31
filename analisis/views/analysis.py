@@ -1,12 +1,9 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
 from django.db.models import F, Sum
 import json
 import pandas as pd
-import plotly.express as px
 
 from ..services.business.analysis_service import (
     obtener_analisis_avanzado,
@@ -15,7 +12,7 @@ from ..services.business.analysis_service import (
 )
 from ..services.business.visualization_service import VisualizationService
 from ..models import ResultadoTaxonomico, MuestraSuelo, ArchivoMolecular
-from analisis.constants import OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES, NIVELES_ES, MARCADORES_ES, NIVELES_CHOICES, MARCADORES_CHOICES
+from analisis.constants import OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES, NIVELES_ES, NIVELES_CHOICES, MARCADORES_CHOICES
 
 @login_required
 def analisis_avanzado(request):
@@ -211,23 +208,3 @@ def resultado_analisis(request, muestra_id):
         messages.error(request, f"No se pudo estructurar el reporte: {str(e)}")
         return redirect("analisis:analisis_avanzado")
     return render(request, "analisis/resultados.html", contexto)
-
-
-@login_required
-@require_POST
-def exportar_analisis(request):
-    from analisis.services.business.report_generation_service import ReportGenerationService
-    tipo = request.POST.get("tipo", "16S")
-    top_n = int(request.POST.get("top_n", 10))
-    nivel = request.POST.get("nivel", "genus")
-    variedad_id = request.POST.get("producto_id", None)
-    formato = request.POST.get("formato", "pdf")
-
-    try:
-        resultado = ReportGenerationService.generar_reporte_analisis(
-            tipo=tipo, variedad_id=variedad_id, formato=formato,
-            top_n=top_n, nivel=nivel, usuario=request.user,
-        )
-        return JsonResponse({"ok": True, "url": resultado.get("url")})
-    except Exception as e:
-        return JsonResponse({"ok": False, "error": str(e)}, status=500)

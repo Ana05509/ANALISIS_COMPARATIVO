@@ -3,7 +3,7 @@ from django.db.models import F, Sum
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo, VariedadClon, MuestraSuelo
 from analisis.services.processing.diversity import DiversityService
 from analisis.services.processing.abundance import comparar_abundancias
-from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, MAPA_NIVELES, OPCIONES_TOP_N, get_taxonomia_annotation, clasificar_taxon, NIVEL_ALIASES, normalizar_nombre_catalogo
+from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, OPCIONES_TOP_N, get_taxonomia_annotation, clasificar_taxon, NIVEL_ALIASES, normalizar_nombre_catalogo
 
 
 def _filtrar_catalogo_por_nivel(qs, nivel: str):
@@ -101,32 +101,6 @@ def obtener_analisis_avanzado(tipo="16S", top_n=10, nivel="genus", variedad_id=N
         "nivel_actual": nivel,
         "top_actual":   top_n,
     }
-
-def obtener_top_n(tipo="16S", n=10, nivel="genus", variedad_id=None):
-    if tipo not in MARCADORES_VALIDOS: tipo = "16S"
-    if nivel not in NIVELES_VALIDOS:   nivel = "genus"
-    if n not in OPCIONES_TOP_N:        n = 10
-
-    qs = _base_queryset(tipo, variedad_id)
-
-    if not qs.exists(): return []
-
-    grand_total = qs.aggregate(t=Sum("num_hits"))["t"] or 1
-
-    taxonomia_expr = get_taxonomia_annotation(nivel)
-    data = list(
-        qs.values(taxonomia=taxonomia_expr)
-        .annotate(total_hits=Sum("num_hits"))
-        .order_by("-total_hits")[:n]
-    )
-
-    catalogo_lookup = obtener_lookup_catalogo(tipo, nivel=nivel)
-
-    for item in data:
-        item["total_porcentaje"] = round(item["total_hits"] / grand_total * 100, 5)
-        item["clasificacion"] = clasificar_taxon(item["taxonomia"] or "", catalogo_lookup, nivel)
-
-    return data
 
 def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=None, muestra_ids=None):
     """

@@ -8,7 +8,15 @@ class SubirDatosForm(forms.Form):
     nombre_producto = forms.CharField(
         max_length=100,
         label="Código de muestra",
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: CCN51-2024-01"}),
+        # text-transform es solo visual (cómo se ve mientras se tipea) — el
+        # valor real que llega al servidor no cambia acá; la normalización
+        # de verdad ocurre en upload_service.py y en MuestraSuelo.save(),
+        # que es lo que hace que el guardado sea consistente sin importar
+        # el origen (este formulario, admin, u otro).
+        widget=forms.TextInput(attrs={
+            "class": "form-control", "placeholder": "Ej: CCN51-2024-01",
+            "style": "text-transform: uppercase;",
+        }),
         required=True
     )
 

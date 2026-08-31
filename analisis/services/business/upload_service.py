@@ -43,7 +43,12 @@ def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
     validar_archivo(archivo)
 
     # 1. Parámetros básicos
-    codigo_muestra = request.POST.get("nombre_producto", "").strip()
+    # .upper() acá (no solo en MuestraSuelo.save) para que el lookup de
+    # "¿ya existe un archivo para esta muestra?" de abajo compare en el
+    # mismo formato que se va a guardar — si no, volver a subir el mismo
+    # código con distinta may/minúscula ("amazonico_16s" luego de haber
+    # guardado "Amazonico_16S") no lo detectaría como la misma muestra.
+    codigo_muestra = request.POST.get("nombre_producto", "").strip().upper()
     if not codigo_muestra:
         raise ValueError("El código de muestra es obligatorio.")
     

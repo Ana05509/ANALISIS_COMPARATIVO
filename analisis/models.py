@@ -57,7 +57,8 @@ class VariedadClon(models.Model):
 # ---------------------------------
 
 class MuestraSuelo(models.Model):
-    codigo = models.CharField(max_length=100, unique=True, verbose_name="Código de la Muestra")
+    codigo = models.CharField(max_length=100, unique=True, verbose_name="Código de la Muestra",
+                              help_text="Se normaliza a MAYÚSCULAS automáticamente al guardar.")
     cultivo = models.ForeignKey(
         Cultivo, on_delete=models.PROTECT,
         related_name="muestras", verbose_name="Cultivo"
@@ -77,6 +78,19 @@ class MuestraSuelo(models.Model):
     class Meta:
         verbose_name = "Muestra de Suelo"
         verbose_name_plural = "Muestras de Suelo"
+
+    def save(self, *args, **kwargs):
+        # Normaliza a mayúsculas sin importar el origen (subir_datos,
+        # admin, shell) — antes convivían códigos como "Amazonico_16S" y
+        # "AMAZONICO_16S" como si fueran muestras distintas (unique=True es
+        # case-sensitive en PostgreSQL), lo que podía duplicar una misma
+        # muestra según cómo la tipeara cada quien. upload_service.py
+        # normaliza además ANTES del lookup de "¿ya existe?" (ver ahí) para
+        # que una re-carga con distinta may/minúscula actualice la muestra
+        # existente en vez de crear una duplicada.
+        if self.codigo:
+            self.codigo = self.codigo.strip().upper()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Muestra: {self.codigo}"

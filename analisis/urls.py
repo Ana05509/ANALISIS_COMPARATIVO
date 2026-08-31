@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 from .views.auth import CustomLoginView, CustomLogoutView
-from .views.analysis import exportar_analisis, resultado_analisis
+from .views.analysis import resultado_analisis
 from .views.api import (
     api_muestras, api_muestra_detalle,
     api_catalogo, api_catalogo_entrada,
@@ -26,7 +26,6 @@ urlpatterns = [
     # 3. ANÁLISIS
     path("comparar/", views.comparar, name="comparar"),
     path("analisis-avanzado/", views.analisis_avanzado, name="analisis_avanzado"),
-    path("analisis-avanzado/exportar/", exportar_analisis, name="exportar_analisis"),
     path("historial/", views.historial, name="historial"),
     path("producto/<int:id>/", views.ver_producto, name="ver_producto"),
     path("muestra/<int:muestra_id>/resultados/", resultado_analisis, name="resultado_analisis"),
@@ -42,7 +41,7 @@ urlpatterns = [
     # 6. REPORTES
     path("reportes/", views.reportes, name="reportes"),
     path("reportes/generar/", views.generar_reporte, name="generar_reporte"),
-    path("reportes/<int:reporte_id>/", views.detalle_reporte, name="detalle_reporte"),
+    path("reportes/generar-general/", views.generar_reporte_general, name="generar_reporte_general"),
 
     # 6. API REST v1 — Solo lectura, respuestas JSON
     path("api/v1/muestras/",                    api_muestras,          name="api_muestras"),
