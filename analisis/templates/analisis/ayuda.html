@@ -5,9 +5,14 @@
 {% block topbar_title %}Guía y Glosario{% endblock %}
 
 {% block extra_css %}
-<style>
 .ayuda-hero {
-    background: linear-gradient(135deg, var(--verde-dark, #1a5c42) 0%, var(--verde, #1D9E75) 100%);
+    /* Colores fijos, no var(--verde-dark): esa variable cambia entre tema
+       claro/oscuro (queda pensada para TEXTO legible sobre cada fondo — en
+       oscuro se vuelve un verde menta claro), no para usarse como color de
+       fondo. Si se usa ahí, el degradado se ve mucho más claro/saturado en
+       modo oscuro de lo que debería. Este banner tiene que verse igual en
+       los dos temas. */
+    background: linear-gradient(135deg, #085041 0%, #1D9E75 100%);
     border-radius: var(--radius-lg, 16px);
     padding: 2rem 2.25rem;
     margin-bottom: 1.75rem;
@@ -111,6 +116,16 @@
     margin: 0; font-size: 12.5px; color: var(--text-muted); line-height: 1.6;
 }
 .glosario-item dd strong { color: var(--verde-dark, #1a5c42); }
+.glosario-item[hidden] { display: none; }
+
+.glosario-buscador-wrap {
+    position: relative; max-width: 380px; margin-bottom: 1rem;
+}
+.glosario-buscador-wrap i {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--text-hint); font-size: 15px; pointer-events: none;
+}
+.glosario-buscador-wrap input { padding-left: 34px; width: 100%; }
 
 /* Pestañas Manual / Glosario */
 .ayuda-tabs {
@@ -142,7 +157,6 @@
     font-size: 13px; color: var(--text-muted); line-height: 1.6;
 }
 .tip-item i { color: var(--verde); font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-</style>
 {% endblock %}
 
 {% block content %}
@@ -277,6 +291,16 @@
     <div class="ayuda-section-title">
         <i class="ti ti-book-2"></i> Glosario de términos técnicos
     </div>
+
+    <div class="glosario-buscador-wrap">
+        <i class="ti ti-search"></i>
+        <input type="text" id="glosario-buscador" class="form-control"
+               placeholder="Buscar un término…" aria-label="Buscar en el glosario" autocomplete="off">
+    </div>
+    <p id="glosario-sin-resultados" style="display:none; color:var(--text-hint); font-size:13px; margin:0 0 1rem;">
+        Ningún término coincide con la búsqueda.
+    </p>
+
     <dl class="glosario-grid">
 
         <div class="glosario-item">
@@ -366,7 +390,42 @@
 
         <div class="glosario-item">
             <dt>UFC/g (Unidades Formadoras de Colonias)</dt>
-            <dd>Medida usada en Microbiología Clásica que indica la cantidad de microorganismos viables por gramo de suelo. Se obtiene por recuento en placa, no por secuenciación.</dd>
+            <dd>Medida usada en Microbiología Clásica que indica la cantidad de microorganismos viables por gramo de suelo. Se obtiene por recuento en placa, no por secuenciación. A veces aparece como <strong>UFC/gss</strong> (gramo de suelo seco), la misma medida.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Actinomicetes</dt>
+            <dd>Grupo de bacterias filamentosas del suelo con un papel importante en la descomposición de materia orgánica. Se cuentan aparte de "Bacterias" porque forman colonias distintas en un medio de cultivo específico (Agar Caseína).</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Solubilizadores de Fósforo</dt>
+            <dd>Grupo funcional: microorganismos capaces de liberar fósforo del suelo en una forma que las plantas pueden absorber. Se reporta como recuento aparte, no como una especie puntual.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Celulolíticos</dt>
+            <dd>Grupo funcional: microorganismos que degradan celulosa (materia vegetal). Indican actividad de descomposición de residuos orgánicos en el suelo.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Fijadores de N de vida libre</dt>
+            <dd>Grupo funcional: microorganismos que capturan nitrógeno del aire y lo convierten en una forma disponible para las plantas, sin necesitar vivir en simbiosis con una raíz (a diferencia de otros fijadores de nitrógeno).</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Colonización (%) — micorrízica</dt>
+            <dd>Porcentaje de la raíz muestreada que está efectivamente colonizada por el hongo micorrízico (endófito), determinado al microscopio tras teñir la raíz.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Densidad de endófito</dt>
+            <dd>Cuánta estructura del hongo micorrízico (hifas, vesículas, arbúsculos) hay dentro de la raíz colonizada — a diferencia de Colonización (%), no dice si hay o no, sino <strong>cuánta</strong> hay.</dd>
+        </div>
+
+        <div class="glosario-item">
+            <dt>Esporas viables</dt>
+            <dd>Cantidad de esporas de hongos micorrízicos recuperadas de una muestra de suelo (por 100 g), capaces de germinar y volver a colonizar una raíz.</dd>
         </div>
 
         <div class="glosario-item">
@@ -456,6 +515,42 @@
             });
         });
     });
+
+    // ── Glosario: orden alfabético + buscador en vivo ──────────────────
+    var glosario = document.querySelector('.glosario-grid');
+    if (glosario) {
+        var items = Array.prototype.slice.call(glosario.querySelectorAll('.glosario-item'));
+
+        // Orden alfabético por el término (<dt>), no por el orden en que
+        // se fueron agregando al archivo — localeCompare 'es' para que
+        // los acentos ordenen como en un diccionario (ej. "Ítem" no queda
+        // aparte de "Item" por el acento).
+        items.sort(function (a, b) {
+            var ta = a.querySelector('dt').textContent.trim();
+            var tb = b.querySelector('dt').textContent.trim();
+            return ta.localeCompare(tb, 'es', { sensitivity: 'base' });
+        });
+        items.forEach(function (item) { glosario.appendChild(item); });
+
+        var buscador = document.getElementById('glosario-buscador');
+        var sinResultados = document.getElementById('glosario-sin-resultados');
+
+        function normalizar(s) {
+            return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        buscador.addEventListener('input', function () {
+            var q = normalizar(buscador.value.trim());
+            var visibles = 0;
+            items.forEach(function (item) {
+                var texto = normalizar(item.querySelector('dt').textContent + ' ' + item.querySelector('dd').textContent);
+                var coincide = !q || texto.indexOf(q) !== -1;
+                item.hidden = !coincide;
+                if (coincide) visibles++;
+            });
+            sinResultados.style.display = visibles === 0 ? 'block' : 'none';
+        });
+    }
 })();
 </script>
 {% endblock extra_js %}

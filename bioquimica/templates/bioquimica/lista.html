@@ -5,10 +5,10 @@
 {% block topbar_title %}Microbiología Bioquímica{% endblock %}
 
 {% block topbar_actions %}
+    {% if request.user.is_staff or request.user.rol == 'docente' %}
     <a href="{% url 'bioquimica:subir_pdf' %}" class="btn btn-primary btn-sm">
         <i class="ti ti-file-upload" aria-hidden="true"></i> Subir PDF
     </a>
-    {% if request.user.is_staff or request.user.rol == 'docente' %}
     <a href="/admin/bioquimica/ensayomicrobiologico/add/" class="btn btn-outline btn-sm">
         <i class="ti ti-plus" aria-hidden="true"></i> Manual
     </a>
@@ -19,13 +19,18 @@
 <div class="metrics-grid" style="margin-bottom: 1.5rem;">
     <a href="?tipo=" class="metric-card {% if not tipo_filtro %}verde{% endif %}" style="text-decoration:none;">
         <div class="metric-label">Todos los Ensayos</div>
-        <div class="metric-value">{{ total_recuento|add:total_aislamiento }}</div>
+        <div class="metric-value">{{ total_recuento|add:total_cipal|add:total_aislamiento }}</div>
         <div class="metric-sub">Registros disponibles</div>
     </a>
     <a href="?tipo=recuento" class="metric-card {% if tipo_filtro == 'recuento' %}verde{% endif %}" style="text-decoration:none;">
         <div class="metric-label">📊 Recuentos UFC/g</div>
         <div class="metric-value">{{ total_recuento }}</div>
         <div class="metric-sub">Recuento en placa</div>
+    </a>
+    <a href="?tipo=cipal" class="metric-card {% if tipo_filtro == 'cipal' %}verde{% endif %}" style="text-decoration:none;">
+        <div class="metric-label">🌱 Formato B</div>
+        <div class="metric-value">{{ total_cipal }}</div>
+        <div class="metric-sub">Microbiológico / Micorrízico</div>
     </a>
     <a href="?tipo=aislamiento" class="metric-card {% if tipo_filtro == 'aislamiento' %}verde{% endif %}" style="text-decoration:none;">
         <div class="metric-label">🔬 Aislamientos</div>
@@ -53,14 +58,16 @@
                 <tr>
                     <td data-label="Código" class="td-mono" style="color:var(--verde-dark); font-weight:600;">{{ ensayo.codigo }}</td>
                     <td data-label="Tipo">
-                        {% if ensayo.tipo == 'recuento' %}
+                        {% if ensayo.es_cipal %}
+                        <span class="badge" style="background:#EAF6EE; color:#1D7A45;">🌱 Formato B</span>
+                        {% elif ensayo.tipo == 'recuento' %}
                         <span class="badge badge-recuento">📊 Recuento</span>
                         {% else %}
                         <span class="badge badge-sin-clas">🔬 Aislamiento</span>
                         {% endif %}
                     </td>
                     <td data-label="Muestra" style="font-size:13px;">{{ ensayo.nombre_muestra }}</td>
-                    <td data-label="Fecha" class="td-mono" style="font-size:13px; color:var(--text-muted);">{{ ensayo.fecha_reporte|date:"d/m/Y" }}</td>
+                    <td data-label="Fecha" class="td-mono" style="font-size:13px; color:var(--text-muted);">{{ ensayo.fecha_reporte|date:"d/m/Y"|default:"—" }}</td>
                     <td data-label="Organismos" class="td-mono" style="color:var(--verde-dark); font-weight:600;">{{ ensayo.total_organismos }}</td>
                     <td class="td-center">
                         <a href="{% url 'bioquimica:detalle' ensayo.pk %}" class="btn btn-primary btn-sm">

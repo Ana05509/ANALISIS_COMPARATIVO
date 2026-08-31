@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import F
 from django.conf import settings
 
 
@@ -16,9 +17,24 @@ class EnsayoMicrobiologico(models.Model):
                                       help_text="Ej: Suelo #1")
     etiqueta = models.TextField(blank=True, verbose_name="Etiqueta de la Muestra",
                                 help_text="Información de la etiqueta física: fecha, lote, sección, etc.")
-    fecha_recepcion = models.DateField(verbose_name="Fecha de Recepción")
-    fecha_ejecucion = models.DateField(verbose_name="Fecha de Ejecución")
-    fecha_reporte = models.DateField(verbose_name="Fecha del Reporte")
+    # null=True: algunos informes de origen (ej. formato CIPAL) no traen
+    # fecha en ningún lado del documento — antes se rellenaba con la fecha
+    # de HOY (de importación), lo que hacía ver una muestra de 2011 como si
+    # fuera de la fecha en que se subió el PDF. Ahora se deja sin fecha y
+    # se anota en `observaciones` (ver _guardar_ensayo en views.py).
+    fecha_recepcion = models.DateField(null=True, blank=True, verbose_name="Fecha de Recepción")
+    fecha_ejecucion = models.DateField(null=True, blank=True, verbose_name="Fecha de Ejecución")
+    fecha_reporte = models.DateField(null=True, blank=True, verbose_name="Fecha del Reporte")
+    # La marca real de "esto vino del laboratorio CIPAL" — la pone
+    # _guardar_ensayo en views.py solo cuando pdf_parser.parsear_pdf()
+    # detectó el formato CIPAL (ver services/pdf_parser.py). No basta con
+    # mirar si el ensayo tiene filas RecuentoUFC tipo "Otro/Mixto": ese
+    # mecanismo también lo usa el ingreso manual para CUALQUIER laboratorio
+    # que reporte varias mediciones por fila, no solo CIPAL — sin este
+    # campo, un ensayo manual de otro origen se etiquetaría como CIPAL por
+    # error.
+    es_cipal = models.BooleanField(default=False, verbose_name="Formato CIPAL",
+                                   help_text="Se marca automáticamente al importar un PDF de CIPAL.")
     temp_ambiental = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True,
                                          verbose_name="Temperatura Ambiental (°C)")
     humedad_ambiental = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True,
@@ -38,7 +54,13 @@ class EnsayoMicrobiologico(models.Model):
     class Meta:
         verbose_name = "Ensayo Microbiológico"
         verbose_name_plural = "Ensayos Microbiológicos"
-        ordering = ['-fecha_reporte']
+        # fecha_reporte puede ser None (informes CIPAL sin fecha, ver arriba).
+        # En PostgreSQL, ORDER BY ... DESC pone los NULL primero por defecto,
+        # así que sin nulls_last un ensayo sin fecha aparecería antes que
+        # todos los ensayos con fecha reciente. nulls_last=True lo manda al
+        # final; fecha_registro como criterio secundario ordena esos casos
+        # sin fecha por orden de ingreso al sistema (más reciente primero).
+        ordering = [F('fecha_reporte').desc(nulls_last=True), '-fecha_registro']
 
     def __str__(self):
         return f"{self.codigo} — {self.nombre_muestra}"

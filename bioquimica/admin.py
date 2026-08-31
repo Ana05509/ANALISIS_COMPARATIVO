@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db.models import F
 from django.utils.html import format_html, mark_safe
 from django.contrib import messages
 
@@ -156,7 +157,10 @@ class EnsayoMicrobiologicoAdmin(AccionesColumnaMixin, ModelAdmin):
     list_display_links = ('codigo',)
     list_filter = ('tipo', 'fecha_reporte')
     search_fields = ('codigo', 'nombre_muestra', 'etiqueta')
-    ordering = ('-fecha_reporte',)
+    # fecha_reporte puede ser None (informes CIPAL sin fecha); nulls_last=True
+    # evita que esos ensayos se cuelen al inicio del listado en PostgreSQL
+    # (ver Meta.ordering en models.py).
+    ordering = (F('fecha_reporte').desc(nulls_last=True),)
     date_hierarchy = 'fecha_reporte'
     list_per_page = 20
     list_fullwidth = True
@@ -164,7 +168,7 @@ class EnsayoMicrobiologicoAdmin(AccionesColumnaMixin, ModelAdmin):
 
     fieldsets = (
         ("Identificación del Ensayo", {
-            "fields": ("codigo", "tipo", "nombre_muestra", "etiqueta"),
+            "fields": ("codigo", "tipo", "es_cipal", "nombre_muestra", "etiqueta"),
         }),
         ("Fechas", {
             "fields": ("fecha_recepcion", "fecha_ejecucion", "fecha_reporte"),

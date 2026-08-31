@@ -23,16 +23,20 @@ class EnsayoManualForm(forms.Form):
         widget=forms.Textarea(attrs={'rows': 2, 'class': 'form-control',
                                       'placeholder': 'Fecha, lote, sección… (opcional)'}),
     )
+    # required=False: igual que en la importación automática, hay reportes
+    # de origen que no traen fecha en ningún lado — forzar un valor acá
+    # obligaría a inventar uno. Dejarlo vacío es una fecha real "sin dato",
+    # no un error de captura (ver EnsayoMicrobiologico.fecha_recepcion).
     fecha_recepcion = forms.DateField(
-        label="Fecha de Recepción",
+        required=False, label="Fecha de Recepción",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
     )
     fecha_ejecucion = forms.DateField(
-        label="Fecha de Ejecución",
+        required=False, label="Fecha de Ejecución",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
     )
     fecha_reporte = forms.DateField(
-        label="Fecha del Reporte",
+        required=False, label="Fecha del Reporte",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
     )
     temp_ambiental = forms.DecimalField(

@@ -1,5 +1,5 @@
 import json
-from datetime import date
+import re
 from decimal import Decimal, InvalidOperation
 from typing import cast
 
@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.http import FileResponse, Http404
 from django.shortcuts import redirect, render, get_object_or_404
 
 from .forms import EnsayoManualForm
@@ -65,6 +66,143 @@ def _grafico_recuento(ensayo):
     # un retorno "str | Any | None" — en runtime, para una Figure ya armada
     # con datos (como acá) siempre devuelve el JSON como str; el cast no
     # cambia nada en tiempo de ejecución, solo se lo aclara al chequeador.
+    return json.loads(cast(str, fig.to_json()))
+
+
+# ─── Gráficas para filas "Otro/Mixto" con Parámetros Adicionales ──────────
+#
+# Los recuentos importados del formato CIPAL (ver
+# bioquimica/services/pdf_parser.py::_parsear_tabla_cipal) no tienen un
+# valor UFC en el propio RecuentoUFC — viven como ParametroRecuento por
+# columna (Bacterias, Hongos…, o Colonización/Densidad, o Esporas). Por eso
+# _grafico_recuento() de arriba no los grafica: estas funciones arman esas
+# gráficas aparte, a partir de los parámetros en vez del campo
+# coeficiente/exponente. También sirven para ensayos cargados a mano con los
+# mismos nombres de parámetro (ver placeholder en ingreso_manual.html).
+
+_MICRO_SERIES = [
+    'Bacterias', 'Hongos', 'Actinomicetes',
+    'Solubilizadores de Fósforo', 'Celulolíticos', 'Fijadores de N de vida libre',
+]
+_SERIE_COLONIZACION = 'Colonización (%)'
+_SERIE_DENSIDAD     = 'Densidad de endófito (/47.5%)'
+_SERIE_ESPORAS      = 'Esporas viables /100 gss'
+
+_PARAM_CIENTIFICO = re.compile(r'^([\d.]+)\s*×\s*10\^(-?\d+)')
+
+
+def _valor_numerico_parametro(texto):
+    """Extrae el número de un ParametroRecuento.valor para graficar — cubre
+    "9.7 × 10^5 UFC/gss" (formato CIPAL de recuento) y números simples con
+    coma decimal ("48,48", "171"). None si no es un valor numérico (ej.
+    "Glomus, Acaulospora")."""
+    if not texto:
+        return None
+    t = texto.strip()
+    m = _PARAM_CIENTIFICO.match(t)
+    if m:
+        try:
+            return float(m.group(1)) * (10 ** int(m.group(2)))
+        except ValueError:
+            return None
+    try:
+        return float(t.replace(',', '.'))
+    except ValueError:
+        return None
+
+
+def _parametros_por_nombre(filas):
+    """[(recuento, {parametro.nombre: parametro.valor}), …] para filas
+    'Otro/Mixto' — asume que `filas` ya trae los parámetros precargados
+    (prefetch_related('parametros')).
+
+    Se devuelve una lista, no un dict indexado por `recuento.nombre`:
+    RecuentoUFC.nombre no tiene restricción de unicidad, y el ingreso
+    manual permite crear dos tarjetas 'Otro/Mixto' con el mismo nombre de
+    muestra por error de tipeo — indexar por nombre colapsaría esas dos
+    filas en una sola entrada, perdiendo los datos de la primera sin avisar."""
+    return [(r, {p.nombre: p.valor for p in r.parametros.all()}) for r in filas]
+
+
+def _grafico_cipal_series(filas, series_nombres, titulo_y, log=False):
+    """Gráfico de barras (agrupadas si `series_nombres` trae más de una) a
+    partir de los Parámetros Adicionales de filas 'Otro/Mixto'. None si
+    ninguna fila trae ninguna de las series pedidas."""
+    datos = _parametros_por_nombre(filas)
+    muestras_datos = [
+        (r.nombre, params) for r, params in datos
+        if any(s in params for s in series_nombres)
+    ]
+    if not muestras_datos:
+        return None
+
+    # Si el mismo nombre de muestra aparece más de una vez (ver docstring de
+    # _parametros_por_nombre), se numeran las etiquetas del eje X para que
+    # ambas barras se vean por separado en vez de superponerse en una sola.
+    conteo = {}
+    for nombre, _ in muestras_datos:
+        conteo[nombre] = conteo.get(nombre, 0) + 1
+    vistos = {}
+    muestras = []
+    datos_por_muestra = {}
+    for nombre, params in muestras_datos:
+        if conteo[nombre] > 1:
+            vistos[nombre] = vistos.get(nombre, 0) + 1
+            etiqueta = f'{nombre} ({vistos[nombre]})'
+        else:
+            etiqueta = nombre
+        muestras.append(etiqueta)
+        datos_por_muestra[etiqueta] = params
+
+    # Piso de 0.1 en escala logarítmica: ni un valor ausente ni uno realmente
+    # cero (pasa de verdad en datos reales — ej. "Solubilizadores de
+    # Fósforo: 0.0 × 10^0 UFC/gss" cuando esa muestra no dio ningún colonia
+    # de ese grupo funcional) se pueden ubicar en un eje log (Plotly lo
+    # descarta o lo dibuja mal) — mismo problema que resuelve el piso en
+    # _grafico_recuento() de arriba con max(valor, 0.1). El texto del hover
+    # (`y_txt`) sigue mostrando el valor real ("0.0 × 10^0 UFC/gss"), solo la
+    # altura de la barra se pisa. En escala lineal (Colonización/Densidad/
+    # Esporas) un 0 sí se grafica sin distorsión, así que el piso solo
+    # aplica con log=True.
+    traces = []
+    for serie in series_nombres:
+        y_num, y_txt, tiene_dato = [], [], False
+        for m in muestras:
+            texto = datos_por_muestra.get(m, {}).get(serie)
+            valor = _valor_numerico_parametro(texto)
+            if valor is not None:
+                tiene_dato = True
+            if valor is None:
+                y_num.append(0.1 if log else 0)
+            elif log and valor <= 0:
+                y_num.append(0.1)
+            else:
+                y_num.append(valor)
+            y_txt.append(texto or '—')
+        if not tiene_dato:
+            continue
+        traces.append(go.Bar(
+            name=serie, x=muestras, y=y_num, text=y_txt,
+            hovertemplate='<b>%{x}</b><br>' + serie + ': %{text}<extra></extra>',
+        ))
+    if not traces:
+        return None
+
+    fig = go.Figure(data=traces)
+    fig.update_layout(
+        barmode='group',
+        yaxis_type='log' if log else 'linear',
+        yaxis_title=titulo_y,
+        xaxis_title='Muestra',
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font=dict(family='Inter, sans-serif', size=12),
+        margin=dict(t=20, b=120, l=60, r=20),
+        xaxis=dict(tickangle=-35),
+        showlegend=len(traces) > 1,
+        legend=dict(orientation='h', y=1.15) if len(traces) > 1 else {},
+        height=440,
+    )
     return json.loads(cast(str, fig.to_json()))
 
 
@@ -142,15 +280,26 @@ def _grafico_heatmap_pruebas(ensayo):
 @login_required
 def lista_ensayos(request):
     tipo_filtro = request.GET.get('tipo', '')
+    # 'cipal' es un filtro sintético (no existe como valor de `tipo` en la
+    # base — EnsayoMicrobiologico.tipo solo distingue recuento/aislamiento,
+    # ver comentario en detalle_ensayo) que usa el campo real es_cipal para
+    # separar los reportes CIPAL de los recuentos UFC/g "de verdad": antes
+    # quedaban mezclados bajo un solo conteo de "Recuento".
     qs = EnsayoMicrobiologico.objects.all()
-    if tipo_filtro in ('recuento', 'aislamiento'):
-        qs = qs.filter(tipo=tipo_filtro)
+    if tipo_filtro == 'cipal':
+        qs = qs.filter(es_cipal=True)
+    elif tipo_filtro == 'recuento':
+        qs = qs.filter(tipo='recuento', es_cipal=False)
+    elif tipo_filtro == 'aislamiento':
+        qs = qs.filter(tipo='aislamiento')
 
+    base = EnsayoMicrobiologico.objects
     context = {
         'ensayos': qs,
         'tipo_filtro': tipo_filtro,
-        'total_recuento': EnsayoMicrobiologico.objects.filter(tipo='recuento').count(),
-        'total_aislamiento': EnsayoMicrobiologico.objects.filter(tipo='aislamiento').count(),
+        'total_recuento': base.filter(tipo='recuento', es_cipal=False).count(),
+        'total_cipal': base.filter(es_cipal=True).count(),
+        'total_aislamiento': base.filter(tipo='aislamiento').count(),
     }
     return render(request, 'bioquimica/lista.html', context)
 
@@ -193,10 +342,26 @@ def detalle_ensayo(request, pk):
 
     grafico_recuento_json = None
     grafico_heatmap_json = None
+    grafico_micro_json = None
+    grafico_colonizacion_json = None
+    grafico_densidad_json = None
+    grafico_esporas_json = None
+    lista_otros = []
 
     if ensayo.tipo == 'recuento':
         datos = _grafico_recuento(ensayo)
         grafico_recuento_json = json.dumps(datos) if datos else None
+
+        lista_otros = list(ensayo.recuentos.filter(tipo_organismo='otro').prefetch_related('parametros'))
+        if lista_otros:
+            d = _grafico_cipal_series(lista_otros, _MICRO_SERIES, 'UFC/gss (escala logarítmica)', log=True)
+            grafico_micro_json = json.dumps(d) if d else None
+            d = _grafico_cipal_series(lista_otros, [_SERIE_COLONIZACION], 'Colonización (%)')
+            grafico_colonizacion_json = json.dumps(d) if d else None
+            d = _grafico_cipal_series(lista_otros, [_SERIE_DENSIDAD], 'Densidad de endófito (/47.5%)')
+            grafico_densidad_json = json.dumps(d) if d else None
+            d = _grafico_cipal_series(lista_otros, [_SERIE_ESPORAS], 'Esporas viables /100 gss')
+            grafico_esporas_json = json.dumps(d) if d else None
     else:
         datos = _grafico_heatmap_pruebas(ensayo)
         grafico_heatmap_json = json.dumps(datos) if datos else None
@@ -218,23 +383,56 @@ def detalle_ensayo(request, pk):
         'ensayo': ensayo,
         'grafico_recuento_json': grafico_recuento_json,
         'grafico_heatmap_json': grafico_heatmap_json,
+        'grafico_micro_json': grafico_micro_json,
+        'grafico_colonizacion_json': grafico_colonizacion_json,
+        'grafico_densidad_json': grafico_densidad_json,
+        'grafico_esporas_json': grafico_esporas_json,
         'recuentos_hongos': ensayo.recuentos.filter(tipo_organismo='hongo').prefetch_related('parametros') if ensayo.tipo == 'recuento' else None,
         'recuentos_bacterias': ensayo.recuentos.filter(tipo_organismo='bacteria').prefetch_related('parametros') if ensayo.tipo == 'recuento' else None,
-        'recuentos_otros': ensayo.recuentos.filter(tipo_organismo='otro').prefetch_related('parametros') if ensayo.tipo == 'recuento' else None,
+        'recuentos_otros': lista_otros or None,
         'aislados_con_pruebas': aislados_con_pruebas,
         'aislados_sin_pruebas': aislados_sin_pruebas,
     }
     return render(request, 'bioquimica/detalle.html', context)
 
 
+@login_required
+def ver_pdf(request, pk):
+    """Sirve el PDF original adjunto a un ensayo — SOLO Docente/staff.
+    No usar `ensayo.archivo_pdf.url` (el /media/... crudo) en ningún
+    template: esa URL la sirve Django sin ningún control de acceso (ver
+    config/urls.py), cualquiera que la conozca puede bajarla sin sesión.
+    Esta vista es el único camino con permiso real hacia el archivo — el
+    original trae membrete, logo y datos de contacto del laboratorio y del
+    cliente, así que no se expone a estudiantes ni a un futuro público
+    anónimo si el sistema se abre (ver conversación sobre nombres de
+    laboratorio)."""
+    if _bloquear_si_estudiante(request):
+        return redirect('bioquimica:detalle', pk=pk)
+
+    ensayo = get_object_or_404(EnsayoMicrobiologico, pk=pk)
+    if not ensayo.archivo_pdf:
+        raise Http404("Este ensayo no tiene un PDF original adjunto.")
+
+    return FileResponse(
+        ensayo.archivo_pdf.open('rb'),
+        content_type='application/pdf',
+        filename=f"{ensayo.codigo}.pdf",
+    )
+
+
 def _fecha(valor):
+    """None si el PDF no traía fecha o no se pudo interpretar — antes caía
+    a date.today(), lo que mostraba la fecha de IMPORTACIÓN como si fuera
+    la del análisis. _guardar_ensayo es quien decide qué hacer con un None
+    (dejar el campo sin fecha + anotarlo en Observaciones)."""
     if not valor:
-        return date.today()
+        return None
     try:
         from datetime import datetime
         return datetime.strptime(valor, '%Y-%m-%d').date()
     except (ValueError, TypeError):
-        return date.today()
+        return None
 
 
 def _guardar_ensayo(archivo, request):
@@ -261,17 +459,27 @@ def _guardar_ensayo(archivo, request):
         existing = EnsayoMicrobiologico.objects.get(codigo=codigo)
         raise _DuplicadoError(codigo, existing.pk)
 
+    fecha_recepcion = _fecha(header.get('fecha_recepcion'))
+    fecha_ejecucion = _fecha(header.get('fecha_ejecucion'))
+    fecha_reporte   = _fecha(header.get('fecha_reporte'))
+
+    observaciones = ''
+    if fecha_recepcion is None and fecha_ejecucion is None and fecha_reporte is None:
+        observaciones = 'En el informe no se encuentra esta información (fecha del análisis).'
+
     with transaction.atomic():
         ensayo = EnsayoMicrobiologico(
             codigo=codigo,
             tipo=resultado['tipo'],
+            es_cipal=resultado.get('formato') == 'cipal',
             nombre_muestra=header.get('nombre_muestra', 'Muestra'),
             etiqueta=header.get('etiqueta', ''),
-            fecha_recepcion=_fecha(header.get('fecha_recepcion')),
-            fecha_ejecucion=_fecha(header.get('fecha_ejecucion')),
-            fecha_reporte=_fecha(header.get('fecha_reporte')),
+            fecha_recepcion=fecha_recepcion,
+            fecha_ejecucion=fecha_ejecucion,
+            fecha_reporte=fecha_reporte,
             temp_ambiental=header.get('temp_ambiental'),
             humedad_ambiental=header.get('humedad_ambiental'),
+            observaciones=observaciones,
             registrado_por=request.user,
         )
         archivo.seek(0)
@@ -279,9 +487,21 @@ def _guardar_ensayo(archivo, request):
         ensayo.save()
 
         if resultado['tipo'] == 'recuento':
-            RecuentoUFC.objects.bulk_create([
-                RecuentoUFC(ensayo=ensayo, **d) for d in resultado['datos']
-            ])
+            # No se usa bulk_create: el formato CIPAL trae "Parámetros
+            # Adicionales" por fila (ver pdf_parser._parsear_tabla_cipal) y
+            # esas filas hijas necesitan el pk del RecuentoUFC ya guardado —
+            # mismo patrón que ingreso_manual más abajo. El formato MAg-XXX
+            # no trae 'parametros' (pop devuelve []) así que no cambia nada.
+            for i, d in enumerate(resultado['datos']):
+                d = dict(d)
+                parametros = d.pop('parametros', [])
+                d.setdefault('orden', i)
+                r = RecuentoUFC(ensayo=ensayo, **d)
+                r.save()
+                if parametros:
+                    ParametroRecuento.objects.bulk_create([
+                        ParametroRecuento(recuento=r, **p) for p in parametros
+                    ])
         else:
             for org_data in resultado['datos']:
                 taxonomia = org_data.pop('taxonomia', {})
@@ -302,8 +522,26 @@ class _DuplicadoError(Exception):
         self.pk = pk
 
 
+def _bloquear_si_estudiante(request):
+    """True (y ya dejó el mensaje de error) si el usuario no tiene permiso
+    para registrar ensayos — Subir PDF e Ingreso manual son exclusivos de
+    Docente/Investigador (y Admin); Estudiante puede ver los ensayos ya
+    cargados pero no cargar nuevos."""
+    if request.user.rol == 'estudiante':
+        messages.error(
+            request,
+            "Su nivel de cuenta no dispone de permisos para registrar ensayos. "
+            "Si es docente o investigador, contacte al administrador del sistema para actualizar su rol."
+        )
+        return True
+    return False
+
+
 @login_required
 def subir_pdf(request):
+    if _bloquear_si_estudiante(request):
+        return redirect('bioquimica:lista')
+
     if request.method != 'POST':
         return render(request, 'bioquimica/subir_pdf.html')
 
@@ -327,7 +565,11 @@ def subir_pdf(request):
             creados.append((ensayo.codigo, ensayo.pk))
         except _DuplicadoError as e:
             duplicados.append(e.codigo)
-        except (ValueError, Exception) as e:
+        except Exception as e:
+            # Exception a secas: cubre tanto el ValueError "amigable" de
+            # _guardar_ensayo (PDF ilegible, sin código, etc.) como cualquier
+            # otro fallo inesperado del parser — un solo PDF con problemas no
+            # debe frenar la carga masiva del resto de archivos seleccionados.
             errores.append(str(e))
 
     if creados:
@@ -418,6 +660,15 @@ def _parsear_recuento_manual(post):
             siguiente += 1
         fila['parametros'] = parametros
 
+        # Una fila con nombre pero sin ningún dato real (ni coeficiente/
+        # exponente, ni "<1 UFC/g", ni un solo Parámetro Adicional) no tiene
+        # nada que graficar ni que mostrar — mismo criterio que ya aplica
+        # pdf_parser._parsear_tabla_cipal para no guardar una fila fantasma.
+        # Acá no se descarta en el momento: se marca y el llamador decide
+        # (avisarle al usuario cuáles se omitieron, en vez de borrarlas en
+        # silencio como hace el importador de PDF).
+        fila['sin_datos'] = not (menor or fila['coeficiente'] is not None or parametros)
+
         filas.append(fila)
         i += 1
 
@@ -473,14 +724,32 @@ def _parsear_aislamiento_manual(post):
     return organismos
 
 
+def _contexto_formulario_previo(request, form):
+    """Contexto para volver a renderizar ingreso_manual.html después de un
+    error (formulario inválido, código duplicado, fila sin datos…) SIN
+    perder las tarjetas de Recuento/Organismo que el usuario ya había
+    completado. El JS del template solo tenía una ruta: arrancar con una
+    tarjeta vacía — cualquier error de validación borraba todo lo tipeado y
+    obligaba a empezar de nuevo. Se reaprovechan los mismos parsers que
+    arman los datos para guardar (_parsear_recuento_manual /
+    _parsear_aislamiento_manual) para reconstruir esas tarjetas en el
+    navegador."""
+    filas = _parsear_recuento_manual(request.POST)
+    for f in filas:
+        f.pop('sin_datos', None)
+        if f.get('coeficiente') is not None:
+            f['coeficiente'] = str(f['coeficiente'])  # Decimal no es serializable a JSON
+
+    return {
+        'form': form,
+        'filas_previas_json': json.dumps(filas),
+        'organismos_previos_json': json.dumps(_parsear_aislamiento_manual(request.POST)),
+    }
+
+
 @login_required
 def ingreso_manual(request):
-    if request.user.rol == 'estudiante':
-        messages.error(
-            request,
-            "Su nivel de cuenta no dispone de permisos para registrar ensayos. "
-            "Si es docente o investigador, contacte al administrador del sistema para actualizar su rol."
-        )
+    if _bloquear_si_estudiante(request):
         return redirect("bioquimica:lista")
 
     if request.method != 'POST':
@@ -488,14 +757,15 @@ def ingreso_manual(request):
 
     form = EnsayoManualForm(request.POST, request.FILES)
     if not form.is_valid():
-        return render(request, 'bioquimica/ingreso_manual.html', {'form': form})
+        return render(request, 'bioquimica/ingreso_manual.html', _contexto_formulario_previo(request, form))
 
     codigo = form.cleaned_data['codigo']
     if EnsayoMicrobiologico.objects.filter(codigo=codigo).exists():
         form.add_error('codigo', 'Ya existe un ensayo con este código.')
-        return render(request, 'bioquimica/ingreso_manual.html', {'form': form})
+        return render(request, 'bioquimica/ingreso_manual.html', _contexto_formulario_previo(request, form))
 
     tipo = form.cleaned_data['tipo']
+    omitidas = []
 
     try:
         with transaction.atomic():
@@ -521,7 +791,15 @@ def ingreso_manual(request):
                 filas = _parsear_recuento_manual(request.POST)
                 if not filas:
                     raise ValueError("Agrega al menos un microorganismo con su recuento UFC/g.")
-                for i, f in enumerate(filas):
+                filas_validas = [f for f in filas if not f.get('sin_datos')]
+                omitidas = [f['nombre'] for f in filas if f.get('sin_datos')]
+                if not filas_validas:
+                    raise ValueError(
+                        "Ninguna fila tiene datos para guardar: completá Coeficiente/× 10^, "
+                        "marcá «<1 UFC/g», o agregá al menos un Parámetro Adicional."
+                    )
+                for i, f in enumerate(filas_validas):
+                    f.pop('sin_datos', None)
                     parametros = f.pop('parametros')
                     r = RecuentoUFC(ensayo=ensayo, orden=i, **f)
                     r.save()
@@ -543,8 +821,10 @@ def ingreso_manual(request):
                         ])
     except ValueError as e:
         messages.error(request, str(e))
-        return render(request, 'bioquimica/ingreso_manual.html', {'form': form})
+        return render(request, 'bioquimica/ingreso_manual.html', _contexto_formulario_previo(request, form))
 
     registrar_accion(request, ensayo, "Ensayo registrado manualmente (sin PDF).", accion=ADDITION)
+    if omitidas:
+        messages.warning(request, f"Se omitieron {len(omitidas)} fila(s) sin datos: {', '.join(omitidas)}.")
     messages.success(request, f"Ensayo {ensayo.codigo} registrado manualmente.")
     return redirect('bioquimica:detalle', pk=ensayo.pk)

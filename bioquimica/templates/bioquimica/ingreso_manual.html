@@ -1,4 +1,5 @@
 {% extends "analisis/base.html" %}
+{% load custom_filters %}
 
 {% block topbar_title %}Ingreso Manual{% endblock %}
 
@@ -11,7 +12,6 @@
 {% block nav_ensayos %}active{% endblock %}
 
 {% block extra_css %}
-<style>
 .bq-tabs {
     display: flex;
     gap: 6px;
@@ -43,6 +43,14 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: .6rem .9rem;
+}
+/* En pantallas anchas el contenedor ya no es de 760px (ver más abajo) — se
+   aprovecha el espacio extra poniendo cada grilla en una sola fila en vez
+   de amontonarse en 2-3 columnas fijas, sin tocar nada por debajo de 1000px. */
+@media (min-width: 1000px) {
+    .bq-form-grid { grid-template-columns: repeat(4, 1fr); }
+    .bq-form-grid-3 { grid-template-columns: repeat(5, 1fr); }
+    .bq-org-taxo-grid { grid-template-columns: repeat(7, 1fr) !important; }
 }
 @media (max-width: 720px) {
     .bq-form-grid, .bq-form-grid-3 { grid-template-columns: 1fr 1fr; }
@@ -80,11 +88,23 @@
     color: #A32D2D; background: none; border: 1px solid #E8B4B4;
     border-radius: 6px; cursor: pointer; font-size: 12px; padding: 4px 10px;
 }
-</style>
+
+.bq-param-ref {
+    background: #F8F7F4; border-radius: 8px; padding: 10px 14px; margin-top: 8px;
+    font-size: 12px; color: #5F5E5A; line-height: 1.6;
+}
+.bq-param-ref-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.bq-param-ref-pills code {
+    background: #EFEDE6; color: #1A1A18; padding: 2px 7px;
+    border-radius: 4px; font-size: 11px;
+}
+
+.bq-req { color: var(--rojo, #A32D2D); margin-left: 2px; }
+.bq-req-legend { font-size: 11.5px; color: #888780; margin: .4rem 0 0; }
 {% endblock %}
 
 {% block content %}
-<div style="max-width: 760px; margin: 0 auto;">
+<div style="max-width: 1100px; margin: 0 auto;">
 
     <div class="page-header">
         <h1 style="font-family:'Fraunces',serif; font-size:24px; font-weight:500; color:#1A1A18;">
@@ -122,15 +142,15 @@
 
             <div class="bq-form-grid" style="margin-top:.75rem;">
                 <div class="form-group">
-                    <label class="form-label">{{ form.codigo.label }}</label>
+                    <label class="form-label">{{ form.codigo.label }}<span class="bq-req">*</span></label>
                     {{ form.codigo }}
                 </div>
                 <div class="form-group">
-                    <label class="form-label">{{ form.tipo.label }}</label>
+                    <label class="form-label">{{ form.tipo.label }}<span class="bq-req">*</span></label>
                     {{ form.tipo }}
                 </div>
                 <div class="form-group">
-                    <label class="form-label">{{ form.nombre_muestra.label }}</label>
+                    <label class="form-label">{{ form.nombre_muestra.label }}<span class="bq-req">*</span></label>
                     {{ form.nombre_muestra }}
                 </div>
                 <div class="form-group">
@@ -138,6 +158,7 @@
                     {{ form.archivo_pdf }}
                 </div>
             </div>
+            <p class="bq-req-legend"><span class="bq-req">*</span> Campo obligatorio</p>
 
             <div class="form-group" style="margin-top:.3rem;">
                 <label class="form-label">{{ form.etiqueta.label }}</label>
@@ -146,15 +167,21 @@
 
             <div class="bq-form-grid-3" style="margin-top:.3rem;">
                 <div class="form-group">
-                    <label class="form-label">{{ form.fecha_recepcion.label }}</label>
+                    <label class="form-label">
+                        <span class="bs-tip" data-tip="Cuándo el laboratorio recibió la muestra física.">{{ form.fecha_recepcion.label }} <i class="ti ti-help-circle bs-tip-ico"></i></span>
+                    </label>
                     {{ form.fecha_recepcion }}
                 </div>
                 <div class="form-group">
-                    <label class="form-label">{{ form.fecha_ejecucion.label }}</label>
+                    <label class="form-label">
+                        <span class="bs-tip" data-tip="Cuándo se procesó el análisis en el laboratorio (siembra, incubación, etc.) — puede ser el mismo día que la recepción, o después.">{{ form.fecha_ejecucion.label }} <i class="ti ti-help-circle bs-tip-ico"></i></span>
+                    </label>
                     {{ form.fecha_ejecucion }}
                 </div>
                 <div class="form-group">
-                    <label class="form-label">{{ form.fecha_reporte.label }}</label>
+                    <label class="form-label">
+                        <span class="bs-tip" data-tip="Cuándo se emitió el informe con los resultados — suele ser semanas después de la ejecución. Es la fecha que se usa para ordenar la lista de ensayos.">{{ form.fecha_reporte.label }} <i class="ti ti-help-circle bs-tip-ico"></i></span>
+                    </label>
                     {{ form.fecha_reporte }}
                 </div>
                 <div class="form-group">
@@ -182,6 +209,17 @@
                 Actinomicetes juntos), dejá esos campos vacíos y agregá "Parámetros Adicionales" —
                 elegí "Otro / Mixto" como Tipo si la fila no es puntualmente una bacteria u hongo.
             </p>
+
+            <div class="bq-param-ref">
+                <strong>Para que además arme un gráfico aparte</strong>, escribí el Parámetro
+                exactamente así (mayúsculas y acentos incluidos) — cualquier otro nombre se guarda
+                igual y se ve en la tabla, solo que sin gráfico propio:
+                <div class="bq-param-ref-pills">
+                    <code>Bacterias</code><code>Hongos</code><code>Actinomicetes</code>
+                    <code>Solubilizadores de Fósforo</code><code>Celulolíticos</code><code>Fijadores de N de vida libre</code>
+                    <code>Colonización (%)</code><code>Densidad de endófito (/47.5%)</code><code>Esporas viables /100 gss</code>
+                </div>
+            </div>
 
             <div id="rec-cards" style="margin-top:.75rem;"></div>
 
@@ -265,7 +303,12 @@ function renombrarTarjetas(cards, prefijoFijo, prefijoAnidado, campoValor) {
 var recCards = document.getElementById('rec-cards');
 var recCount = 0;
 
-function agregarTarjetaRecuento() {
+// `datos`: si viene con valores (repoblado tras un error de validación —
+// ver _contexto_formulario_previo en views.py), la tarjeta nace ya
+// completada en vez de vacía. Sin argumento se comporta como antes: una
+// tarjeta en blanco (botón "Agregar recuento" / estado inicial sin errores).
+function agregarTarjetaRecuento(datos) {
+    datos = datos || {};
     var idx = recCount++;
     var card = document.createElement('div');
     card.className = 'bq-org-card';
@@ -284,8 +327,8 @@ function agregarTarjetaRecuento() {
                 '</select>' +
             '</div>' +
             '<div class="form-group">' +
-                '<label class="form-label">Microorganismo / Muestra</label>' +
-                '<input type="text" name="rec_nombre_' + idx + '" class="form-control" placeholder="Ej: Bacillus spp., o m1 - Brachiaria + Clitoria">' +
+                '<label class="form-label">Microorganismo / Muestra<span class="bq-req">*</span></label>' +
+                '<input type="text" name="rec_nombre_' + idx + '" class="form-control" placeholder="Ej: Bacillus spp., o m1 - Brachiaria + Clitoria" required>' +
             '</div>' +
         '</div>' +
         '<div class="bq-form-grid-3">' +
@@ -309,15 +352,30 @@ function agregarTarjetaRecuento() {
 
     var paramBody = card.querySelector('.param-body');
     card.querySelector('.btn-add-param').addEventListener('click', function () {
-        agregarFilaParametro(paramBody, 'recparam', 'valor', 'Ej: pH, NMP/g, Colonización %', 'Ej: 6.5, <10, 48.48');
+        agregarFilaParametro(paramBody, 'recparam', 'valor', 'Ej: pH, Colonización (%)', 'Ej: 6.5, <10, 48.48');
     });
     card.querySelector('.btn-quitar-org').addEventListener('click', function () {
         card.remove();
     });
 
     recCards.appendChild(card);
+
+    if (datos.tipo_organismo) card.querySelector('[name^="rec_tipo_"]').value = datos.tipo_organismo;
+    if (datos.nombre) card.querySelector('[name^="rec_nombre_"]').value = datos.nombre;
+    if (datos.coeficiente != null) card.querySelector('[name^="rec_coeficiente_"]').value = datos.coeficiente;
+    if (datos.exponente != null) card.querySelector('[name^="rec_exponente_"]').value = datos.exponente;
+    if (datos.menor_que_limite) card.querySelector('[name^="rec_menor_"]').value = 'si';
+    (datos.parametros || []).forEach(function (p) {
+        agregarFilaParametro(paramBody, 'recparam', 'valor', 'Ej: pH, Colonización (%)', 'Ej: 6.5, <10, 48.48');
+        var fila = paramBody.querySelector('tr:last-child');
+        fila.querySelector('.recparam-numero').value = p.numero;
+        fila.querySelector('.recparam-nombre').value = p.nombre;
+        fila.querySelector('.recparam-valor').value = p.valor;
+    });
+
+    return card;
 }
-document.getElementById('btn-add-rec').addEventListener('click', agregarTarjetaRecuento);
+document.getElementById('btn-add-rec').addEventListener('click', function () { agregarTarjetaRecuento(); });
 
 /* ════════════════════════════════════════════════
    2. AISLAMIENTO — organismos + pruebas dinámicas
@@ -325,7 +383,11 @@ document.getElementById('btn-add-rec').addEventListener('click', agregarTarjetaR
 var orgCards = document.getElementById('org-cards');
 var orgCount = 0;
 
-function agregarOrganismo() {
+// Mismo criterio que agregarTarjetaRecuento(datos): sin argumento es la
+// tarjeta en blanco de siempre; con `datos` (repoblado tras un error de
+// validación) nace ya completada.
+function agregarOrganismo(datos) {
+    datos = datos || {};
     var idx = orgCount++;
     var card = document.createElement('div');
     card.className = 'bq-org-card';
@@ -343,8 +405,8 @@ function agregarOrganismo() {
                 '</select>' +
             '</div>' +
             '<div class="form-group">' +
-                '<label class="form-label">Nombre Científico</label>' +
-                '<input type="text" name="org_nombre_' + idx + '" class="form-control" placeholder="Ej: Pseudomonas spp.">' +
+                '<label class="form-label">Nombre Científico<span class="bq-req">*</span></label>' +
+                '<input type="text" name="org_nombre_' + idx + '" class="form-control" placeholder="Ej: Pseudomonas spp." required>' +
             '</div>' +
         '</div>' +
         '<div class="bq-org-taxo-grid">' +
@@ -379,9 +441,30 @@ function agregarOrganismo() {
     });
 
     orgCards.appendChild(card);
-    agregarFilaParametro(pruebasBody, 'prueba', 'resultado', 'Nombre de la prueba', 'Resultado');
+
+    if (datos.tipo) card.querySelector('[name^="org_tipo_"]').value = datos.tipo;
+    if (datos.nombre_cientifico) card.querySelector('[name^="org_nombre_"]').value = datos.nombre_cientifico;
+    ['dominio', 'filo', 'clase', 'familia', 'genero', 'especie'].forEach(function (campo) {
+        if (datos[campo]) card.querySelector('[name^="org_' + campo + '_"]').value = datos[campo];
+    });
+    if (datos.orden_taxonomico) card.querySelector('[name^="org_orden_"]').value = datos.orden_taxonomico;
+
+    var pruebas = datos.pruebas || [];
+    if (pruebas.length) {
+        pruebas.forEach(function (p) {
+            agregarFilaParametro(pruebasBody, 'prueba', 'resultado', 'Nombre de la prueba', 'Resultado');
+            var fila = pruebasBody.querySelector('tr:last-child');
+            fila.querySelector('.prueba-numero').value = p.numero;
+            fila.querySelector('.prueba-nombre').value = p.nombre_prueba;
+            fila.querySelector('.prueba-resultado').value = p.resultado;
+        });
+    } else {
+        agregarFilaParametro(pruebasBody, 'prueba', 'resultado', 'Nombre de la prueba', 'Resultado');
+    }
+
+    return card;
 }
-document.getElementById('btn-add-org').addEventListener('click', agregarOrganismo);
+document.getElementById('btn-add-org').addEventListener('click', function () { agregarOrganismo(); });
 
 /* ════════════════════════════════════════════════
    3. Mostrar panel según Tipo de Ensayo
@@ -394,13 +477,44 @@ function actualizarPanel() {
     var esRecuento = selTipo.value === 'recuento';
     panelRecuento.style.display    = esRecuento ? 'block' : 'none';
     panelAislamiento.style.display = esRecuento ? 'none'  : 'block';
+
+    // Un campo required dentro de un panel display:none bloquea el envío
+    // del formulario sin poder mostrar el aviso nativo del navegador
+    // ("An invalid form control … is not focusable") — el usuario queda
+    // atascado sin ver ningún error. Se activa/desactiva required según
+    // qué panel esté visible en vez de dejarlo fijo en la plantilla.
+    recCards.querySelectorAll('[name^="rec_nombre_"]').forEach(function (input) {
+        input.required = esRecuento;
+    });
+    orgCards.querySelectorAll('[name^="org_nombre_"]').forEach(function (input) {
+        input.required = !esRecuento;
+    });
 }
 selTipo.addEventListener('change', actualizarPanel);
-actualizarPanel();
 
-// Estado inicial: un recuento y un organismo listos para llenar.
-agregarTarjetaRecuento();
-agregarOrganismo();
+// Estado inicial: si el formulario se re-renderizó por un error (código
+// duplicado, fila sin datos, etc. — ver _contexto_formulario_previo en
+// views.py) se reconstruyen las tarjetas con lo que el usuario ya había
+// tipeado; si no, arranca con una tarjeta en blanco de cada tipo, como antes.
+var filasPrevias = {{ filas_previas_json|default:"[]"|json_embed }};
+var organismosPrevios = {{ organismos_previos_json|default:"[]"|json_embed }};
+
+if (filasPrevias.length) {
+    filasPrevias.forEach(function (f) { agregarTarjetaRecuento(f); });
+} else {
+    agregarTarjetaRecuento();
+}
+if (organismosPrevios.length) {
+    organismosPrevios.forEach(function (o) { agregarOrganismo(o); });
+} else {
+    agregarOrganismo();
+}
+
+// Recién acá, con las tarjetas ya creadas, actualizarPanel() puede
+// sincronizar required correctamente — llamarla antes (cuando rec-cards/
+// org-cards todavía están vacías) no tiene ningún input que activar/
+// desactivar todavía.
+actualizarPanel();
 
 /* ════════════════════════════════════════════════
    4. Envío

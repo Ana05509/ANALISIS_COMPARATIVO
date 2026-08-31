@@ -8,10 +8,9 @@
 </a>
 {% endblock %}
 
-{% block nav_ensayos %}active{% endblock %}
+{% block nav_subir_pdf %}active{% endblock %}
 
 {% block extra_css %}
-<style>
 .bq-tabs {
     display: flex;
     gap: 6px;
@@ -33,19 +32,41 @@
 .bq-tab-btn i { font-size: 16px; }
 .bq-tab-btn:hover { color: #1A1A18; }
 .bq-tab-btn.active { color: #1D9E75; border-bottom-color: #1D9E75; }
-</style>
+
+/* Grilla principal: form a la izquierda, requisitos a la derecha — mismo
+   patrón que .upload-grid en analisis/subir_datos.html ("Columnas
+   requeridas"), para que las dos páginas de "cargar algo al sistema" se
+   sientan consistentes. */
+.bq-upload-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+@media (max-width: 860px) {
+    .bq-upload-grid { grid-template-columns: 1fr; }
+}
+
+.bq-req-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 12.5px; line-height: 1.5; color: #3A3934;
+    margin-bottom: 7px;
+}
+.bq-req-item:last-child { margin-bottom: 0; }
+.bq-req-item i { color: #1D9E75; flex-shrink: 0; margin-top: 2px; font-size: 15px; }
+.bq-req-item code { font-size: 11.5px; }
 {% endblock %}
 
 {% block content %}
-<div style="max-width: 580px; margin: 0 auto;">
+<div style="max-width: 960px; margin: 0 auto;">
 
     <div class="page-header">
         <h1 style="font-family:'Fraunces',serif; font-size:24px; font-weight:500; color:#1A1A18;">
             Procesar Reportes de Laboratorio
         </h1>
         <p style="color:#5F5E5A; font-size:14px; margin-top:6px;">
-            Sube uno o varios PDFs del laboratorio DISErLAB-PUCE. El sistema extrae
-            automáticamente los datos de recuento UFC/g o pruebas bioquímicas.
+            Sube uno o varios PDFs de reportes de laboratorio. El sistema reconoce
+            automáticamente dos formatos — revisá los requisitos antes de subir.
         </p>
     </div>
 
@@ -58,59 +79,120 @@
         </a>
     </div>
 
-    <div class="card" style="padding: 28px 32px;">
-        <form method="post" enctype="multipart/form-data" id="upload-form">
-            {% csrf_token %}
+    <div class="bq-upload-grid">
 
-            <div class="form-group">
-                <label class="form-label">Archivos PDF</label>
-                <div id="drop-zone" style="
-                    border: 2px dashed #D3D1C7;
-                    border-radius: 12px;
-                    padding: 36px 20px;
-                    text-align: center;
-                    cursor: pointer;
-                    transition: border-color 0.2s, background 0.2s;
-                    background: #FAFAF8;
-                " onclick="document.getElementById('archivo-input').click();"
-                   ondragover="event.preventDefault(); this.style.borderColor='#1D9E75'; this.style.background='#F0FAF6';"
-                   ondragleave="this.style.borderColor='#D3D1C7'; this.style.background='#FAFAF8';"
-                   ondrop="handleDrop(event);">
-                    <i class="ti ti-files" style="font-size:38px; color:#C8C5BC;" id="drop-icon"></i>
-                    <p style="margin-top:10px; font-size:14px; color:#5F5E5A;" id="drop-text">
-                        Arrastra los PDFs aquí o <span style="color:#1D9E75; font-weight:600;">haz clic para seleccionar</span>
-                    </p>
-                    <p style="font-size:12px; color:#888780; margin-top:4px;">Puedes seleccionar varios archivos a la vez · Solo .pdf</p>
-                    <input type="file" name="archivos" id="archivo-input" accept=".pdf" multiple style="display:none;"
-                           aria-label="Seleccionar archivos PDF">
+        <div class="card" style="padding: 28px 32px;">
+            <form method="post" enctype="multipart/form-data" id="upload-form">
+                {% csrf_token %}
+
+                <div class="form-group">
+                    <label class="form-label">Archivos PDF</label>
+                    <div id="drop-zone" style="
+                        border: 2px dashed #D3D1C7;
+                        border-radius: 12px;
+                        padding: 36px 20px;
+                        text-align: center;
+                        cursor: pointer;
+                        transition: border-color 0.2s, background 0.2s;
+                        background: #FAFAF8;
+                    " onclick="document.getElementById('archivo-input').click();"
+                       ondragover="event.preventDefault(); this.style.borderColor='#1D9E75'; this.style.background='#F0FAF6';"
+                       ondragleave="this.style.borderColor='#D3D1C7'; this.style.background='#FAFAF8';"
+                       ondrop="handleDrop(event);">
+                        <i class="ti ti-files" style="font-size:38px; color:#C8C5BC;" id="drop-icon"></i>
+                        <p style="margin-top:10px; font-size:14px; color:#5F5E5A;" id="drop-text">
+                            Arrastra los PDFs aquí o <span style="color:#1D9E75; font-weight:600;">haz clic para seleccionar</span>
+                        </p>
+                        <p style="font-size:12px; color:#888780; margin-top:4px;">Puedes seleccionar varios archivos a la vez · Solo .pdf</p>
+                        <input type="file" name="archivos" id="archivo-input" accept=".pdf" multiple style="display:none;"
+                               aria-label="Seleccionar archivos PDF">
+                    </div>
+                </div>
+
+                {# Lista de archivos seleccionados #}
+                <div id="lista-archivos" style="display:none; margin-bottom:16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span id="contador-archivos" style="font-size:13px; font-weight:600; color:#1A1A18;"></span>
+                        <a href="#" onclick="limpiarArchivos(); return false;" style="font-size:12px; color:#A32D2D;">✕ Quitar todos</a>
+                    </div>
+                    <ul id="nombres-archivos" style="
+                        margin:0; padding:0; list-style:none;
+                        background:#F4F3EF; border-radius:8px;
+                        max-height:160px; overflow-y:auto;
+                    "></ul>
+                </div>
+
+                <button type="submit" id="btn-procesar" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;">
+                    <i class="ti ti-cpu" aria-hidden="true"></i> <span id="btn-label">Procesar PDF</span>
+                </button>
+            </form>
+        </div>
+
+        {# ── Apartado: qué debe cumplir cada formato para subirse automático ── #}
+        <div style="display:flex; flex-direction:column; gap:.75rem;">
+
+            <div class="card card-sm" style="padding:.9rem 1rem;">
+                <div class="card-title">
+                    <i class="ti ti-file-check" aria-hidden="true"></i> Requisitos — Formato A
+                </div>
+                <div style="margin:.4rem 0 .65rem;">
+                    <span style="display:inline-block; background:#E6F1FB; color:#0C447C; padding:1px 8px; border-radius:4px; font-size:11px; font-weight:600;">📊 Recuento UFC/g</span>
+                    <span style="display:inline-block; background:#F1EFE8; color:#5F5E5A; padding:1px 8px; border-radius:4px; font-size:11px; font-weight:600; margin-left:4px;">🔬 Aislamiento</span>
+                </div>
+                <div class="bq-req-item">
+                    <i class="ti ti-check" aria-hidden="true"></i>
+                    <span>Código de ensayo tipo <code>MAg-225-2023</code> visible en el documento</span>
+                </div>
+                <div class="bq-req-item">
+                    <i class="ti ti-check" aria-hidden="true"></i>
+                    <span>Encabezado <code>"INFORME DEL ENSAYO"</code></span>
+                </div>
+                <div class="bq-req-item">
+                    <i class="ti ti-check" aria-hidden="true"></i>
+                    <span>Una tabla por microorganismo con columna "Bacteria" u "Hongo" (Recuento), o de pruebas bioquímicas + taxonomía (Aislamiento)</span>
+                </div>
+                <div class="bq-req-item">
+                    <i class="ti ti-check" aria-hidden="true"></i>
+                    <span>Fechas en formato <code>AAAA-MM-DD</code></span>
                 </div>
             </div>
 
-            {# Lista de archivos seleccionados #}
-            <div id="lista-archivos" style="display:none; margin-bottom:16px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <span id="contador-archivos" style="font-size:13px; font-weight:600; color:#1A1A18;"></span>
-                    <a href="#" onclick="limpiarArchivos(); return false;" style="font-size:12px; color:#A32D2D;">✕ Quitar todos</a>
+            <div class="card card-sm" style="padding:.9rem 1rem;">
+                <div class="card-title">
+                    <i class="ti ti-file-check" aria-hidden="true"></i> Requisitos — Formato B
                 </div>
-                <ul id="nombres-archivos" style="
-                    margin:0; padding:0; list-style:none;
-                    background:#F4F3EF; border-radius:8px;
-                    max-height:160px; overflow-y:auto;
-                "></ul>
+                <div style="margin:.4rem 0 .65rem;">
+                    <span style="display:inline-block; background:#EAF6EE; color:#1D7A45; padding:1px 8px; border-radius:4px; font-size:11px; font-weight:600;">🌱 Formato B</span>
+                </div>
+                <p style="font-size:11px; color:var(--text-muted); margin:0 0 .65rem; line-height:1.45;">
+                    Microbiológico de suelo o Micorrízico.
+                </p>
+                <div class="bq-req-item">
+                    <i class="ti ti-check" aria-hidden="true"></i>
+                    <span>Encabezado <code>"Diagnóstico Microbiológico"</code> o <code>"Diagnóstico Micorrízico"</code></span>
+                </div>
+                <div class="bq-req-item">
+                    <i class="ti ti-check" aria-hidden="true"></i>
+                    <span>Código de muestra tipo <code>088-107</code></span>
+                </div>
+                <div class="bq-req-item">
+                    <i class="ti ti-check" aria-hidden="true"></i>
+                    <span>Tabla "Reporte de Poblaciones" con columnas de Bacterias/Hongos/Actinomicetes + grupos funcionales, Colonización/Densidad de endófito, o Esporas viables</span>
+                </div>
             </div>
 
-            <div style="background:#F8F7F4; border-radius:10px; padding:14px 16px; margin-bottom:20px; font-size:13px; color:#5F5E5A; line-height:1.7;">
-                <strong style="color:#1A1A18;">Tipos de reporte soportados:</strong><br>
-                <span style="display:inline-block; background:#E6F1FB; color:#0C447C; padding:1px 8px; border-radius:4px; font-size:11px; font-weight:600; margin-top:4px;">📊 Recuento UFC/g</span>
-                Bacterias totales, Solubilizadoras de fosfato, Hongos, etc.<br>
-                <span style="display:inline-block; background:#F1EFE8; color:#5F5E5A; padding:1px 8px; border-radius:4px; font-size:11px; font-weight:600; margin-top:4px;">🔬 Aislamiento</span>
-                Pruebas bioquímicas, taxonomía completa por organismo.
+            <div class="card card-sm" style="padding:.75rem .9rem; background:#F8F7F4;">
+                <div style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:#5F5E5A; line-height:1.5;">
+                    <i class="ti ti-info-circle" style="color:#888780; flex-shrink:0; margin-top:1px;" aria-hidden="true"></i>
+                    <span>¿Tu reporte no cumple ninguno de los dos? Usá
+                        <a href="{% url 'bioquimica:ingreso_manual' %}" style="color:#1D9E75; font-weight:600;">Ingreso manual</a>
+                        para transcribirlo con los mismos campos.
+                    </span>
+                </div>
             </div>
 
-            <button type="submit" id="btn-procesar" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;">
-                <i class="ti ti-cpu" aria-hidden="true"></i> <span id="btn-label">Procesar PDF</span>
-            </button>
-        </form>
+        </div>
+
     </div>
 </div>
 {% endblock %}
@@ -193,8 +275,15 @@ function handleDrop(e) {
 }
 
 document.getElementById('archivo-input').addEventListener('change', function () {
-    agregarArchivos(this.files);
+    // this.value = '' (para poder volver a elegir el mismo archivo más
+    // tarde) vacía el FileList del input — y esto vacía TAMBIÉN cualquier
+    // referencia ya obtenida a ese mismo FileList (no es una foto
+    // congelada, es el mismo objeto en vivo), así que guardar `this.files`
+    // en una variable y limpiar después no alcanza. Array.from() copia los
+    // File reales a un array aparte, inmune a que después se vacíe el input.
+    var seleccionados = Array.from(this.files);
     this.value = '';
+    agregarArchivos(seleccionados);
 });
 
 document.getElementById('upload-form').addEventListener('submit', function(e) {

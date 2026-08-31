@@ -8,4 +8,5 @@ urlpatterns = [
     path('subir/', views.subir_pdf, name='subir_pdf'),
     path('manual/', views.ingreso_manual, name='ingreso_manual'),
     path('<int:pk>/', views.detalle_ensayo, name='detalle'),
+    path('<int:pk>/pdf/', views.ver_pdf, name='ver_pdf'),
 ]

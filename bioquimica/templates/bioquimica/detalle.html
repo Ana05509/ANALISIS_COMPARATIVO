@@ -2,6 +2,21 @@
 {% load custom_filters %}
 {% load static %}
 
+{% block extra_css %}
+.bq-colon-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem; }
+@media (max-width: 700px) { .bq-colon-grid { grid-template-columns: 1fr; } }
+
+/* Mismo patrón que .btn-primary (templates_base.html) pero en ámbar —
+   distingue "Ver PDF original" (documento con datos reales del laboratorio
+   y del cliente, ver conversación sobre nombres de laboratorio) del resto
+   de las acciones, que son verdes. --amber no cambia entre tema claro/
+   oscuro (a diferencia de --amber-dark), así que el relleno se ve igual en
+   los dos — el tono de hover es fijo, mismo criterio que .btn-primary:hover
+   usa --teal en vez de una variable de tema. */
+.btn-amber { background: var(--amber); color: #fff; border-color: var(--amber); }
+.btn-amber:hover { background: #965d0f; border-color: #965d0f; box-shadow: 0 2px 8px rgba(186,117,23,0.28); }
+{% endblock %}
+
 {% block title %}{{ ensayo.codigo }} — BioMicro{% endblock %}
 {% block nav_ensayos %}active{% endblock %}
 {% block topbar_title %}{{ ensayo.codigo }}{% endblock %}
@@ -11,6 +26,11 @@
     <i class="ti ti-arrow-left"></i> Volver
 </a>
 {% if request.user.is_staff or request.user.rol == 'docente' %}
+{% if ensayo.archivo_pdf %}
+<a href="{% url 'bioquimica:ver_pdf' ensayo.pk %}" target="_blank" class="btn btn-amber btn-sm">
+    <i class="ti ti-file-type-pdf"></i> Ver PDF original
+</a>
+{% endif %}
 <a href="/admin/bioquimica/ensayomicrobiologico/{{ ensayo.pk }}/change/"
    class="btn btn-primary btn-sm">
     <i class="ti ti-edit"></i> Editar
@@ -26,7 +46,11 @@
         <div>
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
                 <span style="font-size:20px; font-weight:700; color:var(--text-primary);">{{ ensayo.codigo }}</span>
-                {% if ensayo.tipo == 'recuento' %}
+                {% if ensayo.es_cipal %}
+                <span class="badge" style="background:#EAF6EE; color:#1D7A45;">
+                    🌱 Formato B
+                </span>
+                {% elif ensayo.tipo == 'recuento' %}
                 <span class="badge" style="background:#E6F1FB; color:#0C447C;">
                     <i class="ti ti-chart-bar"></i> Recuento UFC/g
                 </span>
@@ -47,15 +71,15 @@
         <div style="display:flex; gap:1.5rem; flex-wrap:wrap; font-size:13px;">
             <div>
                 <div class="metric-label">Recepción</div>
-                <div class="td-mono" style="font-size:14px; font-weight:600; color:var(--text-primary);">{{ ensayo.fecha_recepcion|date:"d/m/Y" }}</div>
+                <div class="td-mono" style="font-size:14px; font-weight:600; color:var(--text-primary);">{{ ensayo.fecha_recepcion|date:"d/m/Y"|default:"—" }}</div>
             </div>
             <div>
                 <div class="metric-label">Ejecución</div>
-                <div class="td-mono" style="font-size:14px; font-weight:600; color:var(--text-primary);">{{ ensayo.fecha_ejecucion|date:"d/m/Y" }}</div>
+                <div class="td-mono" style="font-size:14px; font-weight:600; color:var(--text-primary);">{{ ensayo.fecha_ejecucion|date:"d/m/Y"|default:"—" }}</div>
             </div>
             <div>
                 <div class="metric-label">Reporte</div>
-                <div class="td-mono" style="font-size:14px; font-weight:600; color:var(--text-primary);">{{ ensayo.fecha_reporte|date:"d/m/Y" }}</div>
+                <div class="td-mono" style="font-size:14px; font-weight:600; color:var(--text-primary);">{{ ensayo.fecha_reporte|date:"d/m/Y"|default:"—" }}</div>
             </div>
             {% if ensayo.temp_ambiental %}
             <div>
@@ -75,8 +99,11 @@
 
 {% if ensayo.tipo == 'recuento' %}
 
-{% if grafico_recuento_json %}
+{% if grafico_recuento_json or grafico_micro_json or grafico_colonizacion_json or grafico_densidad_json or grafico_esporas_json %}
 <div id="bq-mode-selector-wrap" style="margin-bottom:0.5rem;"></div>
+{% endif %}
+
+{% if grafico_recuento_json %}
 <div class="card" style="margin-bottom:1.25rem;">
     <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <span><i class="ti ti-chart-bar"></i> UFC/g por microorganismo
@@ -161,6 +188,51 @@
     </div>
     {% endif %}
 
+    {% if grafico_micro_json %}
+    <div class="card">
+        <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span>🧫 Microbiológico de suelo
+            <span style="font-size:12px; font-weight:400; color:var(--text-hint); margin-left:8px;">escala logarítmica</span></span>
+            <span id="dl-micro"></span>
+        </div>
+        <div id="grafico-micro"></div>
+    </div>
+    {% endif %}
+
+    {% if grafico_colonizacion_json or grafico_densidad_json %}
+    <div class="card">
+        <div class="card-title">🌱 Colonización micorrízica</div>
+        <div class="bq-colon-grid">
+            {% if grafico_colonizacion_json %}
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:var(--text-hint); margin-bottom:4px;">
+                    <span>Colonización (%)</span><span id="dl-colonizacion"></span>
+                </div>
+                <div id="grafico-colonizacion"></div>
+            </div>
+            {% endif %}
+            {% if grafico_densidad_json %}
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:var(--text-hint); margin-bottom:4px;">
+                    <span>Densidad de endófito (/47.5%)</span><span id="dl-densidad"></span>
+                </div>
+                <div id="grafico-densidad"></div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if grafico_esporas_json %}
+    <div class="card">
+        <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span>🔬 Esporas de micorriza</span>
+            <span id="dl-esporas"></span>
+        </div>
+        <div id="grafico-esporas"></div>
+    </div>
+    {% endif %}
+
     {% if recuentos_otros %}
     <div class="card">
         <div class="card-title" style="color:var(--text-hint);">📋 Otros / Mixtos</div>
@@ -206,7 +278,7 @@
 <div class="card" style="margin-bottom:1.25rem;">
     <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <span><i class="ti ti-table"></i> Mapa de Pruebas Bioquímicas
-        <span id="bq-heatmap-legend" style="font-size:12px; font-weight:400; color:var(--text-hint); margin-left:8px;">verde = positivo · naranja = negativo</span></span>
+        <span id="bq-heatmap-legend" style="font-size:12px; font-weight:400; color:var(--text-hint); margin-left:8px;">verde = positivo · gris = neutro/no aplica · naranja = negativo</span></span>
         <span id="dl-heatmap"></span>
     </div>
     <div id="grafico-heatmap"></div>
@@ -355,6 +427,36 @@
     }
     {% endif %}
 
+    // Gráficas de filas "Otro/Mixto" (Formato B: microbiológico,
+    // colonización/densidad de micorriza, esporas) — comparten el mismo
+    // patrón: recolorear por índice de trace con la paleta categórica fija
+    // de ChartTheme (una serie por columna, ej. Bacterias/Hongos/…), y
+    // aplicar la cuadrícula de eje Y según el modo activo.
+    function renderBarrasGenerico(divId, raw, mode) {
+        var dataObj = JSON.parse(JSON.stringify(raw));
+        ChartTheme.styleTracesByIndex(dataObj.data, mode);
+        var layout = Object.assign({}, dataObj.layout, ChartTheme.baseLayout(mode));
+        layout.yaxis = Object.assign({}, dataObj.layout.yaxis, ChartTheme.yAxisGrid(mode));
+        Plotly.react(divId, dataObj.data, layout, {responsive: true, displayModeBar: false});
+    }
+
+    {% if grafico_micro_json %}
+    var microRaw = {{ grafico_micro_json|json_embed }};
+    function renderMicro(mode) { renderBarrasGenerico('grafico-micro', microRaw, mode); }
+    {% endif %}
+    {% if grafico_colonizacion_json %}
+    var colonizacionRaw = {{ grafico_colonizacion_json|json_embed }};
+    function renderColonizacion(mode) { renderBarrasGenerico('grafico-colonizacion', colonizacionRaw, mode); }
+    {% endif %}
+    {% if grafico_densidad_json %}
+    var densidadRaw = {{ grafico_densidad_json|json_embed }};
+    function renderDensidad(mode) { renderBarrasGenerico('grafico-densidad', densidadRaw, mode); }
+    {% endif %}
+    {% if grafico_esporas_json %}
+    var esporasRaw = {{ grafico_esporas_json|json_embed }};
+    function renderEsporas(mode) { renderBarrasGenerico('grafico-esporas', esporasRaw, mode); }
+    {% endif %}
+
     {% if grafico_heatmap_json %}
     var heatmapRaw = {{ grafico_heatmap_json|json_embed }};
 
@@ -371,13 +473,19 @@
 
         var leyenda = document.getElementById('bq-heatmap-legend');
         if (leyenda) {
-            leyenda.textContent = gris ? 'oscuro = positivo · claro = negativo' : 'verde = positivo · naranja = negativo';
+            leyenda.textContent = gris
+                ? 'oscuro = positivo · medio = neutro/no aplica · claro = negativo'
+                : 'verde = positivo · gris = neutro/no aplica · naranja = negativo';
         }
     }
     {% endif %}
 
     function renderTodo(mode) {
         {% if grafico_recuento_json %}renderRecuento(mode);{% endif %}
+        {% if grafico_micro_json %}renderMicro(mode);{% endif %}
+        {% if grafico_colonizacion_json %}renderColonizacion(mode);{% endif %}
+        {% if grafico_densidad_json %}renderDensidad(mode);{% endif %}
+        {% if grafico_esporas_json %}renderEsporas(mode);{% endif %}
         {% if grafico_heatmap_json %}renderHeatmap(mode);{% endif %}
     }
 
@@ -386,6 +494,18 @@
 
     {% if grafico_recuento_json %}
     ChartTheme.addPlotlyDownloadButtons('dl-recuento', { divId: 'grafico-recuento', filenameBase: 'recuento_ufc', getMode: modeCtl.getMode });
+    {% endif %}
+    {% if grafico_micro_json %}
+    ChartTheme.addPlotlyDownloadButtons('dl-micro', { divId: 'grafico-micro', filenameBase: 'microbiologico_suelo', getMode: modeCtl.getMode });
+    {% endif %}
+    {% if grafico_colonizacion_json %}
+    ChartTheme.addPlotlyDownloadButtons('dl-colonizacion', { divId: 'grafico-colonizacion', filenameBase: 'colonizacion_micorriza', getMode: modeCtl.getMode });
+    {% endif %}
+    {% if grafico_densidad_json %}
+    ChartTheme.addPlotlyDownloadButtons('dl-densidad', { divId: 'grafico-densidad', filenameBase: 'densidad_endofito', getMode: modeCtl.getMode });
+    {% endif %}
+    {% if grafico_esporas_json %}
+    ChartTheme.addPlotlyDownloadButtons('dl-esporas', { divId: 'grafico-esporas', filenameBase: 'esporas_micorriza', getMode: modeCtl.getMode });
     {% endif %}
     {% if grafico_heatmap_json %}
     ChartTheme.addPlotlyDownloadButtons('dl-heatmap', { divId: 'grafico-heatmap', filenameBase: 'mapa_pruebas', getMode: modeCtl.getMode });

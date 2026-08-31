@@ -47,9 +47,11 @@
             <a href="{% url 'bioquimica:lista' %}" class="nav-link {% block nav_ensayos %}{% endblock %}">
                 <i class="ti ti-flask" aria-hidden="true"></i> Bioquímica
             </a>
+            {% if request.user.is_staff or request.user.rol == 'docente' %}
             <a href="{% url 'bioquimica:subir_pdf' %}" class="nav-link {% block nav_subir_pdf %}{% endblock %}">
                 <i class="ti ti-file-upload" aria-hidden="true"></i> Subir PDF
             </a>
+            {% endif %}
 
             <div class="nav-section-label">Soporte</div>
             <a href="{% url 'analisis:ayuda' %}" class="nav-link {% block nav_ayuda %}{% endblock %}">
