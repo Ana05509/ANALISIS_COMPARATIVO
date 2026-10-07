@@ -414,8 +414,27 @@ def ver_pdf(request, pk):
     if not ensayo.archivo_pdf:
         raise Http404("Este ensayo no tiene un PDF original adjunto.")
 
+    try:
+        archivo_abierto = ensayo.archivo_pdf.open('rb')
+    except (FileNotFoundError, OSError, ValueError):
+        # El registro en la base dice que hay un PDF, pero el archivo ya no
+        # está en el disco del servidor — pasa cuando el almacenamiento de
+        # media/ es local al contenedor (sin Volume persistente en Railway):
+        # cada redeploy empieza con un disco vacío, así que cualquier PDF
+        # subido antes del último redeploy queda "perdido" aunque el
+        # ensayo y sus datos sigan intactos en la base. No es un error de
+        # este ensayo en particular, así que se explica en vez de un 500.
+        messages.error(
+            request,
+            f"El PDF original de «{ensayo.codigo}» ya no está disponible en el servidor "
+            "(el archivo se perdió, probablemente en una actualización del sistema). "
+            "Los datos ya extraídos del ensayo siguen intactos abajo; si necesita el "
+            "PDF, vuelva a subirlo."
+        )
+        return redirect('bioquimica:detalle', pk=pk)
+
     return FileResponse(
-        ensayo.archivo_pdf.open('rb'),
+        archivo_abierto,
         content_type='application/pdf',
         filename=f"{ensayo.codigo}.pdf",
     )

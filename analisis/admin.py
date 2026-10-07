@@ -3,6 +3,7 @@ from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html, mark_safe
 from django.db import transaction
+from django.db.models import Count
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 from django.urls import path, reverse
@@ -287,9 +288,15 @@ class ArchivoMolecularAdmin(AccionesColumnaMixin, ModelAdmin):
         ("Registro de Sistema", {"fields": ("fecha_carga",), "classes": ("collapse",)}),
     )
 
-    @admin.display(description="Resultados procesados")
+    def get_queryset(self, request):
+        # Antes total_resultados() hacía un COUNT(*) aparte por cada fila
+        # de la tabla (N+1: hasta list_per_page consultas extra por página
+        # solo para esta columna) — se anota acá en una sola consulta.
+        return super().get_queryset(request).annotate(_total_resultados=Count("resultados_taxonomicos"))
+
+    @admin.display(description="Resultados procesados", ordering="_total_resultados")
     def total_resultados(self, obj):
-        n = ResultadoTaxonomico.objects.filter(archivo=obj).count()
+        n = obj._total_resultados
         if n == 0:
             return format_html('<span style="color:#A32D2D;font-weight:500;">{}</span>', "0 — sin procesar")
         return format_html('<span style="color:#085041;font-weight:500;">{} registros</span>', n)
@@ -320,7 +327,7 @@ class ArchivoMolecularAdmin(AccionesColumnaMixin, ModelAdmin):
             if change:
                 messages.success(request, f"Archivo [{obj.tipo_analisis}] re-procesado. {total} registros actualizados.")
             else:
-                messages.success(request, f"¡Pipeline completado! {total} registros processed.")
+                messages.success(request, f"¡Pipeline completado! {total} registros procesados.")
         except ValueError as e:
             messages.error(request, f"Error en pipeline: {e}")
         except Exception as e:
@@ -530,13 +537,21 @@ class UsuarioAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, BaseUserAdmin, Mode
 
     def save_model(self, request, obj, form, change):
         # Sincronizar is_staff con el rol de BioMicro para que el acceso
-        # al panel /admin/ quede consistente con el rol asignado.
+        # al panel /admin/ quede consistente con el rol asignado — pero sin
+        # pisar is_superuser de una cuenta que YA es superusuario real
+        # cuando su rol no es (todavía) 'admin'. Usuario.rol tiene
+        # default='estudiante' (ver models.py) y `createsuperuser` no lo
+        # toca: el superusuario de arranque de un entorno nuevo nace con
+        # rol='estudiante' hasta que alguien lo corrija a mano. Antes, con
+        # esta lógica sin la guarda de is_superuser, el simple hecho de
+        # guardar esa cuenta una vez desde este admin (para cualquier
+        # cambio, no solo el rol) le quitaba is_staff/is_superuser y la
+        # dejaba sin acceso al propio panel que necesitaba para arreglarlo.
         if obj.rol == "admin":
             obj.is_staff = True
             obj.is_superuser = True
-        else:
+        elif not obj.is_superuser:
             obj.is_staff = False
-            obj.is_superuser = False
         super().save_model(request, obj, form, change)
         if obj.rol == "admin":
             messages.success(
@@ -548,24 +563,6 @@ class UsuarioAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, BaseUserAdmin, Mode
                 request,
                 f"Acceso al panel de administración actualizado para {obj.email}."
             )
-
-
-# =========================================================
-# BADGES PARA LA BARRA LATERAL
-# =========================================================
-def badge_archivos_sin_procesar(request):
-    archivos_con = ResultadoTaxonomico.objects.values("archivo_id").distinct()
-    n = ArchivoMolecular.objects.exclude(id__in=archivos_con).count()
-    return n if n > 0 else None
-
-
-def badge_usuarios_nuevos(request):
-    from django.utils import timezone
-    from datetime import timedelta
-    n = Usuario.objects.filter(
-        date_joined__gte=timezone.now() - timedelta(days=7)
-    ).count()
-    return n if n > 0 else None
 
 
 # =========================================================
@@ -771,56 +768,6 @@ def _fecha_corta_es(iso):
     return f"{d} {_MESES_ES[m]}"
 
 
-def _figura_eventos_por_dia(filas):
-    """filas: [{'dia': date, 'tipo': str, 'total': int}, ...] ->
-    {"light": <figura Plotly>, "dark": <figura Plotly>}."""
-    import plotly.graph_objects as go
-    from collections import defaultdict
-
-    dias = sorted({str(f["dia"]) for f in filas})
-    por_tipo = defaultdict(lambda: {d: 0 for d in dias})
-    for f in filas:
-        por_tipo[f["tipo"]][str(f["dia"])] = f["total"]
-
-    nombres = {"login_ok": "Exitosos", "login_fallido": "Fallidos", "logout": "Cierres de sesión"}
-    etiquetas_x = [_fecha_corta_es(d) for d in dias]
-
-    figuras = {}
-    for modo, C in _AUD_COLOR.items():
-        fig = go.Figure()
-        tipos = ("login_ok", "login_fallido", "logout")
-        for i, tipo in enumerate(tipos):
-            valores = [por_tipo[tipo][d] for d in dias]
-            fig.add_trace(go.Bar(
-                name=nombres[tipo], x=etiquetas_x, y=valores,
-                marker=dict(
-                    color=C[tipo],
-                    line=dict(color=C["line"], width=2),  # separa visualmente los segmentos apilados
-                    # Solo el segmento de arriba (logout, el último en dibujarse)
-                    # lleva esquinas redondeadas: es el único "extremo libre"
-                    # de la barra apilada; los de abajo quedan rectos.
-                    cornerradius=4 if tipo == "logout" else 0,
-                ),
-                hovertemplate=f"<b>{nombres[tipo]}</b>: %{{y}}<extra></extra>",
-            ))
-        fig.update_layout(
-            autosize=True,
-            barmode="stack", bargap=0.35, height=300, margin=dict(t=30, b=10, l=36, r=10),
-            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Outfit, sans-serif", size=11, color=C["text"]),
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
-                font=dict(color=C["text"]),
-            ),
-            xaxis=dict(showgrid=False, zeroline=False, linecolor=C["grid"], tickfont=dict(color=C["text"])),
-            yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, tickfont=dict(color=C["text"])),
-            hoverlabel=dict(bgcolor=C["hover_bg"], font=dict(color=C["hover_text"]), bordercolor=C["hover_border"]),
-            hovermode="x unified",
-        )
-        figuras[modo] = fig.to_dict()
-    return figuras
-
-
 def _figura_fallidos_por_usuario(filas):
     """filas: [{'username_intentado': str, 'total': int}, ...] ->
     {"light": <figura Plotly>, "dark": <figura Plotly>}."""
@@ -948,6 +895,14 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         ("Usuario", {"fields": ("usuario", "username_intentado")}),
         ("Origen de la conexión", {"fields": ("ip_address", "navegador", "sistema_operativo", "user_agent")}),
     )
+
+    def get_queryset(self, request):
+        # usuario_o_intento() accede a obj.usuario.username en cada fila —
+        # sin select_related eso es una consulta aparte por fila, tanto en
+        # el listado en pantalla (30/página) como en exportar_pdf() más
+        # abajo, que puede recorrer hasta 3000 filas. LogEntryAdmin (más
+        # abajo en este mismo archivo) ya usa este mismo patrón.
+        return super().get_queryset(request).select_related("usuario")
 
     def has_add_permission(self, request):
         return False
@@ -1680,6 +1635,14 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
     # Inyecta tarjetas de estadísticas + gráficos antes de la tabla, mismo
     # gancho que usa EventoAcceso (ver changelist_view/get_urls debajo).
     list_before_template = "admin/admin/logentry/dashboard_stats.html"
+
+    def get_queryset(self, request):
+        # list_display muestra user y content_type directamente — sin
+        # select_related eso es una consulta aparte por cada uno en cada
+        # fila del listado (30/página). exportar_excel()/exportar_pdf() ya
+        # lo hacían para su propio qs_detalle interno, pero eso no ayudaba
+        # al listado en pantalla, que arma su queryset acá.
+        return super().get_queryset(request).select_related("user", "content_type")
 
     def has_add_permission(self, request):
         return False
