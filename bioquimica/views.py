@@ -463,6 +463,8 @@ def _guardar_ensayo(archivo, request):
 
     if not archivo.name.lower().endswith('.pdf'):
         raise ValueError(f"«{archivo.name}» no es un PDF.")
+    if archivo.size > 20 * 1024 * 1024:
+        raise ValueError(f"«{archivo.name}» supera el máximo de 20 MB.")
 
     try:
         resultado = parsear_pdf(archivo)

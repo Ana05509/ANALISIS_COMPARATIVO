@@ -595,8 +595,8 @@
 
 <script>
 var _MODO_MUESTRA = {{ muestra_ids_seleccionados|length }};
-var _RESUMEN_JSON  = {% if resumen_json %}{{ resumen_json|safe }}{% else %}[]{% endif %};
-var _CLAS_JSON     = {{ datos_clasificacion_json|safe }};
+var _RESUMEN_JSON  = {% if resumen_json %}{{ resumen_json|json_embed }}{% else %}[]{% endif %};
+var _CLAS_JSON     = {{ datos_clasificacion_json|json_embed }};
 
 var COLOR_CLAS = {
     benefico:      '#16a34a',

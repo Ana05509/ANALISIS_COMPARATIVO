@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% load i18n %}
+{% load i18n custom_filters %}
 
 {% block extrahead %}
 {{ block.super }}
@@ -564,7 +564,7 @@
 (function () {
     function dibujar() {
         if (typeof Plotly === 'undefined') { setTimeout(dibujar, 100); return; }
-        var datos = {{ chart_catalogo_json|default:"null"|safe }};
+        var datos = {{ chart_catalogo_json|default:"null"|json_embed }};
         var el = document.getElementById('tb-chart-catalogo');
         if (datos && datos.data && datos.data.length) {
             Plotly.newPlot(el, datos.data, datos.layout, {responsive: true, displayModeBar: false});

@@ -288,6 +288,15 @@ ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']  # sin username; 
 ACCOUNT_LOGIN_METHODS = {'email'}                               # login con correo (username = email auto)
 ACCOUNT_UNIQUE_EMAIL = True         # un correo = una cuenta
 
+# Detrás del proxy de Railway, REMOTE_ADDR es la IP del proxy, no la del
+# cliente: sin esto el limitador de intentos de login (consume_or_429 en
+# views/auth.py) metía a TODOS los usuarios en el mismo contador. Con 1
+# proxy de confianza se toma la última IP de X-Forwarded-For (la que
+# agregó el proxy), no la primera (que la escribe el cliente y es falsificable).
+ALLAUTH_TRUSTED_PROXY_COUNT = int(
+    os.environ.get('ALLAUTH_TRUSTED_PROXY_COUNT', '1' if _railway_domain else '0')
+)
+
 # Configuración del proveedor de Google OAuth2
 SOCIALACCOUNT_PROVIDERS = {
     'google': {

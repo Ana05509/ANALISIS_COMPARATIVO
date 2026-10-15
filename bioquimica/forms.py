@@ -54,3 +54,20 @@ class EnsayoManualForm(forms.Form):
     archivo_pdf = forms.FileField(
         required=False, label="Adjuntar PDF de respaldo (opcional)",
     )
+
+    def clean_archivo_pdf(self):
+        # Sin esto se podía adjuntar cualquier archivo (.html, .exe…) y
+        # quedaba guardado en media/ como si fuera el PDF del ensayo.
+        archivo = self.cleaned_data.get('archivo_pdf')
+        if not archivo:
+            return archivo
+        if not archivo.name.lower().endswith('.pdf'):
+            raise forms.ValidationError("El respaldo debe ser un archivo PDF.")
+        if archivo.size > 20 * 1024 * 1024:
+            raise forms.ValidationError("El PDF no debe superar 20 MB.")
+        archivo.seek(0)
+        es_pdf = archivo.read(5) == b'%PDF-'
+        archivo.seek(0)
+        if not es_pdf:
+            raise forms.ValidationError("El archivo no es un PDF válido.")
+        return archivo

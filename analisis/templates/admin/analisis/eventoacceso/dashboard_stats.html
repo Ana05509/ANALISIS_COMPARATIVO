@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n custom_filters %}
 <style>
     .aud-dash { margin-bottom: 1.5rem; font-family: 'Outfit', sans-serif; }
 
@@ -147,7 +147,7 @@
     }
 
     var FIGURAS = {
-        fallidos: {{ grafico_fallidos_json|default:"null"|safe }},
+        fallidos: {{ grafico_fallidos_json|default:"null"|json_embed }},
     };
 
     function pintar(id, porModo, vacioTexto) {

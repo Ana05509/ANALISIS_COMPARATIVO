@@ -43,7 +43,7 @@ def subir_datos(request):
             try:
                 cultivo = Cultivo.objects.get(id=cultivo_id)
                 form.fields['variedad_clon'].queryset = VariedadClon.objects.filter(cultivo=cultivo)
-            except Cultivo.DoesNotExist:
+            except (Cultivo.DoesNotExist, ValueError):
                 form.fields['variedad_clon'].queryset = VariedadClon.objects.none()
         else:
             form.fields['variedad_clon'].queryset = VariedadClon.objects.none()
@@ -70,7 +70,7 @@ def subir_datos(request):
                     form.data = datos_mutables
                 if created:
                     messages.info(request, f"Variedad '{variedad_manual}' creada automáticamente.")
-            except Cultivo.DoesNotExist:
+            except (Cultivo.DoesNotExist, ValueError):
                 messages.error(request, "El cultivo seleccionado no existe.")
                 return redirect("analisis:subir_datos")
 

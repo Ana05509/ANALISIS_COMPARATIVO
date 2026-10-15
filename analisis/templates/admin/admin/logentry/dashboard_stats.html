@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n custom_filters %}
 <style>
     .rl-dash { margin-bottom: 1.5rem; font-family: 'Outfit', sans-serif; }
 
@@ -151,9 +151,9 @@
     }
 
     var FIGURAS = {
-        dias:      {{ grafico_dias_json|default:"null"|safe }},
-        campos:    {{ grafico_campos_json|default:"null"|safe }},
-        usuarios:  {{ grafico_usuarios_json|default:"null"|safe }},
+        dias:      {{ grafico_dias_json|default:"null"|json_embed }},
+        campos:    {{ grafico_campos_json|default:"null"|json_embed }},
+        usuarios:  {{ grafico_usuarios_json|default:"null"|json_embed }},
     };
 
     function pintar(id, porModo, vacioTexto) {

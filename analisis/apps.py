@@ -14,12 +14,20 @@ def _ip_cliente(request):
     # en silencio, sin avisar a nadie. Mejor guardar sin IP que no guardar
     # el evento. A nivel de módulo (no dentro de AnalisisConfig.ready())
     # para poder reusarla también desde _AdminAuthFormAuditada más abajo.
+    #
+    # La IP se toma con la misma lógica que el limitador de intentos de
+    # allauth (ALLAUTH_TRUSTED_PROXY_COUNT en settings): la PRIMERA entrada
+    # de X-Forwarded-For la escribe el propio cliente, así que antes
+    # cualquiera podía registrar en la auditoría la IP que quisiera.
     import ipaddress
+    from allauth.core.internal.httpkit import get_client_ip
 
     if request is None:
         return None
-    xff = request.META.get('HTTP_X_FORWARDED_FOR')
-    candidato = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR')
+    try:
+        candidato = get_client_ip(request)
+    except Exception:
+        candidato = request.META.get('REMOTE_ADDR')
     if not candidato:
         return None
     try:

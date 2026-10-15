@@ -44,6 +44,8 @@ def api_muestras(request):
     q          = request.GET.get("q", "").strip()
 
     if cultivo_id:
+        if not cultivo_id.isdigit():
+            return _error("cultivo_id debe ser numérico.")
         qs = qs.filter(cultivo_id=cultivo_id)
     if q:
         qs = qs.filter(codigo__icontains=q)
