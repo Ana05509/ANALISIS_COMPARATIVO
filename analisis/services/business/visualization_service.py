@@ -2,10 +2,10 @@ import json
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from sklearn.manifold import MDS
-from scipy.spatial.distance import braycurtis
 from typing import Dict, List, Any, Optional
 import numpy as np
+
+from analisis.services.processing.diversity import DiversityService
 
 class VisualizationService:
     """
@@ -234,33 +234,27 @@ class VisualizationService:
             n_muestras = len(columnas_muestras)
             if n_muestras >= 3:
                 matriz = df_analisis[columnas_muestras].values.T
-                sumas = matriz.sum(axis=1, keepdims=True)
-                sumas[sumas == 0] = 1
-                matriz_norm = matriz / sumas
+                dist_matrix = DiversityService.matriz_bray_curtis(matriz)
 
-                dist_matrix = np.zeros((n_muestras, n_muestras))
-                for i in range(n_muestras):
-                    for j in range(i + 1, n_muestras):
-                        d = braycurtis(matriz_norm[i], matriz_norm[j])
-                        dist_matrix[i, j] = d
-                        dist_matrix[j, i] = d
+                pcoa = DiversityService.calcular_pcoa(dist_matrix)
+                coords = pcoa["coords"]
+                pct1, pct2 = pcoa["pct_varianza"]
 
-                mds = MDS(n_components=2, dissimilarity='precomputed', random_state=42)
-                coords = mds.fit_transform(dist_matrix)
+                def _pct(valor):
+                    return f"{valor:.1f}".replace(".", ",")
 
                 # Centroide y distancias al centroide
                 cx = float(np.mean(coords[:, 0]))
                 cy = float(np.mean(coords[:, 1]))
                 dist_cent = np.sqrt((coords[:, 0] - cx) ** 2 + (coords[:, 1] - cy) ** 2)
 
-                # Calidad del estrés MDS
-                stress = round(float(mds.stress_), 4)
-                stress_label = (
-                    "Excelente" if stress < 0.05 else
-                    "Bueno"     if stress < 0.10 else
-                    "Aceptable" if stress < 0.20 else
-                    "Pobre"
-                )
+                nota_pcoa = f"Variación explicada por PCo1 + PCo2: <b>{_pct(pct1 + pct2)} %</b>"
+                if pcoa["ratio_negativo"] > 0.01:
+                    nota_pcoa += (
+                        "<br>Bray-Curtis no es euclidiana: se detectaron "
+                        f"{pcoa['n_negativos']} valores propios negativos; los porcentajes "
+                        "se calculan sobre los valores propios positivos."
+                    )
 
                 # Hover enriquecido con disimilitudes Bray-Curtis reales
                 hover_texts = []
@@ -324,9 +318,9 @@ class VisualizationService:
                 fig_pcoa.update_layout(
                     title=dict(text='PCoA — Disimilitud Bray-Curtis', font=dict(size=14),
                                x=0.5, xanchor='center'),
-                    xaxis=dict(title='Coordenada Principal 1 (PCo1) — eje sin unidad física', zeroline=False,
+                    xaxis=dict(title=f'PCo1 ({_pct(pct1)} % de variación explicada)', zeroline=False,
                                gridcolor='#c8c8c8', automargin=True),
-                    yaxis=dict(title='Coordenada Principal 2 (PCo2) — eje sin unidad física', zeroline=False,
+                    yaxis=dict(title=f'PCo2 ({_pct(pct2)} %)', zeroline=False,
                                gridcolor='#c8c8c8', automargin=True),
                     template='plotly_white',
                     height=560,
@@ -336,13 +330,11 @@ class VisualizationService:
                         bgcolor='rgba(255,255,255,0.9)',
                         bordercolor='rgba(200,200,200,0.6)', borderwidth=1,
                     ),
-                    margin=dict(b=60, t=80, l=60, r=170),
+                    margin=dict(b=110, t=80, l=60, r=170),
                     annotations=[dict(
-                        x=0.0, y=-0.07,
+                        x=0.0, y=-0.2, yanchor='top',
                         xref='paper', yref='paper',
-                        text=(f"Estrés MDS: <b>{stress}</b> ({stress_label})"
-                              f"  ·  < 0.10 = representación confiable  ·  "
-                              f"< 0.20 = aceptable"),
+                        text=nota_pcoa,
                         showarrow=False,
                         font=dict(size=9, color='gray'),
                         align='left',

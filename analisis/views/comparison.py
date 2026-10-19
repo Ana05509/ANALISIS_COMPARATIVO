@@ -31,6 +31,24 @@ def _contar_clasificaciones(tabla: List[Dict[str, Any]]) -> Dict[str, int]:
     return conteo
 
 
+def _aviso_profundidad(lecturas: List[int]) -> str:
+    """
+    Aviso si la profundidad de secuenciación difiere más del doble entre las
+    muestras comparadas: la riqueza observada crece con el número de lecturas,
+    así que compararla entre profundidades muy distintas es engañoso.
+    """
+    lecturas = [n for n in lecturas if n > 0]
+    if len(lecturas) < 2 or max(lecturas) / min(lecturas) <= 2:
+        return ""
+    def _fmt(x):
+        return f"{x:,}".replace(",", ".")
+    return (
+        f"Las muestras tienen profundidades de secuenciación muy distintas "
+        f"({_fmt(min(lecturas))}–{_fmt(max(lecturas))} lecturas); la riqueza no es "
+        f"directamente comparable (Schloss, 2024)."
+    )
+
+
 @login_required
 def comparar(request):
     from analisis.forms import CompararForm
@@ -75,6 +93,7 @@ def comparar(request):
         "shannon_json": "{}",
         "alfa_json": "{}",
         "alfa_por_muestra": {},
+        "aviso_profundidad": "",
         "diversidad_beta": None,
         "diversidad_gamma": None,
         "permanova": None,
@@ -188,6 +207,9 @@ def comparar(request):
                             .values(t=taxonomia_expr)
                             .annotate(h=Sum('num_hits'))
                         )
+                        # Profundidad = todas las lecturas de la muestra, incluidas
+                        # las que no tienen asignación a este nivel taxonómico
+                        lecturas_totales = int(sum(r['h'] or 0 for r in rows))
                         rows = [r for r in rows if r['t']]
                         if rows:
                             total = sum(r['h'] for r in rows) or 1
@@ -200,9 +222,13 @@ def comparar(request):
                                     'shannon': round(alfa.get('shannon', 0), 4),
                                     'simpson': round(alfa.get('simpson', 0), 4),
                                     'equitatividad': round(alfa.get('equitatividad', 0), 4),
+                                    'lecturas_totales': lecturas_totales,
                                 }
                                 shannon_por_muestra[muestra.codigo] = alfa_por_muestra[muestra.codigo]['shannon']
                     contexto["alfa_por_muestra"] = alfa_por_muestra
+                    contexto["aviso_profundidad"] = _aviso_profundidad(
+                        [m['lecturas_totales'] for m in alfa_por_muestra.values()]
+                    )
                     contexto["alfa_json"] = json.dumps(alfa_por_muestra)
                     contexto["shannon_json"] = json.dumps(shannon_por_muestra)
 

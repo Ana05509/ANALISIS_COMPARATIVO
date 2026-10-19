@@ -1,0 +1,5 @@
+# Dependencias solo para desarrollo y pruebas (NO se instalan en producción).
+-r requirements.txt
+
+# Validación externa de la PCoA en analisis/tests.py
+scikit-bio==0.7.4

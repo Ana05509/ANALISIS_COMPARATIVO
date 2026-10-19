@@ -1,3 +1,5 @@
+import csv
+
 import pandas as pd
 from django.db import transaction
 from django.http import HttpRequest
@@ -25,16 +27,37 @@ def validar_archivo(archivo) -> None:
     if archivo.size > 10 * 1024 * 1024:
         raise ValueError("Archivo demasiado grande (máximo 10 MB).")
 
+def _detectar_separador(archivo) -> str:
+    """Deduce el delimitador de un .csv a partir de sus primeros 2 KB (coma si no se puede)."""
+    archivo.seek(0)
+    muestra = archivo.read(2048)
+    archivo.seek(0)
+    if isinstance(muestra, bytes):
+        muestra = muestra.decode("utf-8-sig", errors="ignore")
+    try:
+        return csv.Sniffer().sniff(muestra, delimiters=",;\t").delimiter
+    except csv.Error:
+        return ","
+
+
 def leer_archivo(archivo) -> pd.DataFrame:
     nombre = archivo.name.lower()
-    if nombre.endswith((".xlsx", ".xls")):
-        return pd.read_excel(archivo)
     try:
         archivo.seek(0)
-        return pd.read_csv(archivo)
-    except pd.errors.ParserError:
-        archivo.seek(0)
-        return pd.read_csv(archivo, sep="\t")
+        if nombre.endswith((".xlsx", ".xls")):
+            return pd.read_excel(archivo)
+        sep = "\t" if nombre.endswith(".tsv") else _detectar_separador(archivo)
+        return pd.read_csv(archivo, sep=sep)
+    except ImportError as e:
+        raise ValueError(
+            f"El servidor no tiene instalado el soporte para leer este tipo de archivo ({e.name}). "
+            "Conviértalo a CSV o XLSX e inténtelo de nuevo."
+        ) from e
+    except ValueError as e:
+        raise ValueError(
+            f"No se pudo leer el archivo «{archivo.name}». Verifique que no esté dañado, que la "
+            f"primera fila contenga los encabezados y que el texto esté en UTF-8. Detalle: {e}"
+        ) from e
 
 def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
     archivo = request.FILES.get("archivo")

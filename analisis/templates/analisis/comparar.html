@@ -410,11 +410,17 @@
 <div class="card" style="margin-top: .7rem;">
     <div class="card-title"><i class="ti ti-leaf"></i> Diversidad Alfa — Métricas por Muestra</div>
     <p style="font-size:12.5px; color:var(--text-hint); margin:0 0 0.75rem;">Perfil taxonómico completo por muestra (sin truncar al Top N).</p>
+    {% if aviso_profundidad %}
+    <div style="padding:0.65rem 0.9rem; margin-bottom:0.75rem; border-radius:var(--radius); font-size:12.5px; line-height:1.55; background:var(--amber-light); color:var(--text-primary); border-left:3px solid var(--amber);">
+        <i class="ti ti-alert-triangle" style="color:var(--amber);"></i> {{ aviso_profundidad }}
+    </div>
+    {% endif %}
     <div class="table-wrap cards-mobile">
         <table style="width:100%;">
             <thead>
                 <tr>
                     <th>Muestra</th>
+                    <th style="text-align:right;"><span class="bs-tip" data-tip="<strong>Lecturas</strong> — número total de lecturas (num_hits) de la muestra: su profundidad de secuenciación. Con más lecturas se detectan más taxa raros, por lo que la riqueza solo es comparable entre muestras de profundidad similar.">Lecturas <i class="ti ti-help-circle bs-tip-ico"></i></span></th>
                     <th style="text-align:right;"><span class="bs-tip" data-tip="<strong>Riqueza (S)</strong> — número total de taxa distintos encontrados en la muestra. Más taxa = mayor riqueza.">Riqueza (S) <i class="ti ti-help-circle bs-tip-ico"></i></span></th>
                     <th style="text-align:right;"><span class="bs-tip" data-tip="<strong>Shannon H'</strong> — mide diversidad considerando riqueza y equitatividad. H' &lt; 1 = muy baja · 1–2 = baja · 2–3 = moderada · &gt; 3 = alta diversidad.">Shannon H' <i class="ti ti-help-circle bs-tip-ico"></i></span></th>
                     <th style="text-align:right;"><span class="bs-tip" data-tip="<strong>Simpson (1-D)</strong> — probabilidad de que dos individuos elegidos al azar pertenezcan a especies distintas. Valores cerca de 1 indican alta diversidad.">Simpson D <i class="ti ti-help-circle bs-tip-ico"></i></span></th>
@@ -425,6 +431,7 @@
                 {% for codigo, m in alfa_por_muestra.items %}
                 <tr>
                     <td data-label="Muestra" style="font-weight:500; font-style:italic;">{{ codigo }}</td>
+                    <td data-label="Lecturas" class="td-mono" style="text-align:right;">{{ m.lecturas_totales }}</td>
                     <td data-label="Riqueza (S)" class="td-mono" style="text-align:right;">{{ m.riqueza }}</td>
                     <td data-label="Shannon H'" class="td-mono" style="text-align:right;">{{ m.shannon }}</td>
                     <td data-label="Simpson D" class="td-mono" style="text-align:right;">{{ m.simpson }}</td>

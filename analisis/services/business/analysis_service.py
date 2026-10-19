@@ -124,7 +124,10 @@ def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=N
 
     df = pd.DataFrame(data)
     diversidades = []
-    for _, grupo in df.groupby("muestra_pk"):
+    # Profundidad de secuenciación (suma de num_hits) por id de muestra
+    lecturas_totales = {}
+    for muestra_pk, grupo in df.groupby("muestra_pk"):
+        lecturas_totales[int(muestra_pk)] = int(grupo["hits"].sum())
         total = grupo["hits"].sum() or 1
         df_m = pd.DataFrame({"%_hits": grupo["hits"] / total * 100})
         df_m = df_m[df_m["%_hits"] > 0]
@@ -139,6 +142,7 @@ def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=N
         "simpson":       round(sum(d["simpson"] for d in diversidades) / n, 4),
         "equitatividad": round(sum(d["equitatividad"] for d in diversidades) / n, 4),
         "n_muestras":    n,
+        "lecturas_totales": lecturas_totales,
     }
 
 def obtener_diversidad_beta_inter(tipo="16S", nivel="genus", muestra_ids=None):
@@ -148,7 +152,7 @@ def obtener_diversidad_beta_inter(tipo="16S", nivel="genus", muestra_ids=None):
     TODAS las muestras) y taxa únicos (presentes en solo 1 muestra).
     Requiere ≥ 2 muestras con datos.
     """
-    from scipy.spatial.distance import braycurtis
+    from scipy.spatial.distance import squareform
     from itertools import combinations
     import numpy as np
 
@@ -178,15 +182,12 @@ def obtener_diversidad_beta_inter(tipo="16S", nivel="genus", muestra_ids=None):
         [[abundancias[mid].get(t, 0) for t in all_taxa] for mid in ids_ok],
         dtype=float,
     )
-    row_sums = matrix.sum(axis=1, keepdims=True)
-    row_sums[row_sums == 0] = 1
-    matrix /= row_sums
-
     presencia = (matrix > 0).astype(float)
 
-    bc_vals, jac_vals = [], []
+    # La forma condensada recorre los pares en el mismo orden que combinations(range(n), 2)
+    bc_vals = squareform(DiversityService.matriz_bray_curtis(matrix), checks=False).tolist()
+    jac_vals = []
     for i, j in combinations(range(len(ids_ok)), 2):
-        bc_vals.append(float(braycurtis(matrix[i], matrix[j])))
         inter = float(np.sum(presencia[i] * presencia[j]))
         union = float(np.sum(np.clip(presencia[i] + presencia[j], 0, 1)))
         jac_vals.append(inter / union if union > 0 else 0.0)
@@ -250,7 +251,6 @@ def obtener_permanova(tipo="16S", nivel="genus", muestra_ids=None, n_perm=499):
     entre cultivos. Si todas las muestras son del mismo cultivo, intenta
     agrupar por variedad/clon.
     """
-    from scipy.spatial.distance import braycurtis
     import numpy as np
     from analisis.models import MuestraSuelo
 
@@ -300,22 +300,23 @@ def obtener_permanova(tipo="16S", nivel="genus", muestra_ids=None, n_perm=499):
         [[abundancias[mid].get(t, 0) for t in all_taxa] for mid in ids_ok],
         dtype=float,
     )
-    row_sums = matrix.sum(axis=1, keepdims=True)
-    row_sums[row_sums == 0] = 1
-    matrix /= row_sums
 
     n = len(ids_ok)
-    dist_mat = np.zeros((n, n))
-    for i in range(n):
-        for j in range(i + 1, n):
-            d = braycurtis(matrix[i], matrix[j])
-            dist_mat[i, j] = dist_mat[j, i] = d
+    dist_mat = DiversityService.matriz_bray_curtis(matrix)
 
     grupos   = [mapa_grupo[mid] for mid in ids_ok]
     resultado = DiversityService.calcular_permanova(dist_mat, grupos, n_permutaciones=n_perm)
     if resultado:
         resultado["nivel_agrupacion"]    = nivel_agrupacion
         resultado["muestras_con_datos"]  = n
+        if resultado.get("ejecutado"):
+            permdisp = DiversityService.calcular_permdisp(dist_mat, grupos, n_permutaciones=n_perm)
+            resultado["permdisp"] = permdisp
+            if permdisp and permdisp["significativo"]:
+                resultado["interpretacion"] += (
+                    " Las dispersiones difieren entre grupos; el resultado de PERMANOVA puede "
+                    "reflejar diferencias de variabilidad y no solo de composición."
+                )
     return resultado
 
 
