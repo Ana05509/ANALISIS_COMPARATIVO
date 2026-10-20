@@ -33,6 +33,7 @@ urlpatterns = [
     # 4. CATÁLOGO
     path("catalogo/", views.catalogo_microorganismos, name="catalogo"),
     path("catalogo/importar/", views.importar_catalogo, name="importar_catalogo"),
+    path("catalogo/exportar/<str:formato>/", views.exportar_catalogo, name="exportar_catalogo"),
     path("catalogo/<int:pk>/reclasificar/", views.actualizar_clasificacion, name="reclasificar"),
 
     # 5. AYUDA

@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import itertools
 import unittest
 import warnings
@@ -291,3 +292,42 @@ class AvisoProfundidadTests(SimpleTestCase):
 
     def test_ignora_muestras_sin_lecturas(self):
         self.assertEqual(_aviso_profundidad([0, 100, 150]), "")
+
+
+class ExportacionCatalogoTests(SimpleTestCase):
+
+    FILAS = [
+        {"nombre": "Bacillus", "nivel": "genus", "marcador": "16S", "clasificacion": "benefico",
+         "descripcion": "Promotor del crecimiento", "referencia": ""},
+        {"nombre": "Ralstonia", "nivel": "genus", "marcador": "16S", "clasificacion": "fitopatogeno",
+         "descripcion": "=HYPERLINK(\"http://x\")", "referencia": "- Smith 2020"},
+    ]
+
+    def test_csv_reimportable_y_sin_formulas(self):
+        from analisis.services.business.catalog_service import CatalogService
+        contenido = CatalogService.exportar_csv(self.FILAS)
+
+        self.assertTrue(contenido.startswith(b"\xef\xbb\xbf"))  # BOM: Excel muestra bien las tildes
+        df = pd.read_csv(io.BytesIO(contenido), encoding="utf-8-sig", keep_default_na=False)
+        self.assertEqual(list(df.columns), CatalogService.COLUMNAS_EXPORTACION)
+        self.assertEqual(df.loc[1, "descripcion"], "'=HYPERLINK(\"http://x\")")
+        # Al reimportar se quita el escape: ida y vuelta sin pérdida
+        self.assertEqual(CatalogService._quitar_escape_formula(df.loc[1, "descripcion"]),
+                         "=HYPERLINK(\"http://x\")")
+        self.assertEqual(CatalogService._quitar_escape_formula(df.loc[1, "referencia"]), "- Smith 2020")
+
+    def test_quitar_escape_no_toca_apostrofes_normales(self):
+        from analisis.services.business.catalog_service import CatalogService
+        self.assertEqual(CatalogService._quitar_escape_formula("'Candidatus' Solibacter"),
+                         "'Candidatus' Solibacter")
+        self.assertEqual(CatalogService._quitar_escape_formula("Bacillus"), "Bacillus")
+
+    def test_excel_hojas_y_contenido(self):
+        from analisis.services.business.catalog_service import CatalogService
+        contenido = CatalogService.exportar_excel(self.FILAS)
+        hojas = pd.read_excel(io.BytesIO(contenido), sheet_name=None, keep_default_na=False)
+
+        # Sin filas ITS no se crea su hoja; la primera hoja (la que lee la importación) tiene todo
+        self.assertEqual(list(hojas), ["Catálogo", "Bacterias (16S)"])
+        self.assertEqual(list(hojas["Catálogo"].columns), CatalogService.COLUMNAS_EXPORTACION)
+        self.assertEqual(hojas["Catálogo"]["nombre"].tolist(), ["Bacillus", "Ralstonia"])

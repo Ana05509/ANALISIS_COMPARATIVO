@@ -8,6 +8,32 @@ from analisis.forms import CatalogoImportarForm
 from analisis.audit import registrar_accion
 from django.contrib.admin.models import ADDITION, CHANGE
 
+def _filtrar_catalogo(params):
+    """
+    Aplica los filtros de la página del catálogo (búsqueda, marcador,
+    clasificación, nivel). Compartido por el listado y la exportación para
+    que el archivo descargado contenga exactamente lo que se ve en pantalla.
+    """
+    filtros = {
+        'busqueda':             params.get('busqueda', '').strip(),
+        'filtro_marcador':      params.get('filtro_marcador', ''),
+        'filtro_clasificacion': params.get('filtro_clasificacion', ''),
+        'filtro_nivel':         params.get('filtro_nivel', ''),
+    }
+    qs = CatalogoMicroorganismo.objects.all()
+
+    if filtros['busqueda']:
+        qs = qs.filter(nombre__icontains=filtros['busqueda'])
+    if filtros['filtro_marcador']:
+        qs = qs.filter(marcador=filtros['filtro_marcador'])
+    if filtros['filtro_clasificacion']:
+        qs = qs.filter(clasificacion=filtros['filtro_clasificacion'])
+    if filtros['filtro_nivel']:
+        qs = qs.filter(nivel__iexact=filtros['filtro_nivel'])
+
+    return qs.order_by('nombre'), filtros
+
+
 @login_required
 def catalogo_microorganismos(request):
     """
@@ -16,23 +42,11 @@ def catalogo_microorganismos(request):
     """
     from django.db.models import Count
 
-    busqueda             = request.GET.get('busqueda', '').strip()
-    filtro_marcador      = request.GET.get('filtro_marcador', '')
-    filtro_clasificacion = request.GET.get('filtro_clasificacion', '')
-    filtro_nivel         = request.GET.get('filtro_nivel', '')
-
-    qs = CatalogoMicroorganismo.objects.all()
-
-    if busqueda:
-        qs = qs.filter(nombre__icontains=busqueda)
-    if filtro_marcador:
-        qs = qs.filter(marcador=filtro_marcador)
-    if filtro_clasificacion:
-        qs = qs.filter(clasificacion=filtro_clasificacion)
-    if filtro_nivel:
-        qs = qs.filter(nivel__iexact=filtro_nivel)
-
-    qs = qs.order_by('nombre')
+    qs, filtros = _filtrar_catalogo(request.GET)
+    busqueda             = filtros['busqueda']
+    filtro_marcador      = filtros['filtro_marcador']
+    filtro_clasificacion = filtros['filtro_clasificacion']
+    filtro_nivel         = filtros['filtro_nivel']
 
     # Estadísticas sobre el catálogo completo (no sobre el queryset filtrado)
     conteos = {
@@ -75,6 +89,36 @@ def catalogo_microorganismos(request):
         "clasificaciones_disponibles": clasificaciones_disponibles,
         "niveles_taxonomicos":     niveles_taxonomicos,
     })
+
+
+@login_required
+def exportar_catalogo(request, formato):
+    """
+    Descarga el catálogo (respetando los filtros activos de la página) en
+    Excel o CSV. El CSV usa las columnas que acepta «Importar», así que el
+    archivo puede volver a importarse.
+    """
+    from django.http import Http404, HttpResponse
+    from django.utils import timezone
+
+    if formato not in ('xlsx', 'csv'):
+        raise Http404("Formato no soportado.")
+
+    qs, filtros = _filtrar_catalogo(request.GET)
+    filas = qs.values(*CatalogService.COLUMNAS_EXPORTACION)
+
+    if formato == 'xlsx':
+        contenido = CatalogService.exportar_excel(filas)
+        tipo = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    else:
+        contenido = CatalogService.exportar_csv(filas)
+        tipo = 'text/csv; charset=utf-8'
+
+    sufijo = '_filtrado' if any(filtros.values()) else ''
+    nombre = f"catalogo_microorganismos{sufijo}_{timezone.localdate():%Y-%m-%d}.{formato}"
+    respuesta = HttpResponse(contenido, content_type=tipo)
+    respuesta['Content-Disposition'] = f'attachment; filename="{nombre}"'
+    return respuesta
 
 
 @login_required

@@ -198,7 +198,7 @@ class CatalogService:
         creados = actualizados = errores = 0
 
         for _, row in df.iterrows():
-            nombre = str(row.get('nombre', '')).strip()
+            nombre = CatalogService._quitar_escape_formula(str(row.get('nombre', '')).strip())
             nivel  = CatalogService._normalizar_nivel(row.get('nivel', 'genus'))
 
             if not nombre or nombre.lower() in _nan:
@@ -216,7 +216,7 @@ class CatalogService:
 
             _nan_set = _nan
             def _clean(val):
-                s = str(val).strip()
+                s = CatalogService._quitar_escape_formula(str(val).strip())
                 return '' if s.lower() in _nan_set else s
 
             descripcion = _clean(row.get('descripcion', '')) if 'descripcion' in df.columns else ''
@@ -252,6 +252,92 @@ class CatalogService:
                 errores += 1
 
         return creados, actualizados, errores
+
+    # ---------------------------
+    # EXPORTACIÓN
+    # ---------------------------
+
+    # Mismas columnas (y mismo orden) que exige importar_desde_archivo, para
+    # que un archivo exportado se pueda volver a importar tal cual.
+    COLUMNAS_EXPORTACION = ['nombre', 'nivel', 'marcador', 'clasificacion', 'descripcion', 'referencia']
+
+    @staticmethod
+    def _quitar_escape_formula(texto: str) -> str:
+        """
+        Revierte el apóstrofe que la exportación antepone a textos que Excel
+        interpretaría como fórmula ('=…, '+…, '-…, '@…), para que exportar y
+        volver a importar no altere los datos.
+        """
+        from analisis.services.business.export_service import _EXCEL_FORMULA_TRIGGERS
+        if texto.startswith("'") and texto[1:2] and texto[1:].startswith(_EXCEL_FORMULA_TRIGGERS):
+            return texto[1:]
+        return texto
+
+    @staticmethod
+    def _dataframe_exportacion(filas) -> pd.DataFrame:
+        """filas: iterable de dicts con las COLUMNAS_EXPORTACION (p. ej. queryset.values(...))."""
+        from analisis.services.business.export_service import _excel_safe_df
+        df = pd.DataFrame(list(filas), columns=CatalogService.COLUMNAS_EXPORTACION).fillna('')
+        return _excel_safe_df(df)
+
+    @staticmethod
+    def exportar_csv(filas) -> bytes:
+        """CSV UTF-8 con BOM (para que Excel muestre bien las tildes), reimportable."""
+        df = CatalogService._dataframe_exportacion(filas)
+        return df.to_csv(index=False).encode('utf-8-sig')
+
+    @staticmethod
+    def exportar_excel(filas) -> bytes:
+        """
+        Libro con una hoja «Catálogo» (todas las filas; es la que lee la
+        importación, que toma la primera hoja) y una hoja por marcador.
+        """
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Font, PatternFill
+        from openpyxl.utils import get_column_letter
+
+        df = CatalogService._dataframe_exportacion(filas)
+        verde = PatternFill('solid', fgColor='0F6E56')
+        insignias = {
+            'benefico':       ('D4EDDA', '14532D'),
+            'fitopatogeno':   ('FADBD8', '7F1D1D'),
+            'neutral':        ('D6E4F0', '1E3A5F'),
+            'sin_clasificar': ('E5E7EB', '374151'),
+        }
+        anchos = {'nombre': 38, 'nivel': 10, 'marcador': 10, 'clasificacion': 16,
+                  'descripcion': 60, 'referencia': 50}
+        col_clasif = CatalogService.COLUMNAS_EXPORTACION.index('clasificacion') + 1
+
+        wb = Workbook()
+        wb.remove(wb.active)
+        hojas = [('Catálogo', df)] + [
+            (titulo, df[df['marcador'] == marcador])
+            for marcador, titulo in (('16S', 'Bacterias (16S)'), ('ITS', 'Hongos (ITS)'))
+        ]
+        for titulo, datos in hojas:
+            if titulo != 'Catálogo' and datos.empty:
+                continue
+            ws = wb.create_sheet(titulo)
+            ws.append(CatalogService.COLUMNAS_EXPORTACION)
+            for fila in datos.itertuples(index=False):
+                ws.append(list(fila))
+
+            for j, col in enumerate(CatalogService.COLUMNAS_EXPORTACION, start=1):
+                celda = ws.cell(row=1, column=j)
+                celda.fill = verde
+                celda.font = Font(bold=True, color='FFFFFF')
+                celda.alignment = Alignment(horizontal='center', vertical='center')
+                ws.column_dimensions[get_column_letter(j)].width = anchos[col]
+            for (celda,) in ws.iter_rows(min_row=2, min_col=col_clasif, max_col=col_clasif):
+                bg, fg = insignias.get(celda.value, insignias['sin_clasificar'])
+                celda.fill = PatternFill('solid', fgColor=bg)
+                celda.font = Font(bold=True, color=fg)
+            ws.freeze_panes = 'A2'
+            ws.auto_filter.ref = ws.dimensions
+
+        salida = io.BytesIO()
+        wb.save(salida)
+        return salida.getvalue()
 
     @staticmethod
     def reclasificar_microorganismo(pk, nueva_clasificacion, descripcion):
