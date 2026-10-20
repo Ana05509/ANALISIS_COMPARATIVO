@@ -397,8 +397,44 @@ class CatalogoMicroorganismoAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, Mode
                 self.admin_site.admin_view(self.importar_view),
                 name="catalogo_importar",
             ),
+            path(
+                "exportar/<str:formato>/",
+                self.admin_site.admin_view(self.exportar_view),
+                name="catalogo_exportar",
+            ),
         ]
         return custom + urls
+
+    def exportar_view(self, request, formato):
+        """
+        Descarga en Excel o CSV lo que muestra el listado del admin: usa el
+        mismo queryset del ChangeList, así respeta la búsqueda y los filtros
+        activos («Filters»), sin paginar.
+        """
+        from django.core.exceptions import PermissionDenied
+        from django.http import Http404, HttpResponse
+        from django.utils import timezone
+        from analisis.services.business.catalog_service import CatalogService
+
+        if formato not in ("xlsx", "csv"):
+            raise Http404("Formato no soportado.")
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+
+        qs = self.get_changelist_instance(request).get_queryset(request)
+        filas = qs.values(*CatalogService.COLUMNAS_EXPORTACION)
+        if formato == "xlsx":
+            contenido = CatalogService.exportar_excel(filas)
+            tipo = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        else:
+            contenido = CatalogService.exportar_csv(filas)
+            tipo = "text/csv; charset=utf-8"
+
+        sufijo = "_filtrado" if request.GET else ""
+        nombre = f"catalogo_microorganismos{sufijo}_{timezone.localdate():%Y-%m-%d}.{formato}"
+        respuesta = HttpResponse(contenido, content_type=tipo)
+        respuesta["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        return respuesta
 
     def importar_view(self, request):
         """Vista de importación masiva desde CSV/Excel accesible en el admin."""

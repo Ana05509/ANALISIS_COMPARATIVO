@@ -2,11 +2,59 @@
 {% load i18n %}
 
 {% block object-tools-items %}
-<li>
+<li style="list-style:none;">
+    <button type="button" id="btn-exportar-catalogo" class="tb-btn-import tb-btn-export"
+            title="Descarga el listado con la búsqueda y los filtros aplicados">
+        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">download</span>
+        Exportar
+    </button>
+</li>
+<li style="list-style:none;">
     <a href="importar/" class="tb-btn-import">
         <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">upload</span>
         Importar CSV / Excel
     </a>
 </li>
 {{ block.super }}
+{% endblock %}
+
+{% block content %}
+{{ block.super }}
+
+{# Pregunta el formato. Los enlaces reenvían la búsqueda y los filtros activos del listado #}
+<dialog id="dlg-exportar-catalogo" class="tb-dialog-export" aria-labelledby="dlg-exportar-titulo">
+    <h3 id="dlg-exportar-titulo">¿En qué formato quieres exportar?</h3>
+    <p class="tb-dialog-export-sub">Se descargará el listado con la búsqueda y los filtros aplicados.</p>
+    <div class="tb-dialog-export-opciones">
+        <a href="exportar/xlsx/{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="tb-dialog-export-opcion">
+            <span class="material-symbols-outlined">table_view</span>
+            <strong>Excel (.xlsx)</strong>
+            <small>Para revisar: una hoja general y una por marcador (16S / ITS).</small>
+        </a>
+        <a href="exportar/csv/{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="tb-dialog-export-opcion">
+            <span class="material-symbols-outlined">description</span>
+            <strong>CSV (.csv)</strong>
+            <small>Para volver a importarlo con «Importar CSV / Excel».</small>
+        </a>
+    </div>
+    <div class="tb-dialog-export-pie">
+        <button type="button" id="btn-cancelar-exportar" class="tb-btn-import tb-btn-export">Cancelar</button>
+    </div>
+</dialog>
+
+<script>
+(function () {
+    var dlg = document.getElementById('dlg-exportar-catalogo');
+    var abrir = document.getElementById('btn-exportar-catalogo');
+    if (!dlg || !abrir) return;
+    abrir.addEventListener('click', function () { dlg.showModal(); });
+    document.getElementById('btn-cancelar-exportar').addEventListener('click', function () { dlg.close(); });
+    // Clic fuera del recuadro cierra el diálogo
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
+    // Al elegir un formato empieza la descarga; se cierra el diálogo
+    dlg.querySelectorAll('.tb-dialog-export-opcion').forEach(function (a) {
+        a.addEventListener('click', function () { setTimeout(function () { dlg.close(); }, 150); });
+    });
+})();
+</script>
 {% endblock %}

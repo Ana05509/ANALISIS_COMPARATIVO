@@ -276,19 +276,8 @@ th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; color: var(--verde,
         <a href="{% url 'analisis:catalogo' %}" class="btn btn-outline">
             <i class="ti ti-x" aria-hidden="true"></i> Limpiar
         </a>
-        <span style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;"
-              title="Descarga lo que muestra la tabla, con los filtros aplicados">
-            <a href="{% url 'analisis:exportar_catalogo' 'xlsx' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"
-               class="btn btn-outline">
-                <i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Exportar Excel
-            </a>
-            <a href="{% url 'analisis:exportar_catalogo' 'csv' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"
-               class="btn btn-outline">
-                <i class="ti ti-file-text" aria-hidden="true"></i> Exportar CSV
-            </a>
-        </span>
         {% if request.user.is_staff %}
-        <button type="button" id="btn-abrir-importar" class="btn btn-outline">
+        <button type="button" id="btn-abrir-importar" class="btn btn-outline" style="margin-left:auto;">
             <i class="ti ti-upload" aria-hidden="true"></i> Importar
         </button>
         {% endif %}

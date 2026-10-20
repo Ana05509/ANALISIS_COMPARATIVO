@@ -92,36 +92,6 @@ def catalogo_microorganismos(request):
 
 
 @login_required
-def exportar_catalogo(request, formato):
-    """
-    Descarga el catálogo (respetando los filtros activos de la página) en
-    Excel o CSV. El CSV usa las columnas que acepta «Importar», así que el
-    archivo puede volver a importarse.
-    """
-    from django.http import Http404, HttpResponse
-    from django.utils import timezone
-
-    if formato not in ('xlsx', 'csv'):
-        raise Http404("Formato no soportado.")
-
-    qs, filtros = _filtrar_catalogo(request.GET)
-    filas = qs.values(*CatalogService.COLUMNAS_EXPORTACION)
-
-    if formato == 'xlsx':
-        contenido = CatalogService.exportar_excel(filas)
-        tipo = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    else:
-        contenido = CatalogService.exportar_csv(filas)
-        tipo = 'text/csv; charset=utf-8'
-
-    sufijo = '_filtrado' if any(filtros.values()) else ''
-    nombre = f"catalogo_microorganismos{sufijo}_{timezone.localdate():%Y-%m-%d}.{formato}"
-    respuesta = HttpResponse(contenido, content_type=tipo)
-    respuesta['Content-Disposition'] = f'attachment; filename="{nombre}"'
-    return respuesta
-
-
-@login_required
 def actualizar_clasificacion(request, pk):
     """
     Vista para reescribir o corregir manualmente un rol en el catálogo.

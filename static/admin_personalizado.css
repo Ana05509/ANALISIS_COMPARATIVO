@@ -582,6 +582,66 @@ li.warning {
     border-color: var(--tb-verde-dark) !important;
 }
 
+/* Exportar: misma forma, en contorno, para no competir con «Importar» */
+.tb-btn-export {
+    background-color: transparent !important;
+    color: var(--tb-verde) !important;
+    border: 1px solid var(--tb-verde) !important;
+}
+
+.tb-btn-export:hover {
+    background-color: var(--tb-verde) !important;
+    color: #ffffff !important;
+}
+
+/* Diálogo «¿En qué formato quieres exportar?» del catálogo */
+.tb-dialog-export {
+    /* Los estilos base del admin anulan el centrado nativo de <dialog> */
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    height: fit-content;
+    border: none;
+    border-radius: 14px;
+    padding: 22px 24px 18px;
+    width: min(460px, calc(100vw - 32px));
+    background: #ffffff;
+    color: #1f2937;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    font-family: 'Outfit', sans-serif;
+}
+.tb-dialog-export::backdrop { background: rgba(0, 0, 0, 0.45); }
+.tb-dialog-export h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+.tb-dialog-export-sub { margin: 0 0 16px; font-size: 13px; color: #6b7280; }
+.tb-dialog-export-opciones { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tb-dialog-export-opcion {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    color: inherit !important;
+    text-decoration: none !important;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+.tb-dialog-export-opcion:hover,
+.tb-dialog-export-opcion:focus-visible {
+    border-color: var(--tb-verde);
+    background-color: rgba(29, 158, 117, 0.08);
+}
+.tb-dialog-export-opcion .material-symbols-outlined { color: var(--tb-verde); font-size: 26px; }
+.tb-dialog-export-opcion strong { font-size: 14px; }
+.tb-dialog-export-opcion small { font-size: 12px; color: #6b7280; line-height: 1.4; }
+.tb-dialog-export-pie { display: flex; justify-content: flex-end; margin-top: 16px; }
+.dark .tb-dialog-export { background: #1c1b19; color: #edecea; }
+.dark .tb-dialog-export-opcion { border-color: #3a3936; }
+.dark .tb-dialog-export-sub,
+.dark .tb-dialog-export-opcion small { color: #a8a6a1; }
+@media (max-width: 480px) {
+    .tb-dialog-export-opciones { grid-template-columns: 1fr; }
+}
+
 /* ─── DARK MODE ─── */
 .dark body {
     background-color: #111110 !important;
