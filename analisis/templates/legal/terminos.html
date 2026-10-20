@@ -1,0 +1,119 @@
+{% extends "legal/base_legal.html" %}
+{% block titulo %}Términos de uso{% endblock %}
+{% block contenido %}
+<h1>Términos y condiciones de uso</h1>
+<p class="meta">Versión {{ version }} · Vigente desde el {{ fecha }}</p>
+
+{% if user.is_staff %}
+<div class="aviso">
+    <strong>Nota para administradores:</strong> este texto es una base de trabajo y debe ser revisado y aprobado
+    por el área jurídica de la institución antes de su publicación definitiva. Complete los campos
+    <span class="completar">[RESALTADOS]</span>. Este aviso solo lo ven los administradores.
+</div>
+{% endif %}
+
+<h2>1. Objeto y aceptación</h2>
+<p>
+    Estos términos regulan el acceso y uso de <strong>BioMicro</strong> (en adelante, «la plataforma»), herramienta
+    para el análisis de perfiles microbianos de suelo a partir de datos de secuenciación (16S e ITS) y de ensayos
+    microbiológicos. Al crear una cuenta, iniciar sesión o usar la plataforma, usted declara haber leído y aceptado
+    estos términos y la <a href="{% url 'analisis:privacidad' %}">Política de privacidad</a>. Si no está de acuerdo,
+    no debe utilizar la plataforma.
+</p>
+
+<h2>2. Titular de la plataforma</h2>
+<p>
+    La plataforma es administrada por <span class="completar">[NOMBRE DE LA INSTITUCIÓN]</span>,
+    con domicilio en <span class="completar">[DIRECCIÓN]</span>. Para cualquier consulta sobre estos términos puede
+    escribir a <span class="completar">[CORREO DE CONTACTO]</span>.
+</p>
+
+<h2>3. Finalidad académica y de investigación</h2>
+<p>
+    La plataforma se ofrece con fines académicos, docentes y de investigación. Su uso con otros fines, incluidos los
+    comerciales, requiere autorización expresa del titular.
+</p>
+
+<h2>4. Cuentas de usuario y seguridad</h2>
+<ul>
+    <li>Usted debe proporcionar información veraz y mantenerla actualizada.</li>
+    <li>Sus credenciales son personales e intransferibles. Es responsable de mantener la confidencialidad de su
+        contraseña y de toda actividad realizada desde su cuenta; avise de inmediato si sospecha un uso no autorizado.</li>
+    <li>Por seguridad, después de <strong>3 intentos fallidos</strong> de inicio de sesión, el acceso con ese correo
+        se bloquea temporalmente durante <strong>15 minutos</strong>.</li>
+    <li>Las sesiones se cierran automáticamente tras un periodo de inactividad.</li>
+    <li>El titular puede suspender o cancelar cuentas que incumplan estos términos o comprometan la seguridad de la plataforma.</li>
+</ul>
+
+<h2>5. Datos y archivos que usted sube</h2>
+<ul>
+    <li>Usted declara que tiene derecho o autorización para cargar los archivos, muestras y datos que incorpora a la
+        plataforma, y que hacerlo no vulnera derechos de terceros ni acuerdos de confidencialidad.</li>
+    <li>Usted conserva la titularidad de sus datos. Al cargarlos, autoriza al titular a almacenarlos y procesarlos
+        para prestar el servicio, y a mostrarlos a los demás usuarios autorizados de la plataforma según su rol.</li>
+    <li>Evite incluir datos personales de terceros (por ejemplo, nombres de productores o propietarios) en códigos,
+        observaciones o archivos, salvo que cuente con su autorización y sea necesario.</li>
+    <li>Le recomendamos conservar siempre una copia de sus archivos originales.</li>
+</ul>
+
+<h2>6. Carácter orientativo de los resultados</h2>
+<p>
+    Los índices de diversidad, ordenaciones, pruebas estadísticas, clasificaciones funcionales (por ejemplo,
+    «benéfico» o «potencial fitopatógeno») y reportes se generan automáticamente a partir de los datos cargados y de
+    un catálogo de referencia elaborado con literatura científica. Su exactitud depende de la calidad de los datos de
+    entrada, de la clasificación taxonómica de origen y del estado del conocimiento científico, que puede ser
+    incompleto o cambiar.
+</p>
+<p>
+    <strong>Los resultados son orientativos y no constituyen un diagnóstico, una recomendación fitosanitaria o
+    agronómica, ni una certificación.</strong> Cualquier decisión agronómica, productiva, comercial o regulatoria
+    basada en ellos es responsabilidad de quien la toma y debe ser validada por un profesional calificado y, cuando
+    corresponda, mediante métodos de laboratorio confirmatorios.
+</p>
+
+<h2>7. Disponibilidad del servicio</h2>
+<p>
+    La plataforma se ofrece «tal como está» y «según disponibilidad». El titular procurará su buen funcionamiento,
+    pero no garantiza que esté libre de errores ni disponible sin interrupciones, y podrá realizar mantenimientos,
+    actualizaciones o cambios de funcionalidad.
+</p>
+
+<h2>8. Limitación de responsabilidad</h2>
+<p>
+    En la máxima medida permitida por la legislación aplicable, el titular no será responsable de daños indirectos,
+    lucro cesante ni pérdidas derivadas de: (a) decisiones tomadas con base en los resultados de la plataforma;
+    (b) la calidad, exactitud o legalidad de los datos cargados por los usuarios; (c) interrupciones, fallas o
+    pérdida de información atribuibles a causas ajenas a su control, incluidos servicios de terceros; o (d) el uso
+    indebido de las credenciales del usuario. Nada en estos términos excluye la responsabilidad que, por ley, no
+    pueda limitarse.
+</p>
+
+<h2>9. Conductas prohibidas</h2>
+<ul>
+    <li>Intentar acceder a cuentas, datos o funciones sin autorización, o eludir las medidas de seguridad.</li>
+    <li>Compartir sus credenciales o usar la cuenta de otra persona.</li>
+    <li>Cargar archivos con código malicioso o contenido ilícito.</li>
+    <li>Extraer información de forma masiva o automatizada sin autorización.</li>
+    <li>Usar la plataforma para infringir derechos de terceros o la normativa vigente.</li>
+</ul>
+
+<h2>10. Propiedad intelectual</h2>
+<p>
+    El software, los diseños, los textos y el catálogo de referencia de la plataforma pertenecen al titular o a sus
+    autores. Los reportes generados pueden utilizarse con fines académicos y de investigación citando la plataforma
+    como fuente.
+</p>
+
+<h2>11. Modificaciones</h2>
+<p>
+    Estos términos pueden actualizarse. Cada versión indica su número y fecha; cuando el cambio sea relevante, se le
+    pedirá aceptarla de nuevo al ingresar.
+</p>
+
+<h2>12. Ley aplicable y jurisdicción</h2>
+<p>
+    Estos términos se rigen por la legislación de la República del Ecuador. Cualquier controversia se someterá a los
+    jueces competentes de <span class="completar">[CIUDAD]</span>, sin perjuicio de los mecanismos alternativos de
+    solución de conflictos que las partes acuerden.
+</p>
+{% endblock %}

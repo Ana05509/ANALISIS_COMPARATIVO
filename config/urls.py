@@ -12,6 +12,9 @@ from analisis.views.manual_admin import manual_admin_view
 
 urlpatterns = [
     path('admin/manual/', admin.site.admin_view(manual_admin_view), name='admin-manual'),
+    # El login propio del admin no tiene límite de intentos: se redirige al
+    # login de la plataforma (bloqueo tras 3 fallos), conservando ?next=
+    path('admin/login/', RedirectView.as_view(url='/login/', query_string=True, permanent=False)),
     path('admin/', admin.site.urls),
     # Redirigir la URL de login de allauth a nuestra vista personalizada
     path('accounts/login/', RedirectView.as_view(url='/login/', permanent=False)),

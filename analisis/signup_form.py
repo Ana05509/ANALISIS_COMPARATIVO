@@ -34,6 +34,14 @@ class CustomSignupForm(forms.Form):
         widget=forms.TextInput(attrs={'placeholder': 'Ej: Pérez', 'class': 'form-control'}),
     )
 
+    acepta_terminos = forms.BooleanField(
+        required=True,
+        label='Acepto los Términos de uso y la Política de privacidad',
+        error_messages={
+            'required': 'Para crear la cuenta debes aceptar los Términos de uso y la Política de privacidad.',
+        },
+    )
+
     def clean_first_name(self):
         return _validate_name(self.cleaned_data.get('first_name', ''), 'nombre')
 
@@ -45,3 +53,6 @@ class CustomSignupForm(forms.Form):
         user.last_name = self.cleaned_data['last_name']
         user.rol = 'estudiante'
         user.save()
+        # Constancia de la aceptación (fecha, versión, IP) en Auditoría
+        from analisis.seguridad import registrar_aceptacion
+        registrar_aceptacion(request, user)

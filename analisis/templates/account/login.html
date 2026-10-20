@@ -174,6 +174,21 @@
         }
         .error-banner i { font-size:18px; flex-shrink:0; }
 
+        /* ── Banner de bloqueo temporal ─────────────── */
+        .lock-banner {
+            display:flex; align-items:flex-start; gap:10px;
+            background:#fffbeb; border:1px solid #fcd34d; border-radius:12px;
+            padding:12px 15px; margin-bottom:1.4rem; font-size:13.5px; line-height:1.5; color:#92400e;
+            animation:slideUp .4s var(--ease) both;
+        }
+        .lock-banner i { font-size:18px; flex-shrink:0; margin-top:1px; }
+        .lock-banner a { color:#92400e; font-weight:600; }
+
+        /* ── Pie legal ──────────────────────────────── */
+        .legal-foot { margin-top:.9rem; text-align:center; font-size:11.5px; line-height:1.5; color:var(--muted); }
+        .legal-foot a { color:var(--muted); text-decoration:underline; }
+        .legal-foot a:hover { color:var(--p-vivid); }
+
         /* ── Banner de éxito ───────────────────────── */
         .success-banner {
             display:flex; align-items:center; gap:10px;
@@ -467,10 +482,28 @@
                 <p class="card-sub">Ingresa tus credenciales para acceder a la plataforma</p>
             </div>
 
-            {% if form.errors %}
-            <div class="error-banner">
+            {% if bloqueo_minutos %}
+            <div class="lock-banner" role="alert">
+                <i class="ti ti-lock"></i>
+                <span>
+                    <strong>Acceso bloqueado temporalmente.</strong>
+                    Por tu seguridad, tras {{ bloqueo_intentos }} intentos fallidos el acceso con este correo
+                    se bloqueó. Podrás intentarlo de nuevo en
+                    {{ bloqueo_minutos }} minuto{{ bloqueo_minutos|pluralize }}.
+                    Si olvidaste tu contraseña, puedes
+                    <a href="{% url 'account_reset_password' %}">restablecerla aquí</a>.
+                </span>
+            </div>
+            {% elif form.errors %}
+            <div class="error-banner" role="alert">
                 <i class="ti ti-alert-triangle-filled"></i>
-                <span>Correo o contraseña incorrectos. Verifica tus datos.</span>
+                <span>
+                    Correo o contraseña incorrectos. Verifica tus datos.
+                    {% if intentos_restantes %}
+                    <br><strong>Te queda{{ intentos_restantes|pluralize:"n" }} {{ intentos_restantes }} intento{{ intentos_restantes|pluralize }}</strong>
+                    antes de que el acceso se bloquee {{ bloqueo_tras }} minutos.
+                    {% endif %}
+                </span>
             </div>
             {% endif %}
 
@@ -536,6 +569,11 @@
 
             <p class="auth-foot">
                 ¿Aún no tienes cuenta? <a href="{% url 'account_signup' %}">Regístrate aquí</a>
+            </p>
+            <p class="legal-foot">
+                Al usar la plataforma aceptas los
+                <a href="{% url 'analisis:terminos' %}" target="_blank" rel="noopener">Términos de uso</a> y la
+                <a href="{% url 'analisis:privacidad' %}" target="_blank" rel="noopener">Política de privacidad</a>.
             </p>
         </div>
     </div>

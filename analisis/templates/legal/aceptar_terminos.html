@@ -1,0 +1,56 @@
+{% extends "legal/base_legal.html" %}
+{% block titulo %}Aceptación de términos{% endblock %}
+{% block estilos %}
+<style>
+    .resumen { margin: 0 0 20px; padding-left: 20px; }
+    .error { background: #fff5f5; border: 1px solid #fca5a5; color: #b91c1c; border-radius: 12px;
+             padding: 10px 14px; font-size: 13.5px; margin-bottom: 16px; }
+    @media (prefers-color-scheme: dark) { .error { background: #2a1515; border-color: #7f1d1d; color: #fca5a5; } }
+    .casilla { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer; margin-bottom: 20px; }
+    .casilla input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--p-vivid); flex-shrink: 0; cursor: pointer; }
+    .acciones { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .btn { border: none; border-radius: 10px; padding: 11px 22px; font: 600 14px 'Outfit', sans-serif; cursor: pointer; }
+    .btn-principal { background: var(--p-vivid); color: #fff; }
+    .btn-principal:hover { background: var(--p-dark); }
+    .salir { color: var(--muted); font-size: 13.5px; }
+    .enlace-salir { background: none; border: none; padding: 0; color: var(--p-vivid);
+                    text-decoration: underline; font: inherit; cursor: pointer; }
+</style>
+{% endblock %}
+{% block contenido %}
+<h1>Antes de continuar</h1>
+<p class="meta">Hemos publicado los Términos de uso y la Política de privacidad de BioMicro (versión {{ version }}).</p>
+
+<p>Para seguir usando la plataforma, revise y acepte los siguientes documentos. En resumen:</p>
+<ul class="resumen">
+    <li>Los resultados de la plataforma son <strong>orientativos</strong> y no sustituyen un diagnóstico profesional ni
+        análisis de laboratorio confirmatorios.</li>
+    <li>Usted es responsable de los datos y archivos que carga y de mantener seguras sus credenciales.</li>
+    <li>Tratamos sus datos personales (cuenta, accesos y actividad) para prestar el servicio y protegerlo, conforme a
+        la Ley Orgánica de Protección de Datos Personales del Ecuador.</li>
+    <li>El acceso se bloquea 15 minutos tras 3 intentos fallidos de inicio de sesión.</li>
+</ul>
+
+{% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label class="casilla">
+        <input type="checkbox" name="acepto" required>
+        <span>
+            He leído y acepto los <a href="{% url 'analisis:terminos' %}" target="_blank" rel="noopener">Términos de uso</a>
+            y la <a href="{% url 'analisis:privacidad' %}" target="_blank" rel="noopener">Política de privacidad</a>,
+            y autorizo el tratamiento de mis datos personales para los fines allí descritos.
+        </span>
+    </label>
+    <div class="acciones">
+        <button type="submit" class="btn btn-principal">Aceptar y continuar</button>
+        <span class="salir">¿No está de acuerdo?
+            <button type="submit" form="form-salir" class="enlace-salir">Cerrar sesión</button>
+        </span>
+    </div>
+</form>
+{# Django exige POST para cerrar sesión #}
+<form id="form-salir" method="post" action="{% url 'analisis:logout' %}">{% csrf_token %}</form>
+{% endblock %}

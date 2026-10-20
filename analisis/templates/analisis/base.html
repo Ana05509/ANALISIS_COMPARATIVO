@@ -57,6 +57,14 @@
             <a href="{% url 'analisis:ayuda' %}" class="nav-link {% block nav_ayuda %}{% endblock %}">
                 <i class="ti ti-help-circle" aria-hidden="true"></i> Guía y Glosario
             </a>
+
+            {# Solo administradores (rol Administrador → is_staff). El panel /admin/ además rechaza a cualquier otro usuario. #}
+            {% if request.user.is_staff %}
+            <div class="nav-section-label">Administración</div>
+            <a href="{% url 'admin:index' %}" class="nav-link">
+                <i class="ti ti-shield-lock" aria-hidden="true"></i> Panel de administración
+            </a>
+            {% endif %}
         </nav>
 
         <div class="marker-tabs">

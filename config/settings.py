@@ -145,6 +145,10 @@ MIDDLEWARE = [
     # Auditoría: adjunta el usuario autenticado a cada registro histórico,
     # sin importar si el cambio vino del admin, de una vista o de la API
     'simple_history.middleware.HistoryRequestMiddleware',
+
+    # Pide aceptar los Términos de uso y la Política de privacidad vigentes
+    # a quien aún no lo hizo (va después de AuthenticationMiddleware)
+    'analisis.middleware.TerminosMiddleware',
 ]
 
 # ---------------------------
@@ -287,6 +291,11 @@ ACCOUNT_PREVENT_ENUMERATION = False
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']  # sin username; email=username
 ACCOUNT_LOGIN_METHODS = {'email'}                               # login con correo (username = email auto)
 ACCOUNT_UNIQUE_EMAIL = True         # un correo = una cuenta
+
+# Respaldo del limitador de allauth alineado con el bloqueo propio de
+# analisis.seguridad (3 intentos fallidos por correo → 15 minutos). Solo se
+# sobrescribe esta clave; allauth conserva sus demás límites por defecto.
+ACCOUNT_RATE_LIMITS = {"login_failed": "10/m/ip,3/15m/key"}
 
 # Detrás del proxy de Railway, REMOTE_ADDR es la IP del proxy, no la del
 # cliente: sin esto el limitador de intentos de login (consume_or_429 en

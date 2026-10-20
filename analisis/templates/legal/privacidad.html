@@ -1,0 +1,135 @@
+{% extends "legal/base_legal.html" %}
+{% block titulo %}Política de privacidad{% endblock %}
+{% block contenido %}
+<h1>Política de privacidad y protección de datos personales</h1>
+<p class="meta">Versión {{ version }} · Vigente desde el {{ fecha }}</p>
+
+{% if user.is_staff %}
+<div class="aviso">
+    <strong>Nota para administradores:</strong> este texto es una base de trabajo elaborada conforme a la Ley Orgánica
+    de Protección de Datos Personales del Ecuador (LOPDP) y debe ser revisado y aprobado por el área jurídica de la
+    institución. Complete los campos <span class="completar">[RESALTADOS]</span>. Este aviso solo lo ven los administradores.
+</div>
+{% endif %}
+
+<p>
+    Esta política explica qué datos personales trata la plataforma <strong>BioMicro</strong>, con qué finalidad y
+    cuáles son sus derechos, de acuerdo con la Ley Orgánica de Protección de Datos Personales del Ecuador.
+</p>
+
+<h2>1. Responsable del tratamiento</h2>
+<p>
+    <span class="completar">[NOMBRE DE LA INSTITUCIÓN]</span>, RUC <span class="completar">[RUC]</span>, con domicilio en
+    <span class="completar">[DIRECCIÓN]</span>.<br>
+    Contacto para temas de privacidad: <span class="completar">[CORREO DE CONTACTO]</span>.<br>
+    Delegado de protección de datos (si aplica): <span class="completar">[NOMBRE Y CORREO DEL DELEGADO]</span>.
+</p>
+
+<h2>2. Datos que tratamos</h2>
+<ul>
+    <li><strong>Datos de cuenta:</strong> nombre, apellido, correo electrónico, rol en la plataforma y, si la sube,
+        foto de perfil. La contraseña se guarda cifrada y nadie, ni siquiera los administradores, puede leerla.</li>
+    <li><strong>Inicio de sesión con Google</strong> (opcional): el nombre, el correo y el identificador de cuenta que
+        Google nos comparte con su autorización.</li>
+    <li><strong>Registros de acceso y seguridad:</strong> fecha y hora de inicios y cierres de sesión, intentos
+        fallidos (incluido el correo escrito), dirección IP y tipo de navegador o dispositivo.</li>
+    <li><strong>Registro de actividad:</strong> qué registros crea, modifica o elimina en la plataforma, y la constancia
+        de aceptación de estos textos (fecha, versión e IP).</li>
+    <li><strong>Datos de muestras y ensayos:</strong> códigos, cultivo, variedad, localidad, finca o lote, altitud,
+        observaciones y archivos de secuenciación o informes de laboratorio. Estos datos pueden permitir identificar
+        a un productor o a un predio; evite incluir información personal de terceros si no es necesaria.</li>
+</ul>
+<p>
+    La plataforma no está diseñada para tratar datos sensibles (salud, origen étnico, opiniones políticas, etc.).
+    Por favor, no los incluya.
+</p>
+
+<h2>3. Finalidades</h2>
+<ul>
+    <li>Crear y administrar su cuenta y permitirle usar las funciones de análisis y reportes.</li>
+    <li>Proteger la plataforma y sus cuentas: detectar accesos indebidos, aplicar el bloqueo temporal tras intentos
+        fallidos y mantener un registro de auditoría.</li>
+    <li>Enviarle correos necesarios para el servicio, como la recuperación de contraseña.</li>
+    <li>Elaborar estadísticas internas de uso de forma agregada.</li>
+    <li>Cumplir obligaciones legales y atender requerimientos de autoridades competentes.</li>
+</ul>
+<p>
+    Si los datos de la plataforma se utilizaran en publicaciones o proyectos de investigación, se hará de forma
+    anonimizada o agregada, o con su consentimiento específico.
+</p>
+
+<h2>4. Base legal</h2>
+<p>
+    Tratamos sus datos con base en: su <strong>consentimiento</strong>, otorgado al aceptar esta política; la
+    <strong>prestación del servicio</strong> que usted solicita al usar la plataforma; el <strong>interés
+    legítimo</strong> de mantener la seguridad de la plataforma y de sus usuarios; y el <strong>cumplimiento de
+    obligaciones legales</strong>. Puede revocar su consentimiento en cualquier momento, sin efectos retroactivos.
+</p>
+
+<h2>5. Con quién se comparten</h2>
+<ul>
+    <li><strong>Otros usuarios autorizados</strong> de la plataforma pueden ver los datos de muestras y resultados,
+        según su rol.</li>
+    <li><strong>Proveedores tecnológicos</strong> que actúan como encargados del tratamiento: el servicio de
+        alojamiento en la nube donde funciona la plataforma (<span class="completar">[PROVEEDOR, p. ej. Railway]</span>),
+        Google (inicio de sesión con Google y envío de correos) y servicios que entregan tipografías y librerías
+        (Google Fonts, jsDelivr), que reciben su dirección IP al cargar las páginas.</li>
+    <li>Algunos de estos proveedores pueden almacenar o procesar datos <strong>fuera del Ecuador</strong>. En esos
+        casos procuramos que ofrezcan garantías adecuadas de protección.</li>
+    <li><strong>Autoridades</strong>, cuando exista una obligación legal o una orden competente.</li>
+</ul>
+<p><strong>No vendemos ni alquilamos sus datos personales.</strong></p>
+
+<h2>6. Plazo de conservación</h2>
+<p>
+    Los datos de cuenta se conservan mientras la cuenta esté activa y hasta
+    <span class="completar">[PLAZO]</span> después de su eliminación. Los registros de acceso y auditoría se conservan
+    durante <span class="completar">[PLAZO]</span> por motivos de seguridad. Los datos de muestras se conservan
+    mientras sean necesarios para los fines académicos y de investigación descritos, o hasta que solicite su
+    eliminación, salvo obligación legal de conservarlos.
+</p>
+
+<h2>7. Seguridad</h2>
+<p>
+    Aplicamos medidas técnicas y organizativas razonables: contraseñas cifradas, conexión cifrada (HTTPS), bloqueo
+    temporal tras 3 intentos fallidos de inicio de sesión, cierre automático de sesiones inactivas, permisos por rol,
+    acceso restringido a los archivos originales y registro de auditoría. Ningún sistema es completamente
+    invulnerable; si ocurriera una vulneración que afecte sus datos, actuaremos y notificaremos conforme a la ley.
+</p>
+
+<h2>8. Sus derechos</h2>
+<p>De acuerdo con la LOPDP, usted puede ejercer en cualquier momento sus derechos de:</p>
+<ul>
+    <li>información y acceso a sus datos;</li>
+    <li>rectificación y actualización;</li>
+    <li>eliminación;</li>
+    <li>oposición y suspensión del tratamiento;</li>
+    <li>portabilidad;</li>
+    <li>no ser objeto de decisiones basadas únicamente en valoraciones automatizadas.</li>
+</ul>
+<p>
+    Para ejercerlos, escriba a <span class="completar">[CORREO DE CONTACTO]</span> indicando su nombre, el correo de
+    su cuenta y el derecho que desea ejercer. Responderemos dentro de los plazos que establece la ley. Si considera que
+    sus derechos no han sido atendidos, puede presentar un reclamo ante la Superintendencia de Protección de Datos
+    Personales.
+</p>
+
+<h2>9. Cookies y almacenamiento local</h2>
+<p>
+    La plataforma usa únicamente cookies técnicas necesarias para su funcionamiento: la cookie de sesión (mantener su
+    sesión iniciada) y la de protección CSRF (seguridad de los formularios). Además, guarda en su navegador su
+    preferencia de tema claro u oscuro. <strong>No usamos cookies publicitarias ni de seguimiento.</strong>
+</p>
+
+<h2>10. Menores de edad</h2>
+<p>
+    La plataforma está dirigida a la comunidad académica y de investigación. Si es menor de 18 años, solo puede
+    usarla con la autorización de su representante legal.
+</p>
+
+<h2>11. Cambios en esta política</h2>
+<p>
+    Podemos actualizar esta política. Cada versión indica su número y fecha; cuando el cambio sea relevante, se le
+    pedirá aceptarla de nuevo al ingresar.
+</p>
+{% endblock %}

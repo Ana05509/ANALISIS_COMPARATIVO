@@ -1,0 +1,66 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block titulo %}{% endblock %} — BioMicro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+    <style>
+        :root {
+            --p: #4a7c64; --p-vivid: #38a878; --p-dark: #2d6b52;
+            --surface: #ffffff; --bg: #f0f5f3; --border: #d6e4dd;
+            --text: #0f1923; --muted: #5b6470; --aviso-bg: #fffbeb; --aviso-bd: #fcd34d; --aviso-tx: #92400e;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --surface: #1c1b19; --bg: #121211; --border: #34332f;
+                --text: #edecea; --muted: #a8a6a1; --aviso-bg: #2a2214; --aviso-bd: #8a6a1f; --aviso-tx: #f5d48a;
+            }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; line-height: 1.65; }
+        .contenedor { max-width: 820px; margin: 0 auto; padding: 32px 16px 56px; }
+        .cabecera { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .marca { font-family: 'Fraunces', serif; font-size: 20px; color: var(--p-dark); text-decoration: none; font-weight: 500; }
+        @media (prefers-color-scheme: dark) { .marca { color: var(--p-vivid); } }
+        .volver { color: var(--muted); font-size: 14px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .volver:hover { color: var(--p-vivid); }
+        .tarjeta { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px 36px; }
+        @media (max-width: 600px) { .tarjeta { padding: 22px 18px; } }
+        h1 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 28px; margin: 0 0 4px; }
+        .meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+        h2 { font-size: 17px; font-weight: 600; margin: 28px 0 8px; color: var(--p-dark); }
+        @media (prefers-color-scheme: dark) { h2 { color: var(--p-vivid); } }
+        p, li { font-size: 14.5px; }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 4px; }
+        a { color: var(--p-vivid); }
+        .aviso { background: var(--aviso-bg); border: 1px solid var(--aviso-bd); color: var(--aviso-tx);
+                 border-radius: 12px; padding: 12px 16px; font-size: 13.5px; margin: 0 0 20px; }
+        .completar { background: rgba(252, 211, 77, .35); padding: 0 4px; border-radius: 4px; font-weight: 600; }
+        .pie { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 20px; }
+        .pie a { color: var(--muted); }
+    </style>
+    {% block estilos %}{% endblock %}
+</head>
+<body>
+<div class="contenedor">
+    <div class="cabecera">
+        <a class="marca" href="/">BioMicro</a>
+        <a class="volver" href="{% if user.is_authenticated %}{% url 'analisis:dashboard' %}{% else %}{% url 'analisis:login' %}{% endif %}">
+            <i class="ti ti-arrow-left"></i> Volver a la plataforma
+        </a>
+    </div>
+    <div class="tarjeta">
+        {% block contenido %}{% endblock %}
+    </div>
+    <p class="pie">
+        <a href="{% url 'analisis:terminos' %}">Términos de uso</a> ·
+        <a href="{% url 'analisis:privacidad' %}">Política de privacidad</a> ·
+        Versión {{ version }} — {{ fecha }}
+    </p>
+</div>
+</body>
+</html>

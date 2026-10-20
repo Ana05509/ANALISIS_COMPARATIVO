@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demasiados intentos — BioMicro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --p-vivid: #38a878; --surface: #fff; --bg: #f0f5f3; --border: #d6e4dd; --text: #0f1923; --muted: #5b6470; }
+        @media (prefers-color-scheme: dark) {
+            :root { --surface: #1c1b19; --bg: #121211; --border: #34332f; --text: #edecea; --muted: #a8a6a1; }
+        }
+        body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+               background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; padding: 16px; box-sizing: border-box; }
+        .tarjeta { max-width: 460px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+                   padding: 32px; text-align: center; }
+        h1 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 24px; margin: 0 0 10px; }
+        p { color: var(--muted); font-size: 14.5px; line-height: 1.6; margin: 0 0 20px; }
+        a { display: inline-block; background: var(--p-vivid); color: #fff; text-decoration: none; border-radius: 10px;
+            padding: 10px 20px; font-weight: 600; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="tarjeta">
+        <h1>Demasiados intentos</h1>
+        <p>
+            Por seguridad, hemos limitado temporalmente las solicitudes desde tu conexión.
+            Espera unos minutos y vuelve a intentarlo.
+        </p>
+        <a href="/login/">Volver al inicio de sesión</a>
+    </div>
+</body>
+</html>

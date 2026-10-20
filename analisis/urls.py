@@ -14,6 +14,10 @@ urlpatterns = [
     # 1. AUTENTICACIÓN
     path("login/", CustomLoginView.as_view(), name="login"),
     path("logout/", CustomLogoutView.as_view(), name="logout"),
+    # Textos legales (públicos) y aceptación obligatoria para cuentas que aún no aceptaron
+    path("terminos/", views.terminos, name="terminos"),
+    path("privacidad/", views.privacidad, name="privacidad"),
+    path("aceptar-terminos/", views.aceptar_terminos, name="aceptar_terminos"),
     # La recuperación de contraseña la maneja allauth (accounts/password/reset/...),
     # que ya cuenta con sus propias plantillas (account/password_reset*.html).
 

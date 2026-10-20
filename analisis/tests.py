@@ -331,3 +331,49 @@ class ExportacionCatalogoTests(SimpleTestCase):
         self.assertEqual(list(hojas), ["Catálogo", "Bacterias (16S)"])
         self.assertEqual(list(hojas["Catálogo"].columns), CatalogService.COLUMNAS_EXPORTACION)
         self.assertEqual(hojas["Catálogo"]["nombre"].tolist(), ["Bacillus", "Ralstonia"])
+
+
+class BloqueoLoginTests(SimpleTestCase):
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+
+    def test_tres_fallos_bloquean_quince_minutos(self):
+        from analisis import seguridad
+        correo = "alguien@utc.edu.ec"
+        self.assertEqual(seguridad.registrar_fallo(correo), 2)
+        self.assertEqual(seguridad.registrar_fallo(correo), 1)
+        self.assertEqual(seguridad.minutos_bloqueo_restantes(correo), 0)
+        self.assertEqual(seguridad.registrar_fallo(correo), 0)  # tercer fallo: bloqueo
+        self.assertEqual(seguridad.minutos_bloqueo_restantes(correo), 15)
+
+    def test_mayusculas_y_espacios_no_evaden_el_bloqueo(self):
+        from analisis import seguridad
+        for variante in ("Ana@UTC.edu.ec", " ana@utc.edu.ec", "ANA@utc.EDU.ec  "):
+            seguridad.registrar_fallo(variante)
+        self.assertGreater(seguridad.minutos_bloqueo_restantes("ana@utc.edu.ec"), 0)
+
+    def test_login_correcto_reinicia_el_contador(self):
+        from analisis import seguridad
+        correo = "b@utc.edu.ec"
+        seguridad.registrar_fallo(correo)
+        seguridad.registrar_fallo(correo)
+        seguridad.limpiar_fallos(correo)
+        self.assertEqual(seguridad.registrar_fallo(correo), 2)
+
+    def test_bloqueo_expira(self):
+        from unittest import mock
+        from analisis import seguridad
+        correo = "c@utc.edu.ec"
+        for _ in range(3):
+            seguridad.registrar_fallo(correo)
+        ahora = __import__("time").time()
+        with mock.patch("analisis.seguridad.time.time", return_value=ahora + 15 * 60 + 1):
+            self.assertEqual(seguridad.minutos_bloqueo_restantes(correo), 0)
+
+    def test_correo_vacio_no_bloquea(self):
+        from analisis import seguridad
+        for _ in range(5):
+            self.assertEqual(seguridad.registrar_fallo("  "), seguridad.INTENTOS_MAXIMOS)
+        self.assertEqual(seguridad.minutos_bloqueo_restantes(""), 0)
