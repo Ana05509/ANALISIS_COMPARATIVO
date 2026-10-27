@@ -1,0 +1,38 @@
+# Servicio de Gunicorn para BioMicro (equivale a la línea "web:" del Procfile).
+# Copiar a /etc/systemd/system/biomicro.service y luego:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now biomicro
+# Las variables de entorno las carga settings.py desde /opt/biomicro/app/.env.
+
+[Unit]
+Description=BioMicro (Django + Gunicorn)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=biomicro
+Group=www-data
+WorkingDirectory=/opt/biomicro/app
+# Crea /run/biomicro (para el socket) con dueño biomicro en cada arranque.
+RuntimeDirectory=biomicro
+RuntimeDirectoryMode=0750
+# 3 procesos caben en 2 GB de RAM; con 1 GB bajar --workers a 2.
+ExecStart=/opt/biomicro/venv/bin/gunicorn config.wsgi \
+    --workers 3 \
+    --timeout 180 \
+    --bind unix:/run/biomicro/gunicorn.sock \
+    --umask 007 \
+    --access-logfile - \
+    --error-logfile -
+Restart=on-failure
+RestartSec=5
+
+# Endurecimiento básico: no puede tocar /usr, /etc ni /home, ni escalar
+# privilegios. Su HOME es /opt/biomicro (ahí guarda Matplotlib su caché).
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -498,9 +498,11 @@ UNFOLD = {
 # ---------------------------
 # CONFIGURACIÓN DE CORREO ELECTRÓNICO
 # ---------------------------
-EMAIL_HOST      = 'smtp.gmail.com'
-EMAIL_PORT      = 587
-EMAIL_USE_TLS   = True
+EMAIL_HOST      = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT      = int(os.environ.get('EMAIL_PORT', '587'))
+# 587 = STARTTLS (EMAIL_USE_TLS); 465 = SSL directo (EMAIL_USE_SSL). Nunca los dos.
+EMAIL_USE_TLS   = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_USE_SSL   = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
 # Sin esto, smtplib no tiene timeout (None) y se queda esperando
 # indefinidamente si el puerto SMTP saliente está lento/filtrado en
 # producción (Railway) — el worker de gunicorn quedaba colgado hasta su
@@ -509,7 +511,12 @@ EMAIL_USE_TLS   = True
 EMAIL_TIMEOUT   = 10
 EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL  = 'BioMicro <{}>'.format(os.environ.get('EMAIL_HOST_USER', 'noreply@biomicro.ec'))
+# Remitente que ven los usuarios. Si no se define, usa la cuenta SMTP.
+# Con el correo de la UTC, por ejemplo: BioMicro UTC <biomicro@utc.edu.ec>
+DEFAULT_FROM_EMAIL  = os.environ.get('DEFAULT_FROM_EMAIL') or 'BioMicro <{}>'.format(
+    os.environ.get('EMAIL_HOST_USER') or 'noreply@biomicro.ec'
+)
+SERVER_EMAIL        = DEFAULT_FROM_EMAIL
 
 # Si hay credenciales en .env usa SMTP real; si no, imprime en consola
 if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
