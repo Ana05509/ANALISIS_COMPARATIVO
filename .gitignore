@@ -200,4 +200,7 @@ vscode/
 !/media/cultivos/**
 
 .docs/
-docs**
+
+# Documento para el jurado (Word/PDF): solo en el equipo local
+docs/*.docx
+docs/*.pdf
