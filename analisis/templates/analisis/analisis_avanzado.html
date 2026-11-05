@@ -17,7 +17,7 @@
 .av-row.marcador-oculta { display:none; }
 .chart-desc { font-size:12.5px; color:var(--text-hint); margin:0 0 0.75rem; line-height:1.55; }
 
-/* ── Grid tabla+donut responsive ── */
+/* Grid tabla+donut responsive */
 .av-2col {
     display: grid;
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
@@ -25,38 +25,30 @@
     align-items: start;
     margin-bottom: .85rem;
 }
-/* 1300px (no 900px): en una laptop de 1366px, la mitad de 1.6/2.6 le deja a
-   la tabla ~560-600px netos — justo al límite de lo que necesita, así que
-   pedía scroll aun con pantalla de sobra. Con el corte más arriba, la tabla
-   usa el ancho completo en cualquier laptop común y solo se parte en 2
-   columnas en monitores realmente anchos. */
+/* Dos columnas solo en pantallas de 1300px o más. */
 @media (max-width: 1300px) {
     .av-2col { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* ── Plotly containers: no overflow ── */
+/* Plotly containers: no overflow */
 .av-chart-wrap {
     width: 100%;
     max-width: 100%;
     overflow: hidden;
 }
 
-/* ── Card title sin desbordamiento ── */
+/* Card title sin desbordamiento */
 .card-title {
     word-break: break-word;
     overflow-wrap: anywhere;
 }
 
-/* ── Tabla Top-N responsive ── */
+/* Tabla Top-N responsive */
 .av-top-table {
     table-layout: fixed;
     width: 100%;
 }
-/* table.av-top-table (no solo .av-top-table): necesita la misma
-   especificidad que ".table-wrap table" (560px) para ganarle — si no,
-   ese mínimo genérico se impone y la tabla no se achica dentro de
-   .av-2col. Sus columnas ya envuelven texto (word-break/overflow-wrap
-   arriba), así que 420px es un mínimo razonable. */
+/* Misma especificidad que ".table-wrap table" para poder bajar el mínimo a 420px. */
 table.av-top-table { min-width: 420px; }
 .av-top-table th:nth-child(1) { width: 40px; }
 .av-top-table th:nth-child(2) { width: 28%; }
@@ -247,9 +239,7 @@ table.av-top-table { min-width: 420px; }
     </div>
 </div>
 
-<!-- ============================================================ -->
 <!-- GRÁFICAS AVANZADAS (Plotly) -->
-<!-- ============================================================ -->
 {% if graficos_avanzados %}
 <div class="card" style="margin-top: 1rem;">
     <div class="card-title">Visualización Avanzada</div>
@@ -302,7 +292,6 @@ table.av-top-table { min-width: 420px; }
     </div>
 </div>
 {% endif %}
-<!-- ============================================================ -->
 
 {% endif %}
 

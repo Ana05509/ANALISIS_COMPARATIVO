@@ -41,10 +41,7 @@ def dashboard(request):
             .order_by("-total")
         )
 
-        # Desglose de variedades/clones por cultivo (para el modal que se abre
-        # al hacer clic en una tarjeta de "Muestras por Cultivo"). El alias no
-        # puede llamarse "cultivo_id" en .values(): Django lo rechaza por
-        # colisionar con el nombre real del campo FK en el modelo.
+        # Variedades por cultivo (para el modal). El alias no puede ser "cultivo_id".
         variedades_por_cultivo: dict = {}
         filas_variedades = (
             muestras.exclude(variedad_clon__isnull=True)
@@ -57,10 +54,7 @@ def dashboard(request):
                 {"nombre": fila["nombre"], "total": fila["total"]}
             )
 
-        # Clasificación funcional — mismo lookup canónico (normalizado y
-        # filtrado por nivel) que usan Comparar/Avanzado/Reportes, en vez de
-        # un match directo por nombre crudo que podía clasificar distinto un
-        # mismo género según la página.
+        # Clasificación funcional con el mismo lookup que el resto de páginas.
         conteos_funcionales = ResultadoTaxonomico.objects.filter(
             archivo__tipo_analisis=tipo
         ).values("genus").annotate(total_hits=Sum("num_hits"))

@@ -38,10 +38,7 @@
             --amber-dark:   #5a3a00;
             --slate-light:  #f1f5f9;
             --slate-dark:   #475569;
-            /* Escala de nivel de salud del suelo (ÓPTIMO → CRÍTICO) — en modo
-               claro va de más oscuro (mejor) a más oscuro (peor) porque el
-               fondo es blanco; en modo oscuro se invierte a tonos claros
-               saturados para que sigan siendo legibles sobre --surface. */
+            /* Escala de nivel de salud del suelo (ÓPTIMO → CRÍTICO), con tonos claros en modo oscuro. */
             --nivel-optimo:    #14532d;
             --nivel-favorable: #16a34a;
             --nivel-moderado:  #ca8a04;
@@ -57,7 +54,7 @@
             --transition:   0.18s ease;
         }
 
-        /* ── TEMA OSCURO ── */
+        /* TEMA OSCURO */
         [data-theme="dark"] {
             --verde-light:  rgba(29,158,117,0.18);
             --verde-dark:   #58d9a6;
@@ -109,7 +106,7 @@
 
         img, svg, video { max-width: 100%; height: auto; }
 
-        /* ── INTERFAZ DE USUARIO: CONTENEDORES CON PREFIJOS PROPIOS (Protege el Admin) ── */
+        /* INTERFAZ DE USUARIO: CONTENEDORES CON PREFIJOS PROPIOS (Protege el Admin) */
         .bs-app-layout-root {
             display: flex !important;
             min-height: 100vh !important;
@@ -137,7 +134,7 @@
             min-width: 0 !important;
         }
 
-        /* ── COMPONENTES GENERALES DE LA APP ── */
+        /* COMPONENTES GENERALES DE LA APP */
         .sidebar-brand {
             padding: 0.8rem 1rem;
             border-bottom: 1px solid var(--gris-border);
@@ -719,11 +716,7 @@
         @keyframes spinBtn { to { transform: rotate(360deg); } }
 
         /* Tabla interna (sin bordes externos, para usar dentro de .card) */
-        /* min-width: sin esto, en un celular el navegador encoge las columnas
-           para que quepan en vez de activar el scroll horizontal de
-           .table-wrap — la tabla "se ajusta" apretando el contenido en vez
-           de adaptarse. Con min-width, si no entra, se ve completa con scroll
-           en lugar de columnas ilegibles. */
+        /* min-width para que en celular aparezca scroll horizontal en vez de apretar columnas. */
         .table-inner { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13px; }
         .table-inner thead tr { border-bottom: 2px solid var(--gris-border); }
         .table-inner thead th { background: var(--gris-light); font-size: 11px; font-weight: 600;
@@ -760,18 +753,18 @@
         /* Barras de progreso — cap implícito */
         .progress-bar-inner { max-width: 100%; }
 
-        /* ── Barras mini en metric-card ─────────────────────────── */
+        /* Barras mini en metric-card */
         .mini-bar-track { height:4px; background:rgba(0,0,0,.1); border-radius:4px; overflow:hidden; margin-top:8px; }
         .mini-bar-fill  { height:100%; border-radius:4px; max-width:100%; }
         .mini-bar-pct   { font-size:12px; font-weight:600; margin-top:4px; }
 
-        /* ── Barras de abundancia en tabla ──────────────────────── */
+        /* Barras de abundancia en tabla */
         .pct-bar-wrap  { display:flex; align-items:center; gap:12px; }
         .pct-bar-track { flex:1; height:6px; background:var(--gris-border); border-radius:4px; overflow:hidden; }
         .pct-bar-fill  { height:100%; border-radius:4px; max-width:100%; background:var(--verde); }
         .pct-bar-label { font-size:13px; font-weight:500; min-width:75px; text-align:right; font-family:'DM Mono',monospace; }
 
-        /* ── Colores de clasificación de organismos ──────────────── */
+        /* Colores de clasificación de organismos */
         .bg-benefico     { background: #1D9E75; }
         .bg-fitopatogeno { background: #BA7517; }
         .bg-neutral-azul { background: #185FA5; }
@@ -781,22 +774,22 @@
         .text-neutral-azul { color: #185FA5; }
         .text-sin-clas     { color: #5F5E5A; }
 
-        /* ── Helpers de celdas de tabla ─────────────────────────── */
+        /* Helpers de celdas de tabla */
         .td-muted     { color:var(--text-muted) !important; font-size:13px !important; }
         .td-taxonomy  { font-family:'DM Mono',monospace; font-weight:500; color:var(--text-primary); }
         .td-italic    { color:var(--text-muted); font-size:13px; font-style:italic; }
         .td-capitalize{ text-transform:capitalize; }
 
-        /* ── Utilidades menores ──────────────────────────────────── */
+        /* Utilidades menores */
         .fw-500          { font-weight:500; }
         .fw-600          { font-weight:600; }
         .card-title-note { font-size:11px; font-weight:400; color:var(--text-hint); margin-left:6px; }
 
-        /* ── Badges adicionales ──────────────────────────────────── */
+        /* Badges adicionales */
         .badge-neutral-azul { background:#E8F0FA; color:#185FA5; border:1px solid #b3cce8; }
         .badge-recuento     { background:#E6F1FB; color:#0C447C; }
 
-        /* ── Layout de formularios de filtro ─────────────────────── */
+        /* Layout de formularios de filtro */
         .form-row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
 
         .btn {
@@ -838,13 +831,10 @@
             font-size: 14px;
         }
 
-        /* Igual que en .table-inner: sin un mínimo, el navegador aprieta las
-           columnas en vez de dejar que .table-wrap la haga scrollable. Tablas
-           puntuales (ids con su propio min-width, como #tabla-historial)
-           siguen ganando por especificidad si necesitan otro valor. */
+        /* Mínimo de ancho para que .table-wrap haga scroll. */
         .table-wrap table { min-width: 560px; }
 
-        /* ── TABLAS → TARJETAS EN MÓVIL ────────────────────────────────── */
+        /* TABLAS → TARJETAS EN MÓVIL */
         @media (max-width: 640px) {
             .table-wrap.cards-mobile { overflow-x: visible; border: none; box-shadow: none; }
             .table-wrap.cards-mobile table {
@@ -949,9 +939,9 @@
         .pill-16s { display: inline-block; background: var(--verde-light); color: var(--verde-dark); font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; }
         .pill-its { display: inline-block; background: var(--amber-light); color: var(--amber-dark); font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; }
 
-        /* ════════════════════════════════════════
+        /*
            1. SISTEMA DE TOASTS FLOTANTES
-           ════════════════════════════════════════ */
+           */
         .toast-container {
             position: fixed;
             top: 1.25rem;
@@ -1024,9 +1014,9 @@
         .toast-info    .toast-icon    { color: #1565C0; }
         .toast-info    .toast-progress{ background: #1565C0; }
 
-        /* ════════════════════════════════════════
+        /*
            2. TABLAS ORDENABLES (SORTING)
-           ════════════════════════════════════════ */
+           */
         .table-wrap table thead th {
             cursor: pointer;
             user-select: none;
@@ -1055,9 +1045,9 @@
         th[data-sort-dir] .th-sort-icon { opacity: 1; color: var(--verde-dark); }
         th[data-sort-dir] { color: var(--verde-dark) !important; }
 
-        /* ════════════════════════════════════════
+        /*
            3. VALIDACIÓN EN TIEMPO REAL
-           ════════════════════════════════════════ */
+           */
         .form-control.field-valid {
             border-color: var(--verde) !important;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231D9E75' stroke-width='2.5'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E");
@@ -1088,7 +1078,7 @@
 
         .messages-container { display: none; } /* reemplazado por toasts */
 
-        /* ── BOTÓN HAMBURGUESA (solo visible en móvil/tablet) ── */
+        /* BOTÓN HAMBURGUESA (solo visible en móvil/tablet) */
         .sidebar-toggle-btn {
             display: none;
             background: none;
@@ -1109,7 +1099,7 @@
         .sidebar-toggle-btn:hover { background: var(--gris-light); color: var(--text-primary); }
         .sidebar-toggle-btn:focus-visible { outline: 2px solid var(--verde); outline-offset: 1px; }
 
-        /* ── OVERLAY para cerrar sidebar en móvil ── */
+        /* OVERLAY para cerrar sidebar en móvil */
         .sidebar-overlay {
             display: none;
             position: fixed;
@@ -1119,7 +1109,7 @@
             backdrop-filter: blur(2px);
         }
 
-        /* ── RESPONSIVE: tablet (hasta 1024px) ── */
+        /* RESPONSIVE: tablet (hasta 1024px) */
         @media (max-width: 1024px) {
             .bs-app-sidebar {
                 transform: translateX(-100%);
@@ -1140,7 +1130,7 @@
             }
         }
 
-        /* ── RESPONSIVE: móvil (hasta 640px) ── */
+        /* RESPONSIVE: móvil (hasta 640px) */
         @media (max-width: 640px) {
             .page-content { padding: 1rem 0.875rem; }
             .topbar { padding: 0 0.875rem; height: 48px; }
@@ -1158,7 +1148,7 @@
             .page-content { padding: 1rem 0.875rem; }
         }
 
-        /* ── Sin animaciones para usuarios que lo prefieren ── */
+        /* Sin animaciones para usuarios que lo prefieren */
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
         }
@@ -1174,19 +1164,19 @@
 
     {% block extra_js %}{% endblock %}
 
-    <!-- ── Contenedor de toasts (siempre presente) ── -->
+    <!-- Contenedor de toasts (siempre presente) -->
     <div class="toast-container" id="toastContainer"
          role="region" aria-label="Notificaciones" aria-live="polite"></div>
 
     <script>
-    /* ════════════════════════════════════════════════
+    /*
        SISTEMA DE INTERACTIVIDAD GLOBAL — BioMicro
        1. Toast Manager
        2. Table Sorter
        3. Form Validator
-       ════════════════════════════════════════════════ */
+       */
 
-    /* ── 1. TOAST MANAGER ── */
+    /* 1. TOAST MANAGER */
     var Toast = (function () {
         var container = null;
         var ICONS = {
@@ -1244,7 +1234,7 @@
         document.head.appendChild(s);
     })();
 
-    /* ── 2. TABLE SORTER ── */
+    /* 2. TABLE SORTER */
     function initSortableTables() {
         document.querySelectorAll('.table-wrap table').forEach(function (table) {
             var headers = table.querySelectorAll('thead th');
@@ -1297,7 +1287,7 @@
         });
     }
 
-    /* ── 3. VALIDACIÓN EN TIEMPO REAL ── */
+    /* 3. VALIDACIÓN EN TIEMPO REAL */
     function initFormValidation() {
         var MSGS = {
             valueMissing:   'Este campo es obligatorio.',
@@ -1371,7 +1361,7 @@
         });
     }
 
-    /* ── SELECTOR DE TEMA ── */
+    /* SELECTOR DE TEMA */
     (function () {
         var KEY = 'bs-theme';
         var ICONS  = { light: 'ti-sun', dark: 'ti-moon', system: 'ti-device-laptop' };
@@ -1418,7 +1408,7 @@
         });
     })();
 
-    /* ── MARCADOR PERSISTENTE (16S / ITS) ── */
+    /* MARCADOR PERSISTENTE (16S / ITS) */
     (function () {
         var KEY   = 'bs-marker';
         var VALID = { '16S': 'active-16s', 'ITS': 'active-its' };
@@ -1460,12 +1450,9 @@
         });
     })();
 
-    /* La adaptación de los gráficos Plotly a pantallas de celular (altura,
-       leyenda y título) está en static/analisis/js/chart_theme.js →
-       adaptarLayoutMovil(). Antes aquí se forzaba una altura fija de 300px,
-       que dejaba el área de datos aplastada por la leyenda y las etiquetas. */
+    /* La adaptación de Plotly a celular está en chart_theme.js → adaptarLayoutMovil(). */
 
-    /* ── INICIALIZACIÓN ── */
+    /* INICIALIZACIÓN */
     document.addEventListener('DOMContentLoaded', function () {
         initSortableTables();
         initFormValidation();
@@ -1474,10 +1461,10 @@
 
     {% block toast_messages %}{% endblock %}
 
-    <!-- ══════════════════════════════════════════════════════
+    <!--
          SISTEMA DE TOOLTIPS CONTEXTUALES — bs-tip
          Uso: <span class="bs-tip" data-tip="Texto explicativo">término <i class="ti ti-help-circle bs-tip-ico"></i></span>
-    ══════════════════════════════════════════════════════ -->
+    -->
     <style>
     .bs-tip { position:relative; display:inline-flex; align-items:center; gap:3px; cursor:default; }
     .bs-tip-ico {

@@ -7,9 +7,7 @@ FILTROS_EXCLUSION = {"others", "unclassified", "unknown", "nan", "", "others sp"
 class DiversityService:
     """Servicio bioinformático para la evaluación de biodiversidad microbiana."""
 
-    # ---------------------------
     # DIVERSIDAD ALFA (Intra-muestra)
-    # ---------------------------
 
     @staticmethod
     def calcular_riqueza(df):
@@ -77,9 +75,7 @@ class DiversityService:
             "equitatividad": round(float(j), 4),
         }
 
-    # ---------------------------
     # DIVERSIDAD BETA (Inter-muestra)
-    # ---------------------------
 
     @staticmethod
     def _obtener_set_taxonomico_limpio(df, nivel="genus"):
@@ -126,9 +122,7 @@ class DiversityService:
             "nivel_evaluado": campo
         }
 
-    # ---------------------------
     # DIVERSIDAD GAMMA (Meta-comunidad)
-    # ---------------------------
 
     @staticmethod
     def calcular_diversidad_gamma(df_pooled):
@@ -161,9 +155,7 @@ class DiversityService:
         sumas[sumas == 0] = 1
         return squareform(pdist(matriz / sumas, metric="braycurtis"))
 
-    # ---------------------------
     # PCoA (Gower, 1966)
-    # ---------------------------
 
     @staticmethod
     def calcular_pcoa(dist_matrix, n_ejes=2) -> dict:
@@ -253,9 +245,7 @@ class DiversityService:
             "ratio_negativo": ratio_negativo,
         }
 
-    # ---------------------------
     # PERMANOVA (Anderson, 2001)
-    # ---------------------------
 
     @staticmethod
     def calcular_permanova(matriz_distancias, grupos, n_permutaciones=499, semilla=42):
@@ -388,9 +378,7 @@ class DiversityService:
             total //= math.factorial(repeticiones)
         return total
 
-    # ---------------------------
     # PERMDISP (Anderson, 2006)
-    # ---------------------------
 
     @staticmethod
     def calcular_permdisp(dist_matrix, grupos, n_permutaciones=499, semilla=42):

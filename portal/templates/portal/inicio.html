@@ -11,9 +11,9 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" integrity="sha384-XAeMOW3g/ahgKWjRcH7Xp+LVEQ/hkKrV0zkAUTnFwlaWK1aXfd9vVufdwqr/836i" crossorigin="anonymous">
     <style>
-        /* ═══════════════════════════════════════════════════════════
+        /*
            1. TOKENS — paleta, tipografía y ritmo de espaciado
-           ═══════════════════════════════════════════════════════════ */
+           */
         :root {
             --p:        #4a7c64;
             --p-vivid:  #38a878;
@@ -49,7 +49,7 @@
         .wrap { max-width:1120px; margin:0 auto; }
         .wrap-sm { max-width:760px; margin:0 auto; }
 
-        /* ── Reveal-on-scroll (compartido por todas las secciones) ── */
+        /* Reveal-on-scroll (compartido por todas las secciones) */
         .reveal { opacity:0; transform:translateY(18px); transition:opacity .6s var(--ease), transform .6s var(--ease); }
         .reveal.in-view { opacity:1; transform:translateY(0); }
         .reveal-d1.in-view { transition-delay:.08s; }
@@ -58,9 +58,9 @@
         .reveal-d4.in-view { transition-delay:.32s; }
         .reveal-d5.in-view { transition-delay:.4s; }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            2. PRIMITIVOS REUTILIZABLES — cards, iconos, encabezados
-           ═══════════════════════════════════════════════════════════ */
+           */
 
         /* Tarjeta base: usada por ps-card, feat-card, who-card, faq-item, cta-card */
         .ux-card {
@@ -128,9 +128,9 @@
             width:0%;
         }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            3. NAV
-           ═══════════════════════════════════════════════════════════ */
+           */
         .nav {
             position:fixed; top:0; left:0; right:0; z-index:200;
             display:flex; align-items:center; justify-content:space-between;
@@ -178,7 +178,7 @@
             font-size:19px; color:var(--text); cursor:pointer;
         }
 
-        /* ── Menú móvil ── */
+        /* Menú móvil */
         .mobile-menu {
             position:fixed; inset:0; z-index:300; background:var(--surface);
             display:flex; flex-direction:column; padding:1.5rem;
@@ -196,9 +196,9 @@
         }
         .mobile-menu .btn-nav-login { margin-top:auto; justify-content:center; padding:1rem; font-size:15.5px; }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            4. HERO — mensaje de beneficio + ilustración agrícola
-           ═══════════════════════════════════════════════════════════ */
+           */
         .hero {
             position:relative; min-height:92vh; display:flex; align-items:center;
             padding:8rem 1.5rem 4rem; overflow:hidden; background:var(--bg);
@@ -222,7 +222,7 @@
         }
         @keyframes meshRotate { to { transform:rotate(360deg); } }
 
-        /* ── Elementos científicos de fondo, muy sutiles: refuerzan la
+        /* Elementos científicos de fondo, muy sutiles: refuerzan la
            identidad bioinformática sin competir con el contenido ── */
         .hero-sci-grid {
             position:absolute; inset:0; z-index:0; pointer-events:none;
@@ -376,9 +376,9 @@
         .hero-float-c i { color:var(--blue); }
         @keyframes floatY { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-10px); } }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            5. PROBLEMA — sin mencionar aún la plataforma
-           ═══════════════════════════════════════════════════════════ */
+           */
         .pain-row { display:grid; grid-template-columns:repeat(3, 1fr); gap:1.25rem; }
         .pain-item {
             display:flex; gap:14px; align-items:flex-start; padding:1.4rem;
@@ -387,9 +387,9 @@
         .pain-item h4 { font-size:14.5px; font-weight:600; margin-bottom:3px; }
         .pain-item p { font-size:12.8px; color:var(--muted); }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            6. QUÉ ES — con mini-diagrama entrada → salida
-           ═══════════════════════════════════════════════════════════ */
+           */
         .transform-visual {
             display:flex; align-items:center; justify-content:center; gap:1.25rem;
             margin-top:2.5rem; flex-wrap:wrap;
@@ -402,18 +402,18 @@
         .transform-node.is-accent { background:var(--p-glow); border-color:rgba(56,168,120,.28); color:var(--p-dark); }
         .transform-arrow { color:var(--hint); font-size:20px; }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            7. QUÉ OFRECE — bento asimétrico
-           ═══════════════════════════════════════════════════════════ */
+           */
         .feat-bento { display:grid; grid-template-columns:repeat(3, 1fr); grid-auto-rows:190px; gap:1.25rem; }
         .feat-card { display:flex; flex-direction:column; }
         .feat-card.feat-lg { grid-column:span 2; }
         .feat-card h3 { font-size:16px; font-weight:600; margin:1.1rem 0 .45rem; }
         .feat-card p { font-size:13.6px; color:var(--muted); max-width:360px; }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            8. CÓMO FUNCIONA — timeline vertical
-           ═══════════════════════════════════════════════════════════ */
+           */
         .timeline { position:relative; max-width:640px; margin:0 auto; }
         .timeline::before {
             content:''; position:absolute; left:25px; top:6px; bottom:6px; width:2px;
@@ -441,25 +441,25 @@
         .timeline-body h4 { font-size:16px; font-weight:600; margin-bottom:.35rem; }
         .timeline-body p { font-size:13.8px; color:var(--muted); max-width:420px; }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            9. BENEFICIOS — lista minimalista sin tarjetas pesadas
-           ═══════════════════════════════════════════════════════════ */
+           */
         .benefits-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:2.25rem 1.75rem; }
         .benefit-item { display:flex; gap:14px; align-items:flex-start; }
         .benefit-item h4 { font-size:14.5px; font-weight:600; margin-bottom:3px; }
         .benefit-item p { font-size:12.8px; color:var(--muted); }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            10. QUIÉNES — tarjetas de audiencia
-           ═══════════════════════════════════════════════════════════ */
+           */
         .who-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:1.25rem; }
         .who-card { display:flex; gap:14px; align-items:flex-start; }
         .who-card h4 { font-size:15px; font-weight:600; margin-bottom:3px; }
         .who-card p { font-size:13px; color:var(--muted); }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            11. FAQ — acordeón accesible (botón + panel animado por JS)
-           ═══════════════════════════════════════════════════════════ */
+           */
         .faq-list { max-width:760px; margin:0 auto; display:flex; flex-direction:column; gap:.85rem; }
         .faq-item { padding:0; overflow:hidden; }
         .faq-question {
@@ -472,9 +472,9 @@
         .faq-answer { max-height:0; overflow:hidden; transition:max-height .3s var(--ease); }
         .faq-answer p { padding:0 1.6rem 1.35rem; font-size:14px; color:var(--muted); max-width:600px; }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            12. CTA FINAL
-           ═══════════════════════════════════════════════════════════ */
+           */
         .cta-final { text-align:center; }
         .cta-card { max-width:640px; margin:0 auto; padding:3rem 2.5rem; text-align:center; }
         .cta-card .icon-tile { margin:0 auto 1.25rem; }
@@ -484,9 +484,9 @@
         }
         .cta-final p { color:var(--muted); margin-bottom:2rem; }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            13. FOOTER
-           ═══════════════════════════════════════════════════════════ */
+           */
         .foot { background:#101f18; color:rgba(255,255,255,.6); padding:3rem 1.5rem 2.25rem; font-size:13px; }
         .foot-inner {
             max-width:1120px; margin:0 auto; display:flex; align-items:center; justify-content:space-between;
@@ -500,9 +500,9 @@
         .foot-links a:hover { color:#fff; }
         .foot-bottom { max-width:1120px; margin:1.75rem auto 0; font-size:12.5px; color:rgba(255,255,255,.45); }
 
-        /* ═══════════════════════════════════════════════════════════
+        /*
            14. RESPONSIVE — breakpoints agrupados
-           ═══════════════════════════════════════════════════════════ */
+           */
         @media (max-width: 900px) {
             .nav-links { display:none; }
             .nav-toggle { display:flex; }
@@ -545,7 +545,7 @@
 <!-- Barra fina que marca el avance de lectura de la página -->
 <div class="scroll-progress" id="scrollProgress"></div>
 
-<!-- ═══════════════════ NAV ═══════════════════ -->
+<!-- NAV -->
 <nav class="nav" id="mainNav">
     <div class="nav-brand">
         <div class="nav-logo"><img src="{% static 'portal/img/logo.png' %}" alt="BioMicro"></div>
@@ -567,7 +567,7 @@
     </div>
 </nav>
 
-<!-- ═══════════════════ MENÚ MÓVIL ═══════════════════ -->
+<!-- MENÚ MÓVIL -->
 <div class="mobile-menu" id="mobileMenu">
     <div class="mobile-menu-head">
         <div class="nav-brand">
@@ -587,7 +587,7 @@
     </a>
 </div>
 
-<!-- ═══════════════════ 1. HERO ═══════════════════ -->
+<!-- 1. HERO -->
 <header class="hero" id="inicio">
     <div class="hero-mesh"></div>
     <div class="hero-blob hero-blob-1"></div>
@@ -644,7 +644,7 @@
     </div>
 </header>
 
-<!-- ═══════════════════ 2. EL PROBLEMA (aún sin mencionar BioMicro) ═══════════════════ -->
+<!-- 2. EL PROBLEMA (aún sin mencionar BioMicro) -->
 <section class="bg-surface" id="por-que">
     <div class="wrap">
         <div class="section-head reveal">
@@ -670,7 +670,7 @@
     </div>
 </section>
 
-<!-- ═══════════════════ 3. ¿QUÉ ES BIOMICRO? ═══════════════════ -->
+<!-- 3. ¿QUÉ ES BIOMICRO? -->
 <section class="bg-tint" id="que-es">
     <div class="wrap">
         <div class="section-head reveal">
@@ -687,7 +687,7 @@
     </div>
 </section>
 
-<!-- ═══════════════════ 4. ¿QUÉ OFRECE LA PLATAFORMA? ═══════════════════ -->
+<!-- 4. ¿QUÉ OFRECE LA PLATAFORMA? -->
 <section class="bg-surface" id="ofrece">
     <div class="wrap">
         <div class="section-head reveal">
@@ -726,7 +726,7 @@
     </div>
 </section>
 
-<!-- ═══════════════════ 5. ¿CÓMO FUNCIONA? — TIMELINE ═══════════════════ -->
+<!-- 5. ¿CÓMO FUNCIONA? — TIMELINE -->
 <section class="bg-tint" id="como-funciona">
     <div class="wrap-sm">
         <div class="section-head reveal">
@@ -775,7 +775,7 @@
     </div>
 </section>
 
-<!-- ═══════════════════ 6. BENEFICIOS ═══════════════════ -->
+<!-- 6. BENEFICIOS -->
 <section class="bg-surface" id="beneficios">
     <div class="wrap">
         <div class="section-head reveal">
@@ -812,7 +812,7 @@
     </div>
 </section>
 
-<!-- ═══════════════════ 7. ¿QUIÉNES PUEDEN UTILIZARLA? ═══════════════════ -->
+<!-- 7. ¿QUIÉNES PUEDEN UTILIZARLA? -->
 <section class="bg-tint" id="quienes">
     <div class="wrap">
         <div class="section-head reveal">
@@ -849,7 +849,7 @@
     </div>
 </section>
 
-<!-- ═══════════════════ 8. PREGUNTAS FRECUENTES ═══════════════════ -->
+<!-- 8. PREGUNTAS FRECUENTES -->
 <section class="bg-surface" id="faq">
     <div class="wrap">
         <div class="section-head reveal">
@@ -916,7 +916,7 @@
     </div>
 </section>
 
-<!-- ═══════════════════ 9. CTA FINAL ═══════════════════ -->
+<!-- 9. CTA FINAL -->
 <section class="bg-tint cta-final">
     <div class="ux-card cta-card reveal">
         <div class="icon-tile icon-tile--lg icon-tile--glow"><i class="ti ti-login-2"></i></div>
@@ -928,7 +928,7 @@
     </div>
 </section>
 
-<!-- ═══════════════════ 10. FOOTER ═══════════════════ -->
+<!-- 10. FOOTER -->
 <footer class="foot">
     <div class="foot-inner">
         <div class="foot-brand">
@@ -952,7 +952,7 @@
 (function () {
     var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    /* ── Nav: fondo al hacer scroll + barra de progreso de lectura ── */
+    /* Nav: fondo al hacer scroll + barra de progreso de lectura */
     var nav = document.getElementById('mainNav');
     var progressBar = document.getElementById('scrollProgress');
     var ticking = false;
@@ -976,7 +976,7 @@
     });
     onScroll();
 
-    /* ── Menú móvil ── */
+    /* Menú móvil */
     var toggle = document.getElementById('navToggle');
     var menu   = document.getElementById('mobileMenu');
     var close  = document.getElementById('mobileMenuClose');
@@ -997,7 +997,7 @@
         a.addEventListener('click', closeMenu);
     });
 
-    /* ── Scrollspy: resalta el link de la sección visible ── */
+    /* Scrollspy: resalta el link de la sección visible */
     var sections = ['inicio', 'que-es', 'como-funciona', 'faq'].map(function (id) {
         return document.getElementById(id);
     }).filter(Boolean);
@@ -1015,7 +1015,7 @@
         sections.forEach(function (s) { spy.observe(s); });
     }
 
-    /* ── Reveal-on-scroll ── */
+    /* Reveal-on-scroll */
     var reveals = document.querySelectorAll('.reveal');
     if ('IntersectionObserver' in window && reveals.length) {
         var ro = new IntersectionObserver(function (entries) {
@@ -1031,7 +1031,7 @@
         reveals.forEach(function (el) { el.classList.add('in-view'); });
     }
 
-    /* ── Acordeón de preguntas frecuentes (un solo panel abierto a la vez) ── */
+    /* Acordeón de preguntas frecuentes (un solo panel abierto a la vez) */
     var faqItems = document.querySelectorAll('.faq-item');
     faqItems.forEach(function (item) {
         var btn   = item.querySelector('.faq-question');
@@ -1054,7 +1054,7 @@
         });
     });
 
-    /* ── Línea del timeline "Cómo funciona": se dibuja y activa nodos según el scroll ── */
+    /* Línea del timeline "Cómo funciona": se dibuja y activa nodos según el scroll */
     var timelineEl   = document.getElementById('timeline');
     var timelineFill = document.getElementById('timelineFill');
     var timelineNums = timelineEl ? timelineEl.querySelectorAll('.timeline-num') : [];
@@ -1074,7 +1074,7 @@
         });
     }
 
-    /* ── Paralaje sutil: la ilustración del hero sigue al cursor ── */
+    /* Paralaje sutil: la ilustración del hero sigue al cursor */
     var heroVisual = document.querySelector('.hero-visual');
     var heroSection = document.querySelector('.hero');
     if (heroVisual && heroSection && !prefersReducedMotion && window.matchMedia('(hover: hover)').matches) {

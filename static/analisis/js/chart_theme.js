@@ -1,14 +1,6 @@
 /*
- * ChartTheme — módulo compartido de presentación para las gráficas del
- * módulo de análisis comparativo (Plotly.js y Chart.js).
- *
- * Provee: paletas (color / escala de grises), patrones para diferenciar
- * series sin depender del color, layout base sobrio con cuadrícula de
- * ancho completo, cálculo de rango Y con margen, un selector de modo
- * (Color / Escala de grises) y botones de descarga PNG/SVG que respetan
- * el modo activo.
- *
- * No calcula ni transforma ningún dato científico — solo estilo.
+ * ChartTheme — estilo compartido de las gráficas (Plotly.js y Chart.js):
+ * paletas color/grises, patrones, layout base, rango Y y descarga PNG/SVG.
  */
 (function (global) {
     'use strict';
@@ -40,15 +32,7 @@
     function getSymbol(i) { return MARKER_SYMBOLS[i % MARKER_SYMBOLS.length]; }
     function getDash(i) { return DASH_STYLES[i % DASH_STYLES.length]; }
 
-    /**
-     * Traduce SOLO para mostrar en pantalla el valor de relleno "Unclassified"
-     * que el pipeline escribe cuando el laboratorio no identificó ese nivel
-     * taxonómico — en inglés tiene sentido para quien ya conoce el pipeline,
-     * pero no para un estudiante que lo ve en una leyenda o eje de gráfica.
-     * Mismo criterio que el filtro de plantilla `taxon_legible`
-     * (analisis/templatetags/custom_filters.py) — no toca el dato real, solo
-     * lo que se pinta en el HTML/gráfica.
-     */
+    /** Muestra "Unclassified" en español (solo en pantalla, como el filtro taxon_legible). */
     function taxonLegible(nombre) {
         if (!nombre) return nombre;
         return String(nombre).trim().toLowerCase() === 'unclassified' ? 'Sin identificar' : nombre;
@@ -65,13 +49,7 @@
         return '#' + yy + yy + yy;
     }
 
-    /**
-     * Aplica color + patrón/símbolo por índice de trace. Pensado para
-     * gráficas donde cada trace = una categoría/muestra independiente
-     * (barras agrupadas o apiladas por muestra/taxón, PCoA un punto por
-     * muestra). No tocar cuando el color de cada punto ya tiene un
-     * significado propio (ver toGrayscaleHex para esos casos).
-     */
+    /** Aplica color y patrón por índice de trace (una categoría o muestra por trace). */
     function styleTracesByIndex(data, mode) {
         if (!Array.isArray(data)) return data;
         data.forEach(function (trace, i) {
@@ -105,25 +83,8 @@
         return isGrayMode(mode) ? 'Greys' : 'Viridis';
     }
 
-    /**
-     * Layout base sobrio, con cuadrícula horizontal de ancho completo.
-     *
-     * En modo "publicacion" se usa Arial/Helvetica (sans-serif) — no Times/Georgia:
-     * las principales editoriales científicas (Elsevier, Springer, Nature, PLOS)
-     * piden explícitamente una tipografía sans-serif para el texto DENTRO de las
-     * figuras, aun cuando el cuerpo del artículo use una serif como Times New Roman.
-     * El tamaño se sube un poco respecto a los otros modos porque esta gráfica se
-     * exporta pensando en un ancho de impresión real (~174 mm), mucho menor que el
-     * ancho en pantalla — sin margen extra, el texto quedaría ilegible una vez
-     * reducido a tamaño de columna.
-     */
-    /**
-     * El modo "publicación" siempre fuerza fondo blanco (es para exportar a
-     * un documento impreso/científico, independiente del tema de la UI).
-     * Para "color"/"grises" en cambio la gráfica debe seguir el tema activo
-     * del sitio (claro/oscuro) — si no, queda un rectángulo blanco fijo
-     * sobre una página oscura, ilegible/desentonado con el resto de la UI.
-     */
+    /** Layout base con cuadrícula horizontal. El modo "publicacion" usa Arial/Helvetica y texto más grande. */
+    /** "publicacion" usa fondo blanco; "color"/"grises" siguen el tema claro/oscuro. */
     function isDarkTheme() {
         return document.documentElement.getAttribute('data-theme') === 'dark';
     }
@@ -143,26 +104,14 @@
         };
     }
 
-    /**
-     * Acorta una etiqueta larga para que quepa en el eje sin solaparse con
-     * las demás (mismo comportamiento que Excel: cuando el nombre de una
-     * categoría no cabe en el espacio disponible, lo recorta con "…" en vez
-     * de dejar que el texto se corte a la mitad o se monte sobre el vecino).
-     * El nombre completo se conserva siempre en el dato real — solo cambia
-     * lo que se dibuja en el eje (ver hover/leyenda para el nombre íntegro).
-     */
+    /** Acorta una etiqueta larga con "…" (solo en el eje, el dato no cambia). */
     function truncateLabel(text, maxLen) {
         var s = String(text == null ? '' : text);
         maxLen = maxLen || 22;
         return s.length > maxLen ? s.slice(0, maxLen - 1) + '…' : s;
     }
 
-    /**
-     * Construye {tickvals, ticktext} para un eje categórico, truncando cada
-     * categoría a `maxLen` caracteres. `tickvals` reutiliza las categorías
-     * reales (necesario para que Plotly asocie cada texto truncado con su
-     * posición correcta en un eje de tipo categoría).
-     */
+    /** {tickvals, ticktext} para un eje categórico con etiquetas truncadas a `maxLen`. */
     function buildTruncatedTicks(categorias, maxLen) {
         var vals = Array.from(new Set(categorias));
         return {
@@ -171,13 +120,7 @@
         };
     }
 
-    /**
-     * Con pocas barras el % cabe legible sobre/dentro de cada una y ayuda a
-     * leer el dato sin pasar el cursor. Con muchas (Top 25/50 × varias
-     * muestras) se amontona en trazos ilegibles — a partir de este umbral
-     * de barras totales (categorías × series) se deja de imprimir el texto
-     * y el valor exacto queda solo en el hover.
-     */
+    /** A partir de este número de barras no se imprime el % (queda en el hover). */
     var DENSE_BAR_THRESHOLD = 32;
     function shouldShowBarText(nCategorias, nSeries) {
         return (nCategorias * (nSeries || 1)) <= DENSE_BAR_THRESHOLD;
@@ -188,7 +131,7 @@
     var PUB_WIDTH_MM = 174;
     var PUB_DPI = 300;
 
-    // ---- Utilidades PNG: inyecta el chunk pHYs (resolución real) ----------
+    // Utilidades PNG: inyecta el chunk pHYs (resolución real)
     // Un PNG exportado desde un <canvas> no lleva DPI en sus metadatos (los
     // lectores asumen 96 DPI), lo que hace que revistas y verificadores
     // automáticos de figuras lo rechacen aunque el PNG tenga suficientes
@@ -267,14 +210,7 @@
         };
     }
 
-    /**
-     * Plotly a veces serializa un array numérico de una trace (x/y/z) en un
-     * formato binario compacto — {dtype:'f8', bdata:'<base64>'} — en vez de
-     * un array JS normal. Si no se decodifica, código que lee `trace.y`
-     * directamente (ej. para calcular el rango del eje) no encuentra
-     * números y termina sin aplicar ningún margen, aunque la gráfica en sí
-     * se vea bien (Plotly SÍ sabe decodificar este formato internamente).
-     */
+    /** Decodifica arrays binarios de Plotly ({dtype, bdata}) a arrays normales. */
     function _decodeTypedArray(obj) {
         if (!obj || typeof obj !== 'object' || typeof obj.bdata !== 'string') return null;
         var binary = atob(obj.bdata);
@@ -300,14 +236,7 @@
         return _decodeTypedArray(field) || [];
     }
 
-    /**
-     * Calcula [0, niceMax] redondeando el máximo real hacia arriba, al
-     * siguiente múltiplo "limpio" de la cuadrícula (1/2/5 × una potencia de
-     * 10) — igual que el autoescalado de Excel: si el valor más alto es 26,
-     * la línea de la cuadrícula ya debe estar en 30, no en 26 exacto ni en
-     * un valor intermedio arbitrario. Así ninguna barra ni su etiqueta
-     * queda pegada o cortada contra el borde del área de la gráfica.
-     */
+    /** Rango [0, niceMax] redondeado al siguiente múltiplo limpio (1/2/5 × 10^n). */
     function computeYRange(values, opts) {
         opts = opts || {};
         var extraFrac = opts.headroomFrac || 0; // por si algún llamador necesita margen adicional
@@ -505,13 +434,11 @@
         adaptarLayoutMovil: adaptarLayoutMovil,
     };
 
-    // ------------------------------------------------------------------
     // Pantallas angostas (celular). Los layouts se diseñaron para escritorio:
     // leyenda vertical a la derecha, títulos largos en una línea y alturas
     // fijas. En ~375 px eso deja el área de datos aplastada o cortada. Aquí
     // se ajusta SOLO la presentación cuando el contenedor mide menos de
     // ANCHO_MOVIL; en escritorio el layout queda intacto.
-    // ------------------------------------------------------------------
     var ANCHO_MOVIL = 576;
     var ALTO_FILA_LEYENDA = 19;
     var ALTO_DATOS_MOVIL = 280;

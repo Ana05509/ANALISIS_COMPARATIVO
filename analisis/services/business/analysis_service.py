@@ -1,3 +1,5 @@
+from typing import cast
+
 import pandas as pd
 from django.db.models import F, Sum
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo, VariedadClon, MuestraSuelo
@@ -7,11 +9,7 @@ from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, OPCIONES_TOP
 
 
 def _filtrar_catalogo_por_nivel(qs, nivel: str):
-    """
-    Aplica el filtro de nivel al queryset de CatalogoMicroorganismo aceptando
-    tanto nombres en inglés ('species') como en español ('especie', 'género', etc.).
-    Si ningún alias devuelve resultados hace fallback al queryset sin filtro.
-    """
+    """Filtra por nivel aceptando nombres en inglés o español; si no hay resultados, no filtra."""
     from django.db.models import Q
     aliases = NIVEL_ALIASES.get(nivel, [nivel])
     q = Q()
@@ -22,12 +20,7 @@ def _filtrar_catalogo_por_nivel(qs, nivel: str):
 
 
 def obtener_lookup_catalogo(tipo, nivel=None):
-    """
-    Dict {nombre_normalizado: clasificacion}.
-    Normaliza nombres del catálogo (elimina accesiones GenBank, _ → espacio) para
-    que coincidan con los nombres limpios que produce el pipeline de importación.
-    Filtra por marcador y nivel (acepta español e inglés); fallback a solo marcador.
-    """
+    """Dict {nombre_normalizado: clasificacion} del catálogo, filtrado por marcador y nivel."""
     qs = CatalogoMicroorganismo.objects.filter(marcador=tipo)
     if nivel:
         qs = _filtrar_catalogo_por_nivel(qs, nivel)
@@ -50,11 +43,7 @@ def _base_queryset(tipo, variedad_id=None, muestra_id=None, muestra_ids=None):
     return qs
 
 def obtener_analisis_avanzado(tipo="16S", top_n=10, nivel="genus", variedad_id=None, muestra_id=None, muestra_ids=None):
-    """
-    Perfil taxonómico agregado para visualización.
-    Usa la suma de num_hits para calcular abundancia relativa real entre muestras agrupadas.
-    El Top N se aplica solo para la tabla resumen; los datos completos están en BD.
-    """
+    """Perfil taxonómico agregado (abundancia relativa por suma de num_hits)."""
     if tipo not in MARCADORES_VALIDOS: tipo = "16S"
     if nivel not in NIVELES_VALIDOS:   nivel = "genus"
     if top_n not in OPCIONES_TOP_N:    top_n = 10
@@ -103,12 +92,7 @@ def obtener_analisis_avanzado(tipo="16S", top_n=10, nivel="genus", variedad_id=N
     }
 
 def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=None, muestra_ids=None):
-    """
-    Calcula diversidad alfa por muestra individual y devuelve el promedio.
-    Agrega Sum(num_hits) por taxon×muestra al nivel elegido antes de calcular
-    los índices, evitando que múltiples especies del mismo genus aparezcan
-    como taxa distintos al operar con nivel superior a species.
-    """
+    """Diversidad alfa promedio por muestra, agrupando num_hits al nivel elegido."""
     if tipo not in MARCADORES_VALIDOS: tipo = "16S"
 
     qs = _base_queryset(tipo, variedad_id, muestra_id, muestra_ids)
@@ -127,7 +111,7 @@ def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=N
     # Profundidad de secuenciación (suma de num_hits) por id de muestra
     lecturas_totales = {}
     for muestra_pk, grupo in df.groupby("muestra_pk"):
-        lecturas_totales[int(muestra_pk)] = int(grupo["hits"].sum())
+        lecturas_totales[int(cast(int, muestra_pk))] = int(grupo["hits"].sum())
         total = grupo["hits"].sum() or 1
         df_m = pd.DataFrame({"%_hits": grupo["hits"] / total * 100})
         df_m = df_m[df_m["%_hits"] > 0]
@@ -146,12 +130,8 @@ def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=N
     }
 
 def obtener_diversidad_beta_inter(tipo="16S", nivel="genus", muestra_ids=None):
-    """
-    Beta diversidad inter-muestra: disimilitud promedio entre todos los pares.
-    Devuelve Bray-Curtis promedio, Jaccard promedio, taxa del core (presentes en
-    TODAS las muestras) y taxa únicos (presentes en solo 1 muestra).
-    Requiere ≥ 2 muestras con datos.
-    """
+    """Beta diversidad entre muestras: Bray-Curtis y Jaccard promedio, core y taxa únicos.
+    Requiere al menos 2 muestras."""
     from scipy.spatial.distance import squareform
     from itertools import combinations
     import numpy as np
@@ -246,11 +226,7 @@ def obtener_diversidad_gamma(tipo="16S", nivel="genus", muestra_ids=None):
 
 
 def obtener_permanova(tipo="16S", nivel="genus", muestra_ids=None, n_perm=499):
-    """
-    PERMANOVA: prueba si la composición microbiana difiere significativamente
-    entre cultivos. Si todas las muestras son del mismo cultivo, intenta
-    agrupar por variedad/clon.
-    """
+    """PERMANOVA entre cultivos (o entre variedades si hay un solo cultivo)."""
     import numpy as np
 
     if not muestra_ids or len(muestra_ids) < 2:
@@ -320,13 +296,7 @@ def obtener_permanova(tipo="16S", nivel="genus", muestra_ids=None, n_perm=499):
 
 
 def obtener_analisis_diferencial(tipo="16S", nivel="genus", variedad_id=None, muestra_id=None):
-    """
-    Compara un conjunto A (la muestra o variedad seleccionada) contra un
-    conjunto B: TODAS las demás muestras del mismo cultivo, agrupadas en un
-    solo perfil agregado (no una segunda muestra individual). Sirve para ver
-    si la muestra elegida es "típica" del cultivo o si se aparta de lo que
-    normalmente se encuentra en él (taxa exclusivos, similitud de Jaccard).
-    """
+    """Compara la muestra o variedad elegida contra el resto de muestras del mismo cultivo."""
     if tipo not in MARCADORES_VALIDOS: tipo = "16S"
 
     etiqueta_a = None

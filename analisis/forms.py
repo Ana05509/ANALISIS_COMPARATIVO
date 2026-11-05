@@ -8,11 +8,7 @@ class SubirDatosForm(forms.Form):
     nombre_producto = forms.CharField(
         max_length=100,
         label="Código de muestra",
-        # text-transform es solo visual (cómo se ve mientras se tipea) — el
-        # valor real que llega al servidor no cambia acá; la normalización
-        # de verdad ocurre en upload_service.py y en MuestraSuelo.save(),
-        # que es lo que hace que el guardado sea consistente sin importar
-        # el origen (este formulario, admin, u otro).
+        # Solo visual; la normalización real está en upload_service.py y MuestraSuelo.save().
         widget=forms.TextInput(attrs={
             "class": "form-control", "placeholder": "Ej: CCN51-2024-01",
             "style": "text-transform: uppercase;",
@@ -89,16 +85,7 @@ class _MuestraMultipleField(forms.ModelMultipleChoiceField):
 
 
 class _SelectMultipleSinValidacionNativa(forms.SelectMultiple):
-    """
-    El <select> real de este campo queda oculto (style="display:none") porque
-    la UI visible es la lista de checkboxes sincronizada por JS. Si Django
-    renderiza el atributo HTML "required" sobre ese <select> oculto, el
-    navegador bloquea el envío del formulario y muestra su aviso nativo
-    "este campo es obligatorio" anclado a un elemento invisible — el usuario
-    no tiene forma de saber a qué campo se refiere. La validación real la
-    hace Django en el servidor (ver CompararForm.clean()), así que el
-    navegador no necesita validar este campo también.
-    """
+    """Select oculto sin atributo "required" (la UI son casillas y valida el servidor)."""
     def use_required_attribute(self, initial):
         return False
 

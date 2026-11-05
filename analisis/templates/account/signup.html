@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" integrity="sha384-XAeMOW3g/ahgKWjRcH7Xp+LVEQ/hkKrV0zkAUTnFwlaWK1aXfd9vVufdwqr/836i" crossorigin="anonymous">
     <style>
-        /* ── Variables (idénticas a login.html) ── */
+        /* Variables (idénticas a login.html) */
         :root {
             --p:       #4a7c64;
             --p-vivid: #38a878;
@@ -26,7 +26,7 @@
             --ease:    cubic-bezier(.4,0,.2,1);
         }
 
-        /* ── Animaciones (idénticas a login.html) ── */
+        /* Animaciones (idénticas a login.html) */
         @keyframes slideUp   { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
         @keyframes fadeIn    { from{opacity:0} to{opacity:1} }
         @keyframes shake     { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
@@ -38,7 +38,7 @@
         @keyframes gridDrift { 0%{background-position:0 0} 100%{background-position:32px 32px} }
         @keyframes spin      { to{transform:rotate(360deg)} }
 
-        /* ── Reset ── */
+        /* Reset */
         *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
         /* Todo el contenido debe caber en un único pantallazo, sin scroll,
            gracias al espaciado fluido (clamp/vh). En móvil (<768px) se
@@ -47,7 +47,7 @@
         body { font-family:'Outfit',sans-serif; color:var(--text); display:flex; -webkit-font-smoothing:antialiased; }
         .split-layout { display:flex; width:100%; height:100vh; align-items:stretch; }
 
-        /* ══ PANEL IZQUIERDO ══ */
+        /* PANEL IZQUIERDO */
         .panel-left {
             flex:1.2; position:relative; height:100vh;
             display:flex; flex-direction:column; justify-content:center; gap:clamp(1rem, 3vh, 2rem);
@@ -83,7 +83,7 @@
         .feature-card:hover { background:rgba(255,255,255,.22); transform:translateX(6px); }
         .feature-card i { font-size:19px; flex-shrink:0; }
 
-        /* ══ PANEL DERECHO ══ */
+        /* PANEL DERECHO */
         .panel-right {
             flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;
             background:var(--bg); padding:clamp(.5rem, 2vh, 1.5rem) 1.5rem; position:relative; height:100vh;
@@ -214,7 +214,7 @@
         .alert-error { background:#fff5f5; border:1px solid #fca5a5; border-radius:12px; padding:12px 16px; margin-bottom:1.4rem; color:var(--error); font-size:14px; display:flex; align-items:flex-start; gap:10px; animation:slideUp .4s var(--ease) both; }
         .alert-error i { font-size:18px; flex-shrink:0; margin-top:1px; }
 
-        /* ── Medidor de fuerza ── */
+        /* Medidor de fuerza */
         .strength-meter { margin-top:6px; display:none; }
         .strength-meter.visible { display:block; }
         .strength-segments { display:flex; gap:4px; margin-bottom:5px; }
@@ -230,14 +230,14 @@
         .strength-check i { font-size:11px; flex-shrink:0; }
         .symbols-hint { font-size:9px; color:#b0b8c4; margin-left:15px; margin-top:1px; font-family:monospace; letter-spacing:.3px; }
 
-        /* ── Confirmación contraseña ── */
+        /* Confirmación contraseña */
         .match-indicator { font-size:10.5px; font-weight:600; margin-top:4px; display:none; align-items:center; gap:4px; transition:color .25s; }
         .match-indicator.visible { display:flex; }
         .match-indicator.ok  { color:#16a34a; }
         .match-indicator.err { color:var(--error); }
         .match-indicator i { font-size:14px; }
 
-        /* ── Responsive ── */
+        /* Responsive */
         @media (max-width:1279px) { .panel-left{padding:3rem} .hero-text{font-size:42px} }
 
         @media (max-width:1023px) {
@@ -444,7 +444,7 @@
             });
         });
 
-        // ── MEDIDOR DE FUERZA ──
+        // MEDIDOR DE FUERZA
         (function () {
             // 5 criterios → 5 barras: cada criterio cumplido = 1 barra más
             const LEVELS = [
@@ -508,7 +508,7 @@
                 setCheck('chk-sym',   c.sym);
             }
 
-            // ── COINCIDENCIA DE CONFIRMACIÓN ──
+            // COINCIDENCIA DE CONFIRMACIÓN
             function updateMatch() {
                 const p1  = document.getElementById('id_password1');
                 const p2  = document.getElementById('id_password2');
@@ -544,7 +544,7 @@
             });
         })();
 
-        // ── MOSTRAR / OCULTAR CONTRASEÑA ──
+        // MOSTRAR / OCULTAR CONTRASEÑA
         function togglePassword(btn) {
             const wrapper = btn.closest('.input-wrapper');
             const input = wrapper.querySelector('input');

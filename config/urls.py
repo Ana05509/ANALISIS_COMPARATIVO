@@ -25,18 +25,8 @@ urlpatterns = [
     path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),
 ]
 
-# No se usa django.conf.urls.static.static(): esa función trae su propio
-# chequeo de DEBUG incrustado y devuelve [] si DEBUG=False, sin importar
-# si esto se envuelve o no en un "if settings.DEBUG". Se registra la vista
-# django.views.static.serve directamente para que funcione también en
-# producción — Railway no tiene nginx/S3 delante para servir /media/.
-#
-# Antes se servía sin ningún control: cualquiera sin sesión podía bajar
-# /media/bioquimica_pdfs/<codigo>.pdf o /media/archivos_moleculares/...
-# con solo adivinar el nombre (los nombres son predecibles: código del
-# ensayo / código de muestra). Ahora exige sesión, y los originales de
-# laboratorio quedan solo para Docente/Investigador/Admin — mismo criterio
-# que bioquimica.views.ver_pdf.
+# Archivos /media/ servidos por Django también en producción, con sesión obligatoria;
+# los originales de laboratorio solo para Docente/Investigador/Admin.
 _MEDIA_RESTRINGIDA = ('bioquimica_pdfs/', 'archivos_moleculares/')
 _MEDIA_INLINE = {'.png', '.jpg', '.jpeg', '.webp', '.gif'}
 
@@ -46,9 +36,7 @@ def media_protegida(request, path):
     if path.startswith(_MEDIA_RESTRINGIDA) and getattr(request.user, 'rol', None) == 'estudiante':
         raise PermissionDenied
     response = serve_media(request, path, document_root=settings.MEDIA_ROOT)
-    # Todo lo que no sea imagen se descarga en vez de abrirse en el
-    # navegador: un .html/.svg subido como "adjunto" no debe poder
-    # ejecutarse con el origen (y las cookies) de la app.
+    # Lo que no es imagen se descarga en vez de abrirse en el navegador.
     if os.path.splitext(path)[1].lower() not in _MEDIA_INLINE:
         response['Content-Disposition'] = 'attachment'
     return response

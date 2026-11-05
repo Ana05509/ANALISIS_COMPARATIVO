@@ -19,7 +19,7 @@ from django.contrib.admin.models import CHANGE
 FORMATOS_VALIDOS = ("pdf", "excel")
 
 
-# ── Helpers de cálculo ────────────────────────────────────────────────────────
+# Helpers de cálculo
 
 def calcular_indice_salud(n_ben, n_fito, n_neu, n_sc, shannon=0):
     """Índice de Salud del Suelo (0-100). Devuelve (indice, nivel)."""
@@ -129,18 +129,7 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
 
 
 def _construir_datos_informe_general(tipo, top_n, muestra_id):
-    """
-    Para el Informe General (todos los niveles taxonómicos en un solo
-    documento, una sola muestra): arma un resumen por cada uno de los 7
-    niveles de NIVELES_VALIDOS (Reino→Especie), reutilizando
-    _construir_datos_reporte sin modificarlo — los reportes de un solo
-    nivel (generar_reporte de arriba) siguen exactamente igual.
-
-    Retorna {nivel: datos_dict, ...} — solo con los niveles que sí tienen
-    datos para esta muestra (un nivel puede no traer resultados si, por
-    ejemplo, el pipeline de clasificación no llegó a resolver esa
-    profundidad para ningún taxón). Si ningún nivel tiene datos, {}.
-    """
+    """Datos del Informe General: {nivel: datos_dict} para cada nivel taxonómico con datos ({} si ninguno)."""
     resultado = {}
     for nivel in NIVELES_VALIDOS:
         datos_nivel = _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=[muestra_id])
@@ -227,7 +216,7 @@ def _clasificacion_por_muestra(tipo, nivel, muestra_ids=None):
     ]
 
 
-# ── Vistas ────────────────────────────────────────────────────────────────────
+# Vistas
 
 @login_required
 def reportes(request):
@@ -420,14 +409,7 @@ def generar_reporte(request) -> HttpResponseBase:
 @login_required
 @require_POST
 def generar_reporte_general(request) -> HttpResponseBase:
-    """
-    Informe General: los 7 niveles taxonómicos (Reino→Especie) de UNA sola
-    muestra en un solo documento — resumen por nivel (Top N + Índice de
-    Salud + Diversidad Alfa), sin las gráficas/narrativa completa de los
-    reportes de un solo nivel. No reemplaza generar_reporte de arriba, que
-    sigue intacto para reportes de un nivel específico (individual o
-    comparativo entre muestras).
-    """
+    """Informe General: resumen de los 7 niveles taxonómicos de una sola muestra."""
     tipo = request.POST.get("tipo", "16S")
     if tipo not in MARCADORES_VALIDOS:
         tipo = "16S"

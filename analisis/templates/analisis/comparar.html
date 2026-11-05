@@ -7,7 +7,7 @@
 {% block topbar_title %}Análisis Comparativo Microbiano{% endblock %}
 
 {% block extra_css %}
-/* ── Panel de selección de muestras ── */
+/* Panel de selección de muestras */
 .muestra-row { border-bottom: 1px solid var(--gris-light); }
 .muestra-row:last-child { border-bottom: none; }
 .muestra-row label {
@@ -22,10 +22,10 @@
 .muestra-row.oculta        { display: none; }
 .muestra-row.marcador-oculta { display: none; }
 
-/* ── Contenedores de gráficas ── */
+/* Contenedores de gráficas */
 .cmp-chart-wrap { width: 100%; max-width: 100%; overflow: hidden; }
 
-/* ── Grid Gamma + PERMANOVA ── */
+/* Grid Gamma + PERMANOVA */
 .cmp-stats-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
@@ -39,7 +39,7 @@
     .cmp-stats-grid.solo { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* ── Grid interno PERMANOVA ── */
+/* Grid interno PERMANOVA */
 .permanova-metrics {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -50,7 +50,7 @@
     .permanova-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* ── Tabla comparativa responsive ── */
+/* Tabla comparativa responsive */
 #tabla-comparativa {
     table-layout: auto;
     width: 100%;
@@ -61,10 +61,10 @@
     overflow-wrap: anywhere;
 }
 
-/* ── Card titles ── */
+/* Card titles */
 .card-title { word-break: break-word; overflow-wrap: anywhere; }
 
-/* ── Panel taxonómico (Dominantes / Core / Exclusivos) ── */
+/* Panel taxonómico (Dominantes / Core / Exclusivos) */
 .taxa-panels {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -568,7 +568,7 @@
 
 <script>
 (function () {
-    /* ── Panel de selección de muestras ── */
+    /* Panel de selección de muestras */
     var sel     = document.getElementById('id_muestras');
     var listDiv = document.getElementById('muestra-checkbox-list');
     var counter = document.getElementById('sample-counter');
@@ -821,11 +821,7 @@
                 var simpsonS  = muestrasS.map(function(m) { return alfaData[m].simpson  || 0; });
                 var equitS    = muestrasS.map(function(m) { return alfaData[m].equitatividad || 0; });
 
-                /* Color por umbral absoluto — consistente con análisis avanzado.
-                   En modo grises/publicación se preserva el orden de severidad
-                   convirtiendo cada color semántico a su gris equivalente, y el
-                   valor numérico ya impreso sobre cada barra evita depender del
-                   color para identificarla. */
+                /* Color por umbral absoluto; en grises se mantiene el orden de severidad. */
                 function colorShannon(h) {
                     if (h < 1.0) return '#DC2626';
                     if (h < 2.0) return '#F97316';

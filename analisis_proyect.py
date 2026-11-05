@@ -4,9 +4,7 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-# ============================================================
 # CONFIGURACIÓN AUTOMÁTICA DE RUTAS (Estructura Real)
-# ============================================================
 
 # Toma como base el directorio donde se encuentra este script (Raíz del proyecto)
 BASE_DIR = Path(__file__).resolve().parent
@@ -16,9 +14,7 @@ OUTPUT_FILE = os.path.join(PROJECT_PATH, "analisis_proyecto.md")
 
 VALID_EXTENSIONS = [".py"]
 
-# ============================================================
 # CLASIFICADOR SEMÁNTICO ADAPTADO A BIOMICRO
-# ============================================================
 
 CATEGORY_RULES = {
     "Modelos y Persistencia (Base de Datos)": [
@@ -56,9 +52,7 @@ CATEGORY_RULES = {
     ]
 }
 
-# ============================================================
 # FUNCIONES DE EXTRACCIÓN SINTÁCTICA (AST)
-# ============================================================
 
 def detect_category(file_path: str, content: str) -> str:
     # Primero valida por nombres clave en las rutas de tu estructura real
@@ -210,9 +204,7 @@ def generate_markdown(project_path: str, project_data: dict) -> str:
     return "\n".join(lines)
 
 
-# ============================================================
 # EJECUCIÓN DEL PROCESO
-# ============================================================
 
 if __name__ == "__main__":
     print("\n" + "="*50)

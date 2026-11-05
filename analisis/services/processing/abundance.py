@@ -9,9 +9,7 @@ from analisis.constants import NIVELES_VALIDOS
 CATEGORIAS_CONTROL = {"others", "unclassified", "unknown", "others sp"}
 
 
-# =====================================================================
 # FUNCIÓN SOLUCIÓN ENLACE: Requerida por analysis_service.py
-# =====================================================================
 def comparar_abundancias(df_a: pd.DataFrame, df_b: pd.DataFrame, nivel: str = "genus") -> List[dict]:
     """
     Realiza un análisis diferencial entre dos muestras (A y B) para un nivel taxonómico dado.

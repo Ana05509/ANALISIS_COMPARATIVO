@@ -13,16 +13,12 @@
 {% endblock %}
 
 {% block extra_css %}
-/* ── Informe General: deshabilitado cuando no hay exactamente 1 muestra ──
-   (a diferencia de PDF/Excel, que solo se deshabilitan un instante durante
-   la descarga, este botón puede quedar deshabilitado un buen rato en modo
-   Comparativo/Global — necesita quedar visualmente claro, no solo con el
-   atributo disabled). */
+/* Informe General deshabilitado (requiere exactamente 1 muestra). */
 #btn-informe-general-pdf:disabled, #btn-informe-general-excel:disabled {
     opacity: .4; cursor: not-allowed;
 }
 
-/* ── Barra de progreso del índice de salud ── */
+/* Barra de progreso del índice de salud */
 .indice-bar  { height:13px; border-radius:7px; background:var(--gris-border); overflow:hidden; margin-top:6px; }
 .indice-fill { height:100%; border-radius:7px; transition:width .5s ease; }
 
@@ -30,12 +26,12 @@
    crítico) usan las clases .card-*/.text-*/.fill-* de templates_base.html
    (theme-aware), no clases propias de esta página. */
 
-/* ── Tabla de taxones (overrides puntuales) ── */
+/* Tabla de taxones (overrides puntuales) */
 #tabla-reporte th, #tabla-reporte td { padding: 6px 10px; font-size:13px; }
 #tabla-reporte thead th { background:var(--verde); color:#fff; }
 #tabla-reporte tbody tr:nth-child(even) { background:var(--gris-light); }
 
-/* ── Panel de filtros: lista de muestras (mismo patrón que Comparar/Análisis Avanzado) ── */
+/* Panel de filtros: lista de muestras (mismo patrón que Comparar/Análisis Avanzado) */
 .rpt-sample-row { border-bottom: 1px solid var(--gris-light); }
 .rpt-sample-row:last-child { border-bottom: none; }
 .rpt-sample-row label,
@@ -48,7 +44,7 @@
 .rpt-sample-row input[type="checkbox"] { accent-color: var(--verde); width: 14px; height: 14px; flex-shrink: 0; }
 .rpt-sample-code { font-family:'DM Mono',monospace; font-size:12.5px; flex:1; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-/* ── Tabs: Resumen / Vista previa PDF ── */
+/* Tabs: Resumen / Vista previa PDF */
 .rpt-tabs { display:flex; gap:4px; margin-bottom:.85rem; }
 .rpt-tab {
     display:flex; align-items:center; gap:6px;
@@ -63,18 +59,18 @@
 .rpt-tab-panel { display:none; }
 .rpt-tab-panel.active { display:block; }
 
-/* ── Botón Excel: mismo sistema de botones, tono --teal en vez de un
+/* Botón Excel: mismo sistema de botones, tono --teal en vez de un
    verde crudo ajeno a la paleta (PDF usa --verde vía .btn-primary) ── */
 .btn-excel { background: var(--teal); color: #fff; border-color: var(--teal); }
 .btn-excel:hover { filter: brightness(1.08); }
 
-/* ── Tarjetas KPI de clasificación: variantes que faltan en templates_base.html ── */
+/* Tarjetas KPI de clasificación: variantes que faltan en templates_base.html */
 .metric-card.gris        { border-left: 3px solid #64748b; }
 .metric-card.gris .metric-value        { color: #64748b; }
 .metric-card.gris-claro  { border-left: 3px solid #94a3b8; }
 .metric-card.gris-claro .metric-value  { color: #94a3b8; }
 
-/* ── Vista previa PDF ── */
+/* Vista previa PDF */
 .rpt-pdf-frame-wrap { position:relative; min-height:400px; }
 .rpt-pdf-loading {
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -83,7 +79,7 @@
 .rpt-pdf-loading.is-loading i { animation: rpt-spin 1s linear infinite; }
 @keyframes rpt-spin { to { transform: rotate(360deg); } }
 
-/* ── Empty state (guía de 4 pasos) ── */
+/* Empty state (guía de 4 pasos) */
 .rpt-guide {
     background: var(--surface);
     border: 1px solid var(--gris-border);
@@ -110,10 +106,7 @@
 .rpt-guide-title { font-family:'Fraunces',serif; font-size:20px; font-weight:500; color:var(--text-primary); margin-bottom:8px; }
 .rpt-guide-desc  { font-size:13.5px; color:var(--text-muted); max-width:420px; margin:0 auto; line-height:1.65; }
 
-/* Mismo breakpoint "móvil" que usa templates_base.html (640px) — antes esta
-   página usaba 700px propio, así que entre 641-700px el resto del sitio ya
-   estaba en modo móvil pero el formulario de filtros seguía en 2 columnas:
-   un salto de layout "disparejo" entre esta página y las demás. */
+/* Breakpoint móvil: 640px, igual que templates_base.html. */
 @media (max-width: 640px) {
     .rpt-guide       { padding: 2rem .9rem; }
     .rpt-guide-steps { flex-wrap: wrap; gap: .75rem 0; max-width: 100%; }
@@ -138,9 +131,9 @@
 
 {% block content %}
 
-<!-- ══════════════════════════════════════════════════════════════════════
+<!--
      PANEL DE FILTROS — siempre visible, incluso con un reporte ya generado
-═══════════════════════════════════════════════════════════════════════ -->
+-->
 <div class="card card-sm" style="margin-bottom:.85rem;">
     <div class="card-title" style="margin-bottom:.5rem;">Parámetros del Reporte</div>
     <form method="get" id="rpt-filter-form" style="display:grid; grid-template-columns:minmax(280px,1fr) auto; gap:1.1rem; align-items:start;">
@@ -152,10 +145,7 @@
             {% endfor %}
         </select>
 
-        <!-- Columna izquierda: Muestras — ocupa todo el ancho disponible;
-             la lista de casillas usa una grilla responsiva (varias columnas)
-             en vez de una sola columna angosta, para aprovechar ese ancho
-             en vez de dejarlo en blanco. -->
+        <!-- Columna izquierda: Muestras (casillas en grilla responsiva) -->
         <div>
             <label class="form-label">
                 Muestras
@@ -223,13 +213,7 @@
 
 {% if resumen %}
 
-<!-- ══════════════════════════════════════════════════════════════════════
-     TABS — Resumen interactivo / Vista previa PDF
-     + Barra de herramientas del reporte (Alcance, Top N, PDF, Excel):
-     agrupada aquí junto a lo que afecta, en vez de sueltos en el topbar.
-     Envuelta en una card angosta para que el espacio entre los tabs y las
-     acciones se lea como una barra de herramientas, no como hueco vacío.
-═══════════════════════════════════════════════════════════════════════ -->
+<!-- TABS — Resumen interactivo / Vista previa PDF + barra de herramientas del reporte -->
 <div id="rpt-toolbar" class="card card-sm" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:.85rem;">
     <div class="rpt-tabs" style="margin-bottom:0;">
         <button type="button" class="rpt-tab active" data-tab="resumen">
@@ -283,13 +267,7 @@
             </button>
         </div>
 
-        <!-- Informe General: los 7 niveles taxonómicos (Reino→Especie) de UNA
-             sola muestra en un solo documento — resumen por nivel (Top N +
-             Índice de Salud + Diversidad Alfa), sin repetir el detalle
-             completo de los reportes de un solo nivel de arriba. Solo tiene
-             sentido con exactamente 1 muestra seleccionada (ver
-             _MODO_MUESTRA / actualizarEstadoInformeGeneral más abajo) —
-             igual que "Vista previa PDF" ya distingue Individual/Comparativo. -->
+        <!-- Informe General: los 7 niveles taxonómicos de una sola muestra (requiere 1 muestra) -->
         <div style="display:flex; align-items:center; gap:6px; padding-left:10px; border-left:1px solid var(--gris-border, #e2e8f0);">
             <span class="bs-tip" data-tip="Un solo documento con los 7 niveles taxonómicos (Reino→Especie) de la muestra seleccionada: Top N, Índice de Salud y Diversidad Alfa de cada nivel. Requiere seleccionar exactamente 1 muestra."
                   style="font-size:12px; color:var(--text-muted); white-space:nowrap;">
@@ -309,9 +287,9 @@
 
 <div class="rpt-tab-panel active" id="tab-resumen">
 
-<!-- ══════════════════════════════════════════════════════════════════════
+<!--
      ÍNDICE DE SALUD DEL SUELO
-═══════════════════════════════════════════════════════════════════════ -->
+-->
 {% if indice_salud is not None %}
 {% with ns=nivel_salud|default:"" slug=nivel_salud|default:""|nivel_slug %}
 <div class="card card-sm card-{{ slug }}" style="margin-bottom:1rem;">
@@ -337,9 +315,9 @@
 {% endwith %}
 {% endif %}
 
-<!-- ══════════════════════════════════════════════════════════════════════
+<!--
      KPI — DIVERSIDAD Y CLASIFICACIÓN FUNCIONAL
-═══════════════════════════════════════════════════════════════════════ -->
+-->
 <div class="metrics-grid" style="margin-bottom:1rem;">
     <div class="metric-card">
         <div class="metric-label">Taxa detectados</div>
@@ -382,9 +360,9 @@
     {% endif %}
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════
+<!--
      GRÁFICA — perfil de abundancia (1 muestra) o tendencia (2+ muestras)
-═══════════════════════════════════════════════════════════════════════ -->
+-->
 <div class="card" style="margin-bottom:1rem;">
     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem; gap:1rem;">
         <div>
@@ -409,9 +387,9 @@
     <div id="rpt-grafico-principal" style="width:100%; min-height:420px;"></div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════
+<!--
      DIVERSIDAD ALFA POR MUESTRA (solo comparativo, 2+ muestras)
-═══════════════════════════════════════════════════════════════════════ -->
+-->
 {% if alfa_por_muestra %}
 <div class="card" style="margin-bottom:1rem;">
     <div class="card-title"><i class="ti ti-dna"></i> Diversidad Alfa por Muestra</div>
@@ -442,9 +420,9 @@
 </div>
 {% endif %}
 
-<!-- ══════════════════════════════════════════════════════════════════════
+<!--
      TABLA TOP N TAXONES
-═══════════════════════════════════════════════════════════════════════ -->
+-->
 <div class="card">
     <div class="card-title">
         Desglose Ecológico — Top {{ top_n_actual }} ({{ nivel_actual|capfirst }})
@@ -520,9 +498,9 @@
 
 </div><!-- /tab-resumen -->
 
-<!-- ══════════════════════════════════════════════════════════════════════
+<!--
      TAB: VISTA PREVIA PDF — generado bajo demanda con generar_reporte()
-═══════════════════════════════════════════════════════════════════════ -->
+-->
 <div class="rpt-tab-panel" id="tab-pdf-preview">
     <div class="card" style="padding:0; overflow:hidden;">
         <div style="display:flex; align-items:center; justify-content:space-between; padding:.75rem 1rem; border-bottom:1px solid var(--gris-border); background:var(--gris-light);">
@@ -549,7 +527,7 @@
 
 {% else %}
 
-<!-- ══ EMPTY STATE ════════════════════════════════════════ -->
+<!-- EMPTY STATE -->
 <div class="rpt-guide">
     <div class="rpt-guide-steps">
         <div class="rpt-guide-step">
@@ -759,7 +737,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script>
-// ── Top N: recarga la página con el mismo filtro pero el nuevo top_n ──
+// Top N: recarga la página con el mismo filtro pero el nuevo top_n
 // El selector vive fuera de #rpt-filter-form (se usa también para PDF/Excel,
 // que no deben disparar un GET), así que no basta con "name=top_n" en un
 // <form> normal: hay que reconstruir la URL actual a mano. Se deshabilita
@@ -774,7 +752,7 @@ function cambiarTopN(selectEl) {
     window.location.href = url.toString();
 }
 
-// ── Sincronización checkbox ↔ hidden select ──────────────────────────
+// Sincronización checkbox ↔ hidden select
 function syncHidden() {
     var hidden = document.getElementById('rpt-select-hidden');
     var chks   = document.querySelectorAll('.rpt-chk');
@@ -815,7 +793,7 @@ function filtrarMuestras(q) {
 
 document.addEventListener('DOMContentLoaded', syncHidden);
 
-// ── Parámetros actuales del reporte (compartido entre descarga y vista previa) ──
+// Parámetros actuales del reporte (compartido entre descarga y vista previa)
 function parametrosReporteActual() {
     var ids = Array.from(document.querySelectorAll('#rpt-select-hidden option:checked'))
                    .map(function(o){ return o.value; });
@@ -851,7 +829,7 @@ async function pedirBlobReporte(formato) {
     return resp.blob();
 }
 
-// ── Descarga PDF / Excel ─────────────────────────────────────────────
+// Descarga PDF / Excel
 async function descargar(formato) {
     var p = parametrosReporteActual();
 
@@ -890,7 +868,7 @@ async function descargar(formato) {
     }
 }
 
-// ── Informe General: los 7 niveles taxonómicos de UNA sola muestra ────
+// Informe General: los 7 niveles taxonómicos de UNA sola muestra
 // Reusa parametrosReporteActual() para tipo/topN/modoColor/ids, pero pega
 // a un endpoint distinto (generar_reporte_general) que no recibe `nivel`
 // — ese parámetro no aplica acá, el informe ya cubre los 7 niveles.
@@ -971,7 +949,7 @@ function actualizarEstadoInformeGeneral() {
 }
 document.addEventListener('DOMContentLoaded', actualizarEstadoInformeGeneral);
 
-// ── Tabs: Resumen / Vista previa PDF ──────────────────────────────────
+// Tabs: Resumen / Vista previa PDF
 function initTabs() {
     document.querySelectorAll('.rpt-tab').forEach(function (tab) {
         tab.addEventListener('click', function () {
@@ -986,7 +964,7 @@ function initTabs() {
 }
 document.addEventListener('DOMContentLoaded', initTabs);
 
-// ── Vista previa PDF — generada bajo demanda, cacheada mientras no cambien los filtros ──
+// Vista previa PDF — generada bajo demanda, cacheada mientras no cambien los filtros
 var _pdfPreviewUrl = null;
 
 async function cargarPreviewPDF() {

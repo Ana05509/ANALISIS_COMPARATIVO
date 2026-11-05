@@ -2,6 +2,8 @@
 # Módulo de exportación avanzada (PDF, JSON, CSV, HTML) optimizado para consistencia de biodiversidad.
 
 import re
+from typing import cast
+
 import pandas as pd
 from datetime import datetime
 from io import BytesIO
@@ -14,6 +16,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table as XLTable, TableStyleInfo
+from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.worksheet.hyperlink import Hyperlink
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.chart import BarChart, PieChart, DoughnutChart, RadarChart, Reference
@@ -31,17 +34,7 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 
-# ---------------------------------------------------------------------------
-# Inyección de fórmulas en Excel (CWE-1236)
-# ---------------------------------------------------------------------------
-# codigo/localidad/finca_lote/cultivo/variedad vienen de texto libre que
-# cualquier usuario con permiso de carga escribe en el formulario, y
-# genus/species/family vienen tal cual del CSV/Excel subido. Si alguno
-# empieza con = + - @ (o tab/CR), Excel/LibreOffice lo interpreta como
-# fórmula al abrir el reporte generado — p. ej. un "código de muestra"
-# =HYPERLINK("http://evil.com","click") ejecutaría esa fórmula para quien
-# abra el reporte. Se sanea en todo el módulo justo antes de escribir a
-# Excel (nunca se toca lo que se guarda en la base de datos).
+# Inyección de fórmulas en Excel (CWE-1236): se sanea el texto libre antes de escribirlo.
 _EXCEL_FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
 
 
@@ -53,24 +46,14 @@ def _excel_safe(value):
 
 
 def _excel_safe_df(df):
-    """
-    Aplica _excel_safe a todas las columnas de texto de un DataFrame.
-
-    No filtra por dtype antes de mapear: pandas >= 2.x puede tipar columnas
-    de texto como 'object' o como su nuevo dtype 'str' dedicado según la
-    versión/configuración, y _excel_safe ya ignora internamente cualquier
-    valor que no sea str, así que aplicarlo a todas las columnas es más
-    simple y no depende de adivinar qué dtype exacto usa pandas en cada caso.
-    """
+    """Aplica _excel_safe a todas las columnas de un DataFrame (ignora valores no str)."""
     df = df.copy()
     for col in df.columns:
         df[col] = df[col].map(_excel_safe)
     return df
 
 
-# ---------------------------------------------------------------------------
 # Paleta global
-# ---------------------------------------------------------------------------
 _DONUT_PALETTE = [
     '#1D9E75', '#0F6E56', '#BA7517', '#185FA5', '#A32D2D',
     '#9E6515', '#0C447C', '#6B4E9E', '#2E8B57', '#c7a640',
@@ -85,12 +68,7 @@ _NIVEL_COLORES = {
     "CRÍTICO":   "#7f1d1d",
 }
 
-# ---------------------------------------------------------------------------
-# Identidad visual — gráficos nativos del reporte Excel
-# ---------------------------------------------------------------------------
-# Reusa los mismos tonos que ya usa el resto del reporte (CV/CAZUL/CA/CR de
-# generar_excel_multisheet), agregando un turquesa como puente visual entre
-# el verde y el azul.
+# Identidad visual de los gráficos del reporte Excel
 PLOTLY_VERDE    = "#1D9E75"
 PLOTLY_VERDE_OS = "#0F6E56"
 PLOTLY_AZUL     = "#185FA5"
@@ -99,9 +77,7 @@ PLOTLY_AMBAR    = "#BA7517"
 PLOTLY_ROJO     = "#A32D2D"
 PLOTLY_GRIS     = "#94A3B8"
 
-# Colores por clasificación ecológica — mismos usados en los íconos
-# 🟢🔴🔵⚪ del resto del reporte, para que los gráficos comuniquen el rol
-# funcional de un vistazo en vez de un solo color plano sin significado.
+# Colores por clasificación ecológica
 COLOR_POR_CLAS = {
     "benefico":       PLOTLY_VERDE,
     "fitopatogeno":   PLOTLY_ROJO,
@@ -109,15 +85,7 @@ COLOR_POR_CLAS = {
     "sin_clasificar": PLOTLY_GRIS,
 }
 
-# ---------------------------------------------------------------------------
-# Modo de exportación (color / escala de grises) — Fase presentación
-# ---------------------------------------------------------------------------
-# El modo por defecto ("color") no cambia ningún valor respecto al
-# comportamiento histórico de este archivo. El modo "grises" es aditivo:
-# convierte cada color a su equivalente de luminancia percibida y, para
-# gráficos de barras/torta, agrega un patrón de trama (hatch) distinto por
-# categoría para que la figura siga siendo legible sin depender del color
-# (requisito de tesis/publicación impresa en blanco y negro).
+# Modo de exportación: color (por defecto) o escala de grises (con tramas por categoría).
 _HATCHES = ['', '//', 'xx', '..', '||', '--', '++', 'oo']  # matplotlib (multi-char permitido)
 
 
@@ -185,10 +153,7 @@ def _get_styles():
         'ScientificH2', parent=styles['Heading2'], fontSize=11, leading=14,
         textColor=_white, spaceBefore=0, spaceAfter=0, fontName='Helvetica-Bold',
     )
-    # Texto normal (títulos internos, cuerpo, tablas, valores) en negro puro
-    # para impresión/publicación académica — solo se deja en blanco/claro el
-    # texto que va DENTRO de una franja o banda con fondo de color (arriba:
-    # titulo/subtitle/h2/th/th_dark), donde negro sería ilegible.
+    # Texto en negro; en blanco solo dentro de franjas con fondo de color.
     style_h3 = ParagraphStyle(
         'ScientificH3', parent=styles['Heading3'], fontSize=10.5, leading=14,
         textColor=colors.black, spaceBefore=10, spaceAfter=5, fontName='Helvetica-Bold',
@@ -295,10 +260,7 @@ def _kpi_tiles(items, ancho_util, S):
 
     cells = []
     for it in items:
-        # El valor va en negro (texto normal) — antes tomaba it["color"]
-        # (verde/rojo/etc. según categoría); ese campo ya no se usa para el
-        # color del texto, se deja en items solo por compatibilidad con las
-        # llamadas existentes.
+        # it["color"] ya no se usa para el texto, se mantiene por compatibilidad.
         kpi_style = ParagraphStyle(
             'KpiValDyn', parent=S["kpi_val"],
             textColor=colors.black,
@@ -327,17 +289,8 @@ def _kpi_tiles(items, ancho_util, S):
 
 
 def _banner_reporte(etiqueta_franja, ancho_util, S):
-    """
-    Encabezado de portada compacto: fondo verde claro y texto negro, en vez
-    de un banner sólido oscuro de ancho completo (~50pt de alto). Un banner
-    así de grande es la franja que más tinta/tóner consume al imprimir un
-    reporte de varias páginas, y ocupaba media página en algunos casos —
-    `etiqueta_franja` es el texto de la línea inferior (ej. "REPORTE
-    INDIVIDUAL DE SALUD MICROBIOLÓGICA · MARCADOR 16S"). Se usa en los tres
-    generadores de PDF (individual, comparativo, informe general) para que
-    los tres tengan el mismo encabezado — antes solo el informe general lo
-    tenía así y los otros dos quedaban con el banner oscuro viejo.
-    """
+    """Encabezado de portada compacto (fondo verde claro, texto negro), común a los tres PDF.
+    etiqueta_franja: texto de la línea inferior."""
     header_h1 = ParagraphStyle(
         'BannerH1', parent=S["body"], fontSize=15, leading=18,
         fontName='Helvetica-Bold', textColor=colors.black,
@@ -374,13 +327,7 @@ def _banner_reporte(etiqueta_franja, ancho_util, S):
     return t_banner
 
 
-# ---------------------------------------------------------------------------
-# Fase 1 — Portada / Índice / Conclusiones / Recomendaciones / navegación
-# ---------------------------------------------------------------------------
-# Todo lo que sigue es aditivo sobre generar_excel_multisheet: agrega hojas
-# y una fila de navegación al tope de las hojas ya existentes, sin tocar su
-# contenido/valores. No modifica generar_pdf_individual, generar_pdf_comparativo
-# ni generar_html_reporte.
+# Portada / Índice / Conclusiones / Recomendaciones / navegación del Excel
 
 _REF_RANGE_RE   = re.compile(r"([A-Z]+)(\d+):([A-Z]+)(\d+)")
 _CELL_ANCHOR_RE = re.compile(r"^([A-Z]+)(\d+)$")
@@ -416,18 +363,8 @@ def _shift_formula_rows(formula, offset):
 
 def _retro_freeze_y_nav(ws, freeze_cell="A3", titulo_extra=None, offset=1,
                          indice_location="'Índice'!A1"):
-    """
-    Inserta una fila de navegación ("⬅ Volver al Índice") al tope de una hoja
-    YA construida y congela paneles, sin romper las Tables ni los gráficos
-    que la hoja ya tenga.
-
-    ws.insert_rows() no actualiza automáticamente el rango de las Tables de
-    Excel, ni el ancla/fórmulas de series de los gráficos, ni row_dimensions
-    (verificado empíricamente) — por eso se parchean a mano después de
-    insertar la fila. ws._charts es un atributo "privado" pero es la única
-    forma de llegar a los gráficos ya agregados (openpyxl no expone una API
-    pública de lectura).
-    """
+    """Inserta la fila "⬅ Volver al Índice" al tope de una hoja ya construida y congela paneles.
+    Ajusta a mano las Tables, gráficos e imágenes, que insert_rows() no desplaza."""
     original_heights = {k: v.height for k, v in list(ws.row_dimensions.items())
                          if v.height is not None}
     for k in list(ws.row_dimensions.keys()):
@@ -454,9 +391,7 @@ def _retro_freeze_y_nav(ws, freeze_cell="A3", titulo_extra=None, offset=1,
             if getattr(s, "tx", None) and s.tx and s.tx.strRef:
                 s.tx.strRef.f = _shift_formula_rows(s.tx.strRef.f, offset)
 
-    # Cualquier imagen suelta (ws._images, p.ej. un logo) usa el mismo tipo
-    # de ancla en string ("G3") que un chart — necesita el mismo
-    # desplazamiento o queda una fila más arriba de donde debería.
+    # Las imágenes también se desplazan una fila.
     for img in ws._images:
         img.anchor = _shift_anchor(img.anchor, offset)
 
@@ -464,13 +399,7 @@ def _retro_freeze_y_nav(ws, freeze_cell="A3", titulo_extra=None, offset=1,
     if titulo_extra:
         texto_nav += f"    |    {titulo_extra}"
     c = ws.cell(row=1, column=1, value=texto_nav)
-    # Hipervínculo INTERNO (misma carpeta de trabajo): debe usarse el
-    # parámetro location= de Hyperlink, no target= (que es lo que openpyxl
-    # asigna por defecto si se pasa un string plano a .hyperlink). target=
-    # crea una relación con TargetMode="External" apuntando a un fragmento
-    # interno ("#'Índice'!A1"), algo que Excel detecta como contenido
-    # inválido y dispara el diálogo de "hemos encontrado un problema...".
-    # location= en cambio se escribe directo en el XML sin relationship.
+    # Hipervínculo interno: usar location= (target= hace que Excel marque el archivo como dañado).
     c.hyperlink = Hyperlink(ref=c.coordinate, location=indice_location,
                              tooltip="Volver al Índice")
     c.font = Font(color="0563C1", underline="single", bold=True, size=10)
@@ -499,10 +428,8 @@ _TITULO_EXTRA_HOJAS = {
 }
 
 
-# ---------------------------------------------------------------------------
 # Interpretación automática — texto generado a partir de valores ya calculados
 # (no se agregan cálculos nuevos, solo se traducen a prosa)
-# ---------------------------------------------------------------------------
 
 _NIVEL_TEXTO_SALUD = {
     "ÓPTIMO":    "Esto indica una comunidad microbiana altamente funcional, con condiciones "
@@ -541,12 +468,7 @@ def _texto_simpson(v):
 
 
 def _contexto_reglas(datos: dict) -> dict:
-    """
-    Extrae un contexto plano y con defaults ya resueltos a partir del dict
-    `datos` que ya arma reportes.py — reusado por los tres generadores de
-    texto para no repetir la misma extracción tres veces. No calcula nada
-    nuevo, solo lee valores que ya vienen calculados.
-    """
+    """Contexto plano con valores por defecto a partir de `datos` (lo usan los tres generadores de texto)."""
     diversidad   = datos.get("diversidad") or {}
     totales_clas = datos.get("totales_clas") or {}
     muestras     = datos.get("muestras") or []
@@ -566,11 +488,7 @@ def _contexto_reglas(datos: dict) -> dict:
         "n_fitopatogeno":   n_fito,
         "n_neutral":        n_neu,
         "n_sin_clasificar": totales_clas.get("sin_clasificar", 0),
-        # ratio_ben/ratio_fito usan el mismo denominador (benéfico+fitopatógeno)
-        # que ya usa calcular_indice_salud() para el índice de salud — así las
-        # reglas de conclusiones/recomendaciones nunca contradicen el nivel
-        # de salud ya calculado (ej. no recomendar "más benéficos" en un
-        # suelo ÓPTIMO solo porque hay muchos taxa neutrales sin relación).
+        # Mismo denominador que calcular_indice_salud(), para no contradecir el nivel de salud.
         "ratio_ben":        n_ben / total_ben_fito,
         "ratio_fito":       n_fito / total_ben_fito,
         # Para la narrativa descriptiva ("% de los taxa catalogados"), que sí
@@ -895,9 +813,7 @@ def _construir_hoja_conclusiones_recomendaciones(wb, datos):
 class ExportService:
     """Servicio de exportación avanzada a múltiples formatos con soporte biogeográfico."""
 
-    # ------------------------------------------------------------------
     # Charts matplotlib
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _chart_donut_taxa(top_taxa, width_pt=250, height_pt=200,
@@ -908,10 +824,7 @@ class ExportService:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
-            # Sans-serif (Arial/Helvetica) — lo que piden la mayoría de
-            # revistas científicas para el texto DENTRO de las figuras;
-            # DejaVu Sans (incluida con matplotlib) como respaldo si el
-            # servidor no tiene Arial/Helvetica instalada.
+            # Fuente sans-serif (Arial/Helvetica, con DejaVu Sans de respaldo).
             plt.rcParams['font.family'] = 'sans-serif'
             plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
 
@@ -977,10 +890,7 @@ class ExportService:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
-            # Sans-serif (Arial/Helvetica) — lo que piden la mayoría de
-            # revistas científicas para el texto DENTRO de las figuras;
-            # DejaVu Sans (incluida con matplotlib) como respaldo si el
-            # servidor no tiene Arial/Helvetica instalada.
+            # Fuente sans-serif (Arial/Helvetica, con DejaVu Sans de respaldo).
             plt.rcParams['font.family'] = 'sans-serif'
             plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
 
@@ -1030,10 +940,7 @@ class ExportService:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
-            # Sans-serif (Arial/Helvetica) — lo que piden la mayoría de
-            # revistas científicas para el texto DENTRO de las figuras;
-            # DejaVu Sans (incluida con matplotlib) como respaldo si el
-            # servidor no tiene Arial/Helvetica instalada.
+            # Fuente sans-serif (Arial/Helvetica, con DejaVu Sans de respaldo).
             plt.rcParams['font.family'] = 'sans-serif'
             plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
             from matplotlib.patches import Patch
@@ -1121,10 +1028,7 @@ class ExportService:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
-            # Sans-serif (Arial/Helvetica) — lo que piden la mayoría de
-            # revistas científicas para el texto DENTRO de las figuras;
-            # DejaVu Sans (incluida con matplotlib) como respaldo si el
-            # servidor no tiene Arial/Helvetica instalada.
+            # Fuente sans-serif (Arial/Helvetica, con DejaVu Sans de respaldo).
             plt.rcParams['font.family'] = 'sans-serif'
             plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
             from matplotlib.patches import Patch
@@ -1159,7 +1063,7 @@ class ExportService:
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(width_pt / 72, height_pt / 72))
             fig.patch.set_facecolor('#ffffff')
 
-            # ── Subplot izquierdo: Shannon H' ───────────────────────────
+            # Subplot izquierdo: Shannon H'
             bars1 = ax1.bar(codigos, shannons, color=shan_colors, edgecolor='white', linewidth=0.6, width=0.55)
             if modo == "grises":
                 for bar, b in zip(bars1, shan_buckets):
@@ -1185,7 +1089,7 @@ class ExportService:
             ax1.legend(handles=shan_leg, fontsize=5, framealpha=0.8,
                        ncol=2, loc='upper left', edgecolor='#e2e8f0')
 
-            # ── Subplot derecho: Índice de Salud ────────────────────────
+            # Subplot derecho: Índice de Salud
             bars2 = ax2.bar(codigos, indices, color=bar_colors, edgecolor='white', linewidth=0.6, width=0.55)
             if modo == "grises":
                 for bar, b in zip(bars2, sal_buckets):
@@ -1236,10 +1140,7 @@ class ExportService:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
-            # Sans-serif (Arial/Helvetica) — lo que piden la mayoría de
-            # revistas científicas para el texto DENTRO de las figuras;
-            # DejaVu Sans (incluida con matplotlib) como respaldo si el
-            # servidor no tiene Arial/Helvetica instalada.
+            # Fuente sans-serif (Arial/Helvetica, con DejaVu Sans de respaldo).
             plt.rcParams['font.family'] = 'sans-serif'
             plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
             import numpy as np
@@ -1290,14 +1191,12 @@ class ExportService:
             logging.getLogger(__name__).exception("No se pudo renderizar _chart_barras_agrupadas_funcional")
             return None
 
-    # ------------------------------------------------------------------
     # PDF individual
-    # ------------------------------------------------------------------
 
     @staticmethod
     def generar_pdf_individual(datos) -> bytes:
         """
-        Genera reporte PDF individual de A4 con 6 páginas.
+        Genera el reporte PDF individual (A4).
         datos keys: muestra, muestras, top_taxa, todos_taxa, diversidad,
                     detalle_clas, totales_clas, indice_salud, nivel_salud,
                     tipo, nivel, top_n, usuario
@@ -1338,7 +1237,7 @@ class ExportService:
 
         ancho_util = A4[0] - 80  # 455 pt aprox
 
-        # ── helpers locales ────────────────────────────────────────────────
+        # helpers locales
         shannon_v = float(diversidad.get("shannon", 0.0) or 0.0)
         simpson_v = float(diversidad.get("simpson", 0.0) or 0.0)
         equit_v   = float(diversidad.get("equitatividad", 0.0) or 0.0)
@@ -1350,9 +1249,7 @@ class ExportService:
             if v >= 1.0: return "#EA580C"
             return "#DC2626"
 
-        # ================================================================
         # PÁGINA 1 — Portada
-        # ================================================================
         contenido.append(_banner_reporte(
             f"REPORTE INDIVIDUAL DE SALUD MICROBIOLÓGICA · MARCADOR {marcador_lbl}", ancho_util, S,
         ))
@@ -1438,18 +1335,14 @@ class ExportService:
             S["muted"],
         ))
 
-        # Sin PageBreak entre secciones: el reporte fluye continuo en vez de
-        # forzar una página nueva y dejar hueco en blanco al pie de la
-        # anterior — mismo criterio que generar_pdf_informe_general.
+        # Sin PageBreak entre secciones.
         contenido.append(Spacer(1, 18))
 
-        # ================================================================
         # PÁGINA 2 — Resumen Ejecutivo
-        # ================================================================
         contenido.append(_seccion_hdr("RESUMEN EJECUTIVO", ancho_util, S, numero=1))
         contenido.append(Spacer(1, 14))
 
-        # ── Tarjeta Índice de Salud ─────────────────────────────────────
+        # Tarjeta Índice de Salud
         nivel_color_hex = _NIVEL_COLORES.get(nivel_salud, "#64748b")
         nivel_color_rl  = colors.HexColor(nivel_color_hex)
 
@@ -1467,9 +1360,7 @@ class ExportService:
             ('ROWHEIGHT',     (0, 0), (-1, -1), 12),
         ]))
 
-        # El color de nivel (verde/ámbar/rojo) se conserva en la barra y el
-        # borde de la tarjeta (nivel_color_rl más abajo); el número y las
-        # etiquetas van en negro como el resto del texto.
+        # El color del nivel va en la barra y el borde; el texto en negro.
         salud_num_style = ParagraphStyle('SaludN', parent=S["body"],
             fontSize=40, fontName='Helvetica-Bold',
             textColor=colors.black, alignment=TA_CENTER)
@@ -1501,7 +1392,7 @@ class ExportService:
         contenido.append(t_salud)
         contenido.append(Spacer(1, 12))
 
-        # ── Fila de 4 KPI tiles de diversidad ──────────────────────────
+        # Fila de 4 KPI tiles de diversidad
         shan_color = _shannon_color(shannon_v)
         shan_nivel = (
             "Alta (H'≥3)" if shannon_v >= 3 else
@@ -1517,7 +1408,7 @@ class ExportService:
         contenido.append(kpi_div)
         contenido.append(Spacer(1, 10))
 
-        # ── Fila de 4 KPI tiles de clasificación funcional ─────────────
+        # Fila de 4 KPI tiles de clasificación funcional
         kpi_func = _kpi_tiles([
             {"val": str(totales_clas.get("benefico", 0)),      "lbl": "Benéficos",     "color": "#16A34A", "sub": "Taxa"},
             {"val": str(totales_clas.get("fitopatogeno", 0)),  "lbl": "Fitopatógenos", "color": "#DC2626", "sub": "Taxa"},
@@ -1527,7 +1418,7 @@ class ExportService:
         contenido.append(kpi_func)
         contenido.append(Spacer(1, 12))
 
-        # ── Conclusión ─────────────────────────────────────────────────
+        # Conclusión
         cod_muestra = _safe(muestra, "codigo", "la muestra seleccionada")
         conclusion = (
             f"La muestra <b>{cod_muestra}</b> del cultivo <b>{cultivo_nom}</b> presenta un "
@@ -1540,13 +1431,11 @@ class ExportService:
         contenido.append(Paragraph(conclusion, S["body"]))
         contenido.append(Spacer(1, 18))
 
-        # ================================================================
         # PÁGINA 3 — Perfil Taxonómico
-        # ================================================================
         contenido.append(_seccion_hdr("PERFIL DE ABUNDANCIA RELATIVA", ancho_util, S, numero=2))
         contenido.append(Spacer(1, 10))
 
-        # ── Gráfica rankeada (principal) ────────────────────────────────
+        # Gráfica rankeada (principal)
         chart_ranked = ExportService._chart_ranked_bar_taxa(
             top_taxa, width_pt=ancho_util,
             titulo=f"Perfil de Abundancia Relativa — Top {top_n} {nivel.capitalize()}",
@@ -1562,7 +1451,7 @@ class ExportService:
                 S["caption"],
             ))
 
-        # ── Donut composición + barras funcionales (fila complementaria) ─
+        # Donut composición + barras funcionales (fila complementaria) ─
         chart_donut = ExportService._chart_donut_taxa(
             top_taxa, width_pt=200, height_pt=158,
             titulo="Composición Taxonómica",
@@ -1592,7 +1481,7 @@ class ExportService:
             contenido.append(t_charts)
             contenido.append(Spacer(1, 8))
 
-        # ── Tabla Top N taxa ────────────────────────────────────────────
+        # Tabla Top N taxa
         def _clas_badge(clas):
             # Texto en negro (S["body_sm"] ya es negro) — la distinción entre
             # categorías queda en la palabra y el símbolo (●/○/·), no en color.
@@ -1634,9 +1523,7 @@ class ExportService:
         contenido.append(t_taxa)
         contenido.append(Spacer(1, 18))
 
-        # ================================================================
         # PÁGINA 4 — Diversidad Alfa
-        # ================================================================
         contenido.append(_seccion_hdr("DIVERSIDAD ALFA", ancho_util, S, numero=3))
         contenido.append(Spacer(1, 14))
 
@@ -1734,9 +1621,7 @@ class ExportService:
         contenido.append(t_concl)
         contenido.append(Spacer(1, 18))
 
-        # ================================================================
         # PÁGINA 5 — Perfil Funcional
-        # ================================================================
         contenido.append(_seccion_hdr("PERFIL FUNCIONAL DE LA COMUNIDAD MICROBIANA", ancho_util, S, numero=4))
         contenido.append(Spacer(1, 14))
 
@@ -1821,9 +1706,7 @@ class ExportService:
             contenido.append(Paragraph(noms, S["body_sm"]))
         contenido.append(Spacer(1, 18))
 
-        # ================================================================
         # PÁGINA 6 — Trazabilidad
-        # ================================================================
         contenido.append(_seccion_hdr("TRAZABILIDAD Y NOTA METODOLÓGICA", ancho_util, S, numero=5))
         contenido.append(Spacer(1, 12))
 
@@ -1874,14 +1757,12 @@ class ExportService:
         buffer.seek(0)
         return buffer.getvalue()
 
-    # ------------------------------------------------------------------
     # PDF comparativo
-    # ------------------------------------------------------------------
 
     @staticmethod
     def generar_pdf_comparativo(datos) -> bytes:
         """
-        Genera reporte PDF comparativo de A4 con 5 páginas.
+        Genera el reporte PDF comparativo (A4).
         datos keys: muestras, datos_por_muestra, top_taxa, diversidad,
                     totales_clas, indice_salud, nivel_salud, tipo, nivel,
                     top_n, usuario
@@ -1910,20 +1791,13 @@ class ExportService:
         analista   = str(usuario) if usuario else "Sistema"
         marcador_lbl = "BACTERIA 16S" if tipo == "16S" else "HONGOS ITS"
 
-        # ================================================================
         # PORTADA — Comparativo
-        # ================================================================
         contenido.append(_banner_reporte(
             f"ANÁLISIS COMPARATIVO · MARCADOR {marcador_lbl} · {len(muestras)} MUESTRAS", ancho_util, S,
         ))
         contenido.append(Spacer(1, 16))
 
-        # Título de portada sobre fondo BLANCO de página — no puede reusar
-        # S["titulo"] (blanco, pensado para ir DENTRO de una franja de color)
-        # o quedaría invisible; lleva su propio estilo negro, igual que el
-        # reporte individual (title_style más arriba en este archivo). El
-        # nombre de la universidad ya va en la franja de _banner_reporte, así
-        # que no se repite acá como subtítulo.
+        # Título de portada en negro (va sobre fondo blanco).
         titulo_portada_style = ParagraphStyle('ComparativeTitle', parent=S["body"],
             fontSize=17, fontName='Helvetica-Bold', textColor=colors.black, leading=21)
         contenido.append(Paragraph(
@@ -1987,9 +1861,7 @@ class ExportService:
         contenido.append(meta_bar)
         contenido.append(Spacer(1, 18))
 
-        # ================================================================
         # PÁGINA 2 — Cuadro comparativo de salud
-        # ================================================================
         contenido.append(_seccion_hdr("CUADRO COMPARATIVO DE SALUD DEL SUELO", ancho_util, S, numero=1))
         contenido.append(Spacer(1, 14))
 
@@ -2009,11 +1881,7 @@ class ExportService:
             m    = d["muestra"]
             tc   = d.get("totales_clas", {})
             shan = float(d.get("diversidad", {}).get("shannon", 0) or 0)
-            # "Taxa" en la misma fila que "Benéficos"/"Fitopatógenos" — ambos
-            # deben venir del universo completo de la muestra (todos_taxa), no
-            # del Top N recortado (top_taxa). Con top_taxa, cualquier muestra
-            # con más taxa que el Top N elegido mostraba siempre el mismo
-            # número (el propio top_n) sin importar su riqueza real.
+            # Taxa totales de la muestra (todos_taxa), no solo el Top N.
             comp_hdr.append([
                 Paragraph(str(m.codigo),                     S["body_sm"]),
                 Paragraph(str(d.get("indice_salud", 0)),     S["body_sm"]),
@@ -2050,9 +1918,7 @@ class ExportService:
             ))
         contenido.append(Spacer(1, 18))
 
-        # ================================================================
         # PÁGINA 3 — Composición global (Top N)
-        # ================================================================
         contenido.append(_seccion_hdr("COMPOSICIÓN GLOBAL POR MUESTRA", ancho_util, S, numero=2))
         contenido.append(Spacer(1, 14))
 
@@ -2108,9 +1974,7 @@ class ExportService:
         contenido.append(t_g)
         contenido.append(Spacer(1, 18))
 
-        # ================================================================
         # PÁGINA 4 — Perfil funcional comparativo
-        # ================================================================
         contenido.append(_seccion_hdr("PERFIL FUNCIONAL COMPARATIVO", ancho_util, S, numero=3))
         contenido.append(Spacer(1, 14))
 
@@ -2172,9 +2036,7 @@ class ExportService:
         contenido.append(t_pm)
         contenido.append(Spacer(1, 18))
 
-        # ================================================================
         # PÁGINA 5 — Trazabilidad
-        # ================================================================
         contenido.append(_seccion_hdr("TRAZABILIDAD Y NOTA METODOLÓGICA", ancho_util, S, numero=4))
         contenido.append(Spacer(1, 12))
 
@@ -2217,10 +2079,7 @@ class ExportService:
 
         marcador_txt = "16S rRNA" if tipo == "16S" else "ITS (Internal Transcribed Spacer)"
         shannon_g    = float(diversidad.get("shannon", 0) or 0)
-        # Universo completo de taxa (todos_taxa), no el Top N recortado
-        # (top_taxa) — mismo criterio de respaldo que el resto del reporte
-        # (ver _div_valor / líneas 544, 1284, 2852, 3211) para que "Taxa
-        # únicos detectados" no dependa de qué Top N se haya elegido.
+        # Se usa todos_taxa para que no dependa del Top N elegido.
         riqueza_g    = diversidad.get("riqueza") or len(todos_taxa)
         nota_meto = (
             f"Análisis comparativo de <b>{len(muestras)}</b> muestras · Marcador: <b>{marcador_txt}</b> "
@@ -2251,9 +2110,7 @@ class ExportService:
         buffer.seek(0)
         return buffer.getvalue()
 
-    # ------------------------------------------------------------------
     # Excel multi-hoja
-    # ------------------------------------------------------------------
 
     @staticmethod
     def generar_excel_multisheet(datos) -> HttpResponse:  # noqa: C901
@@ -2262,7 +2119,7 @@ class ExportService:
         Modo INDIVIDUAL (1 muestra): 9-10 hojas.
         Modo COMPARATIVO (N muestras): 11 hojas.
         """
-        # ── Extracción de datos ──────────────────────────────────────────
+        # Extracción de datos
         muestra          = datos.get("muestra")
         muestras         = datos.get("muestras", [])
         top_taxa         = datos.get("top_taxa", [])
@@ -2284,7 +2141,7 @@ class ExportService:
         # resto del formato de la hoja: encabezados, fills, tablas).
         modo             = datos.get("modo_color", "color")
 
-        # ── Constantes de estilo ──────────────────────────────────────────
+        # Constantes de estilo
         CV        = "1D9E75"   # verde medio
         CV_OSC    = "0F6E56"   # verde oscuro (headers principales)
         CV_CLAR   = "E8F5EF"   # verde muy claro (secciones)
@@ -2313,7 +2170,7 @@ class ExportService:
             bottom=Side(style="thin", color="D0D0D0"),
         )
 
-        # ── Interpretaciones biológicas ───────────────────────────────────
+        # Interpretaciones biológicas
         INTERP_SALUD = {
             "ÓPTIMO":    "Comunidad microbiana altamente funcional. Condiciones óptimas para el cultivo.",
             "FAVORABLE": "Condiciones adecuadas. Relación benéfico/fitopatógeno favorable al cultivo.",
@@ -2351,7 +2208,7 @@ class ExportService:
             if v > 0.10: return "Baja similitud — comunidades con perfiles distintos"
             return "Muy baja similitud — comunidades completamente diferenciadas"
 
-        # ── Interpretaciones cortas debajo de tablas clave (Fase 1) ────────
+        # Interpretaciones cortas debajo de tablas clave (Fase 1)
         def _caption(ws, fila, texto, ancho_cols=5):
             c = ws.cell(row=fila, column=1, value=f"ℹ  {texto}")
             c.font = fnt_gris
@@ -2382,7 +2239,7 @@ class ExportService:
                 texto = "La comunidad presenta un equilibrio entre microorganismos benéficos y fitopatógenos."
             _caption(ws, fila, texto, ancho_cols)
 
-        # ── Funciones auxiliares ──────────────────────────────────────────
+        # Funciones auxiliares
         def _safe(obj, attr, default="N/A"):
             val = getattr(obj, attr, None) if obj else None
             return str(val) if val not in (None, "") else default
@@ -2441,14 +2298,8 @@ class ExportService:
                     )
                 ws.row_dimensions[i].height = h
 
-        # ── Motor único de formato de tabla (Fase 1.3) ──────────────────────
-        # Reemplaza la combinación _hdr+_datos_filas+_aplicar_tabla+_ajustar_cols
-        # +_wrap repetida en cada hoja: encabezado institucional verde/azul,
-        # Excel Table con autofiltro + bandas cebra, alineación y
-        # number_format por tipo de dato inferido del dtype de cada columna,
-        # ancho automático por contenido, e insignias de color por fila en la
-        # columna de clasificación funcional (en vez de pintar el encabezado
-        # completo de rojo/ámbar/gris como antes).
+        # Motor único de formato de tabla: encabezado institucional, autofiltro,
+        # bandas, formatos por tipo, ancho automático e insignias por clasificación.
         _BADGE_CLASIF = {
             "benefico":         ("D4EDDA", "14532D"),
             "fitopatogeno":     ("FADBD8", "7F1D1D"),
@@ -2518,12 +2369,7 @@ class ExportService:
             c.font  = Font(bold=True, size=12, color=color or CV_OSC)
             c.alignment = al_l
 
-        # ── Gráficos nativos de Excel (openpyxl.chart) ──────────────────────
-        # Todos leen (o escriben primero) datos en celdas reales de la hoja —
-        # a diferencia de las imágenes PNG que usaba este bloque antes, un
-        # gráfico nativo queda conectado a esas celdas: si se edita un valor
-        # en Excel después de descargar el reporte, el gráfico se actualiza
-        # solo, y puede editarse (colores, tipo) directamente desde Excel.
+        # Gráficos nativos de Excel (conectados a las celdas de la hoja)
 
         def _fig_barras_h(ws, n_filas, col_datos, col_cats, color_fill=None,
                           titulo_celda=None, titulo_txt="", col_clasif=None,
@@ -2626,11 +2472,7 @@ class ExportService:
 
         def _fig_pie_categoria(ws, registros, fila_datos, col_datos,
                                titulo_txt="Abundancia por Categoría Funcional"):
-            """Sustituto nativo del treemap: pie de abundancia total (suma de
-            Total_Hits) agrupada por categoría funcional — complementa el
-            ranking de taxa individuales de al lado en vez de duplicarlo.
-            Escribe una tabla de apoyo de 4 filas porque PieChart necesita
-            una Reference a celdas reales, no listas Python."""
+            """Pie de abundancia total por categoría funcional (usa una tabla de apoyo de 4 filas)."""
             totales = {"benefico": 0.0, "fitopatogeno": 0.0, "neutral": 0.0, "sin_clasificar": 0.0}
             for r in registros:
                 clas = r.get("Clasificación", "sin_clasificar")
@@ -2701,11 +2543,8 @@ class ExportService:
             return ch
 
         def _fig_heatmap_celdas(ws, matriz, filas, columnas, fila_datos, col_datos):
-            """Sustituto nativo del heatmap: escribe la matriz muestra×taxón
-            real en celdas y aplica un ColorScaleRule (formato condicional
-            nativo de 3 colores) sobre ese rango — a diferencia de la imagen
-            anterior, esta versión sí reacciona si se edita un valor.
-            Devuelve True si escribió algo, False si no había datos."""
+            """Heatmap muestra×taxón con formato condicional de 3 colores.
+            Devuelve True si escribió algo."""
             if not matriz:
                 return False
             ws.cell(row=fila_datos, column=col_datos, value="Taxón")
@@ -2761,12 +2600,8 @@ class ExportService:
 
         def _fig_gauge(ws, valor, nivel_salud_g, fila_datos, col_datos,
                       celda_texto=None, titulo_txt="Índice de Salud del Suelo"):
-            """Sustituto nativo del gauge: DoughnutChart de 2 segmentos
-            (valor vs. 100-valor) coloreado según el nivel de salud —
-            openpyxl no soporta un gauge/velocímetro nativo. celda_texto: si
-            se indica, escribe ahí el valor numérico grande, porque el
-            DoughnutChart ya no puede "hornear" el número en el centro como
-            hacía el go.Indicator de Plotly."""
+            """Indicador del índice de salud como DoughnutChart de 2 segmentos.
+            celda_texto: celda donde se escribe el valor numérico."""
             color = _resolver_color(_NIVEL_COLORES.get(nivel_salud_g, "#64748b"), modo)
             valor = float(valor or 0)
             ws.cell(row=fila_datos, column=col_datos, value="Valor")
@@ -2791,7 +2626,7 @@ class ExportService:
                 c.font = Font(bold=True, size=16, color=color.lstrip("#"))
             return ch
 
-        # ── Datos para las visualizaciones nuevas (Fase 1.2) ────────────────
+        # Datos para las visualizaciones nuevas (Fase 1.2)
         _CLASES_LBL = {
             "benefico":       "🟢 Benéficos",
             "fitopatogeno":   "🔴 Fitopatógenos",
@@ -2833,7 +2668,7 @@ class ExportService:
                 ],
             )
 
-        # ── Valores derivados ─────────────────────────────────────────────
+        # Valores derivados
         cultivo_nom = (muestra.cultivo.nombre
                        if muestra and getattr(muestra, "cultivo", None) else "N/A")
         var_nom = (muestra.variedad_clon.nombre
@@ -2851,14 +2686,10 @@ class ExportService:
         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
             wb = writer.book
 
-            # ════════════════════════════════════════════════════════════
             # ██  MODO INDIVIDUAL — 1 muestra
-            # ════════════════════════════════════════════════════════════
             if not is_comparativo:
 
-                # ─────────────────────────────────────────────────────
                 # H-01  RESUMEN EJECUTIVO
-                # ─────────────────────────────────────────────────────
                 shanval  = _div_valor(diversidad, "shannon")
                 simpval  = _div_valor(diversidad, "simpson")
                 equival  = _div_valor(diversidad, "equitatividad")
@@ -2973,7 +2804,7 @@ class ExportService:
                 _ajustar_cols(ws_r, {"A": 30, "B": 22, "C": 65})
                 _wrap(ws_r, min_row=2, h=28)
 
-                # ── Resumen ejecutivo interpretado (Fase 1) ─────────────
+                # Resumen ejecutivo interpretado (Fase 1)
                 fila_hs = ws_r.max_row + 2
                 ws_r.cell(row=fila_hs, column=1, value="RESUMEN EJECUTIVO INTERPRETADO").font = fnt_seccion
                 for col in range(1, 4):
@@ -3000,9 +2831,7 @@ class ExportService:
                     ws_r.row_dimensions[fila_hs].height = 40
                     fila_hs += 1
 
-                # ─────────────────────────────────────────────────────
                 # H-02  TOP N TAXA
-                # ─────────────────────────────────────────────────────
                 top_rec = [{
                     "#": i + 1,
                     "Taxón":          r.get("taxonomia", r.get("nombre", "?")),
@@ -3030,9 +2859,7 @@ class ExportService:
                         ws_top, top_rec, fila_datos=2, col_datos=30,
                     ), "V3")
 
-                # ─────────────────────────────────────────────────────
                 # H-03  TAXONOMÍA COMPLETA
-                # ─────────────────────────────────────────────────────
                 todos_rec = [{
                     "#": i + 1,
                     "Taxón":         r.get("taxonomia", r.get("nombre", "?")),
@@ -3053,9 +2880,7 @@ class ExportService:
                         ws_tod, jerarquia_taxonomica, fila_datos=2, col_datos=30,
                     ), "G2")
 
-                # ─────────────────────────────────────────────────────
                 # H-04  DIVERSIDAD ALFA
-                # ─────────────────────────────────────────────────────
                 div_rec = [
                     {"Métrica": "Riqueza de taxa",
                      "Valor": riqval,
@@ -3096,9 +2921,7 @@ class ExportService:
                     titulo_celda="F2", titulo_txt="Índices de Diversidad Alfa",
                 ), "F3")
 
-                # ─────────────────────────────────────────────────────
                 # H-05  CLASIFICACIÓN FUNCIONAL
-                # ─────────────────────────────────────────────────────
                 total_det = max(total_catalogados + totales_clas.get("sin_clasificar", 0), 1)
                 clf_rec = [
                     {"Categoría": "🟢 Benéficos",
@@ -3137,11 +2960,7 @@ class ExportService:
                     colores=[PLOTLY_VERDE, PLOTLY_ROJO, PLOTLY_AMBAR, PLOTLY_GRIS],
                 ), "F2")
 
-                # ─────────────────────────────────────────────────────
-                # H-06  MICROORGANISMOS — detalle por categoría (fusión de
-                # Benéficos + Fitopatógenos + Neutrales en una sola tabla
-                # filtrable/ordenable en vez de 3 hojas casi idénticas)
-                # ─────────────────────────────────────────────────────
+                # H-06  MICROORGANISMOS — detalle por categoría
                 micro_datos = []
                 for b in detalle_clas.get("benefico", []):
                     micro_datos.append(("🟢 Benéficos", b.get("nombre", ""),
@@ -3166,9 +2985,7 @@ class ExportService:
                 ws_micro = writer.sheets["Microorganismos_Detalle"]
                 _formatear_tabla(ws_micro, df_micro, "TablaMicroorganismos", col_clasif="Categoría")
 
-                # ─────────────────────────────────────────────────────
                 # H-09  ANÁLISIS DIFERENCIAL (si disponible)
-                # ─────────────────────────────────────────────────────
                 diferencial = analisis_dif.get("diferencial", [])
                 beta_dif    = analisis_dif.get("beta", {})
                 if diferencial:
@@ -3213,13 +3030,9 @@ class ExportService:
                             for c in range(1, 7):
                                 ws_dif.cell(row=j, column=c).border = borde
 
-            # ════════════════════════════════════════════════════════════
             # ██  MODO COMPARATIVO — N muestras
-            # ════════════════════════════════════════════════════════════
             else:
-                # ─────────────────────────────────────────────────────
                 # H-01  RESUMEN COMPARATIVO
-                # ─────────────────────────────────────────────────────
                 shanval  = _div_valor(diversidad, "shannon")
                 simpval  = _div_valor(diversidad, "simpson")
                 equival  = _div_valor(diversidad, "equitatividad")
@@ -3293,7 +3106,7 @@ class ExportService:
                 _ajustar_cols(ws_rc, {"A": 34, "B": 25, "C": 65})
                 _wrap(ws_rc, h=28)
 
-                # ── Resumen ejecutivo interpretado (Fase 1) ─────────────
+                # Resumen ejecutivo interpretado (Fase 1)
                 fila_hsc = ws_rc.max_row + 2
                 ws_rc.cell(row=fila_hsc, column=1, value="RESUMEN EJECUTIVO INTERPRETADO").font = fnt_seccion
                 for col in range(1, 4):
@@ -3320,9 +3133,7 @@ class ExportService:
                     ws_rc.row_dimensions[fila_hsc].height = 40
                     fila_hsc += 1
 
-                # ─────────────────────────────────────────────────────
                 # H-02  CUADRO COMPARATIVO POR MUESTRA
-                # ─────────────────────────────────────────────────────
                 cuad_rec = []
                 for dpm in datos_por_muestra:
                     m    = dpm["muestra"]
@@ -3366,9 +3177,7 @@ class ExportService:
                         y_titulo="Índice (0-100)", y_max=100,
                     ), "P3")
 
-                # ─────────────────────────────────────────────────────
                 # H-03  DIVERSIDAD ALFA DETALLADA POR MUESTRA
-                # ─────────────────────────────────────────────────────
                 def _interp_shannon_nivel(v):
                     v = float(v or 0)
                     if v >= 3.0: return "Alta (H'≥3)"
@@ -3433,15 +3242,11 @@ class ExportService:
                         y_titulo="Shannon H'",
                     ), "H3")
 
-                # ─────────────────────────────────────────────────────
                 # H-04  DIVERSIDAD BETA
-                # ─────────────────────────────────────────────────────
                 # Construir sets de taxa por muestra
                 taxa_sets: dict = {}
                 for dpm in datos_por_muestra:
-                    # _excel_safe: cod y los nombres de taxón terminan como valores de
-                    # celda en esta hoja (Diversidad_Beta se escribe con openpyxl directo,
-                    # no vía DataFrame, así que _excel_safe_df no los cubre).
+                    # Se sanea porque esta hoja se escribe directo con openpyxl.
                     cod = _excel_safe(str(dpm["muestra"].codigo))
                     if "todos_taxa_nombres" in dpm:
                         taxa_sets[cod] = {_excel_safe(n) for n in dpm["todos_taxa_nombres"]}
@@ -3588,9 +3393,7 @@ class ExportService:
                         fila_uniq += 1
                     fila_uniq += 1
 
-                # ─────────────────────────────────────────────────────
                 # H-05  TOP N GLOBAL
-                # ─────────────────────────────────────────────────────
                 top_rec = [{
                     "#": i + 1,
                     "Taxón":          r.get("taxonomia", r.get("nombre", "?")),
@@ -3617,9 +3420,7 @@ class ExportService:
                         ws_top, top_rec, fila_datos=2, col_datos=30,
                     ), "V3")
 
-                # ─────────────────────────────────────────────────────
                 # H-06  TAXONOMÍA COMPLETA
-                # ─────────────────────────────────────────────────────
                 todos_rec = [{
                     "#": i + 1,
                     "Taxón":         r.get("taxonomia", r.get("nombre", "?")),
@@ -3640,9 +3441,7 @@ class ExportService:
                         ws_tod, jerarquia_taxonomica, fila_datos=2, col_datos=30,
                     ), "G2")
 
-                # ─────────────────────────────────────────────────────
                 # H-07  CLASIFICACIÓN POR MUESTRA
-                # ─────────────────────────────────────────────────────
                 cls_rec = []
                 for dpm in datos_por_muestra:
                     tc   = dpm.get("totales_clas", {})
@@ -3666,10 +3465,8 @@ class ExportService:
                 _formatear_tabla(ws_cls, df_cls, "TablaClsPorMuestra")
                 _caption_clasificacion(ws_cls, ws_cls.max_row + 2, totales_clas, ancho_cols=7)
 
-                # ─────────────────────────────────────────────────────
                 # H-08  MICROORGANISMOS — detalle por categoría (global,
                 # fusión de Benéficos + Fitopatógenos + Neutrales)
-                # ─────────────────────────────────────────────────────
                 micro_datos = []
                 for b in detalle_clas.get("benefico", []):
                     micro_datos.append(("🟢 Benéficos", b.get("nombre", ""),
@@ -3694,9 +3491,7 @@ class ExportService:
                 ws_micro = writer.sheets["Microorganismos_Detalle"]
                 _formatear_tabla(ws_micro, df_micro, "TablaMicroorganismos", col_clasif="Categoría")
 
-            # ─────────────────────────────────────────────────────────────
             # DASHBOARD — tarjetas KPI + visualizaciones consolidadas (Fase 1.2)
-            # ─────────────────────────────────────────────────────────────
             ws_dash = wb.create_sheet("Dashboard")
             ws_dash.sheet_view.showGridLines = False
 
@@ -3734,9 +3529,7 @@ class ExportService:
             _kpi_card(3, 16, "Taxa Benéficos", totales_clas.get("benefico", 0), PLOTLY_VERDE)
             _kpi_card(3, 21, "Taxa Fitopatógenos", totales_clas.get("fitopatogeno", 0), PLOTLY_ROJO)
 
-            # ── Tablas de apoyo (no visibles en el panel, alimentan los
-            # gráficos de abajo con el mismo criterio de lectura-desde-celda
-            # que usa el resto del reporte) ─────────────────────────────
+            # Tablas de apoyo que alimentan los gráficos del panel
             fila_ap = 160
 
             # Gauge + Radar
@@ -3812,13 +3605,9 @@ class ExportService:
             ws_dash.cell(row=157, column=1,
                          value="Generado por BioMicro").font = fnt_gris
 
-            # ── Fase 1: Portada / Índice / Conclusiones / Recomendaciones ──
-            # Aditivo: agrega hojas y una fila de navegación al tope de las
-            # que ya existen, sin tocar su contenido (ver _retro_freeze_y_nav).
+            # Portada / Índice / Conclusiones / Recomendaciones
             hojas_originales = list(wb.sheetnames)
-            # El Dashboard se construyó al final (necesita datos ya calculados
-            # en ambos modos), pero visualmente debe ir primero, justo
-            # después del Índice.
+            # El Dashboard va justo después del Índice.
             hojas_originales.remove("Dashboard")
             hojas_originales.insert(0, "Dashboard")
 
@@ -3838,7 +3627,7 @@ class ExportService:
             wb._sheets = [wb[_n] for _n in _orden_final]
             wb.active = 0
 
-        # ── Respuesta HTTP ────────────────────────────────────────────────
+        # Respuesta HTTP
         buffer.seek(0)
         fecha = datetime.now().strftime("%Y%m%d_%H%M%S")
         modo  = "comparativo" if is_comparativo else "individual"
@@ -3850,19 +3639,13 @@ class ExportService:
         response["Content-Disposition"] = f'attachment; filename="{nombre}"'
         return response
 
-    # ------------------------------------------------------------------
-    # Informe General — los 7 niveles taxonómicos de UNA muestra, en un
-    # solo documento (resumen por nivel, no el detalle completo que ya
-    # trae cada reporte individual). No toca generar_pdf_individual,
-    # generar_pdf_comparativo ni generar_excel_multisheet de arriba.
-    # ------------------------------------------------------------------
+    # Informe General — resumen de los 7 niveles taxonómicos de una muestra.
 
     @staticmethod
     def generar_pdf_informe_general(datos) -> bytes:
         """
-        datos keys: datos_por_nivel ({nivel: dict con top_taxa/diversidad/
-        indice_salud/nivel_salud, uno por cada NIVELES_VALIDOS que tenga
-        datos}), muestra, tipo, top_n, usuario.
+        datos keys: datos_por_nivel ({nivel: top_taxa/diversidad/indice_salud/nivel_salud}),
+        muestra, tipo, top_n, usuario.
         """
         datos_por_nivel = datos.get("datos_por_nivel", {})
         muestra = datos.get("muestra")
@@ -3888,10 +3671,8 @@ class ExportService:
         marcador_lbl = "BACTERIA 16S" if tipo == "16S" else "HONGOS ITS"
         niveles_con_datos = [n for n in NIVELES_VALIDOS if n in datos_por_nivel]
 
-        # ================================================================
         # Portada — mismo encabezado compacto que generar_pdf_individual y
         # generar_pdf_comparativo (ver _banner_reporte).
-        # ================================================================
         contenido.append(_banner_reporte(
             f"INFORME GENERAL · TODOS LOS NIVELES TAXONÓMICOS · MARCADOR {marcador_lbl}", ancho_util, S,
         ))
@@ -3939,12 +3720,7 @@ class ExportService:
         contenido.append(t_info)
         contenido.append(Spacer(1, 18))
 
-        # ================================================================
         # Tabla comparativa: Índice de Salud por nivel
-        # ================================================================
-        # Sin PageBreak: el informe fluye continuo, sin dejar hueco en
-        # blanco al final de cada página solo para arrancar la siguiente
-        # sección — ReportLab ya pagina solo cuando el contenido no entra.
         contenido.append(_seccion_hdr("ÍNDICE DE SALUD POR NIVEL TAXONÓMICO", ancho_util, S, numero=1))
         contenido.append(Spacer(1, 10))
         resumen_rows = [[
@@ -3980,9 +3756,7 @@ class ExportService:
         contenido.append(t_resumen)
         contenido.append(Spacer(1, 18))
 
-        # ================================================================
         # Una sección por nivel: KPIs + tabla Top N
-        # ================================================================
         def _clas_badge(clas):
             if clas == 'benefico':     return Paragraph("&#9679; Benéfico",     S["body_sm"])
             if clas == 'fitopatogeno': return Paragraph("&#9679; Fitopatógeno", S["body_sm"])
@@ -4000,12 +3774,7 @@ class ExportService:
             simpson_v = float(div.get("simpson", 0.0) or 0.0)
             riqueza_v = div.get("riqueza", len(top_taxa))
 
-            # KeepTogether solo del encabezado + KPIs (bloque chico): evita
-            # que el título de la sección quede solo al pie de una página
-            # con sus tarjetas empujadas a la siguiente. La tabla de abajo
-            # NO va adentro — son hasta 25 filas, envolverla forzaría todo
-            # el bloque a la página siguiente y dejaría un hueco en blanco
-            # bajo el título, justo lo que se quiere evitar acá.
+            # Encabezado y KPIs juntos para que el título no quede solo al pie de página.
             contenido.append(KeepTogether([
                 _seccion_hdr(
                     f"NIVEL: {NIVELES_ES.get(nivel, nivel.upper()).upper()}", ancho_util, S, numero=idx + 1,
@@ -4052,9 +3821,7 @@ class ExportService:
             contenido.append(t_taxa)
 
             if idx < len(niveles_con_datos):
-                # Separador liviano en vez de PageBreak: el siguiente nivel
-                # arranca en el espacio que quede en la página actual —
-                # solo pasa a la página siguiente si de verdad no entra.
+                # Separador liviano en vez de PageBreak.
                 contenido.append(Spacer(1, 16))
                 contenido.append(HRFlowable(width="100%", thickness=0.6, color=_C_BORDER, spaceAfter=16))
 
@@ -4073,11 +3840,8 @@ class ExportService:
 
     @staticmethod
     def generar_excel_informe_general(datos) -> HttpResponse:
-        """
-        Un libro Excel con una hoja "Resumen" (los 7 niveles comparados) más
-        una hoja por cada nivel taxonómico con datos (Top N + clasificación).
-        datos keys: igual que generar_pdf_informe_general.
-        """
+        """Libro Excel con hoja "Resumen" (7 niveles) y una hoja por nivel con datos.
+        datos keys: igual que generar_pdf_informe_general."""
         datos_por_nivel = datos.get("datos_por_nivel", {})
         muestra = datos.get("muestra")
         tipo    = datos.get("tipo", "16S")
@@ -4179,7 +3943,7 @@ class ExportService:
             return fila_inicio + 3
 
         wb = Workbook()
-        ws_resumen = wb.active
+        ws_resumen = cast(Worksheet, wb.active)
         ws_resumen.title = "Resumen"
 
         fila = _escribir_encabezado_muestra(ws_resumen, 1, "INFORME GENERAL — ÍNDICE DE SALUD POR NIVEL")

@@ -32,11 +32,7 @@ def _contar_clasificaciones(tabla: List[Dict[str, Any]]) -> Dict[str, int]:
 
 
 def _aviso_profundidad(lecturas: List[int]) -> str:
-    """
-    Aviso si la profundidad de secuenciación difiere más del doble entre las
-    muestras comparadas: la riqueza observada crece con el número de lecturas,
-    así que compararla entre profundidades muy distintas es engañoso.
-    """
+    """Avisa si la profundidad de secuenciación difiere más del doble entre muestras."""
     lecturas = [n for n in lecturas if n > 0]
     if len(lecturas) < 2 or max(lecturas) / min(lecturas) <= 2:
         return ""
@@ -53,13 +49,7 @@ def _aviso_profundidad(lecturas: List[int]) -> str:
 def comparar(request):
     from analisis.forms import CompararForm
 
-    # El selector Bacterias/Hongos del menú lateral es compartido por todo el
-    # sitio y navega agregando "?tipo=16S"/"?tipo=ITS" a la URL (ver
-    # templates_base.html) — pero el formulario de esta página lee el
-    # marcador con el nombre de campo "marcador", no "tipo". Sin este ajuste,
-    # llegar aquí desde el menú lateral no reflejaba la selección: el
-    # desplegable de esta página se quedaba en su propio valor por defecto
-    # (16S) sin importar qué se hubiera elegido en el menú.
+    # El menú lateral envía ?tipo=, pero este formulario usa "marcador".
     get_params = request.GET
     if "tipo" in get_params and "marcador" not in get_params:
         get_params = get_params.copy()
@@ -102,13 +92,7 @@ def comparar(request):
 
     if request.GET and form.is_valid():
         muestras_seleccionadas = form.cleaned_data.get("muestras")
-        # marcador/nivel son ChoiceField requeridos (ver CompararForm en
-        # forms.py) — con form.is_valid() ya en True, cleaned_data siempre
-        # trae ambas claves con un valor no vacío. Se indexan con [] en vez
-        # de .get() para que el tipo sea el del campo (str) y no "Any | None":
-        # mismo valor en runtime, pero sin arrastrar un Optional falso a
-        # cada función de abajo que espera str (nivel.capitalize(),
-        # get_taxonomia_annotation(nivel), obtener_diversidad_beta_inter(...), etc.).
+        # Campos requeridos: tras is_valid() siempre tienen valor.
         marcador = form.cleaned_data["marcador"]
         nivel = form.cleaned_data["nivel"]
         try:
@@ -145,12 +129,7 @@ def comparar(request):
                     contexto["total_taxonomias"] = len(tabla)
                     contexto["top_taxonomia"] = tabla[0].get("taxonomia", "—")
 
-                    # % de taxa compartidos, SOLO dentro de los taxa mostrados en la
-                    # tabla (Top N). `compartidos` viene calculado sobre el universo
-                    # completo de taxa detectados (sin truncar), mientras que la tabla
-                    # está recortada a Top N — dividir uno entre el otro sin acotar
-                    # antes el numerador a ese mismo Top N podía dar más de 100% (el
-                    # conjunto compartido completo puede ser más grande que la tabla).
+                    # % de taxa compartidos dentro del Top N mostrado (máximo 100%).
                     taxa_en_tabla = {
                         f.get("taxonomia") for f in tabla
                         if "Otros microorganismos" not in str(f.get("taxonomia", ""))
@@ -194,9 +173,7 @@ def comparar(request):
 
                     contexto["tabla_json"] = json.dumps(tabla)
 
-                    # Diversidad alfa completa por muestra
-                    # Agrega Sum(num_hits) por taxon al nivel elegido para evitar
-                    # contar múltiples especies del mismo genus como taxa distintos
+                    # Diversidad alfa por muestra (agrupada al nivel elegido).
                     taxonomia_expr = get_taxonomia_annotation(nivel)
                     alfa_por_muestra = {}
                     shannon_por_muestra = {}
@@ -255,9 +232,7 @@ def comparar(request):
             except Exception as e:
                 messages.error(request, f"Error en el procesamiento comparativo: {str(e)}")
     elif request.GET:
-        # El formulario se envió pero no pasó validación (ej. menos de 2
-        # muestras seleccionadas) — sin esto, el usuario no recibía ningún
-        # aviso y la página simplemente volvía al estado vacío en silencio.
+        # Formulario inválido (p. ej. menos de 2 muestras): avisar al usuario.
         primer_error = next(
             (str(err) for errs in form.errors.values() for err in errs), None
         )

@@ -5,9 +5,9 @@
 {% block topbar_title %}Catálogo de Referencia Microbiana{% endblock %}
 
 {% block extra_css %}
-/* ══════════════════════════════════════════════
+/*
    CHIPS DE NIVEL TAXONÓMICO
-══════════════════════════════════════════════ */
+*/
 .nivel-chip {
     display: inline-block; font-size: 11px; font-weight: 700;
     padding: 2px 9px; border-radius: 20px;
@@ -32,9 +32,9 @@
     .nivel-phylum  { background: #500724; color: #f9a8d4; border-color: #9d174d; }
 }
 
-/* ══════════════════════════════════════════════
+/*
    BADGES DE MARCADOR MOLECULAR (sin emoji)
-══════════════════════════════════════════════ */
+*/
 .mkr-badge {
     display: inline-flex; align-items: center; gap: 5px;
     font-size: 11px; font-weight: 600; padding: 3px 9px;
@@ -47,9 +47,9 @@
     .mkr-its { background: #451a03; color: #fcd34d; border-color: #92400e; }
 }
 
-/* ══════════════════════════════════════════════
+/*
    NOMBRE CIENTÍFICO
-══════════════════════════════════════════════ */
+*/
 .taxon-name {
     font-style: italic; font-weight: 600;
     color: var(--text-primary); font-size: 13px;
@@ -57,9 +57,9 @@
     line-height: 1.45; display: block;
 }
 
-/* ══════════════════════════════════════════════
+/*
    TABLA PRINCIPAL
-══════════════════════════════════════════════ */
+*/
 #tabla-catalogo {
     table-layout: fixed;
     width: 100%;
@@ -118,9 +118,9 @@
     background: rgba(29,158,117,0.05) !important;
 }
 
-/* ══════════════════════════════════════════════
+/*
    CABECERAS ORDENABLES
-══════════════════════════════════════════════ */
+*/
 th.sortable { cursor: pointer; user-select: none; }
 th.sortable:hover { color: var(--verde, #1D9E75); }
 .sort-icon { display: inline-block; font-size: 9px; opacity: .35; margin-left: 3px; }
@@ -128,9 +128,9 @@ th.sortable:hover { color: var(--verde, #1D9E75); }
 th.sort-asc  .sort-icon::after { content: '↑'; opacity: 1; color: var(--verde,#1D9E75); }
 th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; color: var(--verde,#1D9E75); }
 
-/* ══════════════════════════════════════════════
+/*
    DESCRIPCIÓN EXPANDIBLE
-══════════════════════════════════════════════ */
+*/
 .desc-full  { display: none; }
 .desc-short { color: var(--text-secondary, #475569); font-size: 12.5px; line-height: 1.5; }
 .btn-expand {
@@ -150,9 +150,9 @@ th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; color: var(--verde,
 }
 .referencia-line i { flex-shrink: 0; margin-top: 1px; }
 
-/* ══════════════════════════════════════════════
+/*
    BÚSQUEDA RÁPIDA
-══════════════════════════════════════════════ */
+*/
 #busq-rapida {
     width: 100%; padding: 0.5rem 1rem 0.5rem 2.5rem;
     border: 1.5px solid var(--gris-border); border-radius: 8px;

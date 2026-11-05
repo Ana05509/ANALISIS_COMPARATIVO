@@ -5,20 +5,8 @@ from django.db.models.signals import pre_save
 
 
 def _ip_cliente(request):
-    # ip_address es un GenericIPAddressField -> columna "inet" en
-    # Postgres, que no acepta cualquier texto. Algunos proxys/redes
-    # (institucionales, VPN, ciertas extensiones de privacidad) meten
-    # valores no-IP en X-Forwarded-For como "unknown" o un hostname; sin
-    # validar, el INSERT entero fallaba con DataError y —desde que el
-    # create() quedó en try/except— ese evento de login/logout se perdía
-    # en silencio, sin avisar a nadie. Mejor guardar sin IP que no guardar
-    # el evento. A nivel de módulo (no dentro de AnalisisConfig.ready())
-    # para poder reusarla también desde _AdminAuthFormAuditada más abajo.
-    #
-    # La IP se toma con la misma lógica que el limitador de intentos de
-    # allauth (ALLAUTH_TRUSTED_PROXY_COUNT en settings): la PRIMERA entrada
-    # de X-Forwarded-For la escribe el propio cliente, así que antes
-    # cualquiera podía registrar en la auditoría la IP que quisiera.
+    # Devuelve la IP del cliente (según ALLAUTH_TRUSTED_PROXY_COUNT) o None si
+    # no es una IP válida, para que el registro de auditoría no falle.
     import ipaddress
     from allauth.core.internal.httpkit import get_client_ip
 
@@ -43,33 +31,8 @@ def _user_agent(request):
     return request.META.get('HTTP_USER_AGENT', '')[:255]
 
 
-# =========================================================
-# Receptores de señales — a nivel de MÓDULO, no anidados dentro de
-# AnalisisConfig.ready() (como estaban antes).
-#
-# Motivo: signal.connect() por defecto usa weak=True, que guarda una
-# referencia DÉBIL al receptor. Si el receptor es una función anidada
-# definida dentro de ready(), una vez que ready() termina de ejecutarse
-# nada más en el programa mantiene una referencia FUERTE a esa función —
-# queda a merced de cuándo el recolector de basura decida liberarla. En un
-# proceso de gunicorn de larga duración, con tráfico real, eventualmente
-# se recolecta y la señal se desconecta sola, en silencio, sin ningún
-# error — el login/logout sigue funcionando perfecto, pero deja de
-# registrarse en la auditoría. Esto es justo lo que se vio en producción:
-# la página de diagnóstico (ver EventoAccesoAdmin.diagnostico en admin.py)
-# mostró CERO receptores conectados a user_logged_out/user_login_failed
-# después de un tiempo corriendo, aunque local (procesos cortos de
-# `manage.py shell`) nunca alcanzaba a mostrar el problema.
-#
-# Es la misma causa raíz, muy probablemente, del bloque "DIAGNOSTICO
-# EMAIL" de acá abajo (correos de bienvenida que a veces no salían en
-# producción): enviar_bienvenida también estaba anidada dentro de ready().
-#
-# Al definirlas acá, el propio módulo (que Python mantiene cargado en
-# sys.modules mientras el proceso viva) es la referencia fuerte permanente
-# — no dependen de recolección de basura para seguir vivas. Además se
-# pasa weak=False explícito en cada connect() como cinturón de seguridad.
-# =========================================================
+# Receptores de señales a nivel de módulo y con weak=False, para que el
+# recolector de basura no los desconecte en producción.
 
 def _sincronizar_dominio_site(sender, **kwargs):
     from django.conf import settings as dj_settings
@@ -87,15 +50,7 @@ def _capitalizar_nombre_y_apellido(sender, instance, **kwargs):
 
 
 def _enviar_bienvenida(sender, request, user, **kwargs):
-    # user_signed_up.send() (allauth) no usa send_robust(): si esta
-    # función deja escapar una excepción, se propaga hasta
-    # complete_signup() y rompe el registro completo — la persona vería
-    # un error 500 en vez de quedar registrada, solo porque el correo de
-    # bienvenida falló. fail_silently=True en msg.send() de más abajo
-    # protege apenas el envío en sí (errores SMTP); todo lo anterior
-    # (armar la URL, renderizar las plantillas) queda bajo este try para
-    # que CUALQUIER falla acá sea, como pretende el nombre, silenciosa —
-    # nunca a costa de bloquear el alta.
+    # Cualquier error aquí se ignora para no romper el registro del usuario.
     try:
         from django.core.mail import EmailMultiAlternatives
         from django.template.loader import render_to_string
@@ -130,13 +85,7 @@ def _enviar_bienvenida(sender, request, user, **kwargs):
         )
 
 
-# user_logged_in/user_logged_out/user_login_failed tampoco usan
-# send_robust() — si EventoAcceso.objects.create() lanza una excepción
-# (p. ej. la tabla desincronizada con una migración, o un corte puntual
-# de conexión a la base), sin este try/except esa excepción se
-# propagaría hasta la vista de login/logout y rompería el acceso mismo
-# solo porque falló la bitácora de auditoría — el registro debe ser
-# best-effort, nunca a costa de bloquear el login.
+# La auditoría nunca debe impedir el login/logout si falla al guardar.
 def _registrar_login(sender, request, user, **kwargs):
     try:
         from .models import EventoAcceso
@@ -184,20 +133,8 @@ def _registrar_login_fallido(sender, credentials, request=None, **kwargs):
 
 
 class _AdminAuthFormAuditada:
-    """Mixin sobre AdminAuthenticationForm (se combina con ella en
-    ready(), no puede heredar de ella acá arriba: importar
-    django.contrib.admin al nivel del módulo, antes de que la app registry
-    termine de cargar, puede romper el arranque).
-
-    El caso que tapa: alguien con credenciales VÁLIDAS pero cuenta sin
-    is_staff (docente/estudiante) prueba /admin/login/. Django lo rechaza
-    en confirm_login_allowed() — pero eso pasa DESPUÉS de que authenticate()
-    ya tuvo éxito, así que user_login_failed nunca se dispara (no fueron
-    credenciales incorrectas), y como el form nunca queda válido tampoco se
-    llama a login(), así que user_logged_in tampoco. Sin este parche, ese
-    intento de entrar al panel admin sin permiso no deja NINGÚN rastro en
-    la auditoría — ideal para no detectarlo si alguien está probando
-    cuentas contra el panel de administración."""
+    """Registra en auditoría los intentos de entrar a /admin/ con una cuenta sin is_staff.
+    Se combina con AdminAuthenticationForm en ready()."""
 
     def confirm_login_allowed(self, user):
         from django.core.exceptions import ValidationError
@@ -228,12 +165,7 @@ class AnalisisConfig(AppConfig):
     verbose_name = 'BioMicro'
 
     def ready(self):
-        # ── Diagnóstico temporal: por qué no llegan los correos en producción ──
-        # Se imprime UNA vez en cada arranque de la app (incluye los que
-        # corre Railway antes de levantar el server: migrate, collectstatic,
-        # y el propio gunicorn) — no hace ninguna conexión SMTP, solo lee la
-        # configuración ya resuelta. Buscar "DIAGNOSTICO EMAIL" en los logs
-        # de Railway. Quitar este bloque una vez resuelto el problema.
+        # Diagnóstico temporal de correo: buscar "DIAGNOSTICO EMAIL" en los logs.
         try:
             from django.conf import settings as dj_settings
             import logging
@@ -258,19 +190,8 @@ class AnalisisConfig(AppConfig):
         except Exception:
             pass
 
-        # ── Sincronizar el dominio del Site con Railway automáticamente ──
-        # Mismo problema que ya resuelven ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS
-        # en settings.py: Railway puede regenerar el dominio público en
-        # cada despliegue. django-allauth arma la redirect_uri de Google
-        # OAuth a partir del dominio guardado en la tabla django_site
-        # (Site.domain), NO del dominio real de la petición — si ese
-        # registro queda desactualizado (p. ej. sigue en "127.0.0.1:8000"
-        # de una migración local), Google responde "Error 400:
-        # redirect_uri_mismatch" aunque el resto de la app funcione bien y
-        # Google Cloud Console tenga el URI correcto configurado. Se
-        # sincroniza después de cada migrate (Railway corre migrate en
-        # cada deploy); en local RAILWAY_PUBLIC_DOMAIN no existe, así que
-        # esto no hace nada (el propio receptor revisa la env var).
+        # Sincronizar el dominio del Site con Railway (lo usa Google OAuth
+        # para la redirect_uri). En local no hace nada.
         from django.db.models.signals import post_migrate
         post_migrate.connect(_sincronizar_dominio_site, sender=self, weak=False)
 
@@ -281,13 +202,7 @@ class AnalisisConfig(AppConfig):
         from allauth.account.signals import user_signed_up
         user_signed_up.connect(_enviar_bienvenida, weak=False)
 
-        # ── Auditoría: registrar login / login fallido / logout ─────────────
-        # Cubre las tres vías de entrada del sistema por igual: el LoginView
-        # propio (analisis.views.auth.CustomLoginView), y las de allauth
-        # (login social con Google, alta de cuenta) — todas pasan tarde o
-        # temprano por django.contrib.auth.login()/logout()/authenticate(),
-        # que son quienes disparan estas señales, así que no hace falta
-        # engancharse a cada vista por separado.
+        # Auditoría: registrar login / login fallido / logout
         from django.contrib.auth.signals import (
             user_logged_in, user_logged_out, user_login_failed,
         )
@@ -295,10 +210,7 @@ class AnalisisConfig(AppConfig):
         user_logged_out.connect(_registrar_logout, weak=False)
         user_login_failed.connect(_registrar_login_fallido, weak=False)
 
-        # ── Auditoría: acceso al panel /admin/ con cuenta sin permiso ───────
-        # Cubre el hueco que las tres señales de arriba no ven: alguien con
-        # contraseña correcta pero is_staff=False probando /admin/login/
-        # (docente/estudiante) — ver el docstring de _AdminAuthFormAuditada.
+        # Auditoría: acceso al panel /admin/ con cuenta sin permiso
         from django.contrib import admin as django_admin
         from django.contrib.admin.forms import AdminAuthenticationForm
 

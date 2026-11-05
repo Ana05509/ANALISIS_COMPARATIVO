@@ -7,11 +7,11 @@
      que ya carga Unfold en todo el admin (logo, menú lateral, botones) —
      no hace falta un CDN de íconos aparte. -->
 <style>
-    /* ════════════════════════════════════════
+    /*
        DASHBOARD ADMIN — BioMicro
        Fuentes: Outfit, Fraunces, DM Mono
        (cargadas desde admin_personalizado.css)
-       ════════════════════════════════════════ */
+       */
 
     .tb-dash {
         font-family: 'Outfit', sans-serif;
@@ -19,7 +19,7 @@
         color: var(--tb-text);
     }
 
-    /* ── ENCABEZADO DEL DASHBOARD ── */
+    /* ENCABEZADO DEL DASHBOARD */
     .tb-dash-header {
         display: flex;
         align-items: flex-end;
@@ -52,14 +52,7 @@
         gap: 6px;
     }
 
-    /* ── GRID DE ESTADÍSTICAS ──
-       auto-fit + minmax (no "repeat(4, 1fr)" a secas): con 1fr solo, cada
-       columna no puede achicarse más allá del contenido de la tarjeta
-       (ícono + etiqueta sin salto de línea), así que si las 4 no entraban
-       en el ancho real disponible, la grid se salía del contenedor en vez
-       de reacomodarse — se veía "cortada" a la derecha. Con minmax(0,1fr)
-       cada columna sí puede achicarse, y auto-fit decide solo cuántas
-       columnas entran (4, 2 o 1) sin necesitar adivinar breakpoints. */
+    /* GRID DE ESTADÍSTICAS (auto-fit + minmax para reacomodar 4, 2 o 1 columnas) */
     .tb-stats-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
@@ -138,7 +131,7 @@
     .card-amber   { --acento: var(--tb-amber);  --icon-bg: var(--tb-amber-light); }
     .card-morado  { --acento: var(--tb-morado); --icon-bg: var(--tb-morado-light); }
 
-    /* ── FILA: GRÁFICO + TOP CULTIVOS ── */
+    /* FILA: GRÁFICO + TOP CULTIVOS */
     .tb-row-2col {
         display: grid;
         grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -214,7 +207,7 @@
         font-size: 0.72rem;
     }
 
-    /* ── TOP CULTIVOS (equivalente a "Top Scorer") ── */
+    /* TOP CULTIVOS (equivalente a "Top Scorer") */
     .tb-top-list {
         display: flex;
         flex-direction: column;
@@ -264,7 +257,7 @@
         padding: 40px 0;
     }
 
-    /* ── BARRA DE ALMACENAMIENTO ── */
+    /* BARRA DE ALMACENAMIENTO */
     .tb-storage-card {
         background: var(--tb-surface);
         border: 1px solid var(--tb-border);
@@ -326,7 +319,7 @@
     .pct-warning { color: var(--tb-amber); }
     .pct-danger  { color: var(--tb-rojo); }
 
-    /* ── NOTIFICACIONES ── */
+    /* NOTIFICACIONES */
     .tb-notif-card {
         background: var(--tb-surface);
         border: 1px solid var(--tb-border);
@@ -384,7 +377,7 @@
         font-size: 0.85rem;
     }
 
-    /* ── RESPONSIVE ──
+    /* RESPONSIVE
        .tb-stats-grid ya se reacomoda sola (auto-fit arriba); acá solo
        queda lo que auto-fit no puede decidir por sí solo. */
     @media (max-width: 1100px) {
@@ -399,7 +392,7 @@
 {% block content %}
 <div class="tb-dash">
 
-    <!-- ── Encabezado ── -->
+    <!-- Encabezado -->
     <div class="tb-dash-header">
         <div>
             <div class="tb-dash-title">Panel de Control Microbiológico</div>
@@ -411,7 +404,7 @@
         </div>
     </div>
 
-    <!-- ── Fila 1: Tarjetas de estadísticas ── -->
+    <!-- Fila 1: Tarjetas de estadísticas -->
     <div class="tb-stats-grid">
 
         <!-- Muestras de suelo -->
@@ -462,7 +455,7 @@
 
     </div>
 
-    <!-- ── Fila 2: Distribución del catálogo + Top Cultivos ── -->
+    <!-- Fila 2: Distribución del catálogo + Top Cultivos -->
     <div class="tb-row-2col">
 
         <div class="tb-panel">
@@ -506,7 +499,7 @@
 
     </div>
 
-    <!-- ── Fila 3: Almacenamiento del servidor ── -->
+    <!-- Fila 3: Almacenamiento del servidor -->
     <div class="tb-storage-card">
         <div class="tb-storage-header">
             <div class="tb-storage-title">
@@ -535,7 +528,7 @@
         </div>
     </div>
 
-    <!-- ── Fila 4: Notificaciones ── -->
+    <!-- Fila 4: Notificaciones -->
     <div class="tb-notif-card">
         <div class="tb-notif-title">
             <span class="material-symbols-outlined">notifications_active</span>

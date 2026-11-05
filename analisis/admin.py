@@ -32,22 +32,9 @@ admin.site.site_title  = "Administración BioMicro"
 admin.site.index_title = "Panel de Control Microbiológico"
 
 
-# =========================================================
 # ACCIONES EXPLÍCITAS (Ver/Editar/Eliminar) EN LAS TABLAS
-# =========================================================
 class AccionesColumnaMixin:
-    """
-    Agrega una columna final con íconos de acción explícitos. Django ya
-    hace clickeable toda la fila hacia la edición (list_display_links),
-    pero para un administrador con poca experiencia técnica un ícono
-    visible es más intuitivo que tener que descubrir eso por su cuenta.
-
-    "Ver" y "Editar" no son dos destinos distintos acá: en este sistema
-    todos los administradores tienen permiso de edición completo, así que
-    ambos apuntarían a la misma pantalla — se muestra un solo ícono
-    (lápiz si hay permiso de edición, ojo si el modelo es de solo
-    lectura, como Auditoría) en vez de duplicar el mismo enlace dos veces.
-    """
+    """Columna final con un ícono de acción (lápiz para editar, ojo si es de solo lectura)."""
 
     def get_list_display(self, request):
         self._request_acciones = request
@@ -84,9 +71,7 @@ class AccionesColumnaMixin:
         return mark_safe(f'<span class="tb-acciones">{"".join(botones)}</span>')
 
 
-# =========================================================
 # CULTIVOS
-# =========================================================
 @admin.register(Cultivo)
 class CultivoAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, ModelAdmin):
     list_display  = ("id", "nombre", "descripcion", "acciones")
@@ -114,9 +99,7 @@ class CultivoAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, ModelAdmin):
             messages.success(request, f"¡Éxito! Cultivo '{obj.nombre}' registrado. Ahora puede crear sus variedades o clones.")
 
 
-# =========================================================
 # VARIEDADES / CLONES
-# =========================================================
 @admin.register(VariedadClon)
 class VariedadClonAdmin(AccionesColumnaMixin, ModelAdmin):
     list_display  = ("id", "nombre", "cultivo", "acciones")
@@ -133,15 +116,9 @@ class VariedadClonAdmin(AccionesColumnaMixin, ModelAdmin):
     )
 
 
-# =========================================================
 # MUESTRAS DE SUELO (FORMULARIO CON PLACEHOLDERS)
-# =========================================================
 class VariedadClonSelect(forms.Select):
-    """
-    <select> de variedad/clon donde cada <option> lleva data-cultivo="<id>".
-    admin/js/filtro_cultivos.js usa ese atributo para mostrar solo las
-    variedades del cultivo elegido, sin necesidad de una petición AJAX.
-    """
+    """<select> de variedad/clon con data-cultivo="<id>" en cada opción (lo usa filtro_cultivos.js)."""
     @property
     def _cultivo_por_variedad(self):
         # Se consulta al primer uso (durante el render del form), nunca al
@@ -234,9 +211,7 @@ class MuestraSueloAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, ModelAdmin):
             messages.success(request, f"¡Registro exitoso! Muestra '{obj.codigo}' indexada.")
 
 
-# =========================================================
 # LÓGICA DE ARCHIVOS MOLECULARES
-# =========================================================
 def _leer_archivo_molecular(archivo_field):
     archivo_field.seek(0)
     nombre = archivo_field.name.lower()
@@ -289,9 +264,7 @@ class ArchivoMolecularAdmin(AccionesColumnaMixin, ModelAdmin):
     )
 
     def get_queryset(self, request):
-        # Antes total_resultados() hacía un COUNT(*) aparte por cada fila
-        # de la tabla (N+1: hasta list_per_page consultas extra por página
-        # solo para esta columna) — se anota acá en una sola consulta.
+        # Conteo anotado en una sola consulta (evita N+1).
         return super().get_queryset(request).annotate(_total_resultados=Count("resultados_taxonomicos"))
 
     @admin.display(description="Resultados procesados", ordering="_total_resultados")
@@ -334,9 +307,7 @@ class ArchivoMolecularAdmin(AccionesColumnaMixin, ModelAdmin):
             messages.error(request, f"Error inesperado: {e}")
 
 
-# =========================================================
 # RESULTADOS TAXONÓMICOS
-# =========================================================
 @admin.register(ResultadoTaxonomico)
 class ResultadoTaxonomicoAdmin(AccionesColumnaMixin, ModelAdmin):
     list_display  = ("id", "archivo", "genus", "species", "num_hits", "porcentaje_hits", "acciones")
@@ -352,9 +323,7 @@ class ResultadoTaxonomicoAdmin(AccionesColumnaMixin, ModelAdmin):
     )
 
 
-# =========================================================
 # FORMULARIO DE IMPORTACIÓN MASIVA PARA EL ADMIN
-# =========================================================
 class CatalogoImportAdminForm(forms.Form):
     archivo = forms.FileField(
         label="Archivo CSV / Excel",
@@ -366,9 +335,7 @@ class CatalogoImportAdminForm(forms.Form):
     )
 
 
-# =========================================================
 # CATÁLOGO MICROORGANISMOS
-# =========================================================
 @admin.register(CatalogoMicroorganismo)
 class CatalogoMicroorganismoAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, ModelAdmin):
     change_list_template = "admin/analisis/catalogomicroorganismo/change_list.html"
@@ -406,11 +373,7 @@ class CatalogoMicroorganismoAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, Mode
         return custom + urls
 
     def exportar_view(self, request, formato):
-        """
-        Descarga en Excel o CSV lo que muestra el listado del admin: usa el
-        mismo queryset del ChangeList, así respeta la búsqueda y los filtros
-        activos («Filters»), sin paginar.
-        """
+        """Exporta a Excel o CSV el listado con la búsqueda y los filtros activos."""
         from django.core.exceptions import PermissionDenied
         from django.http import Http404, HttpResponse
         from django.utils import timezone
@@ -511,9 +474,7 @@ class CatalogoMicroorganismoAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, Mode
         return format_html('<span title="{}">{}…</span>', obj.descripcion, obj.descripcion[:80])
 
 
-# =========================================================
 # FORMULARIOS PARA LA CREACIÓN DE USUARIO
-# =========================================================
 class CustomUserCreationForm(UserCreationForm):
     class Meta:
         model = Usuario
@@ -525,9 +486,7 @@ class CustomUserChangeForm(UserChangeForm):
         fields = "__all__"
 
 
-# =========================================================
 # USUARIOS
-# =========================================================
 @admin.register(Usuario)
 class UsuarioAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, BaseUserAdmin, ModelAdmin):
     form = CustomUserChangeForm
@@ -572,17 +531,7 @@ class UsuarioAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, BaseUserAdmin, Mode
         return fieldsets
 
     def save_model(self, request, obj, form, change):
-        # Sincronizar is_staff con el rol de BioMicro para que el acceso
-        # al panel /admin/ quede consistente con el rol asignado — pero sin
-        # pisar is_superuser de una cuenta que YA es superusuario real
-        # cuando su rol no es (todavía) 'admin'. Usuario.rol tiene
-        # default='estudiante' (ver models.py) y `createsuperuser` no lo
-        # toca: el superusuario de arranque de un entorno nuevo nace con
-        # rol='estudiante' hasta que alguien lo corrija a mano. Antes, con
-        # esta lógica sin la guarda de is_superuser, el simple hecho de
-        # guardar esa cuenta una vez desde este admin (para cualquier
-        # cambio, no solo el rol) le quitaba is_staff/is_superuser y la
-        # dejaba sin acceso al propio panel que necesitaba para arreglarlo.
+        # Sincroniza is_staff con el rol, sin quitar permisos a un superusuario real.
         if obj.rol == "admin":
             obj.is_staff = True
             obj.is_superuser = True
@@ -601,9 +550,7 @@ class UsuarioAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, BaseUserAdmin, Mode
             )
 
 
-# =========================================================
 # CALLBACK DEL DASHBOARD
-# =========================================================
 STORAGE_WARNING_PCT = 70
 STORAGE_DANGER_PCT = 85
 
@@ -657,7 +604,7 @@ def dashboard_callback(request, context):
         "sin_procesar": sin_procesar,
     }
 
-    # ── Gráfico: distribución del catálogo por rol funcional ──
+    # Gráfico: distribución del catálogo por rol funcional
     conteos_cat = {
         row["clasificacion"]: row["total"]
         for row in CatalogoMicroorganismo.objects.values("clasificacion").annotate(total=Count("id"))
@@ -665,7 +612,7 @@ def dashboard_callback(request, context):
     fig_catalogo, context["catalogo_legend"] = _figura_catalogo_distribucion(conteos_cat)
     context["chart_catalogo_json"] = json.dumps(fig_catalogo, default=str)
 
-    # ── Top 3 cultivos con más muestras registradas ──
+    # Top 3 cultivos con más muestras registradas
     colores_rango = ["#1D9E75", "#0F6E56", "#BA7517"]
     top_cultivos_qs = Cultivo.objects.annotate(
         total_muestras=Count("muestras")
@@ -735,9 +682,7 @@ def dashboard_callback(request, context):
     return context
 
 
-# =========================================================
 # AUDITORÍA — Datos compartidos entre el dashboard y las exportaciones
-# =========================================================
 def _calcular_auditoria(qs):
     """A partir del queryset ya filtrado por el changelist, arma las
     estadísticas + las dos series de datos (eventos por día, fallidos por
@@ -775,17 +720,8 @@ def _calcular_auditoria(qs):
     return stats, por_dia, fallidos_por_usuario
 
 
-# =========================================================
-# AUDITORÍA — Gráficos (funciones libres para poder probarlas solas)
-# =========================================================
-# Paleta de estado (no categórica arbitraria): verde=éxito, rojo=crítico,
-# gris=neutral — las mismas tres que ya usan tipo_badge/KPIs/Excel/PDF, así
-# que se validan como escala de estado fija (WCAG por color, no CVD/chroma
-# de paleta categórica: swapping el orden SÍ cambiaría el significado).
-# El rojo y el gris de modo claro no alcanzan 3:1 sobre una tarjeta oscura
-# (2.46:1 y 2.68:1 medidos con el validador de la skill dataviz), así que
-# el modo oscuro usa variantes más claras de la misma familia — el verde
-# no necesitó ajuste (ya da 5.14:1 en ambos fondos).
+# AUDITORÍA — Gráficos
+# Colores de estado: verde=éxito, rojo=crítico, gris=neutral (variantes claras en modo oscuro).
 _AUD_COLOR = {
     "light": {"login_ok": "#1D9E75", "login_fallido": "#A32D2D", "logout": "#5F5E5A",
               "bg": "#ffffff", "grid": "#EEF0EC", "text": "#5F5E5A", "line": "#ffffff",
@@ -842,14 +778,8 @@ def _figura_fallidos_por_usuario(filas):
 
 
 def _figura_catalogo_distribucion(conteos):
-    """conteos: {'benefico': N, 'fitopatogeno': N, ...} -> (dict de figura Plotly, leyenda HTML).
-
-    La leyenda nativa de Plotly (horizontal) no envuelve a varias líneas
-    cuando las 4 etiquetas no entran en una sola fila: se superponen en vez
-    de acomodarse. Por eso el gráfico se dibuja sin leyenda (showlegend=False)
-    y la leyenda se arma aparte como datos simples para un `flex-wrap` en
-    HTML/CSS, que sí envuelve correctamente sin importar el ancho.
-    """
+    """conteos: {'benefico': N, 'fitopatogeno': N, ...} -> (figura Plotly, leyenda HTML).
+    La leyenda se arma aparte en HTML para que se acomode en varias líneas."""
     import plotly.graph_objects as go
 
     etiquetas = {
@@ -894,18 +824,10 @@ def _figura_catalogo_distribucion(conteos):
     return fig.to_dict(), leyenda
 
 
-# =========================================================
 # AUDITORÍA — Eventos de Acceso (login / logout / fallidos)
-# =========================================================
 @admin.register(EventoAcceso)
 class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
-    """
-    Bitácora de solo lectura. No se puede crear, editar ni borrar desde el
-    admin: los registros de auditoría solo tienen valor si son inmutables —
-    si cualquiera con sesión abierta pudiera editarlos o borrarlos, dejarían
-    de servir como evidencia ante un incidente. Se llenan solos vía señales
-    (ver AnalisisConfig.ready() en apps.py).
-    """
+    """Bitácora de accesos de solo lectura (se llena con señales, ver apps.py)."""
     list_display   = ("tipo_badge", "usuario_o_intento", "ip_address", "dispositivo", "fecha_relativa", "acciones")
     list_filter    = ("tipo", "usuario", "fecha")
     search_fields  = ("usuario__username", "usuario__email", "username_intentado", "ip_address")
@@ -914,14 +836,10 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
     list_per_page  = 30
     list_fullwidth = True
 
-    # Inyecta las tarjetas de estadísticas + gráficos justo antes de la
-    # tabla — gancho nativo de Unfold, no requiere sobrescribir todo el
-    # template del changelist (ver ChangeListView/get_urls más abajo).
+    # Tarjetas de estadísticas y gráficos antes de la tabla.
     list_before_template = "admin/analisis/eventoacceso/dashboard_stats.html"
 
-    # Vista de detalle: de solo lectura (has_change_permission=False ya lo
-    # fuerza), pero con fieldsets propios para que se lea bien en vez de
-    # mostrar los campos en el orden crudo del modelo.
+    # Vista de detalle de solo lectura.
     readonly_fields = (
         "tipo", "usuario", "username_intentado", "ip_address",
         "user_agent", "navegador", "sistema_operativo", "fecha",
@@ -933,11 +851,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
     )
 
     def get_queryset(self, request):
-        # usuario_o_intento() accede a obj.usuario.username en cada fila —
-        # sin select_related eso es una consulta aparte por fila, tanto en
-        # el listado en pantalla (30/página) como en exportar_pdf() más
-        # abajo, que puede recorrer hasta 3000 filas. LogEntryAdmin (más
-        # abajo en este mismo archivo) ya usa este mismo patrón.
+        # select_related para evitar una consulta por fila.
         return super().get_queryset(request).select_related("usuario")
 
     def has_add_permission(self, request):
@@ -949,7 +863,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-    # ── URLs propias: exportación ──────────────────────────────────────
+    # URLs propias: exportación
     def get_urls(self):
         urls = super().get_urls()
         propias = [
@@ -962,16 +876,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         ]
         return propias + urls
 
-    # ── Diagnóstico: por qué en producción no aparecen logins recientes ──
-    # Página de una sola vista, sin filtros/orden/paginación de por medio
-    # (fuente de confusión en varias vueltas de este mismo problema) — dice
-    # con hechos crudos del PROCESO que está respondiendo esta petición:
-    # 1) si la señal user_logged_in está realmente conectada a
-    #    registrar_login en este worker (si ready() falló en silencio en
-    #    producción, acá no aparecería y sería la causa),
-    # 2) el total y las últimas filas reales de EventoAcceso comparadas
-    #    contra la hora del propio servidor,
-    # 3) a qué host de Postgres está conectado realmente.
+    # Diagnóstico: estado de las señales, últimos eventos y host de la base de datos.
     def diagnostico(self, request):
         from django.http import HttpResponse
         from django.utils import timezone
@@ -983,10 +888,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         def _listar_receivers(signal):
             out = []
             for entry in signal.receivers:
-                # (lookup_key, receiver) en Django clásico, o
-                # (lookup_key, receiver, is_async) desde que Django soporta
-                # señales async — desempacar por posición, no por cantidad,
-                # para no depender de la versión exacta.
+                # Se desempaca por posición para soportar distintas versiones de Django.
                 receiver = entry[1]
                 try:
                     r = receiver() if isinstance(receiver, weakref.ReferenceType) else receiver
@@ -1036,7 +938,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
 
         return HttpResponse("\n".join(lineas).encode("utf-8"), content_type="text/plain; charset=utf-8")
 
-    # ── Dashboard: estadísticas + datos de gráficos ─────────────────────
+    # Dashboard: estadísticas + datos de gráficos
     def changelist_view(self, request, extra_context=None):
         response = super().changelist_view(request, extra_context=extra_context)
         try:
@@ -1046,11 +948,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
 
         import json
 
-        # El gráfico "Eventos por día (últimos 14 días)" se sacó del
-        # dashboard en pantalla (confuso: dejaba pensar que solo existían
-        # eventos de las últimas dos semanas) — por_dia ya no se usa acá,
-        # pero _calcular_auditoria() lo sigue devolviendo porque
-        # exportar_excel() sí arma ese gráfico en la hoja de Excel.
+        # por_dia solo se usa en la exportación a Excel.
         stats, _por_dia, fallidos_por_usuario = _calcular_auditoria(qs)
         response.context_data["auditoria_stats"] = stats
         response.context_data["grafico_fallidos_json"] = json.dumps(
@@ -1058,10 +956,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         )
         return response
 
-    # ── Exportación ──────────────────────────────────────────────────
-    # Paleta institucional (misma que dashboard_stats.html y admin_personalizado.css
-    # --tb-*, y el motor de reportes de export_service.py) para que ambos
-    # archivos se vean como parte del mismo sistema, no como algo aparte.
+    # Exportación (paleta institucional)
     _KPI_ESTILO = (
         # clave,               etiqueta,             bg claro,  texto oscuro
         ("total",             "Total de eventos",    "E3F2FD", "0D3E8C"),
@@ -1100,11 +995,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
 
         wb = Workbook()
 
-        # ── Hoja 1: Resumen ──────────────────────────────────────────
-        # Workbook.active está tipado Worksheet | None en los stubs de
-        # openpyxl (una hoja de cálculo podría técnicamente no tener
-        # ninguna) pero un Workbook() recién creado siempre trae una hoja
-        # activa por defecto — el cast no cambia nada en runtime.
+        # Hoja 1: Resumen
         ws = cast(Worksheet, wb.active)
         ws.title = "Resumen"
         ws.sheet_view.showGridLines = False
@@ -1146,7 +1037,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         for col in "ABCDEFGH":
             ws.column_dimensions[col].width = 13
 
-        # ── Serie: eventos por día (últimos 14 días) + gráfico nativo ──
+        # Serie: eventos por día (últimos 14 días) + gráfico nativo
         fila = 8
         ws.cell(row=fila, column=1, value="Eventos por día (últimos 14 días)").font = Font(bold=True, size=12, color=CV_OSC)
         fila += 1
@@ -1189,7 +1080,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
             ws.cell(row=cab_dia + 1, column=1, value="Sin eventos en los últimos 14 días.").font = Font(italic=True, color="888888")
             fila_fin_dia = cab_dia + 1
 
-        # ── Serie: top 10 fallidos por usuario + gráfico nativo ─────────
+        # Serie: top 10 fallidos por usuario + gráfico nativo
         fila_top = max(fila_fin_dia + 22, cab_dia + 2)
         ws.cell(row=fila_top, column=1, value="Intentos fallidos por usuario (top 10)").font = Font(bold=True, size=12, color=CV_OSC)
         fila_top += 1
@@ -1226,7 +1117,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         else:
             ws.cell(row=cab_top + 1, column=1, value="Sin intentos fallidos registrados.").font = Font(italic=True, color="888888")
 
-        # ── Hoja 2: detalle completo de eventos ─────────────────────────
+        # Hoja 2: detalle completo de eventos
         ws2 = wb.create_sheet("Eventos de Acceso")
         columnas = ["Tipo", "Usuario", "Intento", "IP", "Navegador", "Sistema operativo", "Fecha"]
         for j, txt in enumerate(columnas, start=1):
@@ -1307,7 +1198,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         ancho_util = landscape(A4)[0] - 60
         contenido = []
 
-        # ── Banner de portada (mismo lenguaje visual que el resto de reportes) ──
+        # Banner de portada (mismo lenguaje visual que el resto de reportes)
         t_banner = Table(
             [[Paragraph("<b>BioMicro — Auditoría de Accesos</b>", S["titulo"])],
              [Paragraph("Bitácora de inicios de sesión, cierres y accesos fallidos", S["subtitle"])]],
@@ -1352,16 +1243,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         cabecera = ["Tipo", "Usuario", "IP", "Navegador", "S.O.", "Fecha"]
         filas = [[Paragraph(t, S["th_dark"]) for t in cabecera]]
         for e in qs[:LIMITE]:
-            # username_intentado es texto libre escrito por quien sea que
-            # intentó loguearse (válido también para anónimos que fallan el
-            # login) — a diferencia de navegador/sistema_operativo (que
-            # _parsear_user_agent() en models.py reduce a una whitelist fija
-            # de valores como "Chrome"/"Windows"/"Otro"), esto llega tal cual
-            # se escribió. Paragraph() de reportlab SÍ interpreta markup
-            # (<font>, <a href>, hasta <img src> con fetch remoto), así que
-            # sin escapar, cualquiera podía inyectar HTML/XML en el PDF de
-            # auditoría que después abre un admin: texto oculto, enlaces de
-            # phishing embebidos o SSRF ciego vía <img src="http://...">.
+            # Se escapa el texto libre para que reportlab no lo interprete como markup.
             usuario_txt = (
                 e.usuario.username if e.usuario_id
                 else _xml_escape(e.username_intentado or "—")
@@ -1401,7 +1283,7 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         resp["Content-Disposition"] = f'attachment; filename="{nombre}"'
         return resp
 
-    # ── Columnas de la lista ─────────────────────────────────────────
+    # Columnas de la lista
     @admin.display(description="Evento")
     def tipo_badge(self, obj):
         estilos = {
@@ -1438,16 +1320,10 @@ class EventoAccesoAdmin(AccionesColumnaMixin, ModelAdmin):
         )
 
 
-# =========================================================
 # REGISTRO DE ACCIONES — Datos + gráficos compartidos (dashboard/exports)
-# =========================================================
 def _calcular_logs_stats(qs):
-    """A partir del queryset ya filtrado por el changelist: estadísticas +
-    eventos por día (14 días) + los 10 campos que más se editan + los 10
-    usuarios más activos. Los campos más editados son el dato que de verdad
-    sirve para decidir qué mejorar: si un campo aparece constantemente en
-    "cambió X", probablemente su formulario/validación de origen necesita
-    ajuste (mal defecto, difícil de acertar a la primera, etc.)."""
+    """Estadísticas del queryset filtrado: eventos por día (14 días), campos más
+    editados y usuarios más activos."""
     from datetime import timedelta
     from django.db.models import Count
     from django.db.models.functions import TruncDate
@@ -1471,9 +1347,7 @@ def _calcular_logs_stats(qs):
           .order_by("dia")
     )
 
-    # change_message es texto (Django serializa el JSON a mano ahí, no es
-    # un JSONField) — no se puede agregar en la BD, se cuenta en Python
-    # sobre el queryset ya filtrado por el changelist.
+    # change_message es texto: se cuenta en Python.
     contador = Counter()
     for msg in qs.filter(action_flag=CHANGE).values_list("change_message", flat=True):
         if not msg or not msg.startswith("["):
@@ -1488,10 +1362,7 @@ def _calcular_logs_stats(qs):
                 contador.update(campos)
     campos_top = [{"campo": c, "total": n} for c, n in contador.most_common(10)]
 
-    # A diferencia de "campos más modificados" (texto libre, hay que
-    # contarlo en Python), esto sí es una columna real (user_id) — se agrega
-    # directo en la BD. exclude(user__isnull=True): las acciones sin usuario
-    # (p. ej. un script de datos) no aportan a un ranking de "quién edita más".
+    # Usuarios más activos (se excluyen acciones sin usuario).
     usuarios_top = list(
         qs.exclude(user__isnull=True)
           .values("user__username")
@@ -1502,15 +1373,8 @@ def _calcular_logs_stats(qs):
     return stats, por_dia, campos_top, usuarios_top
 
 
-# Mismo criterio que _AUD_COLOR (auditoría de accesos): verde/azul/rojo son
-# semántica de estado (creó/editó/eliminó, igual que accion_badge más abajo),
-# no una paleta categórica arbitraria — y el rojo/azul de modo claro no
-# llegan a 3:1 sobre una tarjeta oscura, así que el modo oscuro usa
-# variantes más claras de la misma familia (medido con el validador de la
-# skill dataviz: azul 3.03→4.08, rojo 2.46→3.98; el verde no necesitó ajuste).
-# "morado" es aparte: no es un tipo de acción, es el acento neutro que ya usa
-# EventoAcceso para "usuarios activos" — mismo criterio acá para "usuarios
-# más activos" (2.54→4.06 en modo oscuro).
+# Colores de estado: verde=creó, azul=editó, rojo=eliminó, morado=usuarios activos
+# (variantes claras en modo oscuro).
 _LOG_COLOR = {
     "light": {ADDITION: "#1D9E75", CHANGE: "#1565C0", DELETION: "#A32D2D", "morado": "#6A4C93",
               "bg": "#ffffff", "grid": "#EEF0EC", "text": "#5F5E5A", "line": "#ffffff",
@@ -1641,25 +1505,11 @@ def _figura_usuarios_activos(filas):
     return figuras
 
 
-# =========================================================
 # AUDITORÍA — Registro de Acciones del Admin (LogEntry nativo)
-# =========================================================
 @admin.register(LogEntry)
 class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
-    """
-    Django genera un LogEntry cada vez que alguien crea, edita o borra algo
-    desde el admin — pero no lo registraba en el admin por defecto, así que
-    ese historial existía pero nadie podía verlo. El enlace del sidebar
-    (config/settings.py, sección UNFOLD > Auditoría > "Registro de
-    Acciones") ya apunta aquí (admin:admin_logentry_changelist).
-
-    Además de lo que el admin llena solo, las acciones hechas desde las
-    vistas propias de la app (fuera de /admin/ — subir muestra, reclasificar
-    catálogo, generar reporte, ensayos de bioquímica…) también caen aquí:
-    ver registrar_accion() en analisis/audit.py y sus llamadas en cada vista.
-
-    Igual que EventoAcceso, es de solo lectura.
-    """
+    """Registro de acciones (LogEntry) del admin y de las vistas propias
+    (ver registrar_accion() en audit.py). Solo lectura."""
     list_display  = ("accion_badge", "user", "content_type", "object_repr", "detalle_legible", "action_time_corta", "acciones")
     list_filter   = ("action_flag", "user", "content_type", "action_time")
     search_fields = ("object_repr", "change_message", "user__username")
@@ -1673,11 +1523,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
     list_before_template = "admin/admin/logentry/dashboard_stats.html"
 
     def get_queryset(self, request):
-        # list_display muestra user y content_type directamente — sin
-        # select_related eso es una consulta aparte por cada uno en cada
-        # fila del listado (30/página). exportar_excel()/exportar_pdf() ya
-        # lo hacían para su propio qs_detalle interno, pero eso no ayudaba
-        # al listado en pantalla, que arma su queryset acá.
+        # select_related para evitar consultas por fila.
         return super().get_queryset(request).select_related("user", "content_type")
 
     def has_add_permission(self, request):
@@ -1709,19 +1555,13 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
 
     @admin.display(description="Detalle")
     def detalle_legible(self, obj):
-        # change_message crudo es el JSON que arma Django internamente
-        # (p.ej. [{"changed": {"fields": ["Altitud (msnm)"]}}]) — nunca
-        # pensado para mostrarse tal cual. get_change_message() lo traduce
-        # a texto legible ("Modificado Altitud (msnm)."), ya en español
-        # porque LANGUAGE_CODE='es' usa las traducciones que Django trae
-        # incluidas; si no es JSON (los mensajes propios de registrar_accion
-        # en audit.py, que ya son texto plano) lo devuelve tal cual.
+        # Traduce el JSON de change_message a texto legible.
         try:
             return obj.get_change_message() or "—"
         except Exception:
             return obj.change_message or "—"
 
-    # ── URLs propias: exportación ──────────────────────────────────────
+    # URLs propias: exportación
     def get_urls(self):
         urls = super().get_urls()
         propias = [
@@ -1732,7 +1572,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
         ]
         return propias + urls
 
-    # ── Dashboard: estadísticas + datos de gráficos ─────────────────────
+    # Dashboard: estadísticas + datos de gráficos
     def changelist_view(self, request, extra_context=None):
         response = super().changelist_view(request, extra_context=extra_context)
         try:
@@ -1755,7 +1595,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
         )
         return response
 
-    # ── Exportación ──────────────────────────────────────────────────
+    # Exportación
     _KPI_ESTILO = (
         # clave,           etiqueta,          bg claro,  texto oscuro
         ("total",          "Total de acciones",   "EEE8F5", "4A3369"),
@@ -1794,11 +1634,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
 
         wb = Workbook()
 
-        # ── Hoja 1: Resumen ──────────────────────────────────────────
-        # Workbook.active está tipado Worksheet | None en los stubs de
-        # openpyxl (una hoja de cálculo podría técnicamente no tener
-        # ninguna) pero un Workbook() recién creado siempre trae una hoja
-        # activa por defecto — el cast no cambia nada en runtime.
+        # Hoja 1: Resumen
         ws = cast(Worksheet, wb.active)
         ws.title = "Resumen"
         ws.sheet_view.showGridLines = False
@@ -1839,7 +1675,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
         for col in "ABCDEFGH":
             ws.column_dimensions[col].width = 13
 
-        # ── Serie: acciones por día (últimos 14 días) + gráfico nativo ──
+        # Serie: acciones por día (últimos 14 días) + gráfico nativo
         fila = 8
         ws.cell(row=fila, column=1, value="Acciones por día (últimos 14 días)").font = Font(bold=True, size=12, color=CV_OSC)
         fila += 1
@@ -1882,7 +1718,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
             ws.cell(row=cab_dia + 1, column=1, value="Sin acciones en los últimos 14 días.").font = Font(italic=True, color="888888")
             fila_fin_dia = cab_dia + 1
 
-        # ── Serie: campos más modificados + gráfico nativo ──────────────
+        # Serie: campos más modificados + gráfico nativo
         fila_top = max(fila_fin_dia + 22, cab_dia + 2)
         ws.cell(row=fila_top, column=1, value="Campos más modificados (top 10)").font = Font(bold=True, size=12, color=CV_OSC)
         fila_top += 1
@@ -1919,9 +1755,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
         else:
             ws.cell(row=cab_top + 1, column=1, value="Sin ediciones registradas.").font = Font(italic=True, color="888888")
 
-        # fila_fin_top ya quedó en cab_top (+ 0 filas) si campos_top venía
-        # vacío — se calculó antes del if/else de arriba, sirve igual acá.
-        # ── Serie: usuarios más activos + gráfico nativo ─────────────────
+        # Serie: usuarios más activos + gráfico nativo
         fila_usr = max(fila_fin_top + 22, cab_top + 2)
         ws.cell(row=fila_usr, column=1, value="Usuarios más activos (top 10)").font = Font(bold=True, size=12, color=CV_OSC)
         fila_usr += 1
@@ -1958,7 +1792,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
         else:
             ws.cell(row=cab_usr + 1, column=1, value="Sin acciones con usuario registrado.").font = Font(italic=True, color="888888")
 
-        # ── Hoja 2: detalle completo de acciones ─────────────────────────
+        # Hoja 2: detalle completo de acciones
         ws2 = wb.create_sheet("Registro de Acciones")
         columnas = ["Acción", "Usuario", "Modelo", "Objeto", "Detalle", "Fecha"]
         for j, txt in enumerate(columnas, start=1):
@@ -2099,11 +1933,7 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
                 Paragraph(f'<font color="{color}"><b>{texto_accion}</b></font>', S["body_sm"]),
                 Paragraph(_xml_escape(e.user.username) if e.user_id else "—", S["body_sm"]),
                 Paragraph(_xml_escape(str(e.content_type)) if e.content_type_id else "—", S["body_sm"]),
-                # object_repr y el detalle (get_change_message) pueden llevar
-                # texto libre que alguien escribió en un formulario (p. ej. el
-                # nombre de un Cultivo) — se escapan antes de Paragraph() para
-                # que no se interprete como markup de reportlab (mismo motivo
-                # que username_intentado en EventoAccesoAdmin.exportar_pdf).
+                # Se escapa el texto libre antes de pasarlo a Paragraph().
                 Paragraph(_xml_escape(e.object_repr or "—"), S["body_sm"]),
                 Paragraph(_xml_escape(detalle), S["body_sm"]),
                 Paragraph(e.action_time.strftime("%d/%m/%Y %H:%M"), S["body_sm"]),

@@ -1,10 +1,6 @@
 /**
- * Filtra el <select> de "Variedad / clon" en el admin de Muestras de Suelo
- * para mostrar solo las variedades del cultivo elegido.
- *
- * No usa AJAX: cada <option> de #id_variedad_clon ya trae data-cultivo="<id>"
- * (ver VariedadClonSelect en analisis/admin.py), así que solo se ocultan
- * las opciones que no coinciden con el cultivo seleccionado.
+ * Muestra solo las variedades del cultivo elegido en el admin de Muestras de Suelo
+ * (usa el atributo data-cultivo de cada <option>).
  */
 (function () {
     'use strict';

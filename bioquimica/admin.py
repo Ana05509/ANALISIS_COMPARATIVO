@@ -12,9 +12,7 @@ from .models import (
 from analisis.admin import AccionesColumnaMixin
 
 
-# =========================================================
 # INLINES
-# =========================================================
 
 class RecuentoUFCInline(TabularInline):
     model = RecuentoUFC
@@ -45,9 +43,7 @@ class MicroorganismoAisladoInline(TabularInline):
     show_change_link = True
 
 
-# =========================================================
 # RECUENTO UFC (standalone para edición detallada)
-# =========================================================
 
 @admin.register(RecuentoUFC)
 class RecuentoUFCAdmin(AccionesColumnaMixin, ModelAdmin):
@@ -72,9 +68,7 @@ class RecuentoUFCAdmin(AccionesColumnaMixin, ModelAdmin):
         return obj.valor_display
 
 
-# =========================================================
 # PRUEBA BIOQUÍMICA (standalone)
-# =========================================================
 
 @admin.register(PruebaBioquimica)
 class PruebaBioquimicaAdmin(AccionesColumnaMixin, ModelAdmin):
@@ -100,9 +94,7 @@ class PruebaBioquimicaAdmin(AccionesColumnaMixin, ModelAdmin):
         )
 
 
-# =========================================================
 # MICROORGANISMO AISLADO
-# =========================================================
 
 @admin.register(MicroorganismoAislado)
 class MicroorganismoAisladoAdmin(AccionesColumnaMixin, ModelAdmin):
@@ -146,9 +138,7 @@ class MicroorganismoAisladoAdmin(AccionesColumnaMixin, ModelAdmin):
             messages.info(request, f"Microorganismo '{obj.nombre_cientifico}' registrado. Ahora puede agregar sus pruebas bioquímicas.")
 
 
-# =========================================================
 # ENSAYO MICROBIOLÓGICO (principal)
-# =========================================================
 
 @admin.register(EnsayoMicrobiologico)
 class EnsayoMicrobiologicoAdmin(AccionesColumnaMixin, ModelAdmin):
@@ -157,9 +147,7 @@ class EnsayoMicrobiologicoAdmin(AccionesColumnaMixin, ModelAdmin):
     list_display_links = ('codigo',)
     list_filter = ('tipo', 'fecha_reporte')
     search_fields = ('codigo', 'nombre_muestra', 'etiqueta')
-    # fecha_reporte puede ser None (informes CIPAL sin fecha); nulls_last=True
-    # evita que esos ensayos se cuelen al inicio del listado en PostgreSQL
-    # (ver Meta.ordering en models.py).
+    # nulls_last: los ensayos sin fecha van al final.
     ordering = (F('fecha_reporte').desc(nulls_last=True),)
     date_hierarchy = 'fecha_reporte'
     list_per_page = 20

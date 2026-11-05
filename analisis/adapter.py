@@ -111,18 +111,7 @@ class CustomAccountAdapter(DefaultAccountAdapter):
         return bool(settings.REGISTRO_DOMINIOS_PERMITIDOS)
 
     def send_mail(self, template_prefix, email, context):
-        """
-        Punto único por el que allauth manda TODOS sus correos (recuperar
-        contraseña, confirmación de email, etc.) — ver
-        DefaultAccountAdapter.send_mail(). msg.send() es una llamada SMTP
-        síncrona y bloqueante dentro del propio request; sin este try/except,
-        si el envío falla o tarda (EMAIL_TIMEOUT en settings.py acota esto a
-        10s) la excepción sube sin capturar y el usuario ve un error
-        genérico ("algo salió mal") en vez de la pantalla normal de "revisa
-        tu correo" — igual de mal si el correo sí se pudo enviar como si no,
-        ya que por seguridad esa pantalla no debe delatar si el envío
-        falló. Mismo criterio que enviar_bienvenida() en apps.py.
-        """
+        """Envía los correos de allauth sin romper la petición si el envío falla."""
         try:
             super().send_mail(template_prefix, email, context)
         except Exception:
@@ -171,12 +160,7 @@ class CustomAccountAdapter(DefaultAccountAdapter):
 
 class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
     def is_open_for_signup(self, request, sociallogin):
-        """
-        Allauth solo llama a esto cuando el inicio con Google crearía una
-        cuenta NUEVA; quien ya tiene su cuenta enlazada entra normalmente.
-        Si el correo de Google no es institucional, se vuelve al login con un
-        mensaje claro en lugar de la página genérica de "registro cerrado".
-        """
+        """Bloquea el alta con Google si el correo no es institucional."""
         from allauth.account.utils import user_email
         email = user_email(sociallogin.user) or next(
             (e.email for e in sociallogin.email_addresses), "")

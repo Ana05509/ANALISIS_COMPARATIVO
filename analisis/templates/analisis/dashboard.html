@@ -15,19 +15,19 @@
 {% endblock %}
 
 {% block extra_css %}
-/* ════════════════════════════════════════════════
+/*
    DASHBOARD — BioMicro
    Canvas network · Counters · Reveal · Live clock
-   ════════════════════════════════════════════════ */
+   */
 
-/* ─ Keyframes ─────────────────────────────────── */
+/* ─ Keyframes */
 @keyframes bfloat    { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-5px)} }
 @keyframes pulseRing { 0%{transform:scale(1);opacity:.55} 70%{transform:scale(2.4);opacity:0} 100%{transform:scale(2.4);opacity:0} }
 @keyframes chipFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
 @keyframes dotPulse  { 0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.6)} 50%{box-shadow:0 0 0 5px rgba(74,222,128,0)} }
 @keyframes fadeSlide { from{opacity:0;transform:translateY(22px)} to{opacity:1;transform:none} }
 
-/* ─ Staggered reveal ──────────────────────────── */
+/* ─ Staggered reveal */
 .dash-reveal {
     opacity: 0;
     transform: translateY(24px);
@@ -36,7 +36,7 @@
 }
 .dash-reveal.in { opacity: 1; transform: none; }
 
-/* ─ Hero ──────────────────────────────────────── */
+/* ─ Hero */
 .dash-hero {
     background: linear-gradient(140deg, #052b1f 0%, #074534 35%, #0b6347 65%, #1D9E75 100%);
     border-radius: var(--radius-lg);
@@ -145,7 +145,7 @@
     margin-top: 2px;
 }
 
-/* ─ Stats grid ────────────────────────────────── */
+/* ─ Stats grid */
 .dash-stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -153,7 +153,7 @@
     margin-bottom: .85rem;
 }
 
-/* ─ Stat card ─────────────────────────────────── */
+/* ─ Stat card */
 .ds-card {
     background: var(--surface);
     border: 1px solid var(--gris-border);
@@ -265,7 +265,7 @@
 [data-theme="dark"] .ds-azul  { --ds-bg:rgba(21,101,192,.18); }
 [data-theme="dark"] .ds-amber { --ds-bg:rgba(186,117,23,.18);  }
 
-/* ─ Section header ────────────────────────────── */
+/* ─ Section header */
 .section-hdr {
     display: flex;
     align-items: center;
@@ -285,7 +285,7 @@
 .section-hdr-title i { font-size: 16px; color: var(--verde); }
 .section-hdr-meta  { font-size: 12px; color: var(--text-hint); }
 
-/* ─ Cultivos cards ──────────────────────────────── */
+/* ─ Cultivos cards */
 .cultivos-card {
     background: var(--surface);
     border: 1px solid var(--gris-border);
@@ -342,7 +342,7 @@
     font-family: 'DM Mono', monospace; font-variant-numeric: tabular-nums;
 }
 
-/* ─ Modal de variedades por cultivo ─────────────── */
+/* ─ Modal de variedades por cultivo */
 dialog#modal-variedades {
     border: none; border-radius: 14px; padding: 1.5rem 1.75rem;
     max-width: 420px; width: calc(100% - 2rem);
@@ -380,7 +380,7 @@ dialog#modal-variedades::backdrop { background: rgba(0,0,0,0.45); }
 /* ─ Ajuste de página: sin aire de sobra en el dashboard ─ */
 .page-content { padding: .75rem 1.25rem; }
 
-/* ─ Responsive ──────────────────────────────────── */
+/* ─ Responsive */
 @media (max-width:1100px) { .dash-stats-grid { grid-template-columns:repeat(2,1fr); } }
 @media (max-width:640px)  {
     .dash-stats-grid { grid-template-columns:1fr 1fr; }
@@ -400,7 +400,7 @@ dialog#modal-variedades::backdrop { background: rgba(0,0,0,0.45); }
 
 {% block content %}
 
-{# ══ HERO ══ #}
+{# HERO #}
 <div class="dash-hero dash-reveal">
     <canvas id="hero-canvas"></canvas>
 
@@ -450,7 +450,7 @@ dialog#modal-variedades::backdrop { background: rgba(0,0,0,0.45); }
     </div>
 </div>
 
-{# ══ MÉTRICAS ══ #}
+{# MÉTRICAS #}
 <div class="dash-stats-grid">
 
     <div class="ds-card ds-verde dash-reveal" style="transition-delay:.06s">
@@ -503,7 +503,7 @@ dialog#modal-variedades::backdrop { background: rgba(0,0,0,0.45); }
 
 </div>
 
-{# ══ CULTIVOS ══ #}
+{# CULTIVOS #}
 {% if productos_por_variedad %}
 <div class="cultivos-card dash-reveal" style="transition-delay:.14s">
     <div class="section-hdr">
@@ -562,9 +562,9 @@ dialog#modal-variedades::backdrop { background: rgba(0,0,0,0.45); }
 (function () {
 'use strict';
 
-/* ════════════════════════════════════════════════
+/*
    1. LIVE CLOCK
-   ════════════════════════════════════════════════ */
+   */
 var DIAS  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 var MESES = ['enero','febrero','marzo','abril','mayo','junio',
              'julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -581,9 +581,9 @@ function tickClock(){
 tickClock();
 setInterval(tickClock, 1000);
 
-/* ════════════════════════════════════════════════
+/*
    2. HERO CANVAS — Red de nodos biológica
-   ════════════════════════════════════════════════ */
+   */
 (function initCanvas(){
     var canvas = document.getElementById('hero-canvas');
     if (!canvas) return;
@@ -671,9 +671,9 @@ setInterval(tickClock, 1000);
     init();
 })();
 
-/* ════════════════════════════════════════════════
+/*
    3. COUNTER ANIMATION (ease-out cubic)
-   ════════════════════════════════════════════════ */
+   */
 function countUp(el, target, duration){
     if(!el || isNaN(target) || target === 0){
         if(el) el.textContent = '0';
@@ -691,9 +691,9 @@ function countUp(el, target, duration){
     requestAnimationFrame(step);
 }
 
-/* ════════════════════════════════════════════════
+/*
    4. INTERSECTION OBSERVER — reveal + trigger
-   ════════════════════════════════════════════════ */
+   */
 var io = new IntersectionObserver(function(entries){
     entries.forEach(function(e){
         if(!e.isIntersecting) return;
@@ -717,9 +717,9 @@ var io = new IntersectionObserver(function(entries){
 
 document.querySelectorAll('.dash-reveal').forEach(function(el){ io.observe(el); });
 
-/* ════════════════════════════════════════════════
+/*
    6. MODAL — variedades por cultivo
-   ════════════════════════════════════════════════ */
+   */
 (function initModalVariedades(){
     var dlg = document.getElementById('modal-variedades');
     if(!dlg) return;

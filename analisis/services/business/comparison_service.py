@@ -169,4 +169,3 @@ def ejecutar_comparacion_clean(cleaned_data):
         "nivel_actual": nivel, "top_actual": top_n,
     }
 
-

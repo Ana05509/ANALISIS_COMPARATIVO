@@ -32,7 +32,7 @@ class Command(BaseCommand):
         self.stdout.write(f"  DIAGNÓSTICO  marcador={tipo}  nivel={nivel}")
         self.stdout.write(f"{'='*60}\n")
 
-        # ── 1. Estado del catálogo ──────────────────────────────────────
+        # 1. Estado del catálogo
         total_cat = CatalogoMicroorganismo.objects.count()
         cat_tipo  = CatalogoMicroorganismo.objects.filter(marcador=tipo).count()
         cat_nivel = CatalogoMicroorganismo.objects.filter(marcador=tipo, nivel__iexact=nivel).count()
@@ -68,7 +68,7 @@ class Command(BaseCommand):
         else:
             self.stdout.write(W("    (ninguna — el nivel puede no coincidir exactamente)"))
 
-        # ── 2. Datos en ResultadoTaxonomico ─────────────────────────────
+        # 2. Datos en ResultadoTaxonomico
         self.stdout.write(f"\n{S('RESULTADOS TAXONÓMICOS')}  (Top {top} por hits, tipo='{tipo}')")
         qs = ResultadoTaxonomico.objects.filter(archivo__tipo_analisis=tipo)
         total_res = qs.count()
@@ -84,7 +84,7 @@ class Command(BaseCommand):
             .order_by("-hits")[:top]
         )
 
-        # ── 3. Cruce con catálogo ───────────────────────────────────────
+        # 3. Cruce con catálogo
         # Lookup usando la misma lógica que el código de producción
         lookup_solo_marcador = {
             o.nombre.lower().strip(): o.clasificacion
@@ -127,7 +127,7 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(E(linea))
 
-        # ── 4. Resumen ──────────────────────────────────────────────────
+        # 4. Resumen
         self.stdout.write(f"\n{S('RESUMEN')}")
         self.stdout.write(f"  Top {top} taxa analizados:              {len(top_taxa)}")
         self.stdout.write(f"  Coinciden solo por marcador:           {coincidencias_marcador}")
@@ -139,7 +139,7 @@ class Command(BaseCommand):
             for n in sin_match[:10]:
                 self.stdout.write(W(f"    · {n!r}"))
 
-        # ── 5. Recomendación ────────────────────────────────────────────
+        # 5. Recomendación
         self.stdout.write(f"\n{S('RECOMENDACIÓN')}")
         if coincidencias_ambos == 0 and coincidencias_marcador > 0:
             self.stdout.write(W(

@@ -200,7 +200,7 @@
             </div>
         </div>
 
-        {# ── Panel: Recuento UFC/g ── #}
+        {# Panel: Recuento UFC/g #}
         <div class="card" id="panel-recuento" style="padding: 22px 26px; margin-bottom: 1.1rem;">
             <div class="card-title"><i class="ti ti-chart-bar"></i> Recuento UFC/g por microorganismo</div>
             <p style="color:#5F5E5A; font-size:12.5px; margin-top:2px;">
@@ -228,7 +228,7 @@
             </button>
         </div>
 
-        {# ── Panel: Aislamiento e Identificación ── #}
+        {# Panel: Aislamiento e Identificación #}
         <div class="card" id="panel-aislamiento" style="padding: 22px 26px; margin-bottom: 1.1rem; display:none;">
             <div class="card-title"><i class="ti ti-microscope"></i> Organismos Aislados</div>
 
@@ -251,15 +251,7 @@
 (function () {
 'use strict';
 
-/* ════════════════════════════════════════════════
-   Helper genérico: fila de parámetro libre (N° + nombre + valor) —
-   usado tanto por "Pruebas Bioquímicas" (aislamiento) como por
-   "Parámetros Adicionales" (recuento). `prefix` + `campoValor` arman las
-   clases CSS que renombrarTarjetas() usa después para reconstruir los
-   arrays *_numero_i[]/*_nombre_i[]/*_<campoValor>_i[] antes de enviar —
-   el nombre del tercer campo cambia entre "resultado" (aislamiento, ya
-   esperado así por _parsear_aislamiento_manual) y "valor" (recuento).
-   ════════════════════════════════════════════════ */
+/* Fila de parámetro libre (N° + nombre + valor), para pruebas bioquímicas y parámetros adicionales. */
 function agregarFilaParametro(tbody, prefix, campoValor, placeholderNombre, placeholderValor) {
     var tr = document.createElement('tr');
     tr.className = 'bq-prueba-row';
@@ -297,9 +289,9 @@ function renombrarTarjetas(cards, prefijoFijo, prefijoAnidado, campoValor) {
     });
 }
 
-/* ════════════════════════════════════════════════
+/*
    1. RECUENTO — tarjetas dinámicas
-   ════════════════════════════════════════════════ */
+   */
 var recCards = document.getElementById('rec-cards');
 var recCount = 0;
 
@@ -377,9 +369,9 @@ function agregarTarjetaRecuento(datos) {
 }
 document.getElementById('btn-add-rec').addEventListener('click', function () { agregarTarjetaRecuento(); });
 
-/* ════════════════════════════════════════════════
+/*
    2. AISLAMIENTO — organismos + pruebas dinámicas
-   ════════════════════════════════════════════════ */
+   */
 var orgCards = document.getElementById('org-cards');
 var orgCount = 0;
 
@@ -466,9 +458,9 @@ function agregarOrganismo(datos) {
 }
 document.getElementById('btn-add-org').addEventListener('click', function () { agregarOrganismo(); });
 
-/* ════════════════════════════════════════════════
+/*
    3. Mostrar panel según Tipo de Ensayo
-   ════════════════════════════════════════════════ */
+   */
 var selTipo = document.getElementById('id_tipo');
 var panelRecuento    = document.getElementById('panel-recuento');
 var panelAislamiento = document.getElementById('panel-aislamiento');
@@ -516,9 +508,9 @@ if (organismosPrevios.length) {
 // desactivar todavía.
 actualizarPanel();
 
-/* ════════════════════════════════════════════════
+/*
    4. Envío
-   ════════════════════════════════════════════════ */
+   */
 document.getElementById('form-manual').addEventListener('submit', function () {
     renombrarTarjetas(recCards.querySelectorAll('.bq-org-card'), 'rec_', 'recparam', 'valor');
     renombrarTarjetas(orgCards.querySelectorAll('.bq-org-card'), 'org_', 'prueba', 'resultado');

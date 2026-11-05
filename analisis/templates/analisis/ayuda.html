@@ -6,12 +6,7 @@
 
 {% block extra_css %}
 .ayuda-hero {
-    /* Colores fijos, no var(--verde-dark): esa variable cambia entre tema
-       claro/oscuro (queda pensada para TEXTO legible sobre cada fondo — en
-       oscuro se vuelve un verde menta claro), no para usarse como color de
-       fondo. Si se usa ahí, el degradado se ve mucho más claro/saturado en
-       modo oscuro de lo que debería. Este banner tiene que verse igual en
-       los dos temas. */
+    /* Colores fijos para que el banner se vea igual en ambos temas. */
     background: linear-gradient(135deg, #085041 0%, #1D9E75 100%);
     border-radius: var(--radius-lg, 16px);
     padding: 2rem 2.25rem;
@@ -516,7 +511,7 @@
         });
     });
 
-    // ── Glosario: orden alfabético + buscador en vivo ──────────────────
+    // Glosario: orden alfabético + buscador en vivo
     var glosario = document.querySelector('.glosario-grid');
     if (glosario) {
         var items = Array.prototype.slice.call(glosario.querySelectorAll('.glosario-item'));

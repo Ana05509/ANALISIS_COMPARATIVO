@@ -85,11 +85,9 @@ def analisis_avanzado(request):
         if diversidad:
             contexto["diversidad"] = diversidad
 
-        # Nota: diversidad beta/gamma y PERMANOVA (estadísticas inherentemente
-        # multi-muestra) viven solo en "Comparar Perfiles", que ya exige ≥2
-        # muestras para ese propósito — evita mostrar el mismo cálculo dos veces.
+        # Beta/gamma y PERMANOVA están solo en "Comparar Perfiles".
 
-        # --- GRÁFICAS AVANZADAS ---
+        # GRÁFICAS AVANZADAS
         qs = ResultadoTaxonomico.objects.filter(
             archivo__tipo_analisis=tipo,
             archivo__muestra_id__in=muestra_ids,
@@ -108,12 +106,7 @@ def analisis_avanzado(request):
                 df_raw = pd.DataFrame(data_agg)
                 df_raw = df_raw[df_raw['taxon'].notna() & (df_raw['taxon'] != '')]
 
-                # Orden "Top N" por hits acumulados (pooled), calculado ANTES de
-                # normalizar por muestra — el MISMO criterio que usa la tabla de
-                # arriba (obtener_analisis_avanzado, que ordena por Sum(num_hits)
-                # agrupado). Se pasa explícitamente a las gráficas para que
-                # muestren los mismos Top N taxa que la tabla, en vez de que cada
-                # una calcule su propio orden con un criterio distinto.
+                # Mismo orden Top N que la tabla, para que gráficas y tabla coincidan.
                 orden_taxa_pooled = (
                     df_raw.groupby('taxon')['abundancia'].sum()
                     .sort_values(ascending=False)

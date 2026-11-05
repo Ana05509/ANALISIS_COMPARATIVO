@@ -6,13 +6,7 @@
 .bq-colon-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem; }
 @media (max-width: 700px) { .bq-colon-grid { grid-template-columns: 1fr; } }
 
-/* Mismo patrón que .btn-primary (templates_base.html) pero en ámbar —
-   distingue "Ver PDF original" (documento con datos reales del laboratorio
-   y del cliente, ver conversación sobre nombres de laboratorio) del resto
-   de las acciones, que son verdes. --amber no cambia entre tema claro/
-   oscuro (a diferencia de --amber-dark), así que el relleno se ve igual en
-   los dos — el tono de hover es fijo, mismo criterio que .btn-primary:hover
-   usa --teal en vez de una variable de tema. */
+/* Botón ámbar para "Ver PDF original". */
 .btn-amber { background: var(--amber); color: #fff; border-color: var(--amber); }
 .btn-amber:hover { background: #965d0f; border-color: #965d0f; box-shadow: 0 2px 8px rgba(186,117,23,0.28); }
 {% endblock %}
@@ -40,7 +34,7 @@
 
 {% block content %}
 
-{# ── Cabecera del ensayo ── #}
+{# Cabecera del ensayo #}
 <div class="card" style="margin-bottom:1.25rem;">
     <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
         <div>
@@ -386,7 +380,7 @@
 
 {% endif %}
 
-{# ── Observaciones ── #}
+{# Observaciones #}
 {% if ensayo.observaciones %}
 <div class="card card-sm" style="background:var(--gris-light);">
     <strong style="font-size:13px; color:var(--text-muted);">Observaciones:</strong>

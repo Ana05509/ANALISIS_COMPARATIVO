@@ -52,9 +52,7 @@ class VariedadClon(models.Model):
         return f"{self.cultivo.nombre} - {self.nombre}"
 
 
-# ---------------------------------
 # Muestras de Suelo y Datos Asociados
-# ---------------------------------
 
 class MuestraSuelo(models.Model):
     codigo = models.CharField(max_length=100, unique=True, verbose_name="Código de la Muestra",
@@ -80,14 +78,7 @@ class MuestraSuelo(models.Model):
         verbose_name_plural = "Muestras de Suelo"
 
     def save(self, *args, **kwargs):
-        # Normaliza a mayúsculas sin importar el origen (subir_datos,
-        # admin, shell) — antes convivían códigos como "Amazonico_16S" y
-        # "AMAZONICO_16S" como si fueran muestras distintas (unique=True es
-        # case-sensitive en PostgreSQL), lo que podía duplicar una misma
-        # muestra según cómo la tipeara cada quien. upload_service.py
-        # normaliza además ANTES del lookup de "¿ya existe?" (ver ahí) para
-        # que una re-carga con distinta may/minúscula actualice la muestra
-        # existente en vez de crear una duplicada.
+        # Código siempre en mayúsculas para evitar muestras duplicadas.
         if self.codigo:
             self.codigo = self.codigo.strip().upper()
         super().save(*args, **kwargs)
@@ -208,9 +199,7 @@ class CatalogoMicroorganismo(models.Model):
     def __str__(self):
         return f"{self.nombre} [{self.get_clasificacion_display()}] - {self.get_marcador_display()}"
 
-# ---------------------------------
 # Modelo de Usuario Personalizado
-# ---------------------------------
 
 class Usuario(AbstractUser):
     ROLES = (
@@ -249,17 +238,10 @@ class Usuario(AbstractUser):
         return f"{self.username} ({rol_display})"
 
 
-# ---------------------------------
 # Auditoría — Eventos de Acceso
-# ---------------------------------
 
 def _parsear_user_agent(ua):
-    """
-    Identifica navegador y sistema operativo a partir del User-Agent.
-    Parser propio y liviano (sin dependencia externa) para los casos más
-    comunes — no pretende cubrir cada variante existente, solo lo suficiente
-    para que la bitácora de auditoría sea legible para una persona.
-    """
+    """Identifica navegador y sistema operativo a partir del User-Agent (parser simple)."""
     if not ua:
         return "Desconocido", "Desconocido"
 
@@ -295,17 +277,8 @@ def _parsear_user_agent(ua):
 
 
 class EventoAcceso(models.Model):
-    """
-    Bitácora de autenticación: quién entró, quién intentó entrar y falló,
-    y quién salió — con IP y user-agent. Se completa sola vía señales de
-    Django/allauth (ver Usuario.apps.AnalisisConfig.ready()), nunca a mano.
-
-    Es intencionalmente de solo lectura desde el admin (ver EventoAccesoAdmin):
-    un registro de auditoría que se puede editar o borrar deja de servir como
-    evidencia — si alguna vez hace falta purgar historial viejo, debe ser por
-    un comando de gestión con su propio registro, no por el botón "eliminar"
-    de cualquier admin con sesión abierta.
-    """
+    """Bitácora de autenticación (login, intentos fallidos, logout) con IP y user-agent.
+    Se llena con señales y es de solo lectura en el admin."""
     TIPOS = (
         ("login_ok", "Inicio de sesión exitoso"),
         ("login_fallido", "Intento de inicio de sesión fallido"),

@@ -1,15 +1,7 @@
 """
 Parser de reportes PDF de laboratorios de microbiología agrícola.
-
-Soporta dos formatos:
-  - MAg-XXX: tablas UFC/g por tipo de microorganismo (Recuento), o
-    pruebas bioquímicas + taxonomía (Aislamiento e Identificación).
-  - CIPAL (Nº de muestra tipo "088-107"): tabla "Reporte de Poblaciones" de
-    un "Diagnóstico Microbiológico" (Bacterias/Hongos/Actinomicetes +
-    grupos funcionales) o "Diagnóstico Micorrízico" (Colonización/Densidad
-    de endófito, o Esporas viables). Cada fila (m1, m2, t1…) se guarda como
-    un Recuento tipo "Otro/Mixto" con sus columnas como Parámetros
-    Adicionales — mismo mecanismo que usa el ingreso manual para este caso.
+Formatos: MAg-XXX (recuento UFC/g o aislamiento) y CIPAL (filas "Otro/Mixto"
+con sus columnas como Parámetros Adicionales).
 """
 import re
 import unicodedata
@@ -18,7 +10,7 @@ from decimal import Decimal
 import pdfplumber
 
 
-# ─── Patrones de extracción ───────────────────────────────────────────────────
+# Patrones de extracción
 
 _UFC_CIENTIFICO = re.compile(r'(\d+(?:[.,]\d+)?)\s*[xX×]\s*10\s*(\d+)', re.IGNORECASE)
 _UFC_SIMPLE     = re.compile(r'(\d+(?:[.,]\d+)?)\s*UFC', re.IGNORECASE)
@@ -48,7 +40,7 @@ _CIPAL_MICORRIZA_MARCA = re.compile(r'DIAGN[OÓ]STICO\s+MICORR[IÍ]ZICO', re.IGN
 _CIPAL_CODIGO          = re.compile(r'\b(\d{2,4}-\d{2,4})\b')
 
 
-# ─── Utilidades ──────────────────────────────────────────────────────────────
+# Utilidades
 
 def _celda(c) -> str:
     return (c or '').strip().replace('\n', ' ')
@@ -80,7 +72,7 @@ def _parsear_ufc(texto: str):
     return None, None, False
 
 
-# ─── Cabecera ────────────────────────────────────────────────────────────────
+# Cabecera
 
 def _extraer_header(pdf) -> dict:
     texto = '\n'.join(p.extract_text() or '' for p in pdf.pages[:2])
@@ -128,7 +120,7 @@ def _extraer_header(pdf) -> dict:
     return h
 
 
-# ─── Tipo de reporte ─────────────────────────────────────────────────────────
+# Tipo de reporte
 
 def _detectar_tipo(pdf) -> str:
     texto = pdf.pages[0].extract_text() or ''
@@ -139,7 +131,7 @@ def _detectar_tipo(pdf) -> str:
     return 'recuento'
 
 
-# ─── Parser de Recuento (MAg-225) ────────────────────────────────────────────
+# Parser de Recuento (MAg-225)
 
 def _parsear_recuento(pdf) -> list:
     resultados = []
@@ -180,12 +172,7 @@ def _parsear_recuento(pdf) -> list:
 
                 coef, exp, menor = _parsear_ufc(ufc_str)
 
-                # Fila de encabezado/sección sin UFC real (p. ej. "TOTAL HONGOS"
-                # u otra variante no cubierta por la lista de nombres exactos de
-                # arriba): una fila de datos genuina siempre trae un valor
-                # numérico o "<1"; si no se pudo parsear ninguno, no es un
-                # microorganismo real y se descarta en vez de guardarse como
-                # una barra fantasma sin valor.
+                # Fila sin valor UFC (encabezado o sección): se descarta.
                 if coef is None and not menor:
                     continue
 
@@ -202,7 +189,7 @@ def _parsear_recuento(pdf) -> list:
     return resultados
 
 
-# ─── Parser de Aislamiento (MAg-226) ─────────────────────────────────────────
+# Parser de Aislamiento (MAg-226)
 
 def _parsear_aislamiento(pdf) -> list:
     organismos = []
@@ -270,20 +257,9 @@ def _parsear_aislamiento(pdf) -> list:
     return organismos
 
 
-# ─── Parser CIPAL (Diagnóstico Microbiológico / Micorrízico) ────────────────
-#
-# Reportes "Nº de muestra: 088-107" del laboratorio de microbiología de CIPAL
-# (ANCUPA): no traen un organismo puntual por fila como el MAg-XXX de arriba,
-# sino una fila por muestra (m1, m2…, t1, t2…) con varias columnas de
-# resultado a la vez. Cada fila se guarda como un Recuento tipo "Otro/Mixto"
-# y sus columnas van como Parámetros Adicionales — el mismo mecanismo que ya
-# usa el ingreso manual para este caso (ver RecuentoUFC/ParametroRecuento en
-# models.py). Se reconocen tres variantes de la tabla "Reporte de
-# Poblaciones", según qué columnas trae:
-#   - Microbiológico de suelo: Bacterias/Hongos/Actinomicetes + grupos
-#     funcionales (Solubilizadores de P, Celulolíticos, Fijadores de N).
-#   - Micorrízico (colonización): Colonización (%) y Densidad de endófito.
-#   - Micorrízico (esporas): Esporas viables, Morfoespecies, Observaciones.
+# Parser CIPAL (Diagnóstico Microbiológico / Micorrízico)
+# Una fila por muestra (m1, t1…) guardada como Recuento "Otro/Mixto".
+# Variantes: microbiológico de suelo, micorrízico (colonización) y micorrízico (esporas).
 
 _CIPAL_KEYWORDS_MICRO = {
     'BACTERIA':      'Bacterias',
@@ -308,9 +284,7 @@ _MESES_ES = {
     'JULIO': 7, 'AGOSTO': 8, 'SEPTIEMBRE': 9, 'SETIEMBRE': 9, 'OCTUBRE': 10,
     'NOVIEMBRE': 11, 'DICIEMBRE': 12,
 }
-# "30-Agosto-2012", "9-Septiembre-2012", "28-Octubre-2011" (a veces sin
-# separador entre el mes y el año, ej. "28-Octubre2011", por eso los `\s*-?\s*`
-# quedan opcionales en vez de exigir un separador fijo).
+# Fechas tipo "30-Agosto-2012" (el separador antes del año es opcional).
 _FECHA_ES_CIPAL  = re.compile(
     r'(\d{1,2})\s*-?\s*(?:de\s+)?([A-Za-zÁÉÍÓÚáéíóúñÑ]+)\s*-?\s*(?:de\s+)?(\d{4})'
 )
@@ -322,11 +296,7 @@ _CIPAL_DECIMAL          = re.compile(r'^-?\d+(?:[.,]\d+)?$')
 
 
 def _quitar_etiqueta(texto: str) -> str:
-    """De una celda tipo "Fecha: 30-Agosto-2012" (etiqueta y valor pegados,
-    como vienen en la tabla de cabecera de los reportes "Microbiológico")
-    devuelve solo "30-Agosto-2012". Si la celda no tiene etiqueta (caso de
-    los reportes "Micorrízico", donde la tabla de cabecera trae la fila de
-    etiquetas y la fila de valores por separado) la deja intacta."""
+    """De "Fecha: 30-Agosto-2012" devuelve "30-Agosto-2012"; sin etiqueta la deja igual."""
     return _CIPAL_ETIQUETA_PREFIJO.sub('', texto, count=1).strip()
 
 
@@ -354,12 +324,7 @@ def _extraer_fecha_cipal(texto):
 
 
 def _valor_columna_cipal(tabla, idx_fila, idx_col):
-    """Valor de la celda [idx_fila][idx_col] de la tabla de cabecera CIPAL.
-    Cubre las dos variantes vistas: "Etiqueta:\\nValor" en una sola fila
-    (reportes Microbiológico), o etiquetas y valores en filas separadas
-    (reportes Micorrízico) — en ese segundo caso, si la celda de la fila de
-    la etiqueta no trae valor pegado, se toma la misma columna de la fila
-    siguiente."""
+    """Valor de la celda de cabecera CIPAL; si está vacía, toma la misma columna de la fila siguiente."""
     if idx_col is None or idx_fila >= len(tabla):
         return ''
     fila = tabla[idx_fila]
@@ -420,22 +385,15 @@ def _extraer_header_cipal(pdf, texto_p0=None) -> dict:
 
 
 def _mapear_columnas(celdas_norm, keywords):
-    """Empareja cada columna de un encabezado de tabla con su nombre bonito
-    según `keywords` (ej. {'BACTERIA': 'Bacterias'}). Retorna
-    (columnas_id, mapeo) — columnas_id son los índices previos a la primera
-    columna reconocida (código/identificación de la muestra) — o None si
-    ninguna palabra clave apareció en esta fila."""
+    """Empareja las columnas del encabezado con `keywords`.
+    Retorna (columnas_id, mapeo) o None si no hay coincidencias."""
     mapeo = {}
     for idx, celda in enumerate(celdas_norm):
         for kw, bonito in keywords.items():
             if kw in celda:
                 mapeo[idx] = bonito
                 break
-    # Se exigen al menos 2 columnas reconocidas: una sola coincidencia no
-    # alcanza para llamarla encabezado de la tabla de resultados — la celda
-    # "Tipo de Análisis: Colonización en raíces" de la tabla de cabecera
-    # (portada) también contiene la palabra "Colonización" y produciría un
-    # falso positivo de una sola columna si se aceptara.
+    # Se exigen al menos 2 columnas reconocidas para evitar falsos positivos.
     if len(mapeo) < 2:
         return None
     return list(range(min(mapeo))), mapeo
@@ -459,12 +417,8 @@ def _formatear_valor_cipal(texto):
 
 
 def _parsear_tabla_cipal(pdf, keywords) -> list:
-    """Busca la tabla "Reporte de Poblaciones" cuyo encabezado matchea
-    `keywords` y arma una fila RecuentoUFC (tipo_organismo='otro') por cada
-    fila de datos, con sus columnas como ParametroRecuento. El mapeo de
-    columnas, una vez encontrado, se reutiliza para las tablas siguientes —
-    los reportes de 40 muestras parten la tabla en dos páginas y la
-    continuación (m39/m40, t39/t40…) no repite el encabezado."""
+    """Arma un RecuentoUFC 'otro' por fila de la tabla "Reporte de Poblaciones".
+    El mapeo de columnas se reutiliza en las tablas que continúan en otra página."""
     resultados = []
     orden = 0
     columnas_id = None
@@ -508,9 +462,7 @@ def _parsear_tabla_cipal(pdf, keywords) -> list:
                     parametros.append({'numero': num, 'nombre': nombre_param, 'valor': valor_fmt})
                     num += 1
 
-                # Fila sin ningún valor numérico real (encabezado repetido,
-                # fila de unidades "UFC / gss", fila en blanco de relleno):
-                # se descarta en vez de guardarse como una muestra fantasma.
+                # Fila sin valores numéricos: se descarta.
                 if not tiene_valor:
                     continue
 
@@ -557,15 +509,8 @@ def _parsear_cipal(pdf, texto_p0=None) -> dict:
             "(se esperaban columnas de Bacterias/Hongos, Colonización/Densidad, o Esporas)."
         )
 
-    # El mismo rango de muestra (ej. "088-107") se reutiliza entre el
-    # reporte microbiológico y el micorrízico de un mismo envío — el sufijo
-    # por tipo evita que choquen contra el código único de EnsayoMicrobiologico.
-    #
-    # Si el PDF no trae fecha en el campo "Fecha:" (pasa en varios reportes
-    # CIPAL — no es un fallo del parser, el campo está vacío en el propio
-    # documento), `fecha_recepcion` queda en None acá: _guardar_ensayo en
-    # views.py es quien decide qué hacer con eso (dejar el campo sin fecha
-    # y anotarlo en Observaciones, en vez de inventar una fecha).
+    # Sufijo por tipo para que el código no choque entre reportes del mismo envío.
+    # Si el PDF no trae fecha, queda en None (lo resuelve _guardar_ensayo).
     header = {
         'codigo':          f"{codigo_base}-{sufijo}",
         'nombre_muestra':  nombre_reporte,
@@ -577,29 +522,18 @@ def _parsear_cipal(pdf, texto_p0=None) -> dict:
     return {'tipo': 'recuento', 'header': header, 'datos': datos, 'formato': 'cipal'}
 
 
-# ─── API pública ─────────────────────────────────────────────────────────────
+# API pública
 
 def parsear_pdf(archivo) -> dict:
     """
     Parsea un PDF de reporte de laboratorio.
-    Retorna:
-      {
-        'tipo':   'recuento' | 'aislamiento',
-        'header': {codigo, nombre_muestra, etiqueta, fechas, temp, humedad},
-        'datos':  [lista de recuentos u organismos aislados],
-        'formato': 'cipal' | 'mag',
-      }
-    'formato' es la marca que _guardar_ensayo (views.py) usa para poner
-    EnsayoMicrobiologico.es_cipal — no confundir con 'tipo': un reporte
-    CIPAL siempre es 'tipo'='recuento' por dentro (ver _parsear_cipal), pero
-    no es un recuento UFC/g "de verdad" tipo MAg-XXX.
+    Retorna: {'tipo': 'recuento' | 'aislamiento', 'header': {...},
+              'datos': [...], 'formato': 'cipal' | 'mag'}
     """
     with pdfplumber.open(archivo) as pdf:
         texto_p1 = pdf.pages[0].extract_text() or ''
         if _CIPAL_MICRO_MARCA.search(texto_p1) or _CIPAL_MICORRIZA_MARCA.search(texto_p1):
-            # Se reutiliza el texto de la página 0 ya extraído arriba —
-            # _extraer_header_cipal necesita ese mismo texto para el nombre
-            # del cliente y, como respaldo, el código de muestra.
+            # Se reutiliza el texto de la página 0.
             return _parsear_cipal(pdf, texto_p0=texto_p1)
 
         tipo   = _detectar_tipo(pdf)

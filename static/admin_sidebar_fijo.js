@@ -1,10 +1,5 @@
 /**
- * Sidebar del admin siempre fijo y visible — pero SOLO en escritorio
- * (>=1024px, mismo umbral que el @media de admin_personalizado.css que
- * fuerza el sidebar visible desde ese ancho). Por debajo de eso, Unfold
- * lo maneja como cajón móvil (oculto + botón de hamburguesa) — este
- * script no debe tocarlo, o queda permanentemente abierto tapando todo
- * el contenido en un celular, sin ninguna forma de cerrarlo.
+ * Sidebar del admin siempre fijo y visible, solo en escritorio (>=1024px).
  * Se carga en <head> antes de Alpine.js.
  */
 (function () {
@@ -13,13 +8,7 @@
         return window.innerWidth >= 1024;
     }
 
-    /* ── 1. Bloquear cierre desde localStorage — solo aplica en escritorio.
-       Alpine usa una clave aparte (sidebarMobileOpen) para el cajón móvil,
-       pero interceptar setItem de forma incondicional igual competía con
-       cualquier lógica que dependiera de sidebarDesktopOpen en pantallas
-       chicas — se re-evalúa el ancho en cada llamada, no solo una vez al
-       cargar el script, para que responda bien si alguien rota una
-       tablet o cambia el tamaño de la ventana. ── */
+    /* 1. Bloquear el cierre desde localStorage (solo en escritorio). */
     if (esEscritorio()) {
         localStorage.setItem('sidebarDesktopOpen', '1');
     }
@@ -32,20 +21,10 @@
         }
     };
 
-    /* sidebarWidth: Unfold usa 288px por defecto, y ese ancho es el que le
-       quita espacio real a las tablas en TODOS los listados del admin — con
-       columnas ya angostas, esos 288px eran la diferencia entre que la tabla
-       entrara sin scroll horizontal o no, especialmente en laptops. Se fija
-       en 220px (el mínimo que Unfold permite, ver nav_sidebar.html) en cada
-       carga de página; los ítems del menú ya truncan con "…" así que un
-       sidebar angosto no corta ni superpone nada. Quien lo necesite más
-       ancho puede seguir arrastrando el borde derecho del sidebar — vuelve
-       a 220px en la siguiente página, no queda "roto" para el resto.
-       Esto no afecta el cajón móvil (que no usa este ancho), así que se
-       deja sin condicionar. */
+    /* Ancho del sidebar fijado en 220px (mínimo de Unfold) en cada carga. */
     localStorage.setItem('sidebarWidth', '220');
 
-    /* ── 2. Aplicar estilos al sidebar (inline > !important de Tailwind) ──
+    /* 2. Aplicar estilos al sidebar (inline > !important de Tailwind)
        Solo en escritorio: es la parte que lo vuelve "siempre visible", así
        que en móvil directamente no se ejecuta y Alpine queda a cargo. */
     function fixSidebar() {
@@ -65,7 +44,7 @@
         /* Sidebar real */
         var sidebar = document.getElementById('nav-sidebar');
 
-        /* ── Alpine wrapper → sticky en el flex row ── */
+        /* Alpine wrapper → sticky en el flex row */
         var aw = alpineWrap.style;
         aw.setProperty('position',    'sticky',       'important');
         aw.setProperty('top',         '0',            'important');
@@ -73,13 +52,13 @@
         aw.setProperty('alignSelf',   'flex-start',   'important');
         aw.setProperty('flexShrink',  '0',            'important');
 
-        /* ── Ghost wrapper → siempre visible y relativo ── */
+        /* Ghost wrapper → siempre visible y relativo */
         var gw = ghostWrap.style;
         gw.setProperty('display',   'block',    'important');
         gw.setProperty('position',  'relative', 'important');
         gw.setProperty('height',    '100dvh',   'important');
 
-        /* ── Sidebar → relativo, altura fija ── */
+        /* Sidebar → relativo, altura fija */
         /* NO se toca overflow: Unfold ya gestiona el scroll interno del nav.
            Poner overflow-y:auto aquí crea un bloque de clipping que recorta
            el dropdown del usuario (menú pie de sidebar). */
@@ -92,7 +71,7 @@
             sw.setProperty('height',   '100dvh',   'important');
         }
 
-        /* ── Encabezado del sidebar (logo + nombre) → sticky interno ── */
+        /* Encabezado del sidebar (logo + nombre) → sticky interno */
         var inner = document.getElementById('nav-sidebar-inner');
         if (inner) {
             inner.style.setProperty('minHeight', '0', 'important');
@@ -106,7 +85,7 @@
             }
         }
 
-        /* ── Botón dock_to_right (toggle) → ocultarlo en escritorio ── */
+        /* Botón dock_to_right (toggle) → ocultarlo en escritorio */
         document.querySelectorAll('body *').forEach(function (el) {
             var attr = el.getAttribute('x-on:click') || '';
             if (attr.indexOf('sidebarDesktopOpen') !== -1) {
@@ -120,10 +99,7 @@
         });
     }
 
-    /* Deshace los estilos forzados si la ventana cruza a móvil (p. ej. se
-       gira una tablet, o se achica la ventana) — sin esto, alguien que
-       abre el panel en escritorio y después achica la ventana se queda
-       con el sidebar trabado en el estado de escritorio. */
+    /* Deshace los estilos forzados al pasar a tamaño móvil. */
     function restaurarEnMovil() {
         var page = document.getElementById('page');
         if (!page || !page.firstElementChild || !page.firstElementChild.firstElementChild) return;
@@ -145,7 +121,7 @@
 
     var estabaEnEscritorio = esEscritorio();
 
-    /* ── 3. Ejecutar al cargar el DOM ── */
+    /* 3. Ejecutar al cargar el DOM */
     document.addEventListener('DOMContentLoaded', function () {
         fixSidebar();
 

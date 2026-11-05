@@ -11,9 +11,9 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" integrity="sha384-XAeMOW3g/ahgKWjRcH7Xp+LVEQ/hkKrV0zkAUTnFwlaWK1aXfd9vVufdwqr/836i" crossorigin="anonymous">
 
     <style>
-        /* ══════════════════════════════════════════════════
+        /*
            PALETA — Verdes de planta, texto negro, alto contraste
-           ══════════════════════════════════════════════════ */
+           */
         :root {
             /* Mismo verde de marca BioMicro que el resto del admin (la
                escala OKLCH declarada como UNFOLD["COLORS"]["primary"] en
@@ -67,7 +67,7 @@
             padding: 1rem;
         }
 
-        /* ── VIDEO + OVERLAY ILUMINADO ── */
+        /* VIDEO + OVERLAY ILUMINADO */
         .bg-wrap {
             position: fixed;
             inset: 0;
@@ -86,7 +86,7 @@
             background: var(--overlay);
         }
 
-        /* ── TARJETA PRINCIPAL ── */
+        /* TARJETA PRINCIPAL */
         .login-card {
             position: relative;
             z-index: 1;
@@ -107,10 +107,10 @@
             to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* ══════════════════════════════════════════
+        /*
            PANEL IZQUIERDO — Branding (verde planta)
            Texto BLANCO sobre verde oscuro = alto contraste
-           ══════════════════════════════════════════ */
+           */
         .brand-panel {
             /* Naturaleza: prado soleado → hoja madura → sombra de bosque */
             background: linear-gradient(155deg, #5EA83A 0%, #3D8228 50%, #235218 100%);
@@ -237,10 +237,10 @@
             50%       { opacity: 0.4; transform: scale(0.72); }
         }
 
-        /* ══════════════════════════════════════════
+        /*
            PANEL DERECHO — Formulario
            FONDO MUY CLARO, texto NEGRO puro
-           ══════════════════════════════════════════ */
+           */
         .form-panel {
             background: var(--panel-fondo);
             padding: 1.8rem 2.4rem;
@@ -267,7 +267,7 @@
             font-weight: 500;
         }
 
-        /* ── BANNER DE ERROR — rojo oscuro, texto negro ── */
+        /* BANNER DE ERROR — rojo oscuro, texto negro */
         .error-banner {
             display: flex;
             align-items: flex-start;
@@ -288,7 +288,7 @@
         .errorlist { display: none !important; }
         .errornote  { display: none !important; }
 
-        /* ── ETIQUETAS Y CAMPOS ── */
+        /* ETIQUETAS Y CAMPOS */
         .field-group { margin-bottom: 0.85rem; }
 
         .field-label {
@@ -375,7 +375,7 @@
             outline-offset: 2px;
         }
 
-        /* ── BOTÓN INGRESAR ── */
+        /* BOTÓN INGRESAR */
         .btn-login {
             width: 100%;
             padding: 0.85rem;
@@ -422,7 +422,7 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ── LINK VOLVER ── */
+        /* LINK VOLVER */
         .back-link {
             display: flex;
             align-items: center;
@@ -443,9 +443,9 @@
             outline-offset: 2px;
         }
 
-        /* ══════════════════════════════════════════
+        /*
            RESPONSIVE
-           ══════════════════════════════════════════ */
+           */
         /* 900px (no 740px): a los ~723px de ancho útil que le quedan a la
            tarjeta en un iPad vertical (768px), 2 columnas dejaban cada panel
            en ~360px — muy justo para el texto. Con este umbral, tablets en
@@ -484,7 +484,7 @@
 
     <main class="login-card" role="main">
 
-        <!-- ══ Panel izquierdo: identidad del sistema ══ -->
+        <!-- Panel izquierdo: identidad del sistema -->
         <div class="brand-panel" aria-hidden="true">
             <div class="brand-top">
                 <div class="brand-icon-wrap">
@@ -523,7 +523,7 @@
             </div>
         </div>
 
-        <!-- ══ Panel derecho: formulario de acceso ══ -->
+        <!-- Panel derecho: formulario de acceso -->
         <div class="form-panel">
             <div class="form-header">
                 <h1 class="form-title">Consola de Administración</h1>

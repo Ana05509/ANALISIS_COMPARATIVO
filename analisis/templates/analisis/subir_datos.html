@@ -117,7 +117,7 @@
                 {{ form.tipo }}
             </div>
 
-            <!-- ─── Zona de arrastre ─────────────────────────────────── -->
+            <!-- Zona de arrastre -->
             <div class="form-group">
                 <label class="form-label">Archivo de resultados</label>
 
@@ -144,7 +144,7 @@
                 </div>
             </div>
 
-            <!-- ─── Barra de progreso ────────────────────────────────── -->
+            <!-- Barra de progreso -->
             <div id="progress-section" style="display:none;" aria-live="polite" aria-label="Estado de carga">
                 <div class="progress-header">
                     <span id="progress-label" class="progress-label">Subiendo archivo…</span>
@@ -233,7 +233,7 @@
 </div>
 
 <style>
-/* ── Drop zone ───────────────────────────────────────────── */
+/* Drop zone */
 .drop-zone {
     border: 2px dashed var(--gris-border, #d1d5db);
     border-radius: var(--radius, 8px);
@@ -294,7 +294,7 @@
     letter-spacing: .3px;
 }
 
-/* ── File preview ────────────────────────────────────────── */
+/* File preview */
 .file-preview {
     display: flex;
     align-items: center;
@@ -346,7 +346,7 @@
     background: var(--rojo-light);
 }
 
-/* ── Barra de progreso ───────────────────────────────────── */
+/* Barra de progreso */
 .progress-header {
     display: flex;
     justify-content: space-between;
@@ -398,7 +398,7 @@
 }
 .progress-pct.pct-error { color: var(--rojo, #ef4444); }
 
-/* ── Tarjeta lateral de estado ───────────────────────────── */
+/* Tarjeta lateral de estado */
 .status-card {
     display: flex;
     align-items: center;
@@ -432,7 +432,7 @@
 
 <script>
 (function () {
-    /* ── Referencias DOM ─────────────────────────────────── */
+    /* Referencias DOM */
     const form        = document.getElementById('upload-form');
     const dropZone    = document.getElementById('drop-zone');
     const fileInput   = document.getElementById('archivo-input');
@@ -458,7 +458,7 @@
     const dzIcon  = document.getElementById('dz-icon');
     const dzTitle = document.getElementById('dz-title');
 
-    /* ── Utilidades ──────────────────────────────────────── */
+    /* Utilidades */
     const ALLOWED_EXT = ['csv', 'tsv', 'xlsx', 'xls'];
     const MAX_BYTES   = 10 * 1024 * 1024;
 
@@ -488,7 +488,7 @@
         statusDetail.textContent = detail;
     }
 
-    /* ── Selección / validación de archivo ───────────────── */
+    /* Selección / validación de archivo */
     function applyFile(file) {
         if (!file) return;
 
@@ -632,7 +632,7 @@
         submitBtn.disabled = true;
     }
 
-    /* ── Eventos de drag & drop ──────────────────────────── */
+    /* Eventos de drag & drop */
     let dragCounter = 0;  // evita falsos dragleave al pasar sobre hijos
 
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt =>
@@ -685,7 +685,7 @@
         resetDropZone();
     });
 
-    /* ── Envío con XHR y progreso en tiempo real ─────────── */
+    /* Envío con XHR y progreso en tiempo real */
     let processingTimer = null;
 
     function enviarFormulario(forzarSobrescritura) {
@@ -776,7 +776,7 @@
         enviarFormulario(false);
     });
 
-    /* ── Carga de variedades vía AJAX ────────────────────── */
+    /* Carga de variedades vía AJAX */
     document.getElementById('cultivo').addEventListener('change', function () {
         var cultivoId = this.value;
         var variedadSelect = document.getElementById('variedad_clon');
@@ -803,7 +803,7 @@
             });
     });
 
-    /* ── Toggle cultivo manual / lista ───────────────────── */
+    /* Toggle cultivo manual / lista */
     document.getElementById('toggleCultivoBtn').addEventListener('click', function () {
         var selCultivo = document.getElementById('cultivo');
         var inpCultivo = document.getElementById('cultivo_manual');
@@ -833,7 +833,7 @@
         }
     });
 
-    /* ── Toggle variedad manual / lista ──────────────────── */
+    /* Toggle variedad manual / lista */
     document.getElementById('toggleVariedadBtn').addEventListener('click', function () {
         var selVariedad = document.getElementById('variedad_clon');
         var inpVariedad = document.getElementById('variedad_manual');

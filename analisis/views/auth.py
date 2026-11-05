@@ -8,16 +8,8 @@ from analisis import seguridad
 
 class CustomLoginView(LoginView):
     """
-    Vista de login personalizada usando el template en templates/registration/login.html
-
-    Usa el LoginView nativo de Django (no el de allauth) para conservar
-    nuestro template/formulario propios. Eso significa que la protección
-    contra fuerza bruta que allauth trae de fábrica (ACCOUNT_RATE_LIMITS)
-    NO se aplica aquí automáticamente, así que se reutiliza manualmente
-    el mismo limitador que ya usa allauth internamente (por IP) y, encima,
-    el bloqueo por cuenta de analisis.seguridad: 3 intentos fallidos con un
-    mismo correo bloquean el acceso 15 minutos, también con la contraseña
-    correcta, y el usuario ve cuántos intentos le quedan.
+    Login propio con el LoginView de Django. Aplica el limitador por IP de allauth
+    y el bloqueo por cuenta de analisis.seguridad (3 intentos → 15 minutos).
     """
     template_name = 'account/login.html'
 

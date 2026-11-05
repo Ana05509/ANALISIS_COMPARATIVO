@@ -64,11 +64,7 @@
         color: var(--tb-hint); font-size: 13px; text-align: center; padding: 40px 0;
     }
 
-    /* Unfold pone la clase "dark" en <html> (Alpine, sin recarga) — estos
-       tokens --tb-* solo están definidos para modo claro en
-       admin_personalizado.css, así que sin esto las tarjetas se quedan
-       blancas sobre el fondo oscuro. Los gráficos Plotly se resuelven
-       aparte en el <script> de abajo (SVG, no CSS). */
+    /* Tokens --tb-* para modo oscuro (Unfold agrega la clase "dark" en <html>). */
     .dark .aud-stat-card,
     .dark .aud-chart-card {
         background: #1a1a19; border-color: #333330;

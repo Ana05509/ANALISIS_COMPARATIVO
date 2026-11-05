@@ -32,9 +32,7 @@ def subir_datos(request):
         form = SubirDatosForm(request.POST, request.FILES)
         upload_error = None
 
-        # Cuando el cultivo se ingresa a mano el dropdown queda vacío;
-        # desactivamos su validación para que el form no lo rechace.
-        # procesar_upload maneja cultivo_manual directamente en el servicio.
+        # Con cultivo manual, el dropdown no es obligatorio.
         if cultivo_manual:
             form.fields['cultivo'].required = False
 
@@ -60,11 +58,7 @@ def subir_datos(request):
                 if form.is_valid():
                     form.cleaned_data['variedad_clon'] = variedad
                 else:
-                    # form.data está tipado como el genérico _DataT de
-                    # BaseForm (Pylance no sabe que en runtime es un
-                    # QueryDict mutable tras .copy()) — el cast no cambia
-                    # nada en runtime, solo le dice al chequeador de tipos
-                    # qué es realmente este objeto.
+                    # cast solo para el chequeador de tipos.
                     datos_mutables = cast(QueryDict, form.data.copy())
                     datos_mutables['variedad_clon'] = variedad.id
                     form.data = datos_mutables

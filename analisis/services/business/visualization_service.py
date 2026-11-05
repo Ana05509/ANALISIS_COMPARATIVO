@@ -17,15 +17,8 @@ class VisualizationService:
     def obtener_paquete_graficos_avanzados(df_pivote: pd.DataFrame, columnas_muestras: List[str], nivel: str, top_n: int = 10,
                                             orden_taxa: Optional[List[str]] = None) -> Dict[str, Any]:
         """
-        Coordinador analítico: Procesa el DataFrame de abundancias microbianas según el Top N elegido.
-        Retorna un diccionario estructurado con objetos JSON (dict) listos para el frontend.
-
-        `orden_taxa`: lista opcional de nombres de taxón, ya ordenada de mayor a
-        menor abundancia con el MISMO criterio que la tabla "Top N" de la misma
-        página (hits acumulados/pooled). Si se pasa, las gráficas usan ese orden
-        para elegir el Top N en vez de calcular uno propio por promedio de
-        porcentajes — así la tabla y las gráficas siempre muestran los mismos
-        taxa. Si no se pasa, se conserva el criterio de promedio (compatibilidad).
+        Procesa el DataFrame de abundancias según el Top N y devuelve los gráficos en JSON.
+        orden_taxa: orden opcional de taxa (el mismo de la tabla Top N).
         """
         paquete_graficos: Dict[str, Any] = {}
         
@@ -60,9 +53,7 @@ class VisualizationService:
             df_analisis = df_analisis.sort_values(by='__promedio_abundancia', ascending=False)
         df_ordenado = df_analisis
 
-        # -----------------------------------------------------------------
         # 1. GRÁFICO DE BARRAS APILADAS AL 100%
-        # -----------------------------------------------------------------
         try:
             df_top = df_ordenado.head(top_n).copy()
             df_resto = df_ordenado.iloc[top_n:]
@@ -106,9 +97,7 @@ class VisualizationService:
                 template="plotly_white",
             )
             fig_barras.update_traces(
-                # El % de cada segmento se ve al pasar el cursor, no como texto
-                # fijo sobre la barra — con varias muestras, cada taxón tiene un
-                # valor distinto por muestra y no cabe legible ahí.
+                # El % de cada segmento se ve en el hover.
                 hovertemplate=(
                     "<b>%{fullData.name}</b><br>"
                     "Muestra: %{x}<br>"
@@ -140,9 +129,7 @@ class VisualizationService:
         except Exception as e:
             paquete_graficos["error_barras"] = f"Error en barras apiladas: {str(e)}"
 
-        # -----------------------------------------------------------------
         # 2. MAPA DE CALOR INTERACTIVO
-        # -----------------------------------------------------------------
         try:
             df_datos_mapa = df_ordenado.head(top_n)
             
@@ -173,9 +160,7 @@ class VisualizationService:
         except Exception as e:
             paquete_graficos["error_heatmap"] = f"Error en mapa de calor: {str(e)}"
 
-        # -----------------------------------------------------------------
         # 3. ANÁLISIS DE COORDENADAS PRINCIPALES – PCoA (Bray-Curtis)
-        # -----------------------------------------------------------------
         try:
             n_muestras = len(columnas_muestras)
             if n_muestras >= 3:

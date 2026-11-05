@@ -9,11 +9,7 @@ from analisis.audit import registrar_accion
 from django.contrib.admin.models import ADDITION, CHANGE
 
 def _filtrar_catalogo(params):
-    """
-    Aplica los filtros de la página del catálogo (búsqueda, marcador,
-    clasificación, nivel). Compartido por el listado y la exportación para
-    que el archivo descargado contenga exactamente lo que se ve en pantalla.
-    """
+    """Filtros del catálogo; compartidos por el listado y la exportación."""
     filtros = {
         'busqueda':             params.get('busqueda', '').strip(),
         'filtro_marcador':      params.get('filtro_marcador', ''),
@@ -93,11 +89,7 @@ def catalogo_microorganismos(request):
 
 @login_required
 def actualizar_clasificacion(request, pk):
-    """
-    Vista para reescribir o corregir manualmente un rol en el catálogo.
-    Solo staff: reclasificar afecta el catálogo compartido que usan todos
-    los análisis y reportes del sistema, no solo la muestra que se ve.
-    """
+    """Reclasificación manual de un rol del catálogo (solo staff)."""
     if not request.user.is_staff:
         messages.error(request, "No tiene permisos para realizar esta acción.")
         return redirect('analisis:catalogo')
@@ -139,12 +131,7 @@ def importar_catalogo(request):
                 )
                 resumen = f"{creados} creados, {actualizados} actualizados"
                 if creados or actualizados:
-                    # Importación masiva: no hay un único microorganismo al
-                    # que atribuirle el registro (LogEntry exige un objeto
-                    # puntual), así que se registra un resumen con object_id=0
-                    # como ancla — no apunta a una fila real del catálogo,
-                    # solo dice "qué modelo" para agruparlo bajo Catálogo de
-                    # Microorganismos en el listado de auditoría.
+                    # Importación masiva: se registra un resumen con object_id=0.
                     from django.contrib.admin.models import LogEntry
                     from django.contrib.contenttypes.models import ContentType
                     LogEntry.objects.create(

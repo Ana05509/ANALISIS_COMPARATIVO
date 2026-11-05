@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" integrity="sha384-XAeMOW3g/ahgKWjRcH7Xp+LVEQ/hkKrV0zkAUTnFwlaWK1aXfd9vVufdwqr/836i" crossorigin="anonymous">
     <style>
-        /* ── Variables ─────────────────── */
+        /* Variables */
         :root {
             --p:       #4a7c64;
             --p-vivid: #38a878;
@@ -26,7 +26,7 @@
             --ease:    cubic-bezier(.4, 0, .2, 1);
         }
 
-        /* ── Keyframes ─────────────────── */
+        /* Keyframes */
         @keyframes slideUp   { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn    { from { opacity: 0; } to { opacity: 1; } }
         @keyframes shake     { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
@@ -39,7 +39,7 @@
         @keyframes scanLine  { from { width: 0; } to { width: 100%; } }
         @keyframes spin      { to { transform: rotate(360deg); } }
 
-        /* ── Reset ─────────────────────── */
+        /* Reset */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { overflow-x: hidden; }
         body {
@@ -51,10 +51,10 @@
             overflow-x: hidden;
         }
 
-        /* ── Layout ─────────────────────── */
+        /* Layout */
         .auth-split { display: flex; width: 100%; min-height: 100vh; }
 
-        /* ─── Panel Izquierdo ─── */
+        /* Panel Izquierdo */
         .auth-panel-l {
             flex: 1.2;
             position: relative;
@@ -145,7 +145,7 @@
         .auth-feat:hover { background: rgba(255,255,255,.22); transform: translateX(6px); }
         .auth-feat i { color: #b2d8c5; font-size: 20px; flex-shrink: 0; }
 
-        /* ─── Panel Derecho ─── */
+        /* Panel Derecho */
         .auth-panel-r {
             flex: 1; display: flex;
             flex-direction: column;
@@ -170,7 +170,7 @@
             animation: blobPulse 10s ease-in-out infinite;
         }
 
-        /* ─── Tarjeta ─── */
+        /* Tarjeta */
         .auth-card {
             position: relative; z-index: 1;
             background: var(--surface);
@@ -182,7 +182,7 @@
             animation: slideUp .5s var(--ease) both;
         }
 
-        /* ─── Cabecera de tarjeta ─── */
+        /* Cabecera de tarjeta */
         .auth-card-head { margin-bottom: 1.75rem; }
         .auth-card-title {
             font-size: 27px; font-weight: 700;
@@ -191,7 +191,7 @@
         .auth-card-title span { color: var(--p-vivid); }
         .auth-card-sub { color: var(--muted); font-size: 14.5px; line-height: 1.5; }
 
-        /* ─── Ícono decorativo ─── */
+        /* Ícono decorativo */
         .auth-icon {
             display: inline-flex; align-items: center; justify-content: center;
             width: 72px; height: 72px; border-radius: 20px; margin-bottom: 1.5rem;
@@ -202,7 +202,7 @@
         .auth-icon.is-error   { background: #fff5f5; border-color: #fca5a5; color: var(--error); }
         .auth-icon.is-success { background: rgba(22,163,74,.08); border-color: rgba(22,163,74,.3); color: #16a34a; }
 
-        /* ─── Banner de error ─── */
+        /* Banner de error */
         .auth-error-banner {
             display: flex; align-items: center; gap: 10px;
             background: #fff5f5; border: 1px solid #fca5a5;
@@ -213,7 +213,7 @@
         }
         .auth-error-banner i { font-size: 18px; flex-shrink: 0; }
 
-        /* ─── Campo con etiqueta flotante ─── */
+        /* Campo con etiqueta flotante */
         .auth-field-group { margin-bottom: 1.4rem; }
 
         .auth-field-wrap {
@@ -281,7 +281,7 @@
             color: var(--error);
         }
 
-        /* ─── Botón ojo ─── */
+        /* Botón ojo */
         .auth-eye {
             position: absolute; right: 10px; top: 50%;
             transform: translateY(-50%);
@@ -293,7 +293,7 @@
         .auth-eye:hover { color: var(--p-vivid); background: var(--p-glow2); }
         .auth-eye i { font-size: 18px; }
 
-        /* ─── Botón primario ─── */
+        /* Botón primario */
         .auth-btn {
             width: 100%; padding: 15px; margin-top: .25rem;
             background: linear-gradient(135deg, var(--p) 0%, var(--p-vivid) 100%);
@@ -321,7 +321,7 @@
             box-shadow: 0 4px 14px rgba(220,38,38,.35);
         }
 
-        /* ─── Enlace "olvidé contraseña" ─── */
+        /* Enlace "olvidé contraseña" */
         .auth-forgot {
             font-size: 12.5px; font-weight: 600; color: var(--p);
             text-decoration: none; position: relative; transition: color .2s;
@@ -334,7 +334,7 @@
         .auth-forgot:hover { color: var(--p-vivid); }
         .auth-forgot:hover::after { width: 100%; }
 
-        /* ─── Divisor ─── */
+        /* Divisor */
         .auth-divider {
             display: flex; align-items: center; gap: 14px;
             margin: 1.6rem 0; color: #b0bcb7;
@@ -344,7 +344,7 @@
             content: ''; flex: 1; height: 1px; background: var(--border);
         }
 
-        /* ─── Footer de tarjeta ─── */
+        /* Footer de tarjeta */
         .auth-foot {
             margin-top: 1.75rem;
             text-align: center; font-size: 14px; color: var(--muted);
@@ -367,7 +367,7 @@
         }
         .auth-link:hover { color: var(--p); }
 
-        /* ─── Spinner ─── */
+        /* Spinner */
         .auth-spinner {
             display: inline-block;
             width: 16px; height: 16px;
@@ -377,7 +377,7 @@
             animation: spin .7s linear infinite;
         }
 
-        /* ─── Responsive ─── */
+        /* Responsive */
 
         /* Laptop pequeño (1024–1279 px) */
         @media (max-width: 1279px) {

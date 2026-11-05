@@ -1,29 +1,12 @@
 """
 Seguridad de acceso y aceptación de condiciones legales.
 
-1. Bloqueo temporal del login tras intentos fallidos
-   ------------------------------------------------
-   Tras INTENTOS_MAXIMOS fallos con un mismo correo dentro de VENTANA_MINUTOS,
-   el acceso con ese correo queda bloqueado MINUTOS_BLOQUEO minutos. Durante el
-   bloqueo se rechaza cualquier intento, incluso con la contraseña correcta:
-   si no, un atacante podría seguir probando contraseñas y entrar en cuanto
-   acertara, que es justo lo que el bloqueo debe impedir.
+1. Bloqueo del login: tras INTENTOS_MAXIMOS fallos con un mismo correo en
+   VENTANA_MINUTOS, ese correo queda bloqueado MINUTOS_BLOQUEO minutos
+   (incluso con la contraseña correcta). Usa el caché de Django.
 
-   El contador se guarda por correo escrito (normalizado), exista o no la
-   cuenta: el mensaje es idéntico en ambos casos, así que no revela qué
-   correos están registrados.
-
-   Usa el caché de Django (LocMemCache por defecto: vive en la memoria del
-   proceso). Con un solo worker de gunicorn —la configuración actual— es
-   exacto; un reinicio del servidor borra los bloqueos vigentes.
-
-2. Aceptación de Términos de uso y Política de privacidad
-   -----------------------------------------------------
-   La constancia se guarda en el registro de acciones de Django (LogEntry,
-   visible en Auditoría › Registro de Acciones) con fecha, usuario, versión
-   e IP: no requiere cambios en la base de datos. Al publicar una nueva
-   versión de los textos basta con subir TERMINOS_VERSION para que todos
-   vuelvan a aceptarlos.
+2. Aceptación de Términos y Política de privacidad: se registra en LogEntry.
+   Para pedir una nueva aceptación basta con subir TERMINOS_VERSION.
 """
 import hashlib
 import math
@@ -40,9 +23,7 @@ TERMINOS_FECHA = "4 de noviembre de 2026"
 _SESION_TERMINOS = "terminos_aceptados_version"
 
 
-# ---------------------------------------------------------------------------
 # 1. Bloqueo de login
-# ---------------------------------------------------------------------------
 
 def _claves(correo: str):
     h = hashlib.sha256(correo.strip().lower().encode("utf-8")).hexdigest()
@@ -86,9 +67,7 @@ def limpiar_fallos(correo: str) -> None:
     cache.delete(clave_fallos)
 
 
-# ---------------------------------------------------------------------------
 # 2. Aceptación de términos
-# ---------------------------------------------------------------------------
 
 def _marca_aceptacion() -> str:
     return f"Aceptación de Términos y Política de privacidad v{TERMINOS_VERSION}"

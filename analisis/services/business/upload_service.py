@@ -65,12 +65,7 @@ def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
         raise ValueError("No se ha proporcionado ningún archivo para procesar.")
     validar_archivo(archivo)
 
-    # 1. Parámetros básicos
-    # .upper() acá (no solo en MuestraSuelo.save) para que el lookup de
-    # "¿ya existe un archivo para esta muestra?" de abajo compare en el
-    # mismo formato que se va a guardar — si no, volver a subir el mismo
-    # código con distinta may/minúscula ("amazonico_16s" luego de haber
-    # guardado "Amazonico_16S") no lo detectaría como la misma muestra.
+    # 1. Parámetros básicos (código en mayúsculas antes de buscar si ya existe)
     codigo_muestra = request.POST.get("nombre_producto", "").strip().upper()
     if not codigo_muestra:
         raise ValueError("El código de muestra es obligatorio.")

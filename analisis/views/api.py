@@ -25,9 +25,7 @@ def _ok(data, status=200):
     return JsonResponse({"ok": True, "data": data}, status=status)
 
 
-# ─────────────────────────────────────────────────────────────
 # /api/v1/muestras/
-# ─────────────────────────────────────────────────────────────
 @login_required
 @require_GET
 def api_muestras(request):
@@ -66,9 +64,7 @@ def api_muestras(request):
     return _ok(data)
 
 
-# ─────────────────────────────────────────────────────────────
 # /api/v1/muestras/<id>/
-# ─────────────────────────────────────────────────────────────
 @login_required
 @require_GET
 def api_muestra_detalle(request, pk):
@@ -106,10 +102,7 @@ def api_muestra_detalle(request, pk):
         .annotate(total_hits=Sum("num_hits"))
         .order_by("-total_hits")
     )
-    # El total (100%) debe ser sobre TODA la muestra, no solo el Top N que se
-    # va a mostrar — si se sumara después de recortar, los porcentajes del
-    # Top N siempre sumarían 100% entre sí, aunque en realidad representen
-    # menos que el total real de la muestra.
+    # El porcentaje se calcula sobre el total de la muestra, no solo el Top N.
     grand_total = sum(t["total_hits"] for t in todos_los_taxa) or 1
     taxa = todos_los_taxa[:top_n]
     for t in taxa:
@@ -130,9 +123,7 @@ def api_muestra_detalle(request, pk):
     })
 
 
-# ─────────────────────────────────────────────────────────────
 # /api/v1/catalogo/
-# ─────────────────────────────────────────────────────────────
 @login_required
 @require_GET
 def api_catalogo(request):
@@ -189,9 +180,7 @@ def api_catalogo(request):
     })
 
 
-# ─────────────────────────────────────────────────────────────
 # /api/v1/catalogo/<nombre>/
-# ─────────────────────────────────────────────────────────────
 @login_required
 @require_GET
 def api_catalogo_entrada(request, nombre):
@@ -224,9 +213,7 @@ def api_catalogo_entrada(request, nombre):
     })
 
 
-# ─────────────────────────────────────────────────────────────
 # /api/v1/estadisticas/
-# ─────────────────────────────────────────────────────────────
 @login_required
 @require_GET
 def api_estadisticas(request):

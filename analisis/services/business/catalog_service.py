@@ -163,9 +163,7 @@ class CatalogService:
 
         return creados, actualizados, errores
 
-    # ---------------------------
     # EXPORTACIÓN
-    # ---------------------------
 
     # Mismas columnas (y mismo orden) que exige importar_desde_archivo, para
     # que un archivo exportado se pueda volver a importar tal cual.
@@ -219,7 +217,7 @@ class CatalogService:
         col_clasif = CatalogService.COLUMNAS_EXPORTACION.index('clasificacion') + 1
 
         wb = Workbook()
-        wb.remove(wb.active)
+        wb.remove(wb.worksheets[0])
         hojas = [('Catálogo', df)] + [
             (titulo, df[df['marcador'] == marcador])
             for marcador, titulo in (('16S', 'Bacterias (16S)'), ('ITS', 'Hongos (ITS)'))

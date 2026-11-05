@@ -73,7 +73,7 @@
         </div>
     </aside>
 
-    <!-- ── Modal de confirmación de cierre de sesión ── -->
+    <!-- Modal de confirmación de cierre de sesión -->
     <div id="modal-logout"
          role="dialog"
          aria-modal="true"
@@ -232,7 +232,7 @@
 
 <script>
 (function () {
-    /* ── 1. Sidebar móvil ── */
+    /* 1. Sidebar móvil */
     var sidebarToggleBtn = document.getElementById('sidebarToggle');
     var sidebar          = document.querySelector('.bs-app-sidebar');
     var overlay          = document.getElementById('sidebarOverlay');
@@ -254,7 +254,7 @@
         overlay.addEventListener('click', closeSidebar);
     }
 
-    /* ── 2. Modal de cierre de sesión ── */
+    /* 2. Modal de cierre de sesión */
     var modalLogout = document.getElementById('modal-logout');
     var cancelarBtn = document.getElementById('btn-cancelar-logout');
 
@@ -278,7 +278,7 @@
         });
     }
 
-    /* ── 3. Dropdown de perfil de usuario ── */
+    /* 3. Dropdown de perfil de usuario */
     var tuWrap     = document.getElementById('tuWrap');
     var tuBtn      = document.getElementById('tuBtn');
     var tuDropdown = document.getElementById('tuDropdown');
@@ -315,7 +315,7 @@
         });
     }
 
-    /* ── 4. Escape: cierra dropdown o sidebar ── */
+    /* 4. Escape: cierra dropdown o sidebar */
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
             if (modalLogout && modalLogout.style.display !== 'none') {
@@ -330,7 +330,7 @@
 })();
 </script>
 
-<!-- ── TOUR GUIADO ──────────────────────────────────── -->
+<!-- TOUR GUIADO -->
 <style>
 .tour-overlay{position:fixed;inset:0;z-index:9980;background:rgba(0,0,0,.55);display:none;pointer-events:none;}
 .tour-overlay.show{display:block;}

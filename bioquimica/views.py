@@ -20,12 +20,7 @@ from django.contrib.admin.models import ADDITION
 
 
 def _grafico_recuento(ensayo):
-    # Filas sin valor UFC estándar (tipo_organismo='otro', o cualquier fila
-    # cargada solo con ParametroRecuento libres) no tienen nada que graficar
-    # en escala logarítmica — antes caían igual con valor_numerico=0 (piso
-    # artificial de 0.1 más abajo) y aparecían como una barra fantasma con
-    # etiqueta "—". Se descartan acá, no en el JS: sus datos reales se ven
-    # en la tabla de detalle, no en este gráfico.
+    # Se descartan las filas sin valor UFC estándar (se ven en la tabla de detalle).
     recuentos = [r for r in ensayo.recuentos.all() if r.menor_que_limite or r.coeficiente is not None]
     if not recuentos:
         return None
@@ -34,9 +29,7 @@ def _grafico_recuento(ensayo):
     valores = [max(r.valor_numerico, 0.1) for r in recuentos]
     etiquetas = [r.valor_display for r in recuentos]
     colores = ['#1D9E75' if r.tipo_organismo == 'bacteria' else '#F5A623' for r in recuentos]
-    # tipo_organismo por punto — el cliente lo usa para recolorear en modo
-    # Escala de grises sin perder la agrupación bacteria/hongo (ver
-    # ChartTheme en detalle.html); no afecta el color/valor mostrado en modo Color.
+    # tipo_organismo por punto: lo usa el modo escala de grises del gráfico.
     tipos = [r.tipo_organismo for r in recuentos]
 
     fig = go.Figure(go.Bar(
@@ -62,23 +55,12 @@ def _grafico_recuento(ensayo):
         height=420,
     )
 
-    # fig.to_json() no está anotado en los stubs de plotly y Pylance infiere
-    # un retorno "str | Any | None" — en runtime, para una Figure ya armada
-    # con datos (como acá) siempre devuelve el JSON como str; el cast no
-    # cambia nada en tiempo de ejecución, solo se lo aclara al chequeador.
+    # cast solo para el chequeador de tipos.
     return json.loads(cast(str, fig.to_json()))
 
 
-# ─── Gráficas para filas "Otro/Mixto" con Parámetros Adicionales ──────────
-#
-# Los recuentos importados del formato CIPAL (ver
-# bioquimica/services/pdf_parser.py::_parsear_tabla_cipal) no tienen un
-# valor UFC en el propio RecuentoUFC — viven como ParametroRecuento por
-# columna (Bacterias, Hongos…, o Colonización/Densidad, o Esporas). Por eso
-# _grafico_recuento() de arriba no los grafica: estas funciones arman esas
-# gráficas aparte, a partir de los parámetros en vez del campo
-# coeficiente/exponente. También sirven para ensayos cargados a mano con los
-# mismos nombres de parámetro (ver placeholder en ingreso_manual.html).
+# Gráficas para filas "Otro/Mixto" con Parámetros Adicionales
+# (formato CIPAL o ingreso manual: los valores están en ParametroRecuento).
 
 _MICRO_SERIES = [
     'Bacterias', 'Hongos', 'Actinomicetes',
@@ -112,15 +94,8 @@ def _valor_numerico_parametro(texto):
 
 
 def _parametros_por_nombre(filas):
-    """[(recuento, {parametro.nombre: parametro.valor}), …] para filas
-    'Otro/Mixto' — asume que `filas` ya trae los parámetros precargados
-    (prefetch_related('parametros')).
-
-    Se devuelve una lista, no un dict indexado por `recuento.nombre`:
-    RecuentoUFC.nombre no tiene restricción de unicidad, y el ingreso
-    manual permite crear dos tarjetas 'Otro/Mixto' con el mismo nombre de
-    muestra por error de tipeo — indexar por nombre colapsaría esas dos
-    filas en una sola entrada, perdiendo los datos de la primera sin avisar."""
+    """[(recuento, {parametro.nombre: parametro.valor}), …] para filas 'Otro/Mixto'.
+    Requiere prefetch_related('parametros'). Es lista porque el nombre puede repetirse."""
     return [(r, {p.nombre: p.valor for p in r.parametros.all()}) for r in filas]
 
 
@@ -136,9 +111,7 @@ def _grafico_cipal_series(filas, series_nombres, titulo_y, log=False):
     if not muestras_datos:
         return None
 
-    # Si el mismo nombre de muestra aparece más de una vez (ver docstring de
-    # _parametros_por_nombre), se numeran las etiquetas del eje X para que
-    # ambas barras se vean por separado en vez de superponerse en una sola.
+    # Nombres repetidos se numeran para que no se superpongan en el eje X.
     conteo = {}
     for nombre, _ in muestras_datos:
         conteo[nombre] = conteo.get(nombre, 0) + 1
@@ -154,16 +127,7 @@ def _grafico_cipal_series(filas, series_nombres, titulo_y, log=False):
         muestras.append(etiqueta)
         datos_por_muestra[etiqueta] = params
 
-    # Piso de 0.1 en escala logarítmica: ni un valor ausente ni uno realmente
-    # cero (pasa de verdad en datos reales — ej. "Solubilizadores de
-    # Fósforo: 0.0 × 10^0 UFC/gss" cuando esa muestra no dio ningún colonia
-    # de ese grupo funcional) se pueden ubicar en un eje log (Plotly lo
-    # descarta o lo dibuja mal) — mismo problema que resuelve el piso en
-    # _grafico_recuento() de arriba con max(valor, 0.1). El texto del hover
-    # (`y_txt`) sigue mostrando el valor real ("0.0 × 10^0 UFC/gss"), solo la
-    # altura de la barra se pisa. En escala lineal (Colonización/Densidad/
-    # Esporas) un 0 sí se grafica sin distorsión, así que el piso solo
-    # aplica con log=True.
+    # En escala logarítmica los ceros se dibujan con piso 0.1 (el hover muestra el valor real).
     traces = []
     for serie in series_nombres:
         y_num, y_txt, tiene_dato = [], [], False
@@ -270,21 +234,14 @@ def _grafico_heatmap_pruebas(ensayo):
         height=max(300, len(organismos) * 60 + 180),
     )
 
-    # fig.to_json() no está anotado en los stubs de plotly y Pylance infiere
-    # un retorno "str | Any | None" — en runtime, para una Figure ya armada
-    # con datos (como acá) siempre devuelve el JSON como str; el cast no
-    # cambia nada en tiempo de ejecución, solo se lo aclara al chequeador.
+    # cast solo para el chequeador de tipos.
     return json.loads(cast(str, fig.to_json()))
 
 
 @login_required
 def lista_ensayos(request):
     tipo_filtro = request.GET.get('tipo', '')
-    # 'cipal' es un filtro sintético (no existe como valor de `tipo` en la
-    # base — EnsayoMicrobiologico.tipo solo distingue recuento/aislamiento,
-    # ver comentario en detalle_ensayo) que usa el campo real es_cipal para
-    # separar los reportes CIPAL de los recuentos UFC/g "de verdad": antes
-    # quedaban mezclados bajo un solo conteo de "Recuento".
+    # 'cipal' es un filtro sintético basado en el campo es_cipal.
     qs = EnsayoMicrobiologico.objects.all()
     if tipo_filtro == 'cipal':
         qs = qs.filter(es_cipal=True)
@@ -398,15 +355,8 @@ def detalle_ensayo(request, pk):
 
 @login_required
 def ver_pdf(request, pk):
-    """Sirve el PDF original adjunto a un ensayo — SOLO Docente/staff.
-    No usar `ensayo.archivo_pdf.url` (el /media/... crudo) en ningún
-    template: esa URL la sirve Django sin ningún control de acceso (ver
-    config/urls.py), cualquiera que la conozca puede bajarla sin sesión.
-    Esta vista es el único camino con permiso real hacia el archivo — el
-    original trae membrete, logo y datos de contacto del laboratorio y del
-    cliente, así que no se expone a estudiantes ni a un futuro público
-    anónimo si el sistema se abre (ver conversación sobre nombres de
-    laboratorio)."""
+    """Sirve el PDF original de un ensayo, solo a Docente/staff.
+    No usar ensayo.archivo_pdf.url en las plantillas: no tiene control de acceso."""
     if _bloquear_si_estudiante(request):
         return redirect('bioquimica:detalle', pk=pk)
 
@@ -417,13 +367,7 @@ def ver_pdf(request, pk):
     try:
         archivo_abierto = ensayo.archivo_pdf.open('rb')
     except (FileNotFoundError, OSError, ValueError):
-        # El registro en la base dice que hay un PDF, pero el archivo ya no
-        # está en el disco del servidor — pasa cuando el almacenamiento de
-        # media/ es local al contenedor (sin Volume persistente en Railway):
-        # cada redeploy empieza con un disco vacío, así que cualquier PDF
-        # subido antes del último redeploy queda "perdido" aunque el
-        # ensayo y sus datos sigan intactos en la base. No es un error de
-        # este ensayo en particular, así que se explica en vez de un 500.
+        # El PDF ya no está en el disco (p. ej. tras un redeploy sin volumen persistente).
         messages.error(
             request,
             f"El PDF original de «{ensayo.codigo}» ya no está disponible en el servidor "
@@ -508,11 +452,7 @@ def _guardar_ensayo(archivo, request):
         ensayo.save()
 
         if resultado['tipo'] == 'recuento':
-            # No se usa bulk_create: el formato CIPAL trae "Parámetros
-            # Adicionales" por fila (ver pdf_parser._parsear_tabla_cipal) y
-            # esas filas hijas necesitan el pk del RecuentoUFC ya guardado —
-            # mismo patrón que ingreso_manual más abajo. El formato MAg-XXX
-            # no trae 'parametros' (pop devuelve []) así que no cambia nada.
+            # Sin bulk_create: los parámetros adicionales necesitan el pk del recuento.
             for i, d in enumerate(resultado['datos']):
                 d = dict(d)
                 parametros = d.pop('parametros', [])
@@ -587,10 +527,7 @@ def subir_pdf(request):
         except _DuplicadoError as e:
             duplicados.append(e.codigo)
         except Exception as e:
-            # Exception a secas: cubre tanto el ValueError "amigable" de
-            # _guardar_ensayo (PDF ilegible, sin código, etc.) como cualquier
-            # otro fallo inesperado del parser — un solo PDF con problemas no
-            # debe frenar la carga masiva del resto de archivos seleccionados.
+            # Un PDF con problemas no debe frenar la carga del resto.
             errores.append(str(e))
 
     if creados:
@@ -611,14 +548,7 @@ def subir_pdf(request):
     return redirect('bioquimica:lista')
 
 
-# ─── Ingreso manual (alternativa a subir PDF) ──────────────────────────────
-#
-# Para reportes cuya estructura no coincide con la que espera pdf_parser.py
-# (otro formato de laboratorio, PDF escaneado sin capa de texto, etc.): en
-# vez de intentar leer el documento, la persona transcribe los valores a
-# mano en un formulario con los mismos campos que ya usa el sistema. El PDF
-# original se puede adjuntar igual como respaldo (campo archivo_pdf), pero
-# ya no es la fuente de la que se extraen los datos.
+# Ingreso manual (alternativa a subir PDF, para formatos que el parser no lee)
 
 def _decimal_o_none(valor):
     valor = (valor or '').strip().replace(',', '.')
@@ -641,14 +571,8 @@ def _int_o_none(valor):
 
 
 def _parsear_recuento_manual(post):
-    """
-    Filas de recuento UFC/g ingresadas a mano. Cada fila tiene sus campos
-    fijos sufijados por índice (rec_nombre_0, rec_coeficiente_0, …) y sus
-    parámetros adicionales libres en arrays paralelos sufijados con el mismo
-    índice (recparam_nombre_0[], recparam_valor_0[], …) — mismo patrón
-    indexado que _parsear_aislamiento_manual usa para organismo/pruebas,
-    generado por el JS del template al agregar/quitar tarjetas y parámetros.
-    """
+    """Filas de recuento UFC/g del formulario manual (campos sufijados por índice:
+    rec_nombre_0, recparam_nombre_0[], …)."""
     filas = []
     i = 0
     while f'rec_nombre_{i}' in post:
@@ -681,13 +605,7 @@ def _parsear_recuento_manual(post):
             siguiente += 1
         fila['parametros'] = parametros
 
-        # Una fila con nombre pero sin ningún dato real (ni coeficiente/
-        # exponente, ni "<1 UFC/g", ni un solo Parámetro Adicional) no tiene
-        # nada que graficar ni que mostrar — mismo criterio que ya aplica
-        # pdf_parser._parsear_tabla_cipal para no guardar una fila fantasma.
-        # Acá no se descarta en el momento: se marca y el llamador decide
-        # (avisarle al usuario cuáles se omitieron, en vez de borrarlas en
-        # silencio como hace el importador de PDF).
+        # Fila sin ningún dato: se marca para avisar al usuario que se omitió.
         fila['sin_datos'] = not (menor or fila['coeficiente'] is not None or parametros)
 
         filas.append(fila)
@@ -697,13 +615,8 @@ def _parsear_recuento_manual(post):
 
 
 def _parsear_aislamiento_manual(post):
-    """
-    Organismos aislados ingresados a mano. Cada organismo tiene sus campos
-    de taxonomía sufijados por índice (org_nombre_0, org_dominio_0, …) y sus
-    pruebas bioquímicas en arrays paralelos sufijados con el mismo índice
-    (prueba_nombre_0[], prueba_resultado_0[], …), generados por el JS del
-    template al agregar/quitar organismos y pruebas dinámicamente.
-    """
+    """Organismos aislados del formulario manual (campos sufijados por índice:
+    org_nombre_0, prueba_nombre_0[], …)."""
     organismos = []
     i = 0
     while f'org_nombre_{i}' in post:
@@ -746,15 +659,8 @@ def _parsear_aislamiento_manual(post):
 
 
 def _contexto_formulario_previo(request, form):
-    """Contexto para volver a renderizar ingreso_manual.html después de un
-    error (formulario inválido, código duplicado, fila sin datos…) SIN
-    perder las tarjetas de Recuento/Organismo que el usuario ya había
-    completado. El JS del template solo tenía una ruta: arrancar con una
-    tarjeta vacía — cualquier error de validación borraba todo lo tipeado y
-    obligaba a empezar de nuevo. Se reaprovechan los mismos parsers que
-    arman los datos para guardar (_parsear_recuento_manual /
-    _parsear_aislamiento_manual) para reconstruir esas tarjetas en el
-    navegador."""
+    """Contexto para volver a mostrar ingreso_manual.html tras un error sin
+    perder las tarjetas que el usuario ya completó."""
     filas = _parsear_recuento_manual(request.POST)
     for f in filas:
         f.pop('sin_datos', None)

@@ -8,15 +8,8 @@ from analisis import seguridad
 
 
 class TerminosMiddleware:
-    """
-    Usuarios autenticados que aún no aceptaron la versión vigente de los
-    Términos de uso y la Política de privacidad (cuentas creadas antes de
-    que existieran, o altas vía Google sin formulario) son redirigidos una
-    vez a /aceptar-terminos/ antes de seguir usando la plataforma.
-
-    Quedan libres las rutas necesarias para aceptar, leer los textos o
-    salir, los archivos estáticos y la API (clientes JSON, no navegadores).
-    """
+    """Redirige a /aceptar-terminos/ a los usuarios que no aceptaron la versión vigente
+    de los Términos y la Política de privacidad."""
 
     _PREFIJOS_LIBRES = ("/accounts/", "/api/", "/jsi18n/", "/csp-report/")
 
