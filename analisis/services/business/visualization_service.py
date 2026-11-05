@@ -14,60 +14,6 @@ class VisualizationService:
     """
 
     @staticmethod
-    def crear_grafico_abundancia_barras(df: pd.DataFrame, x: str, y: str, titulo: str = "") -> Optional[str]:
-        """Gráfico de barras simple para dashboard."""
-        if df.empty or x not in df.columns or y not in df.columns:
-            return None
-        try:
-            fig = px.bar(df, x=x, y=y, title=titulo, template="plotly_white")
-            fig.update_layout(
-                xaxis=dict(tickangle=-45, automargin=True, tickfont=dict(size=10)),
-                margin=dict(b=160, t=60, l=60, r=20),
-                height=500,
-            )
-            return str(fig.to_json())
-        except Exception as e:
-            print(f"Error en gráfico de barras: {e}")
-            return None
-
-    @staticmethod
-    def crear_grafico_abundancia_pie(df: pd.DataFrame, nombres: str, valores: str, titulo: str = "") -> Optional[str]:
-        """Gráfico circular para dashboard."""
-        if df.empty or nombres not in df.columns or valores not in df.columns:
-            return None
-        try:
-            fig = px.pie(df, names=nombres, values=valores, title=titulo)
-            return str(fig.to_json())
-        except Exception as e:
-            print(f"Error en gráfico de pastel: {e}")
-            return None
-
-    @staticmethod
-    def crear_grafico_comparativo_barras(df_comp: pd.DataFrame, muestra_1_nombre: str, muestra_2_nombre: str, top_n: int = 10) -> Optional[str]:
-        """Gráfico comparativo de barras para dos muestras con límite dinámico."""
-        if df_comp.empty:
-            return None
-        try:
-            muestras_cols = [c for c in df_comp.columns if c not in ['taxonomia', 'clasificacion']]
-            if len(muestras_cols) < 2:
-                return None
-                
-            top_taxa = df_comp.head(top_n)
-            fig = go.Figure()
-            fig.add_trace(go.Bar(x=top_taxa['taxonomia'], y=top_taxa[muestras_cols[0]], name=muestra_1_nombre))
-            fig.add_trace(go.Bar(x=top_taxa['taxonomia'], y=top_taxa[muestras_cols[1]], name=muestra_2_nombre))
-            fig.update_layout(
-                barmode='group',
-                title=f"Comparación: {muestra_1_nombre} vs {muestra_2_nombre} (Top {top_n})",
-                xaxis=dict(tickangle=-45, automargin=True, tickfont=dict(size=10)),
-                margin=dict(b=160, t=60, l=60, r=20),
-            )
-            return str(fig.to_json())
-        except Exception as e:
-            print(f"Error en gráfico comparativo: {e}")
-            return None
-
-    @staticmethod
     def obtener_paquete_graficos_avanzados(df_pivote: pd.DataFrame, columnas_muestras: List[str], nivel: str, top_n: int = 10,
                                             orden_taxa: Optional[List[str]] = None) -> Dict[str, Any]:
         """

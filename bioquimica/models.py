@@ -126,10 +126,6 @@ class RecuentoUFC(models.Model):
             return 0
         return float(self.coeficiente) * (10 ** (self.exponente or 0))
 
-    def tiene_parametros(self):
-        return self.parametros.exists()
-
-
 class ParametroRecuento(models.Model):
     """Mediciones adicionales de un recuento, con nombre y valor libres —
     mismo rol que PruebaBioquimica para Aislamiento, pero del lado de
@@ -182,10 +178,6 @@ class MicroorganismoAislado(models.Model):
     def tiene_taxonomia(self):
         return any([self.dominio, self.filo, self.clase, self.orden_taxonomico,
                     self.familia, self.genero, self.especie])
-
-    def tiene_pruebas(self):
-        return self.pruebas.exists()
-
 
 class PruebaBioquimica(models.Model):
     microorganismo = models.ForeignKey(MicroorganismoAislado, on_delete=models.CASCADE,

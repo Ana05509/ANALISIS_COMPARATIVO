@@ -197,7 +197,6 @@ def _clasificacion_por_muestra(tipo, nivel, muestra_ids=None):
     Devuelve lista de dicts {muestra, benefico, fitopatogeno, neutral, sin_clasificar,
     nombres_benefico, ...} filtrada por muestra_ids (o global si es None).
     """
-    campo_db = MAPA_NIVELES.get(nivel, "genus")
     qs = ResultadoTaxonomico.objects.filter(archivo__tipo_analisis=tipo)
     if muestra_ids:
         qs = qs.filter(archivo__muestra_id__in=muestra_ids)

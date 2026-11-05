@@ -236,7 +236,7 @@
             <i class="ti ti-layout-dashboard"></i> Resumen
         </button>
         <button type="button" class="rpt-tab" data-tab="pdf-preview">
-            <i class="ti ti-file-pdf"></i> Vista previa PDF
+            <i class="ti ti-file-type-pdf"></i> Vista previa PDF
         </button>
     </div>
 
@@ -275,7 +275,7 @@
         <div style="display:flex; gap:4px;">
             <button id="btn-pdf" onclick="descargar('pdf')"
                     class="btn btn-primary btn-sm" title="PDF del reporte de la(s) muestra(s) seleccionada(s)">
-                <i class="ti ti-file-pdf"></i> PDF
+                <i class="ti ti-file-type-pdf"></i> PDF
             </button>
             <button id="btn-excel" onclick="descargar('excel')"
                     class="btn btn-excel btn-sm" title="Excel completo (todos los taxones, multi-hoja)">
@@ -297,7 +297,7 @@
             </span>
             <button id="btn-informe-general-pdf" onclick="descargarInformeGeneral('pdf')"
                     class="btn btn-outline btn-sm" title="Informe General en PDF (todos los niveles taxonómicos)">
-                <i class="ti ti-file-pdf"></i> PDF
+                <i class="ti ti-file-type-pdf"></i> PDF
             </button>
             <button id="btn-informe-general-excel" onclick="descargarInformeGeneral('excel')"
                     class="btn btn-outline btn-sm" title="Informe General en Excel (una hoja por nivel taxonómico)">
@@ -474,7 +474,7 @@
                         {{ forloop.counter }}
                     </td>
                     <td data-label="Taxón">
-                        <strong style="font-family:'DM Mono',monospace; font-weight:500; font-size:13px;">
+                        <strong style="font-family:'DM Mono',monospace; font-weight:500; font-size:13px; overflow-wrap:anywhere;">
                             {{ item.taxonomia|taxon_legible|default:"Desconocido" }}
                         </strong>
                     </td>
@@ -536,7 +536,7 @@
         </div>
         <div class="rpt-pdf-frame-wrap">
             <div class="rpt-pdf-loading" id="rpt-pdf-placeholder">
-                <i class="ti ti-file-pdf" style="font-size:32px; opacity:.4;"></i>
+                <i class="ti ti-file-type-pdf" style="font-size:32px; opacity:.4;"></i>
                 <span>Haz clic para generar la vista previa…</span>
                 <button type="button" class="btn btn-primary btn-sm" onclick="cargarPreviewPDF()">
                     <i class="ti ti-eye"></i> Generar vista previa
@@ -559,7 +559,7 @@
         </div>
         <div class="rpt-guide-arrow"><i class="ti ti-arrow-narrow-right"></i></div>
         <div class="rpt-guide-step">
-            <div class="rpt-guide-step-icon"><i class="ti ti-sliders"></i></div>
+            <div class="rpt-guide-step-icon"><i class="ti ti-adjustments-horizontal"></i></div>
             <div class="rpt-guide-step-name">Paso 2</div>
             <div class="rpt-guide-step-desc">Define marcador y nivel taxonómico</div>
         </div>
@@ -590,7 +590,7 @@
 
 
 {% block extra_js %}
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" integrity="sha384-cCVCZkAjYNxaYKbM8lsArLznDF/SvMFr1jcZrvOpSTCa0W40ZAdLzHCEulnUa5i7" crossorigin="anonymous"></script>
 <script src="{% static 'analisis/js/chart_theme.js' %}"></script>
 
 <script>
@@ -881,7 +881,7 @@ async function descargar(formato) {
     } finally {
         if (btnPdf) {
             btnPdf.disabled  = false;
-            btnPdf.innerHTML = '<i class="ti ti-file-pdf"></i> PDF';
+            btnPdf.innerHTML = '<i class="ti ti-file-type-pdf"></i> PDF';
         }
         if (btnExcel) {
             btnExcel.disabled  = false;

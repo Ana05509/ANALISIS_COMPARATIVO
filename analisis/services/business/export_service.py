@@ -374,11 +374,6 @@ def _banner_reporte(etiqueta_franja, ancho_util, S):
     return t_banner
 
 
-def _nivel_color_rl(nivel_salud: str):
-    hex_color = _NIVEL_COLORES.get(nivel_salud, "#64748b")
-    return colors.HexColor(hex_color)
-
-
 # ---------------------------------------------------------------------------
 # Fase 1 — Portada / Índice / Conclusiones / Recomendaciones / navegación
 # ---------------------------------------------------------------------------
@@ -1949,7 +1944,6 @@ class ExportService:
         for i, m in enumerate(muestras):
             cult = m.cultivo.nombre if getattr(m, 'cultivo', None) else "N/A"
             var  = m.variedad_clon.nombre if getattr(m, 'variedad_clon', None) else "N/A"
-            bg_row = colors.white if i % 2 == 0 else colors.HexColor('#f0fdf4')
             muestras_hdr.append([
                 Paragraph(str(m.codigo), S["body_sm"]),
                 Paragraph(cult,          S["body_sm"]),
@@ -2294,8 +2288,6 @@ class ExportService:
         CV        = "1D9E75"   # verde medio
         CV_OSC    = "0F6E56"   # verde oscuro (headers principales)
         CV_CLAR   = "E8F5EF"   # verde muy claro (secciones)
-        CA        = "BA7517"   # ámbar
-        CR        = "A32D2D"   # rojo
         CAZUL     = "185FA5"   # azul diversidad
         CGRIS     = "888888"   # gris neutro
         CBLANCO   = "FFFFFF"
@@ -2306,7 +2298,6 @@ class ExportService:
         fill_azul      = PatternFill("solid", fgColor=CAZUL)
 
         fnt_hdr        = Font(bold=True, color=CBLANCO, size=11)
-        fnt_titulo     = Font(bold=True, color=CBLANCO, size=13)
         fnt_seccion    = Font(bold=True, color=CV_OSC, size=10)
         fnt_normal     = Font(size=10)
         fnt_bold       = Font(bold=True, size=10)
@@ -2526,25 +2517,6 @@ class ExportService:
             c.value = texto
             c.font  = Font(bold=True, size=12, color=color or CV_OSC)
             c.alignment = al_l
-
-        def _seccion_row(ws, row_num, texto, n_cols):
-            """Pinta una fila completa como cabecera de sección."""
-            ws.cell(row=row_num, column=1, value=texto).font = fnt_seccion
-            for col in range(1, n_cols + 1):
-                c = ws.cell(row=row_num, column=col)
-                c.fill   = fill_seccion
-                c.border = borde
-            ws.row_dimensions[row_num].height = 18
-
-        def _titulo_hoja(ws, texto, n_cols, color=None):
-            """Fila 1: título combinado visual."""
-            ws.row_dimensions[1].height = 24
-            for col in range(1, n_cols + 1):
-                c = ws.cell(row=1, column=col)
-                c.fill   = PatternFill("solid", fgColor=color or CV_OSC)
-                c.font   = fnt_titulo
-                c.border = borde
-            ws.cell(row=1, column=1).value = texto
 
         # ── Gráficos nativos de Excel (openpyxl.chart) ──────────────────────
         # Todos leen (o escriben primero) datos en celdas reales de la hoja —

@@ -18,7 +18,7 @@ class TerminosMiddleware:
     salir, los archivos estáticos y la API (clientes JSON, no navegadores).
     """
 
-    _PREFIJOS_LIBRES = ("/accounts/", "/api/", "/jsi18n/")
+    _PREFIJOS_LIBRES = ("/accounts/", "/api/", "/jsi18n/", "/csp-report/")
 
     def __init__(self, get_response):
         self.get_response = get_response

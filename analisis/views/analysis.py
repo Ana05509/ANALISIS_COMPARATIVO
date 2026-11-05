@@ -12,7 +12,7 @@ from ..services.business.analysis_service import (
 )
 from ..services.business.visualization_service import VisualizationService
 from ..models import ResultadoTaxonomico, MuestraSuelo, ArchivoMolecular
-from analisis.constants import OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES, NIVELES_ES, NIVELES_CHOICES, MARCADORES_CHOICES
+from analisis.constants import OPCIONES_TOP_N, NIVELES_VALIDOS, NIVELES_ES, NIVELES_CHOICES, MARCADORES_CHOICES
 
 @login_required
 def analisis_avanzado(request):
@@ -96,8 +96,6 @@ def analisis_avanzado(request):
         )
 
         if qs.exists():
-            campo_modelo = MAPA_NIVELES.get(nivel, 'genus')
-
             # Agrega Sum(num_hits) por (taxon, muestra) al nivel elegido — evita
             # que múltiples especies del mismo genus aparezcan como filas separadas
             from analisis.constants import get_taxonomia_annotation as _get_tax_ann

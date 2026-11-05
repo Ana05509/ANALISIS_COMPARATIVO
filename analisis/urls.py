@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from .views.auth import CustomLoginView, CustomLogoutView
 from .views.analysis import resultado_analisis
+from .views.csp import reporte_csp
 from .views.api import (
     api_muestras, api_muestra_detalle,
     api_catalogo, api_catalogo_entrada,
@@ -18,6 +19,8 @@ urlpatterns = [
     path("terminos/", views.terminos, name="terminos"),
     path("privacidad/", views.privacidad, name="privacidad"),
     path("aceptar-terminos/", views.aceptar_terminos, name="aceptar_terminos"),
+    # Avisos de la Content Security Policy (los envía el navegador; ver settings.CSP_MODO)
+    path("csp-report/", reporte_csp, name="csp_report"),
     # La recuperación de contraseña la maneja allauth (accounts/password/reset/...),
     # que ya cuenta con sus propias plantillas (account/password_reset*.html).
 

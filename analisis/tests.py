@@ -377,3 +377,108 @@ class BloqueoLoginTests(SimpleTestCase):
         for _ in range(5):
             self.assertEqual(seguridad.registrar_fallo("  "), seguridad.INTENTOS_MAXIMOS)
         self.assertEqual(seguridad.minutos_bloqueo_restantes(""), 0)
+
+
+class RegistroDominioTests(SimpleTestCase):
+    """Solo se crean cuentas nuevas con correo institucional (REGISTRO_DOMINIOS_PERMITIDOS)."""
+
+    def test_dominio_y_subdominios(self):
+        from analisis.adapter import dominio_permitido
+        with self.settings(REGISTRO_DOMINIOS_PERMITIDOS=["utc.edu.ec"]):
+            self.assertTrue(dominio_permitido("ana@utc.edu.ec"))
+            self.assertTrue(dominio_permitido("ana@UTC.EDU.EC"))
+            self.assertTrue(dominio_permitido("ana@est.utc.edu.ec"))
+            self.assertFalse(dominio_permitido("ana@gmail.com"))
+            # Un dominio que solo termina en el mismo texto no es subdominio
+            self.assertFalse(dominio_permitido("ana@falsoutc.edu.ec"))
+            self.assertFalse(dominio_permitido("ana@utc.edu.ec.evil.com"))
+        with self.settings(REGISTRO_DOMINIOS_PERMITIDOS=[]):
+            self.assertTrue(dominio_permitido("ana@gmail.com"))
+
+    def _formulario(self, email):
+        from unittest import mock
+        from allauth.account.forms import SignupForm
+        datos = {"email": email, "password1": "Clave-Segura-2026", "password2": "Clave-Segura-2026",
+                 "first_name": "Ana", "last_name": "Pérez", "acepta_terminos": "on"}
+        # Sin BD ni DNS: el correo se da por no registrado y el dominio por existente
+        with mock.patch("allauth.account.forms.flows.manage_email.email_already_exists",
+                        return_value=(email, False)), \
+             mock.patch("analisis.adapter._domain_can_receive_email", return_value=True):
+            form = SignupForm(data=datos)
+            form.is_valid()
+        return form
+
+    def test_formulario_rechaza_otro_dominio(self):
+        with self.settings(REGISTRO_DOMINIOS_PERMITIDOS=["utc.edu.ec"]):
+            form = self._formulario("ana@gmail.com")
+        self.assertIn("email", form.errors)
+        self.assertIn("@utc.edu.ec", form.errors["email"][0])
+
+    def test_formulario_acepta_correo_institucional(self):
+        with self.settings(REGISTRO_DOMINIOS_PERMITIDOS=["utc.edu.ec"]):
+            form = self._formulario("ana@utc.edu.ec")
+        self.assertNotIn("email", form.errors)
+
+    def test_recuperar_contrasena_no_se_restringe(self):
+        # adapter.clean_email() lo usa también "olvidé mi contraseña": no debe filtrar por dominio
+        from unittest import mock
+        from analisis.adapter import CustomAccountAdapter
+        with self.settings(REGISTRO_DOMINIOS_PERMITIDOS=["utc.edu.ec"]), \
+             mock.patch("analisis.adapter._domain_can_receive_email", return_value=True):
+            self.assertEqual(CustomAccountAdapter().clean_email("ana@gmail.com"), "ana@gmail.com")
+
+    def _google(self, email):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.contrib.sessions.backends.signed_cookies import SessionStore
+        from django.test import RequestFactory
+        from allauth.socialaccount.models import SocialLogin
+        from analisis.adapter import CustomSocialAccountAdapter
+        from analisis.models import Usuario
+        request = RequestFactory().get("/")
+        request.session = SessionStore()
+        request._messages = FallbackStorage(request)
+        return CustomSocialAccountAdapter(request).is_open_for_signup(
+            request, SocialLogin(user=Usuario(email=email)))
+
+    def test_google_rechaza_otro_dominio(self):
+        from allauth.core.exceptions import ImmediateHttpResponse
+        with self.settings(REGISTRO_DOMINIOS_PERMITIDOS=["utc.edu.ec"]):
+            with self.assertRaises(ImmediateHttpResponse) as ctx:
+                self._google("ana@gmail.com")
+        self.assertEqual(ctx.exception.response.status_code, 302)
+
+    def test_google_acepta_correo_institucional(self):
+        with self.settings(REGISTRO_DOMINIOS_PERMITIDOS=["utc.edu.ec"]):
+            self.assertTrue(self._google("ana@utc.edu.ec"))
+
+
+class ContentSecurityPolicyTests(SimpleTestCase):
+    """Cabecera CSP según CSP_MODO y endpoint que registra los avisos del navegador."""
+
+    def test_cabecera_en_modo_reporte(self):
+        from django.conf import settings
+        with self.settings(SECURE_CSP={}, SECURE_CSP_REPORT_ONLY=settings.SECURE_CSP_REPORT_ONLY or {"default-src": ["'self'"]}):
+            r = self.client.get("/terminos/")
+        self.assertIn("Content-Security-Policy-Report-Only", r.headers)
+        self.assertNotIn("Content-Security-Policy", r.headers)
+
+    def test_politica_bloquea_lo_esencial(self):
+        from config.settings import _CSP
+        self.assertEqual(_CSP["object-src"], ["'none'"])
+        self.assertEqual(_CSP["frame-ancestors"], ["'none'"])
+        self.assertIn("https://accounts.google.com", _CSP["form-action"])
+
+    def test_reporte_se_registra(self):
+        import json
+        cuerpo = {"csp-report": {"document-uri": "https://x/", "violated-directive": "script-src",
+                                 "blocked-uri": "https://malicioso.example/x.js"}}
+        with self.assertLogs("analisis.views.csp", level="WARNING") as log:
+            r = self.client.post("/csp-report/", json.dumps(cuerpo), content_type="application/csp-report")
+        self.assertEqual(r.status_code, 204)
+        self.assertIn("malicioso.example", log.output[0])
+
+    def test_reporte_rechaza_get_y_cuerpos_enormes(self):
+        self.assertEqual(self.client.get("/csp-report/").status_code, 405)
+        with self.assertNoLogs("analisis.views.csp", level="WARNING"):
+            r = self.client.post("/csp-report/", "x" * 20_000, content_type="application/csp-report")
+        self.assertEqual(r.status_code, 204)

@@ -3,6 +3,7 @@ import dns.resolver
 from difflib import SequenceMatcher
 from django.core.exceptions import ValidationError
 from allauth.account.adapter import DefaultAccountAdapter
+from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 
 # Patrón estricto: local@dominio.tld — rechaza comas, espacios y caracteres raros
 _EMAIL_RE = re.compile(
@@ -51,6 +52,22 @@ def _domain_can_receive_email(domain):
         return True
 
 
+def dominio_permitido(email):
+    """True si el correo pertenece a REGISTRO_DOMINIOS_PERMITIDOS (o a un subdominio)."""
+    from django.conf import settings
+    permitidos = settings.REGISTRO_DOMINIOS_PERMITIDOS
+    if not permitidos:
+        return True
+    dominio = (email or "").rsplit('@', 1)[-1].lower()
+    return any(dominio == d or dominio.endswith('.' + d) for d in permitidos)
+
+
+def mensaje_dominio_no_permitido():
+    from django.conf import settings
+    dominios = " o ".join(f"@{d}" for d in settings.REGISTRO_DOMINIOS_PERMITIDOS)
+    return f"Solo se pueden crear cuentas con un correo institucional ({dominios})."
+
+
 class CustomAccountAdapter(DefaultAccountAdapter):
     error_messages = {
         **DefaultAccountAdapter.error_messages,
@@ -70,6 +87,8 @@ class CustomAccountAdapter(DefaultAccountAdapter):
             )
 
         domain = email.split('@')[1]
+        if dominio_permitido(email) and self._dominio_restringido():
+            return email
 
         suggestion = _check_typo(domain)
         if suggestion:
@@ -85,6 +104,11 @@ class CustomAccountAdapter(DefaultAccountAdapter):
             )
 
         return email
+
+    @staticmethod
+    def _dominio_restringido():
+        from django.conf import settings
+        return bool(settings.REGISTRO_DOMINIOS_PERMITIDOS)
 
     def send_mail(self, template_prefix, email, context):
         """
@@ -143,3 +167,25 @@ class CustomAccountAdapter(DefaultAccountAdapter):
             username = f"{base[:147]}{counter}"
             counter += 1
         user_username(user, username)
+
+
+class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
+    def is_open_for_signup(self, request, sociallogin):
+        """
+        Allauth solo llama a esto cuando el inicio con Google crearía una
+        cuenta NUEVA; quien ya tiene su cuenta enlazada entra normalmente.
+        Si el correo de Google no es institucional, se vuelve al login con un
+        mensaje claro en lugar de la página genérica de "registro cerrado".
+        """
+        from allauth.account.utils import user_email
+        email = user_email(sociallogin.user) or next(
+            (e.email for e in sociallogin.email_addresses), "")
+        if not dominio_permitido(email):
+            from django.contrib import messages
+            from django.http import HttpResponseRedirect
+            from django.urls import reverse
+            from allauth.core.exceptions import ImmediateHttpResponse
+            messages.error(request, f"{mensaje_dominio_no_permitido()} "
+                                    f"La cuenta de Google {email} no pertenece a ese dominio.")
+            raise ImmediateHttpResponse(HttpResponseRedirect(reverse('analisis:login')))
+        return super().is_open_for_signup(request, sociallogin)

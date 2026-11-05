@@ -48,64 +48,6 @@ def nivel_slug(nivel_salud):
     """
     return _NIVEL_SALUD_SLUGS.get(nivel_salud, "critico")
 
-_CULTIVOS_MAP = {
-    'cacao':     ('🍫', '#7B3F00', '#F7EDE2'),
-    'banano':    ('🍌', '#854D0E', '#FEF9C3'),
-    'banana':    ('🍌', '#854D0E', '#FEF9C3'),
-    'maracuya':  ('🟡', '#92400E', '#FFFBEB'),
-    'maracuyá':  ('🟡', '#92400E', '#FFFBEB'),
-    'maiz':      ('🌽', '#854D0E', '#FEF9C3'),
-    'maíz':      ('🌽', '#854D0E', '#FEF9C3'),
-    'palma':     ('🌴', '#166534', '#DCFCE7'),
-    'papa':      ('🥔', '#713F12', '#FEF3C7'),
-    'tomate':    ('🍅', '#991B1B', '#FEF2F2'),
-    'frutilla':  ('🍓', '#9D174D', '#FDF2F8'),
-    'mora':      ('🫐', '#4C1D95', '#F5F3FF'),
-    'brocoli':   ('🥦', '#14532D', '#F0FDF4'),
-    'brócoli':   ('🥦', '#14532D', '#F0FDF4'),
-    'pimiento':  ('🫑', '#14532D', '#F0FDF4'),
-    'aguacate':  ('🥑', '#14532D', '#F0FDF4'),
-    'naranja':   ('🍊', '#9A3412', '#FFF7ED'),
-    'limon':     ('🍋', '#713F12', '#FEFCE8'),
-    'limón':     ('🍋', '#713F12', '#FEFCE8'),
-    'mango':     ('🥭', '#92400E', '#FFFBEB'),
-    'piña':      ('🍍', '#713F12', '#FEFCE8'),
-    'pina':      ('🍍', '#713F12', '#FEFCE8'),
-    'yuca':      ('🌿', '#14532D', '#F0FDF4'),
-    'arroz':     ('🌾', '#713F12', '#FEFCE8'),
-    'quinua':    ('🌾', '#713F12', '#FEFCE8'),
-    'caña':      ('🌿', '#14532D', '#F0FDF4'),
-    'cabuya':    ('🌵', '#166534', '#DCFCE7'),
-    'uvilla':    ('🍇', '#4C1D95', '#F5F3FF'),
-    'café':      ('☕', '#7B3F00', '#F7EDE2'),
-    'cafe':      ('☕', '#7B3F00', '#F7EDE2'),
-    'pasto':     ('🌿', '#166534', '#DCFCE7'),
-    'hierba':    ('🌿', '#166534', '#DCFCE7'),
-}
-_CULTIVO_DEFAULT = ('🌱', '#166534', '#DCFCE7')
-
-def _cultivo_lookup(nombre):
-    if not nombre:
-        return _CULTIVO_DEFAULT
-    key = nombre.lower().strip()
-    for k, v in _CULTIVOS_MAP.items():
-        if k in key:
-            return v
-    return _CULTIVO_DEFAULT
-
-@register.filter
-def cultivo_emoji(nombre):
-    return _cultivo_lookup(nombre)[0]
-
-@register.filter
-def cultivo_color(nombre):
-    return _cultivo_lookup(nombre)[1]
-
-@register.filter
-def cultivo_bg(nombre):
-    return _cultivo_lookup(nombre)[2]
-
-
 @register.filter
 def as_media_url(path):
     """Convierte una ruta relativa de media en URL absoluta."""
@@ -113,11 +55,6 @@ def as_media_url(path):
         return ''
     return settings.MEDIA_URL + str(path)
 
-
-@register.filter
-def get_item(diccionario, clave):
-    """Accede a un valor de diccionario por clave."""
-    return diccionario.get(clave, 0)
 
 @register.filter(name='split')
 def split(value, arg=","):

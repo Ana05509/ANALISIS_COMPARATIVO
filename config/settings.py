@@ -51,18 +51,8 @@ SESSION_COOKIE_AGE = 60 * 60 * 8  # 8 horas
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
-# HTTPS/HSTS solo con DEBUG=False: en local (DEBUG=True) el servidor de
-# desarrollo no habla HTTPS, así que forzar el redirect rompería
-# runserver. Railway sí sirve todo detrás de HTTPS.
-if not DEBUG:
-    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True'
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
-
 # ---------------------------
-# ENDURECIMIENTO PARA PRODUCCIÓN
+# ENDURECIMIENTO PARA PRODUCCIÓN (HTTPS/HSTS)
 # Todo esto queda inactivo con DEBUG=True para no romper el entorno local
 # (cookies "secure" y redirección HTTPS no funcionan sobre http://localhost).
 # ---------------------------
@@ -86,6 +76,45 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', 31536000))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+# ---------------------------
+# CONTENT SECURITY POLICY
+# Lista de orígenes desde los que el navegador puede cargar scripts, estilos,
+# fuentes e imágenes. Las plantillas tienen scripts y atributos onclick/style
+# en línea, y el admin (Unfold) usa Alpine.js, que necesita eval: por eso se
+# permiten 'unsafe-inline' y 'unsafe-eval'. Aun así la política impide cargar
+# scripts de dominios no listados, plugins (<object>), cambiar la URL base,
+# incrustar el sitio en otra página y enviar formularios a sitios ajenos.
+#
+# CSP_MODO=reporte  (por defecto) el navegador solo avisa; cada aviso queda
+#                   en el log del servidor como "CSP {...}" (ver /csp-report/).
+# CSP_MODO=bloquear el navegador bloquea lo que no cumpla. Pasar a este modo
+#                   cuando el log lleve unos días sin avisos inesperados.
+# CSP_MODO=off      sin cabecera.
+# ---------------------------
+from django.utils.csp import CSP  # noqa: E402
+
+_CDN_SCRIPTS = ["https://cdn.plot.ly", "https://cdn.jsdelivr.net"]
+_CSP = {
+    "default-src": [CSP.SELF],
+    "script-src": [CSP.SELF, CSP.UNSAFE_INLINE, CSP.UNSAFE_EVAL, *_CDN_SCRIPTS],
+    "style-src": [CSP.SELF, CSP.UNSAFE_INLINE, "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
+    "font-src": [CSP.SELF, "https://fonts.gstatic.com", "https://cdn.jsdelivr.net", "data:"],
+    # https: porque los cultivos pueden tener una imagen externa (Cultivo.imagen_url)
+    "img-src": [CSP.SELF, "data:", "blob:", "https:"],
+    # data:/blob: para las descargas PNG/SVG de los gráficos (fetch de un data URL)
+    "connect-src": [CSP.SELF, "data:", "blob:"],
+    "media-src": [CSP.SELF],
+    "object-src": [CSP.NONE],
+    "base-uri": [CSP.SELF],
+    "frame-ancestors": [CSP.NONE],
+    # El login con Google redirige el formulario a accounts.google.com
+    "form-action": [CSP.SELF, "https://accounts.google.com"],
+    "report-uri": "/csp-report/",
+}
+CSP_MODO = os.environ.get('CSP_MODO', 'reporte').strip().lower()
+SECURE_CSP = _CSP if CSP_MODO == 'bloquear' else {}
+SECURE_CSP_REPORT_ONLY = _CSP if CSP_MODO == 'reporte' else {}
 
 # ---------------------------
 # APLICACIONES
@@ -125,6 +154,9 @@ INSTALLED_APPS = [
 # ---------------------------
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+
+    # Cabecera Content-Security-Policy (configuración en SECURE_CSP más abajo)
+    'django.middleware.csp.ContentSecurityPolicyMiddleware',
 
     # Sirve los estáticos directamente desde la app en producción (Railway
     # no tiene un servidor web aparte tipo nginx delante) — debe ir
@@ -291,6 +323,18 @@ ACCOUNT_PREVENT_ENUMERATION = False
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']  # sin username; email=username
 ACCOUNT_LOGIN_METHODS = {'email'}                               # login con correo (username = email auto)
 ACCOUNT_UNIQUE_EMAIL = True         # un correo = una cuenta
+SOCIALACCOUNT_ADAPTER = 'analisis.adapter.CustomSocialAccountAdapter'
+
+# Solo se pueden crear cuentas nuevas (formulario o Google) con correos de
+# estos dominios; también se aceptan sus subdominios (p. ej. est.utc.edu.ec).
+# No afecta a las cuentas que ya existen: siguen entrando y recuperando su
+# contraseña aunque su correo sea de otro dominio. Vacío = registro sin
+# restricción de dominio.
+REGISTRO_DOMINIOS_PERMITIDOS = [
+    d.strip().lower().lstrip('@')
+    for d in os.environ.get('REGISTRO_DOMINIOS_PERMITIDOS', 'utc.edu.ec').split(',')
+    if d.strip()
+]
 
 # Respaldo del limitador de allauth alineado con el bloqueo propio de
 # analisis.seguridad (3 intentos fallidos por correo → 15 minutos). Solo se

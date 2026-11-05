@@ -65,16 +65,6 @@
         return '#' + yy + yy + yy;
     }
 
-    /** Devuelve '#000000' o '#ffffff', el que mejor contraste con el fondo dado. */
-    function contrastTextColor(hex) {
-        if (!hex || hex[0] !== '#') return '#000000';
-        var h = hex.replace('#', '');
-        if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
-        var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
-        var y = 0.299 * r + 0.587 * g + 0.114 * b;
-        return y > 150 ? '#000000' : '#ffffff';
-    }
-
     /**
      * Aplica color + patrón/símbolo por índice de trace. Pensado para
      * gráficas donde cada trace = una categoría/muestra independiente
@@ -108,28 +98,6 @@
             }
         });
         return data;
-    }
-
-    /**
-     * Colorea por punto una única trace que representa varias categorías
-     * (ej. px.bar/px.pie sin color=, donde todas las barras/porciones viven
-     * en una sola trace). Asigna un color distinto por punto y, en modo
-     * grises, un patrón distinto por barra para no depender solo del color.
-     */
-    function styleSingleTraceByPoint(trace, mode) {
-        var n = (trace.x || trace.labels || trace.values || trace.y || []).length;
-        var colors = [];
-        for (var i = 0; i < n; i++) colors.push(getColor(mode, i));
-        trace.marker = trace.marker || {};
-        trace.marker.color = colors;
-        if (trace.type === 'bar' && isGrayMode(mode)) {
-            var shapes = [];
-            for (var j = 0; j < n; j++) shapes.push(getPattern(j));
-            trace.marker.pattern = { shape: shapes, fgcolor: '#ffffff', size: 6 };
-        } else if (trace.type === 'bar') {
-            trace.marker.pattern = undefined;
-        }
-        return trace;
     }
 
     /** Colorscale de heatmap según modo. */
@@ -526,9 +494,7 @@
         toGrayscaleHex: toGrayscaleHex,
         taxonLegible: taxonLegible,
         isDarkTheme: isDarkTheme,
-        contrastTextColor: contrastTextColor,
         styleTracesByIndex: styleTracesByIndex,
-        styleSingleTraceByPoint: styleSingleTraceByPoint,
         heatmapColorscale: heatmapColorscale,
         baseLayout: baseLayout,
         yAxisGrid: yAxisGrid,
@@ -536,5 +502,149 @@
         mountModeSelector: mountModeSelector,
         addPlotlyDownloadButtons: addPlotlyDownloadButtons,
         addCanvasDownloadButton: addCanvasDownloadButton,
+        adaptarLayoutMovil: adaptarLayoutMovil,
     };
+
+    // ------------------------------------------------------------------
+    // Pantallas angostas (celular). Los layouts se diseñaron para escritorio:
+    // leyenda vertical a la derecha, títulos largos en una línea y alturas
+    // fijas. En ~375 px eso deja el área de datos aplastada o cortada. Aquí
+    // se ajusta SOLO la presentación cuando el contenedor mide menos de
+    // ANCHO_MOVIL; en escritorio el layout queda intacto.
+    // ------------------------------------------------------------------
+    var ANCHO_MOVIL = 576;
+    var ALTO_FILA_LEYENDA = 19;
+    var ALTO_DATOS_MOVIL = 280;
+
+    function _partirTexto(texto, maxCar) {
+        // Respeta los <br> existentes y parte el resto por palabras.
+        return String(texto).split(/<br\s*\/?>/i).map(function (linea) {
+            var palabras = linea.split(' '), lineas = [], actual = '';
+            palabras.forEach(function (p) {
+                if (actual && (actual + ' ' + p).replace(/<[^>]+>/g, '').length > maxCar) {
+                    lineas.push(actual); actual = p;
+                } else {
+                    actual = actual ? actual + ' ' + p : p;
+                }
+            });
+            if (actual) lineas.push(actual);
+            return lineas.join('<br>');
+        }).join('<br>');
+    }
+
+    function adaptarLayoutMovil(gd, data, layout) {
+        var el = typeof gd === 'string' ? document.getElementById(gd) : gd;
+        var ancho = el ? el.clientWidth : 0;
+        if (!layout || !ancho || ancho >= ANCHO_MOVIL) return layout;
+        data = data || [];
+
+        var L = Object.assign({}, layout);
+        var m = Object.assign({ t: 60, b: 60, l: 60, r: 40 }, layout.margin);
+        var margenVerticalOriginal = m.t + m.b;
+
+        // Título: más pequeño y en varias líneas para que no se corte.
+        var t = L.title, texto = typeof t === 'string' ? t : (t && t.text);
+        if (texto) {
+            var partido = _partirTexto(texto, Math.max(20, Math.floor(ancho / 8)));
+            var lineas = partido.split('<br>').length;
+            L.title = Object.assign({}, typeof t === 'object' ? t : {}, {
+                text: partido, font: Object.assign({}, (t && t.font) || {}, { size: 12 }),
+                x: 0.02, xanchor: 'left',
+            });
+            m.t = Math.max(m.t, 16 + lineas * 16);
+        }
+
+        // Leyenda: horizontal, al pie del gráfico, una entrada por fila
+        // (los nombres de taxón son largos). Se suma su alto al del gráfico
+        // para que no le quite espacio al área de datos.
+        var esPie = data.some(function (tr) { return tr.type === 'pie'; });
+        var entradas = esPie ? 0 : data.filter(function (tr) {
+            return tr.showlegend !== false && tr.name && tr.type !== 'heatmap';
+        }).length;
+        if (L.showlegend !== false && entradas > 1) {
+            var conTitulo = layout.legend && layout.legend.title && (layout.legend.title.text || typeof layout.legend.title === 'string');
+            var altoLeyenda = (entradas + (conTitulo ? 1 : 0)) * ALTO_FILA_LEYENDA + 12;
+            L.legend = Object.assign({}, layout.legend, {
+                orientation: 'v', x: 0, xanchor: 'left',
+                yref: 'container', y: 0, yanchor: 'bottom',
+                font: Object.assign({}, (layout.legend && layout.legend.font) || {}, { size: 10 }),
+                bgcolor: 'rgba(0,0,0,0)',
+            });
+            m.b = m.b + altoLeyenda;
+            // La leyenda deja de ocupar el margen derecho.
+            m.r = Math.min(m.r, 15);
+        }
+
+        // Mapas de calor: barra de color más delgada, nombres de taxón
+        // recortados con "…" (el nombre completo sigue en el hover) y etiquetas
+        // del eje X en vertical para que no se encimen.
+        data.forEach(function (tr) {
+            if (tr.type === 'heatmap') {
+                ['x', 'y'].forEach(function (k) {
+                    var eje = k + 'axis', cats = tr[k];
+                    if (!Array.isArray(cats) || typeof cats[0] !== 'string') return;
+                    var ejeL = Object.assign({}, L[eje] || layout[eje]);
+                    if (!ejeL.ticktext) {
+                        var t = buildTruncatedTicks(cats, 16);
+                        ejeL.tickmode = 'array'; ejeL.tickvals = t.tickvals; ejeL.ticktext = t.ticktext;
+                    }
+                    if (k === 'x' && cats.length > 4) ejeL.tickangle = -90;
+                    L[eje] = ejeL;
+                });
+                tr.colorbar = Object.assign({}, tr.colorbar, { thickness: 10, tickfont: { size: 9 } });
+                if (tr.colorbar.title) {
+                    tr.colorbar.title = Object.assign({}, typeof tr.colorbar.title === 'object'
+                        ? tr.colorbar.title : { text: tr.colorbar.title }, { font: { size: 9 } });
+                }
+            }
+        });
+
+        // Dispersión (PCoA): las etiquetas de texto junto a cada punto se
+        // salen del borde en pantallas angostas; si hay leyenda, el color ya
+        // identifica cada muestra y el nombre sigue en el hover.
+        if (L.showlegend !== false && entradas > 1) {
+            data.forEach(function (tr) {
+                if ((tr.type || 'scatter') === 'scatter' && typeof tr.mode === 'string' && tr.mode.indexOf('text') !== -1
+                        && tr.mode !== 'text') {
+                    tr.mode = tr.mode.split('+').filter(function (p) { return p !== 'text'; }).join('+');
+                }
+            });
+        }
+
+        m.l = Math.min(m.l, 50);
+        m.r = Math.min(m.r, 40);
+        L.margin = m;
+        ['xaxis', 'yaxis'].forEach(function (eje) {
+            L[eje] = Object.assign({}, L[eje], { automargin: true });
+        });
+        L.font = Object.assign({}, layout.font, { size: Math.min((layout.font && layout.font.size) || 12, 11) });
+        // Alto: el de escritorio (400-560 px) queda muy alto y angosto en un
+        // teléfono, así que el área de datos se limita a ALTO_DATOS_MOVIL y se
+        // le suman los márgenes (etiquetas, leyenda y título). Los mapas de calor
+        // conservan su alto (crece con el número de taxones). El contenedor
+        // suele tener alto fijo en CSS: se ajusta junto con el gráfico. Se
+        // guarda el alto original porque al cambiar Color/Grises la gráfica se
+        // vuelve a dibujar y no debe crecer en cada redibujo.
+        var esHeatmap = data.some(function (tr) { return tr.type === 'heatmap'; });
+        if (!esHeatmap) {
+            if (!el.dataset.altoBase) el.dataset.altoBase = layout.height || el.clientHeight || 450;
+            var areaDatos = Math.max(Number(el.dataset.altoBase) - margenVerticalOriginal, 200);
+            L.height = Math.min(areaDatos, ALTO_DATOS_MOVIL) + m.t + m.b;
+            el.style.height = L.height + 'px';
+        }
+        return L;
+    }
+
+    // Se aplica a todas las gráficas Plotly de las páginas que cargan este
+    // archivo (Plotly siempre se carga justo antes).
+    if (global.Plotly && !global.Plotly.__adaptadoMovil) {
+        ['newPlot', 'react'].forEach(function (fn) {
+            var original = global.Plotly[fn];
+            global.Plotly[fn] = function (gd, data, layout, config) {
+                if (Array.isArray(data)) layout = adaptarLayoutMovil(gd, data, layout);
+                return original.call(this, gd, data, layout, config);
+            };
+        });
+        global.Plotly.__adaptadoMovil = true;
+    }
 })(window);

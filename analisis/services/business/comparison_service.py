@@ -1,7 +1,7 @@
 import json
 import pandas as pd
-from django.db.models import F, Sum
-from analisis.models import MuestraSuelo, ResultadoTaxonomico, VariedadClon
+from django.db.models import Sum
+from analisis.models import MuestraSuelo, ResultadoTaxonomico
 from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, MAPA_NIVELES, OPCIONES_TOP_N, get_taxonomia_annotation, clasificar_taxon
 from analisis.services.business.analysis_service import obtener_lookup_catalogo
 
@@ -117,7 +117,6 @@ def ejecutar_comparacion_clean(cleaned_data):
     if nivel not in NIVELES_VALIDOS:   nivel = "genus"
     if top_n not in OPCIONES_TOP_N:    top_n = 10
 
-    campo_db = MAPA_NIVELES.get(nivel, "genus")
     ids = [m.id for m in muestras_sel] if muestras_sel else []
     
     muestras_base = MuestraSuelo.objects.filter(
@@ -171,52 +170,3 @@ def ejecutar_comparacion_clean(cleaned_data):
     }
 
 
-def obtener_microorganismos_compartidos(tipo="16S", variedad_id=None):
-    """
-    Calcula el Core Microbioma (intersección) restringiendo las muestras
-    estrictamente al contexto de su propio cultivo agrícola.
-    """
-    if not variedad_id:
-        return []
-        
-    try:
-        cultivo_id = VariedadClon.objects.get(id=variedad_id).cultivo_id
-    except VariedadClon.DoesNotExist:
-        return []
-
-    # Filtramos para que solo compare muestras del mismo cultivo biológico
-    qs = ResultadoTaxonomico.objects.filter(
-        archivo__tipo_analisis=tipo,
-        archivo__muestra__cultivo_id=cultivo_id
-    )
-
-    ids = list(qs.values_list("archivo__muestra_id", flat=True).distinct())
-    if len(ids) < 2:
-        return []
-
-    sets = {mid: set(qs.filter(archivo__muestra_id=mid).values_list("genus", flat=True).distinct()) for mid in ids}
-    return sorted(set.intersection(*sets.values()))
-
-
-def obtener_microorganismos_exclusivos(tipo="16S", variedad_id=None):
-    """
-    Calcula taxones exclusivos restando los del grupo de control
-    dentro del mismo nicho ecológico de cultivo vegetal.
-    """
-    if not variedad_id:
-        return []
-
-    try:
-        cultivo_id = VariedadClon.objects.get(id=variedad_id).cultivo_id
-    except VariedadClon.DoesNotExist:
-        return []
-
-    qs_contexto = ResultadoTaxonomico.objects.filter(
-        archivo__tipo_analisis=tipo,
-        archivo__muestra__cultivo_id=cultivo_id
-    )
-    
-    taxa_var   = set(qs_contexto.filter(archivo__muestra__variedad_clon_id=variedad_id).values_list("genus", flat=True).distinct())
-    taxa_otros = set(qs_contexto.exclude(archivo__muestra__variedad_clon_id=variedad_id).values_list("genus", flat=True).distinct())
-    
-    return sorted(taxa_var - taxa_otros)

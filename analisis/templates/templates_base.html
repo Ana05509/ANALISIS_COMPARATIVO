@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" href="{% static 'logo.png' %}?v=1784428237">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" integrity="sha384-XAeMOW3g/ahgKWjRcH7Xp+LVEQ/hkKrV0zkAUTnFwlaWK1aXfd9vVufdwqr/836i" crossorigin="anonymous">
     <!-- Aplica tema antes del render para evitar destello -->
     <script>
     (function(){
@@ -1460,41 +1460,10 @@
         });
     })();
 
-    /* ── AJUSTE DE ALTURA DE GRÁFICOS PLOTLY EN MÓVIL ──
-       Las páginas con gráficos (dashboard, comparar, análisis avanzado,
-       reportes, bioquímica) fijan la altura en píxeles desde el backend
-       (400-560px, y en algún caso crece con la cantidad de datos). Con
-       Plotly {responsive:true} el ANCHO ya se adapta solo, pero la altura
-       se queda fija — en un teléfono angosto el gráfico queda muy alto y
-       angosto. Esto corre después de que cada página renderiza sus propios
-       gráficos (no toca cómo los genera cada una) y solo actúa sobre los
-       que Plotly ya haya dibujado en el DOM. */
-    (function () {
-        var MOBILE_HEIGHT = 300;
-
-        function ajustarGraficos() {
-            if (typeof Plotly === 'undefined') return;
-            var esMovil = window.innerWidth < 640;
-            document.querySelectorAll('.js-plotly-plot').forEach(function (gd) {
-                var alturaActual = gd._fullLayout && gd._fullLayout.height;
-                if (!alturaActual) return;
-                if (esMovil && alturaActual > MOBILE_HEIGHT) {
-                    if (!gd.dataset.bsAlturaOriginal) gd.dataset.bsAlturaOriginal = alturaActual;
-                    Plotly.relayout(gd, { height: MOBILE_HEIGHT });
-                } else if (!esMovil && gd.dataset.bsAlturaOriginal) {
-                    Plotly.relayout(gd, { height: parseInt(gd.dataset.bsAlturaOriginal, 10) });
-                    delete gd.dataset.bsAlturaOriginal;
-                }
-            });
-        }
-
-        var debounceId;
-        window.addEventListener('resize', function () {
-            clearTimeout(debounceId);
-            debounceId = setTimeout(ajustarGraficos, 200);
-        });
-        window.addEventListener('load', function () { setTimeout(ajustarGraficos, 50); });
-    })();
+    /* La adaptación de los gráficos Plotly a pantallas de celular (altura,
+       leyenda y título) está en static/analisis/js/chart_theme.js →
+       adaptarLayoutMovil(). Antes aquí se forzaba una altura fija de 300px,
+       que dejaba el área de datos aplastada por la leyenda y las etiquetas. */
 
     /* ── INICIALIZACIÓN ── */
     document.addEventListener('DOMContentLoaded', function () {

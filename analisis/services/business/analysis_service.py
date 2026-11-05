@@ -252,7 +252,6 @@ def obtener_permanova(tipo="16S", nivel="genus", muestra_ids=None, n_perm=499):
     agrupar por variedad/clon.
     """
     import numpy as np
-    from analisis.models import MuestraSuelo
 
     if not muestra_ids or len(muestra_ids) < 2:
         return None

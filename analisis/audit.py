@@ -12,7 +12,7 @@ cambió de firma entre versiones de Django (log_action -> log_actions en
 Django 6), así que construir el registro a mano es más estable y no
 depende de qué versión de Django esté instalada.
 """
-from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
+from django.contrib.admin.models import CHANGE, LogEntry
 from django.contrib.contenttypes.models import ContentType
 
 

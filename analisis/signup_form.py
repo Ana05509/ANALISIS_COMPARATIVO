@@ -48,6 +48,17 @@ class CustomSignupForm(forms.Form):
     def clean_last_name(self):
         return _validate_name(self.cleaned_data.get('last_name', ''), 'apellido')
 
+    def clean(self):
+        # Se valida aquí y no en adapter.clean_email() porque ese método también
+        # lo usa "olvidé mi contraseña", y las cuentas existentes con otro
+        # dominio deben poder seguir recuperándola.
+        cleaned = super().clean()
+        from analisis.adapter import dominio_permitido, mensaje_dominio_no_permitido
+        email = cleaned.get('email')
+        if email and not dominio_permitido(email):
+            self.add_error('email', mensaje_dominio_no_permitido())
+        return cleaned
+
     def signup(self, request, user):
         user.first_name = self.cleaned_data['first_name']
         user.last_name = self.cleaned_data['last_name']
