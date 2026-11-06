@@ -999,9 +999,12 @@ async function cargarPreviewPDF() {
         placeholder.classList.remove('is-loading');
         placeholder.innerHTML =
             '<i class="ti ti-alert-triangle" style="color:var(--rojo,#dc2626);"></i>' +
-            '<span>No se pudo generar la vista previa: ' + err.message + '</span>' +
+            '<span class="rpt-preview-error"></span>' +
             '<button type="button" class="btn btn-outline btn-sm" onclick="cargarPreviewPDF()">' +
             '<i class="ti ti-refresh"></i> Reintentar</button>';
+        // El mensaje viene del servidor: se inserta como texto.
+        placeholder.querySelector('.rpt-preview-error').textContent =
+            'No se pudo generar la vista previa: ' + err.message;
         console.error(err);
     }
 }

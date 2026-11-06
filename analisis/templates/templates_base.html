@@ -1203,6 +1203,9 @@
             /* Duración: errores no se cierran solos */
             if (duration === undefined) duration = (type === 'error') ? 0 : 5000;
 
+            if (!ICONS[type]) type = 'info';
+            duration = Number(duration) || 0;
+
             var el = document.createElement('div');
             el.className   = 'toast toast-' + type;
             el.setAttribute('role', 'alert');
@@ -1212,10 +1215,12 @@
                 : '';
 
             el.innerHTML =
-                '<i class="ti ' + (ICONS[type] || ICONS.info) + ' toast-icon" aria-hidden="true"></i>' +
-                '<span class="toast-body">' + message + '</span>' +
+                '<i class="ti ' + ICONS[type] + ' toast-icon" aria-hidden="true"></i>' +
+                '<span class="toast-body"></span>' +
                 '<button class="toast-close" aria-label="Cerrar notificación">&#10005;</button>' +
                 progressHtml;
+            // El mensaje puede traer datos del usuario (nombres de archivo, códigos): solo como texto.
+            el.querySelector('.toast-body').textContent = message == null ? '' : String(message);
 
             el.querySelector('.toast-close').addEventListener('click', function () { dismiss(el); });
             c.appendChild(el);

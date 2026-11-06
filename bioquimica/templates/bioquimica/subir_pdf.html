@@ -229,8 +229,9 @@ function actualizarLista() {
         var li = document.createElement('li');
         li.style.cssText = 'display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid #E5E3DC; font-size:13px;';
         li.innerHTML = '<i class="ti ti-file-type-pdf" style="color:#C8443A; flex-shrink:0;"></i>'
-            + '<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + files[i].name + '</span>'
+            + '<span class="bq-nombre-archivo" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>'
             + '<a href="#" data-idx="' + i + '" onclick="quitarArchivo(this); return false;" style="color:#A32D2D; flex-shrink:0; font-size:12px;">✕</a>';
+        li.querySelector('.bq-nombre-archivo').textContent = files[i].name;
         ul.appendChild(li);
     }
     li = ul.querySelector('li:last-child');

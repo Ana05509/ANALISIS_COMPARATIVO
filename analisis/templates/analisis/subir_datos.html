@@ -518,6 +518,13 @@
         submitBtn.disabled = false;
     }
 
+    // Escapa texto que viene del servidor (códigos, columnas y nombres del archivo subido).
+    function esc(valor) {
+        return String(valor == null ? '' : valor)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     function mostrarErrorArchivo(data) {
         let el = document.getElementById('upload-error-inline');
         if (!el) {
@@ -535,8 +542,8 @@
               +     '<div style="flex:1;">'
               +       '<strong style="color:var(--amber);font-size:14.5px;display:block;margin-bottom:4px;">Esta muestra ya tiene datos cargados</strong>'
               +       '<p style="font-size:13px;color:var(--text-primary);line-height:1.5;margin:0 0 .6rem;">'
-              +         'La muestra <strong>' + data.codigo + '</strong> ya tiene un archivo <strong>' + data.marcador + '</strong> cargado'
-              +         (data.fecha_carga ? ' el ' + data.fecha_carga : '') + ' con <strong>' + data.total_taxones + '</strong> taxones. '
+              +         'La muestra <strong>' + esc(data.codigo) + '</strong> ya tiene un archivo <strong>' + esc(data.marcador) + '</strong> cargado'
+              +         (data.fecha_carga ? ' el ' + esc(data.fecha_carga) : '') + ' con <strong>' + esc(data.total_taxones) + '</strong> taxones. '
               +         'Si continúa, esos datos se reemplazarán por los del archivo nuevo y no se podrán recuperar.'
               +       '</p>'
               +       '<div style="display:flex;gap:8px;">'
@@ -566,7 +573,7 @@
                      +     'background:' + (falta ? 'var(--rojo-light)' : 'var(--verde-light)') + ';'
                      +     'color:'      + (falta ? 'var(--rojo)' : 'var(--verde-dark)') + ';'
                      +     'border:1.5px solid ' + (falta ? 'var(--rojo)' : 'var(--verde)') + ';'
-                     +     'white-space:nowrap;">' + col + '</div>'
+                     +     'white-space:nowrap;">' + esc(col) + '</div>'
                      +   '<span style="font-size:10px;font-weight:600;color:' + (falta ? 'var(--rojo)' : 'var(--verde-dark)') + ';">'
                      +     (falta ? '✗ falta' : '✓') + '</span>'
                      + '</div>';
@@ -574,7 +581,7 @@
 
             const recibidasHTML = data.recibidas.length
                 ? data.recibidas.map(function(c) {
-                    return '<span style="padding:2px 8px;background:var(--gris-light);border:1px solid var(--gris-border);border-radius:4px;font-size:11.5px;font-family:monospace;color:var(--text-muted);">' + c + '</span>';
+                    return '<span style="padding:2px 8px;background:var(--gris-light);border:1px solid var(--gris-border);border-radius:4px;font-size:11.5px;font-family:monospace;color:var(--text-muted);">' + esc(c) + '</span>';
                   }).join(' ')
                 : '<em style="color:var(--text-hint);">(ninguna detectada)</em>';
 
@@ -585,7 +592,7 @@
               +     '<strong style="color:var(--rojo);font-size:15px;">El archivo no tiene el formato requerido</strong>'
               +   '</div>'
               +   '<p style="font-size:13px;color:var(--rojo);margin:0 0 .7rem;">'
-              +     'Faltan <strong>' + data.faltantes.length + '</strong> columna(s). '
+              +     'Faltan <strong>' + esc(data.faltantes.length) + '</strong> columna(s). '
               +     'Su archivo debe tener estas columnas <strong>en este orden</strong>:'
               +   '</p>'
               +   '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:.7rem;background:var(--surface);border-radius:8px;margin-bottom:.7rem;">'
@@ -600,7 +607,7 @@
               +   '<i class="ti ti-alert-circle" aria-hidden="true"></i>'
               +   '<div>'
               +     '<strong style="display:block;margin-bottom:2px;">Error al procesar el archivo</strong>'
-              +     '<span style="font-size:13px;line-height:1.5;">' + msg + '</span>'
+              +     '<span style="font-size:13px;line-height:1.5;">' + esc(msg) + '</span>'
               +   '</div>'
               + '</div>';
         }
