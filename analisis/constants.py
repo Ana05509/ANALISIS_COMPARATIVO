@@ -21,6 +21,20 @@ MAPA_NIVELES = {
 
 CLASIFICACIONES = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
 
+# Nombres que indican lecturas SIN asignación al nivel taxonómico (no son un taxón).
+# Se reportan como fracción ("% sin asignar"), pero no cuentan en riqueza, Shannon,
+# Simpson, Bray-Curtis, Jaccard, PCoA, PERMANOVA ni en compartidos/exclusivos.
+# Un epíteto sin identificar dentro de un género conocido ("Bacillus Unclassified",
+# equivalente a "Bacillus sp.") SÍ es un taxón y no se excluye.
+TAXONES_NO_ASIGNADOS = frozenset({"unclassified", "unknown", "others", "others sp", "nan", "none", ""})
+
+
+def es_taxon_asignado(nombre) -> bool:
+    """True si `nombre` es un taxón real y no una etiqueta de lecturas sin asignar."""
+    if nombre is None:
+        return False
+    return str(nombre).strip().lower() not in TAXONES_NO_ASIGNADOS
+
 # Etiquetas en español para la interfaz de usuario. El orden de este dict
 # define el orden en que aparecen las opciones en los desplegables de "Nivel
 # Taxonómico" (NIVELES_CHOICES más abajo) — Género y Especie van primero por
@@ -99,8 +113,7 @@ def clasificar_taxon(taxon: str, catalogo_map: dict, nivel: str) -> str:
     Lookup con cuatro niveles de fallback para nivel 'species':
     1. Binomio completo → match directo.
     2. Género duplicado (CASE WHEN legacy) → intenta parts[1:].
-    3. Catálogo con sólo epíteto → intenta última palabra.
-    4. Catálogo sin entradas de especie (solo géneros, p.ej. ITS) → intenta primera palabra.
+    No se infiere una especie a partir de un epíteto aislado ni de la función de su género.
     """
     if not taxon:
         return "sin_clasificar"
@@ -111,19 +124,8 @@ def clasificar_taxon(taxon: str, catalogo_map: dict, nivel: str) -> str:
     if nivel == "species":
         parts = key.split()
         # Caso 2: "Bacillus Bacillus subtilis" → probar "Bacillus subtilis"
-        if len(parts) >= 3:
+        if len(parts) >= 3 and parts[0] == parts[1]:
             clas = catalogo_map.get(" ".join(parts[1:]))
-            if clas:
-                return clas
-        # Caso 3: catálogo tiene solo epíteto → última palabra
-        if len(parts) >= 2:
-            clas = catalogo_map.get(parts[-1])
-            if clas:
-                return clas
-        # Caso 4: catálogo solo tiene géneros (ej: ITS solo tiene "Mortierella")
-        # → primera palabra del binomio = género
-        if parts:
-            clas = catalogo_map.get(parts[0])
             if clas:
                 return clas
     return "sin_clasificar"
@@ -131,7 +133,7 @@ def clasificar_taxon(taxon: str, catalogo_map: dict, nivel: str) -> str:
 
 def buscar_en_catalogo(nombre: str, catalogo: dict, nivel: str):
     """
-    Busca un objeto CatalogoMicroorganismo con los mismos fallbacks que clasificar_taxon.
+    Busca una coincidencia al mismo nivel, normalizando solo un género duplicado.
     catalogo es un dict {nombre_normalizado: obj}.
     """
     if not nombre:
@@ -142,16 +144,8 @@ def buscar_en_catalogo(nombre: str, catalogo: dict, nivel: str):
         return obj
     if nivel == "species":
         parts = key.split()
-        if len(parts) >= 3:
+        if len(parts) >= 3 and parts[0] == parts[1]:
             obj = catalogo.get(" ".join(parts[1:]))
-            if obj:
-                return obj
-        if len(parts) >= 2:
-            obj = catalogo.get(parts[-1])
-            if obj:
-                return obj
-        if parts:
-            obj = catalogo.get(parts[0])
             if obj:
                 return obj
     return None

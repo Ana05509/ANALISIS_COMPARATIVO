@@ -32,6 +32,7 @@ class SubirDatosForm(forms.Form):
 
     altitud = forms.IntegerField(
         label="Altitud (msnm)",
+        min_value=0, max_value=6500,
         widget=forms.NumberInput(attrs={"class": "form-control", "placeholder": "Ej: 1200"}),
         required=False
     )

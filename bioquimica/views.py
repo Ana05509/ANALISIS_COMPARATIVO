@@ -411,8 +411,8 @@ def _guardar_ensayo(archivo, request):
 
     if not archivo.name.lower().endswith('.pdf'):
         raise ValueError(f"«{archivo.name}» no es un PDF.")
-    if archivo.size > 20 * 1024 * 1024:
-        raise ValueError(f"«{archivo.name}» supera el máximo de 20 MB.")
+    if archivo.size > 10 * 1024 * 1024:
+        raise ValueError(f"«{archivo.name}» supera el máximo de 10 MB.")
 
     try:
         resultado = parsear_pdf(archivo)
@@ -542,6 +542,10 @@ def subir_pdf(request):
     archivos = request.FILES.getlist('archivos')
     if not archivos:
         messages.error(request, "Debe seleccionar al menos un archivo PDF.")
+        return render(request, 'bioquimica/subir_pdf.html')
+
+    if len(archivos) > 10 or sum(a.size for a in archivos) > 20 * 1024 * 1024:
+        messages.error(request, "El lote admite hasta 10 PDF y 20 MB en total.")
         return render(request, 'bioquimica/subir_pdf.html')
 
     creados = []      # [(codigo, pk), ...]

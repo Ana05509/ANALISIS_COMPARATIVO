@@ -3,3 +3,8 @@
 
 # Validación externa de la PCoA en analisis/tests.py
 scikit-bio==0.7.4
+
+
+# Runner opcional para pytest.ini; la validación principal usa manage.py test.
+pytest>=8.3,<10
+pytest-django>=4.9,<5

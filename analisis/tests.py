@@ -116,7 +116,7 @@ class BrayCurtisVectorizadoTests(SimpleTestCase):
     def test_matriz_bray_curtis_igual_a_version_anterior(self):
         rng = np.random.default_rng(42)
         conteos = rng.integers(0, 500, size=(6, 20)).astype(float)
-        conteos[3] = 0  # muestra sin lecturas: control sumas == 0
+        # La equivalencia se comprueba con muestras válidas; los vacíos se prueban aparte.
 
         # Versión anterior: normalización a proporciones + bucles for
         sumas = conteos.sum(axis=1, keepdims=True)

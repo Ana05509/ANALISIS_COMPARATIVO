@@ -3,6 +3,7 @@ from . import views
 from .views.auth import CustomLoginView, CustomLogoutView
 from .views.analysis import resultado_analisis
 from .views.csp import reporte_csp
+from .views.reportes import reporte_archivado
 from .views.api import (
     api_muestras, api_muestra_detalle,
     api_catalogo, api_catalogo_entrada,
@@ -46,6 +47,7 @@ urlpatterns = [
 
     # 6. REPORTES
     path("reportes/", views.reportes, name="reportes"),
+    path("reportes/archivo/<uuid:pk>/", reporte_archivado, name="reporte_archivado"),
     path("reportes/generar/", views.generar_reporte, name="generar_reporte"),
     path("reportes/generar-general/", views.generar_reporte_general, name="generar_reporte_general"),
 

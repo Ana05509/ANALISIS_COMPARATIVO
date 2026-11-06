@@ -165,6 +165,13 @@ class AnalisisConfig(AppConfig):
     verbose_name = 'BioMicro'
 
     def ready(self):
+        from django.db.models.signals import post_delete
+        from .archivos import limpiar_original_eliminado
+        from .models import ArchivoMolecular, ArchivoMolecularRevision
+        from bioquimica.models import EnsayoMicrobiologico
+        for modelo in (ArchivoMolecular, ArchivoMolecularRevision, EnsayoMicrobiologico):
+            post_delete.connect(limpiar_original_eliminado, sender=modelo, weak=False,
+                                dispatch_uid=f"limpiar_original_{modelo._meta.label_lower}")
         # Diagnóstico temporal de correo: buscar "DIAGNOSTICO EMAIL" en los logs.
         try:
             from django.conf import settings as dj_settings

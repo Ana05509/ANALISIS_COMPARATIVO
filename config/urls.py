@@ -1,4 +1,5 @@
 import os
+import posixpath
 
 from django.contrib import admin
 from django.contrib.auth.decorators import login_required
@@ -34,7 +35,11 @@ _MEDIA_INLINE = {'.png', '.jpg', '.jpeg', '.webp', '.gif'}
 
 @login_required
 def media_protegida(request, path):
-    if path.startswith(_MEDIA_RESTRINGIDA) and not puede_cargar_datos(request.user):
+    # Autorizar el mismo destino normalizado que se entrega al servidor de archivos.
+    path = posixpath.normpath(path.replace('\\', '/')).lstrip('/')
+    if path == '..' or path.startswith('../'):
+        raise PermissionDenied
+    if path.casefold().startswith(_MEDIA_RESTRINGIDA) and not puede_cargar_datos(request.user):
         raise PermissionDenied
     response = serve_media(request, path, document_root=settings.MEDIA_ROOT)
     # Lo que no es imagen se descarga en vez de abrirse en el navegador.

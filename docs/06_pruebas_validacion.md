@@ -1,3 +1,5 @@
+> Actualización 6-nov-2026: la suite completa actual pasa 156 pruebas con `--settings=config.settings_test`. Véase [correcciones de auditoría](auditoria_2026-11-06/correcciones.md). Las cifras anteriores de este documento describen la validación histórica.
+
 # 6. Pruebas y validación
 
 ## 6.1 Pruebas automatizadas

@@ -72,7 +72,7 @@ Los permisos de staff se comprueban con `is_staff`, y los de carga y ensayos con
 | RN-06 | La comparación exige al menos 2 muestras. Las estadísticas multimuestra (beta, gamma, PERMANOVA) solo aparecen en «Comparar». | `views/comparison.py`, `views/analysis.py` |
 | RN-07 | Índice de Salud del Suelo = 70 % × benéficos / (benéficos + fitopatógenos) + 30 % × min(H′/3.5, 1), redondeado de 0 a 100. Niveles: ≥80 ÓPTIMO, ≥65 FAVORABLE, ≥50 MODERADO, ≥30 EN RIESGO y menor de 30 CRÍTICO. | `reportes.calcular_indice_salud` |
 | RN-08 | Al cambiar `TERMINOS_VERSION`, todos los usuarios deben volver a aceptar los términos. | `analisis/seguridad.py` |
-| RN-09 | La diversidad alfa se calcula sobre el perfil completo, incluida la categoría «sin clasificar», y no solo sobre el Top N. | `diversity.py`, `views/comparison.py` |
+| RN-09 | La diversidad alfa usa todos los taxones asignados, sin limitarse al Top N. Las lecturas sin asignación se conservan para profundidad y composición, pero no cuentan como taxón. | `diversity.py`, `views/comparison.py` |
 
 ## 2.5 Trazabilidad entre requisitos, funcionalidades y pruebas
 

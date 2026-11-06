@@ -3,19 +3,20 @@ from collections import defaultdict
 from datetime import datetime
 import json
 
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import F, Sum
 from django.http import JsonResponse, HttpResponse, HttpResponseBase
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 
 from analisis.models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo
 from analisis.services.business.analysis_service import (
     obtener_analisis_avanzado, obtener_diversidad, obtener_diversidad_por_muestra, _filtrar_catalogo_por_nivel,
 )
 from analisis.services.business.export_service import ExportService
-from analisis.constants import MARCADORES_VALIDOS, OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES, get_taxonomia_annotation, clasificar_taxon, buscar_en_catalogo, NIVELES_ES, NIVELES_CHOICES, MARCADORES_CHOICES, normalizar_nombre_catalogo
+from analisis.services.business.trazabilidad import archivar_reporte
+from analisis.constants import MARCADORES_VALIDOS, OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES, get_taxonomia_annotation, clasificar_taxon, buscar_en_catalogo, NIVELES_ES, NIVELES_CHOICES, MARCADORES_CHOICES, normalizar_nombre_catalogo, es_taxon_asignado
 from analisis.audit import registrar_accion
 from django.contrib.admin.models import CHANGE
 
@@ -26,10 +27,18 @@ _ERROR_REPORTE = "No se pudo generar el reporte. Intente de nuevo o contacte al 
 
 # Helpers de cálculo
 
-def calcular_indice_salud(n_ben, n_fito, n_neu, n_sc, shannon=0):
-    """Índice de Salud del Suelo (0-100). Devuelve (indice, nivel)."""
-    total_func = n_ben + n_fito
-    ratio      = n_ben / total_func if total_func > 0 else 0.5
+def calcular_indice_salud(pct_ben, pct_fito, shannon=0):
+    """Índice de Salud del Suelo (0-100). Devuelve (indice, nivel).
+
+    pct_ben / pct_fito: abundancia relativa (% de lecturas) de los taxones
+    benéficos y potencialmente fitopatógenos. Se pondera por abundancia y no por
+    número de taxones: un patógeno raro (0,01 %) no pesa lo mismo que un benéfico
+    dominante (30 %). Indicador exploratorio: pesos 70/30 y Shannon/3,5 sin calibrar.
+    """
+    total_func = pct_ben + pct_fito
+    if total_func <= 0:
+        return None, "NO ESTIMABLE"
+    ratio      = pct_ben / total_func if total_func > 0 else 0.5
     shan_norm  = min(float(shannon or 0) / 3.5, 1.0)
     indice     = max(0, min(100, round((ratio * 0.70 + shan_norm * 0.30) * 100)))
     if   indice >= 80: nivel = "ÓPTIMO"
@@ -52,8 +61,10 @@ def _catalogo_por_nombre(tipo, nivel):
 
 def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S", catalogo=None):
     """
-    Devuelve (detalle_dict, totales_dict) con info funcional de cada taxón.
+    Devuelve (detalle_dict, totales_dict, abundancia_dict) con info funcional de cada taxón.
     detalle_dict[cat] = [{nombre, porcentaje, descripcion, referencia}, ...]
+    totales_dict[cat] = número de taxones; abundancia_dict[cat] = % de lecturas.
+    Las lecturas sin asignar no son un taxón: van solo a abundancia_dict["sin_asignar"].
     """
     CATS = ("benefico", "fitopatogeno", "neutral", "sin_clasificar")
     taxa_qs    = list(qs.values(taxon=get_taxonomia_annotation(nivel)).annotate(hits=Sum("num_hits")).order_by("-hits"))
@@ -64,8 +75,13 @@ def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S", catalogo=Non
 
     detalle = {c: [] for c in CATS}
     totales = {c: 0  for c in CATS}
+    abundancia = {c: 0.0 for c in CATS}
+    abundancia["sin_asignar"] = 0.0
     for row in taxa_qs:
-        nombre = row["taxon"] or "Desconocido"
+        if not es_taxon_asignado(row["taxon"]):
+            abundancia["sin_asignar"] += row["hits"] / grand_total * 100
+            continue
+        nombre = row["taxon"]
         cat_obj = buscar_en_catalogo(nombre, catalogo, nivel)
         clas    = (cat_obj.clasificacion if cat_obj and cat_obj.clasificacion in CATS else "sin_clasificar")
 
@@ -79,7 +95,8 @@ def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S", catalogo=Non
             "referencia":  cat_obj.referencia  or "" if cat_obj else "",
         })
         totales[clas] += 1
-    return detalle, totales
+        abundancia[clas] += pct_raw
+    return detalle, totales, {c: round(v, 4) for c, v in abundancia.items()}
 
 
 def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None, diversidad=None):
@@ -110,12 +127,10 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None, diversidad=No
 
     if diversidad is None:  # la vista puede pasar la que ya calculó
         diversidad = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids) or {}
-    detalle_clas, totales_clas = _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo)
+    detalle_clas, totales_clas, abundancia_clas = _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo)
     shannon_val  = diversidad.get("shannon", 0) or 0
     indice, nivel_salud = calcular_indice_salud(
-        totales_clas["benefico"], totales_clas["fitopatogeno"],
-        totales_clas["neutral"],  totales_clas["sin_clasificar"],
-        shannon=shannon_val,
+        abundancia_clas["benefico"], abundancia_clas["fitopatogeno"], shannon=shannon_val,
     )
 
     # Agregación kingdom → phylum → <nivel actual>, para el gráfico Sunburst
@@ -132,6 +147,7 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None, diversidad=No
         "diversidad":   diversidad,
         "detalle_clas": detalle_clas,
         "totales_clas": totales_clas,
+        "abundancia_clas": abundancia_clas,
         "indice_salud": indice,
         "nivel_salud":  nivel_salud,
         "jerarquia_taxonomica": jerarquia_taxonomica,
@@ -153,7 +169,6 @@ def _construir_datos_informe_general(tipo, top_n, muestra_id):
 def _construir_datos_por_muestra(tipo, nivel, top_n, muestras_list):
     """Para reportes comparativos: datos por cada muestra seleccionada."""
     campo_db  = MAPA_NIVELES.get(nivel, "genus")
-    EXCLUIR = {"others", "unclassified", "unknown", "others sp", "nan", ""}
     catalogo = _catalogo_por_nombre(tipo, nivel)  # una vez, no una por muestra
     div_por_muestra = obtener_diversidad_por_muestra(tipo=tipo, nivel=nivel,
                                                      muestra_ids=[m.id for m in muestras_list])
@@ -173,13 +188,12 @@ def _construir_datos_por_muestra(tipo, nivel, top_n, muestras_list):
         top_raw = all_raw[:top_n]
         todos_taxa_nombres = {
             str(r["taxonomia"]) for r in all_raw
-            if r.get("taxonomia") and str(r["taxonomia"]).lower() not in EXCLUIR
+            if es_taxon_asignado(r.get("taxonomia"))
         }
         div_m = div_por_muestra.get(muestra.id) or {}
-        detalle_m, totales_m = _obtener_clasificacion_detalle(qs_m, nivel, campo_db, tipo, catalogo=catalogo)
+        detalle_m, totales_m, abundancia_m = _obtener_clasificacion_detalle(qs_m, nivel, campo_db, tipo, catalogo=catalogo)
         indice_m, nivel_m = calcular_indice_salud(
-            totales_m["benefico"], totales_m["fitopatogeno"],
-            totales_m["neutral"],  totales_m["sin_clasificar"],
+            abundancia_m["benefico"], abundancia_m["fitopatogeno"],
             shannon=div_m.get("shannon", 0) or 0,
         )
         resultado.append({
@@ -190,6 +204,7 @@ def _construir_datos_por_muestra(tipo, nivel, top_n, muestras_list):
             "diversidad":         div_m,
             "detalle_clas":       detalle_m,
             "totales_clas":       totales_m,
+            "abundancia_clas":    abundancia_m,
             "indice_salud":       indice_m,
             "nivel_salud":        nivel_m,
         })
@@ -397,7 +412,7 @@ def generar_reporte(request) -> HttpResponseBase:
                     f"Reporte Excel generado (nivel {nivel}, top {top_n}, {len(muestras_list)} muestra(s)).",
                     accion=CHANGE,
                 )
-            return ExportService.generar_excel_multisheet(datos)
+            return archivar_reporte(ExportService.generar_excel_multisheet(datos), datos, formato)
 
         # PDF — individual si 0-1 muestras, comparativo si 2+
         if len(muestras_list) > 1:
@@ -418,7 +433,7 @@ def generar_reporte(request) -> HttpResponseBase:
 
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{nombre}"'
-        return response
+        return archivar_reporte(response, datos, formato)
 
     except Exception:
         logger.exception("Fallo al generar reporte (usuario=%s, formato=%s, tipo=%s, nivel=%s, muestras=%s)",
@@ -479,15 +494,34 @@ def generar_reporte_general(request) -> HttpResponseBase:
         )
 
         if formato == "excel":
-            return ExportService.generar_excel_informe_general(datos)
+            return archivar_reporte(ExportService.generar_excel_informe_general(datos), datos, formato)
 
         pdf_bytes = ExportService.generar_pdf_informe_general(datos)
         nombre = f"informe_general_{tipo}_{muestra.codigo}_{fecha}.pdf"
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{nombre}"'
-        return response
+        return archivar_reporte(response, datos, formato)
 
     except Exception:
         logger.exception("Fallo al generar informe general (usuario=%s, formato=%s, muestra=%s)",
                          request.user.pk, formato, muestra_id)
         return JsonResponse({"ok": False, "error": _ERROR_REPORTE}, status=500)
+
+
+@login_required
+@require_GET
+def reporte_archivado(request, pk):
+    """La misma política de lectura global que los reportes, sin recalcular el artefacto."""
+    import hashlib
+    from analisis.models import ReporteArchivado
+    reporte = get_object_or_404(ReporteArchivado, pk=pk)
+    cuerpo = bytes(reporte.contenido)
+    if hashlib.sha256(cuerpo).hexdigest() != reporte.sha256:
+        logger.error("Integridad de reporte archivado fallida: %s", reporte.pk)
+        return JsonResponse({"ok": False, "error": "El informe archivado no supera la verificación de integridad."}, status=500)
+    tipo = "application/pdf" if reporte.formato == "pdf" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    response = HttpResponse(cuerpo, content_type=tipo)
+    response["Content-Disposition"] = f'attachment; filename="{reporte.nombre}"'
+    response["X-Reporte-SHA256"] = reporte.sha256
+    response["Cache-Control"] = "private, no-store"
+    return response

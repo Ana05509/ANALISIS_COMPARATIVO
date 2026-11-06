@@ -1,0 +1,130 @@
+﻿{
+  "skbio": "0.7.4",
+  "pipeline": [
+    {
+      "entrada": "1.9",
+      "salida": [
+        {
+          "kingdom": "Bacteria",
+          "phylum": "P",
+          "tax_class": "C",
+          "order": "O",
+          "family": "F",
+          "genus": "Bacillus",
+          "species": "subtilis",
+          "num_hits": 1,
+          "%_hits": 999.0
+        }
+      ]
+    },
+    {
+      "entrada": "no_numerico",
+      "salida": []
+    },
+    {
+      "entrada": -5,
+      "salida": []
+    },
+    {
+      "entrada": 10,
+      "salida": [
+        {
+          "kingdom": "Bacteria",
+          "phylum": "P",
+          "tax_class": "C",
+          "order": "O",
+          "family": "F",
+          "genus": "Bacillus",
+          "species": "subtilis",
+          "num_hits": 10,
+          "%_hits": 999.0
+        }
+      ]
+    }
+  ],
+  "cero": {
+    "distancias_finitas": false,
+    "ejecutado": true,
+    "f_finito": false,
+    "p": 0.1
+  },
+  "riqueza_diferencial": {
+    "compartidos": 1,
+    "compartidos_lista": [
+      "bacillus"
+    ],
+    "exclusivos": {
+      "exclusivos_a": [],
+      "exclusivos_b": []
+    },
+    "jaccard": 1.0,
+    "total_taxa_reales_a": 2,
+    "total_taxa_reales_b": 2,
+    "nivel_evaluado": "genus"
+  },
+  "ufc": [
+    {
+      "entrada": "3 x 10^6 UFC/g",
+      "salida": [
+        "6.0",
+        "0",
+        "False"
+      ]
+    },
+    {
+      "entrada": "3 x 10-2 UFC/g",
+      "salida": [
+        "2.0",
+        "0",
+        "False"
+      ]
+    },
+    {
+      "entrada": "<10 UFC/g",
+      "salida": [
+        "None",
+        "None",
+        "True"
+      ]
+    },
+    {
+      "entrada": "<100 UFC/g",
+      "salida": [
+        "None",
+        "None",
+        "True"
+      ]
+    }
+  ],
+  "media": {
+    "archivos_moleculares/sintetico.csv": 403,
+    "./archivos_moleculares/sintetico.csv": 200,
+    "avatars/../archivos_moleculares/sintetico.csv": 200
+  },
+  "pdf_markup_imagen": "http://audit.invalid/sintetico.png",
+  "permanova_permutaciones": {
+    "f": 0.0,
+    "p_sistema": 0.688,
+    "p_referencia": 1.0
+  },
+  "permdisp_metodo": {
+    "f": 7.2278,
+    "p_sistema": 0.006,
+    "p_referencia": 0.124
+  },
+  "asociacion_aislados": [
+    {
+      "nombre": "Bacillus sinteticus",
+      "n_pruebas": 0
+    },
+    {
+      "nombre": "Pseudomonas sinteticus",
+      "n_pruebas": 2
+    }
+  ],
+  "integridad_modelos": {
+    "constraints_archivo": [],
+    "altitud_admin_menos_1": -1,
+    "altitud_admin_9000": 9000
+  }
+}

@@ -1,8 +1,9 @@
 import math
 
-from analisis.constants import NIVELES_VALIDOS
+from analisis.constants import NIVELES_VALIDOS, TAXONES_NO_ASIGNADOS
 
-FILTROS_EXCLUSION = {"others", "unclassified", "unknown", "nan", "", "others sp"}
+# Alias por compatibilidad: la lista vive en analisis.constants.
+FILTROS_EXCLUSION = TAXONES_NO_ASIGNADOS
 
 class DiversityService:
     """Servicio bioinformático para la evaluación de biodiversidad microbiana."""
@@ -14,7 +15,11 @@ class DiversityService:
         """Calcula el número de taxones únicos presentes."""
         if df.empty or "%_hits" not in df.columns:
             return 0
-        return len(df[df["%_hits"] > 0])
+        presentes = df[df["%_hits"] > 0]
+        for campo in NIVELES_VALIDOS:
+            if campo in presentes.columns:
+                return len(DiversityService._obtener_set_taxonomico_limpio(presentes, campo))
+        return len(presentes)
 
     @staticmethod
     def _proporciones(df):
@@ -82,6 +87,8 @@ class DiversityService:
         campo = nivel if nivel in NIVELES_VALIDOS else "genus"
         if df.empty or campo not in df.columns:
             return set()
+        if "%_hits" in df.columns:
+            df = df[df["%_hits"] > 0]
         taxas_raw = df[campo].dropna().astype(str).str.strip().str.lower()
         return {t for t in taxas_raw if t not in FILTROS_EXCLUSION}
 
@@ -151,8 +158,11 @@ class DiversityService:
         from scipy.spatial.distance import pdist, squareform
 
         matriz = np.asarray(matriz_abundancias, dtype=float)
+        if matriz.ndim != 2 or not np.isfinite(matriz).all() or (matriz < 0).any():
+            raise ValueError("Las abundancias deben formar una matriz finita no negativa.")
         sumas = matriz.sum(axis=1, keepdims=True)
-        sumas[sumas == 0] = 1
+        if (sumas <= 0).any():
+            raise ValueError("Hay muestras sin lecturas asignadas; no se puede calcular Bray-Curtis.")
         return squareform(pdist(matriz / sumas, metric="braycurtis"))
 
     # PCoA (Gower, 1966)
@@ -206,8 +216,8 @@ class DiversityService:
         n = D.shape[0]
         if n < 3:
             raise ValueError("La PCoA requiere al menos 3 muestras.")
-        if np.isnan(D).any():
-            raise ValueError("La matriz de distancias contiene valores NaN.")
+        if not np.isfinite(D).all() or (D < 0).any():
+            raise ValueError("La matriz de distancias contiene valores NaN, infinitos o negativos.")
         if not np.allclose(D, D.T):
             raise ValueError("La matriz de distancias debe ser simétrica.")
         if not np.allclose(np.diag(D), 0.0):
@@ -285,7 +295,14 @@ class DiversityService:
                 "n_muestras": n,
             }
 
-        dist_sq = np.asarray(matriz_distancias, dtype=float) ** 2
+        dist = np.asarray(matriz_distancias, dtype=float)
+        if (dist.shape != (n, n) or not np.isfinite(dist).all()
+                or (dist < 0).any() or not np.allclose(dist, dist.T)
+                or not np.allclose(np.diag(dist), 0)):
+            raise ValueError("PERMANOVA requiere distancias finitas, simétricas y diagonal cero.")
+        if not isinstance(n_permutaciones, int) or n_permutaciones < 0:
+            raise ValueError("El número de permutaciones debe ser un entero no negativo.")
+        dist_sq = dist ** 2
 
         def _pseudo_f(d_sq, grp):
             u  = np.unique(grp)
@@ -303,13 +320,19 @@ class DiversityService:
             ss_a  = ss_t - ss_w
             df_a  = at - 1
             df_w  = nt - at
-            if df_w <= 0 or ss_w <= 0:
+            if df_w <= 0 or ss_t <= 0:
                 return None, ss_t, ss_a, ss_w
+            if ss_w <= 0:
+                return float("inf"), ss_t, ss_a, ss_w
             return (ss_a / df_a) / (ss_w / df_w), ss_t, ss_a, ss_w
 
         f_obs, ss_t, ss_a, ss_w = _pseudo_f(dist_sq, grupos_arr)
-        if f_obs is None:
-            return None
+        if f_obs is None or not np.isfinite(f_obs):
+            return {
+                "ejecutado": False,
+                "razon": "No se puede estimar F: variación total o intragrupo nula.",
+                "grupos": conteos, "n_muestras": n,
+            }
 
         r2 = float(ss_a / ss_t) if ss_t > 0 else 0.0
 
@@ -394,7 +417,7 @@ class DiversityService:
         2. Distancia euclidiana de cada muestra al centroide de su grupo en
            ese espacio.
         3. F de ANOVA de una vía sobre esas distancias.
-        4. p por permutación de las etiquetas de grupo sobre las distancias.
+        4. p permutando etiquetas y recalculando centroides y distancias en cada iteración.
 
         Simplificación: se descartan los ejes de valores propios negativos
         (vegan::betadisper los resta como componente imaginaria). Con
@@ -426,11 +449,18 @@ class DiversityService:
         n = len(grupos_arr)
         a = len(unicos)
 
-        distancias = np.zeros(n)
-        for g in unicos:
-            mask = grupos_arr == g
-            centroide = coords[mask].mean(axis=0)
-            distancias[mask] = np.linalg.norm(coords[mask] - centroide, axis=1)
+        if not isinstance(n_permutaciones, int) or n_permutaciones < 0:
+            raise ValueError("El número de permutaciones debe ser un entero no negativo.")
+
+        def _distancias_centroides(grp):
+            z = np.zeros(n)
+            for g in unicos:
+                mask = grp == g
+                centroide = coords[mask].mean(axis=0)
+                z[mask] = np.linalg.norm(coords[mask] - centroide, axis=1)
+            return z
+
+        distancias = _distancias_centroides(grupos_arr)
 
         def _f_anova(z, grp):
             media_global = z.mean()
@@ -441,17 +471,18 @@ class DiversityService:
                 ss_entre += len(zg) * (zg.mean() - media_global) ** 2
                 ss_dentro += np.sum((zg - zg.mean()) ** 2)
             if ss_dentro <= 0:
-                return None
+                return float("inf") if ss_entre > 0 else None
             return (ss_entre / (a - 1)) / (ss_dentro / (n - a))
 
         f_obs = _f_anova(distancias, grupos_arr)
-        if f_obs is None:
+        if f_obs is None or not np.isfinite(f_obs):
             return None
 
         rng = np.random.default_rng(semilla)
         n_geq = 0
         for _ in range(n_permutaciones):
-            f_p = _f_anova(distancias, rng.permutation(grupos_arr))
+            permutados = rng.permutation(grupos_arr)
+            f_p = _f_anova(_distancias_centroides(permutados), permutados)
             if f_p is not None and f_p >= f_obs:
                 n_geq += 1
         p_value = (n_geq + 1) / (n_permutaciones + 1)

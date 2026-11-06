@@ -719,19 +719,14 @@
             setStatus('uploading', 'Subiendo…', sent + ' / ' + total);
         });
 
-        /* Subida completada → fase 2: 75 → 95% (procesamiento en servidor) */
+        /* Subida completada: el servidor no publica un porcentaje de procesamiento. */
         xhr.upload.addEventListener('load', function () {
             progressBar.classList.add('pb-processing');
             setProgress(75, 'Procesando datos…', 'El servidor está analizando los taxones…');
             setStatus('processing', 'Procesando…', 'Pipeline de análisis activo');
 
-            let current = 75;
-            processingTimer = setInterval(function () {
-                if (current < 93) {
-                    current += (93 - current) * 0.07;  // avance asintótico
-                    setProgress(current);
-                }
-            }, 400);
+            progressBar.setAttribute('aria-valuetext', 'Procesando: avance no disponible');
+
         });
 
         /* Respuesta del servidor → fase 3 */

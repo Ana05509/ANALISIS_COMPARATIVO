@@ -19,7 +19,7 @@ from analisis.services.business.analysis_service import (
     obtener_permanova,
 )
 from analisis.constants import (
-    OPCIONES_TOP_N, NIVELES_ES, get_taxonomia_annotation,
+    OPCIONES_TOP_N, NIVELES_ES, get_taxonomia_annotation, es_taxon_asignado,
 )
 
 logger = logging.getLogger(__name__)
@@ -211,7 +211,7 @@ def comparar(request):
                         # Profundidad = todas las lecturas de la muestra, incluidas
                         # las que no tienen asignación a este nivel taxonómico
                         lecturas_totales = int(sum(r['h'] or 0 for r in rows))
-                        rows = [r for r in rows if r['t']]
+                        rows = [r for r in rows if es_taxon_asignado(r['t'])]
                         if rows:
                             total = sum(r['h'] for r in rows) or 1
                             df_m = pd.DataFrame({'%_hits': [r['h'] / total * 100 for r in rows]})
@@ -226,6 +226,14 @@ def comparar(request):
                                     'lecturas_totales': lecturas_totales,
                                 }
                                 shannon_por_muestra[muestra.codigo] = alfa_por_muestra[muestra.codigo]['shannon']
+                    sin_asignacion = [m.codigo for m in muestras_seleccionadas
+                                      if m.codigo not in alfa_por_muestra]
+                    if sin_asignacion:
+                        messages.warning(
+                            request, "Sin lecturas asignadas al nivel elegido; no se incluyeron "
+                            "en los índices de diversidad ni en las pruebas estadísticas: "
+                            + ", ".join(sin_asignacion) + "."
+                        )
                     contexto["alfa_por_muestra"] = alfa_por_muestra
                     contexto["aviso_profundidad"] = _aviso_profundidad(
                         [m['lecturas_totales'] for m in alfa_por_muestra.values()]

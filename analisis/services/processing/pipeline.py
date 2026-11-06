@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 
 COLUMNAS_REQUERIDAS = [
@@ -62,11 +63,35 @@ class PipelineProcesamiento:
             )
             df["species"] = df["species"].replace(["", "nan"], "Unclassified")
 
-        df["num_hits"] = pd.to_numeric(df["num_hits"], errors="coerce").fillna(0).astype(int)
-        df["%_hits"] = pd.to_numeric(
-            df["%_hits"].astype(str).str.replace(",", ".", regex=False),
-            errors="coerce"
-        ).fillna(0.0).astype(float)
+        # No convertir datos inválidos en ceros ni truncar lecturas fraccionarias.
+        for columna in ("num_hits", "%_hits"):
+            valores = df[columna].astype(str).str.strip()
+            if columna == "%_hits":
+                valores = valores.str.replace(",", ".", regex=False)
+            numeros = pd.to_numeric(valores, errors="coerce")
+            invalidos = ~np.isfinite(numeros) | (numeros < 0)
+            if columna == "num_hits":
+                invalidos |= (numeros % 1 != 0) | (numeros > 2147483647)
+            else:
+                invalidos |= numeros > 100
+            if invalidos.any():
+                filas = [str(i + 2) for i, mal in enumerate(invalidos) if mal][:10]
+                raise ValueError(
+                    f"Valores inválidos en {columna}, filas {', '.join(filas)}. "
+                    "Use conteos enteros no negativos y porcentajes entre 0 y 100."
+                )
+            df[columna] = numeros.astype("int64" if columna == "num_hits" else float)
+        total = int(df["num_hits"].sum())
+        if total:
+            esperados = df["num_hits"] / total * 100
+            # Acepta el redondeo habitual a dos decimales del laboratorio.
+            if not np.allclose(df["%_hits"], esperados, atol=0.02, rtol=0):
+                raise ValueError(
+                    "Los porcentajes no corresponden a num_hits (tolerancia 0,02 puntos). "
+                    "Revise que el archivo contenga el perfil completo de la muestra."
+                )
+        elif (df["%_hits"] != 0).any():
+            raise ValueError("Un perfil sin lecturas no puede tener porcentajes positivos.")
 
         return df
 
@@ -78,7 +103,9 @@ class PipelineProcesamiento:
         El filtrado Top N se aplica únicamente en la capa de visualización.
         """
         df = df.copy()
-        df.columns = df.columns.str.strip().str.lower()
+        df.columns = pd.Index([str(col).strip().lower() for col in df.columns])
+        if df.columns.duplicated().any():
+            raise ValueError("Hay columnas duplicadas después de normalizar los encabezados.")
 
         PipelineProcesamiento.validar_columnas(df)
         df = PipelineProcesamiento.limpiar_datos(df)

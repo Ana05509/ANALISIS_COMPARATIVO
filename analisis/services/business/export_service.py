@@ -2,6 +2,9 @@
 # Módulo de exportación avanzada (PDF, JSON, CSV, HTML) optimizado para consistencia de biodiversidad.
 
 import re
+from html import escape as _escape_xml
+from types import SimpleNamespace
+from django.db.models import Model
 from typing import cast
 
 import pandas as pd
@@ -10,7 +13,7 @@ from io import BytesIO
 from django.conf import settings
 from django.http import HttpResponse
 
-from analisis.constants import NIVELES_VALIDOS, NIVELES_ES
+from analisis.constants import NIVELES_VALIDOS, NIVELES_ES, es_taxon_asignado
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -32,6 +35,43 @@ from reportlab.platypus import (
 )
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+
+def _indice_texto(valor):
+    return "—" if valor is None else str(valor)
+
+
+class _PDFText(str):
+    """Texto externo escapado una sola vez para las plantillas PDF."""
+
+
+class _PDFObject:
+    def __init__(self, objeto):
+        self._objeto = objeto
+
+    def __getattr__(self, nombre):
+        valor = getattr(self._objeto, nombre)
+        if callable(valor):
+            return lambda *args, **kwargs: _pdf_safe_data(valor(*args, **kwargs))
+        return _pdf_safe_data(valor)
+
+    def __str__(self):
+        return _escape_xml(str(self._objeto), quote=False)
+
+
+def _pdf_safe_data(valor):
+    """Copia de presentación: ningún texto externo llega como markup a Paragraph."""
+    if isinstance(valor, (_PDFText, _PDFObject)):
+        return valor
+    if isinstance(valor, str):
+        return _PDFText(_escape_xml(valor, quote=False))
+    if isinstance(valor, dict):
+        return {clave: _pdf_safe_data(dato) for clave, dato in valor.items()}
+    if isinstance(valor, (list, tuple)):
+        return [_pdf_safe_data(dato) for dato in valor]
+    if isinstance(valor, (Model, SimpleNamespace)):
+        return _PDFObject(valor)
+    return valor
 
 
 # Inyección de fórmulas en Excel (CWE-1236): se sanea el texto libre antes de escribirlo.
@@ -476,27 +516,36 @@ def _contexto_reglas(datos: dict) -> dict:
     n_fito = totales_clas.get("fitopatogeno", 0)
     n_neu  = totales_clas.get("neutral", 0)
     total_cat     = (n_ben + n_fito + n_neu) or 1
-    total_ben_fito = (n_ben + n_fito) or 1
+    # Proporciones por ABUNDANCIA (% de lecturas), igual que calcular_indice_salud().
+    # Si faltan (datos antiguos), se cae al conteo de taxones.
+    abund = datos.get("abundancia_clas") or {}
+    pct_ben  = float(abund.get("benefico", n_ben) or 0)
+    pct_fito = float(abund.get("fitopatogeno", n_fito) or 0)
+    total_ben_fito = (pct_ben + pct_fito) or 1
+    taxa_asignados = [t for t in (datos.get("todos_taxa") or []) if es_taxon_asignado(t.get("taxonomia"))]
     return {
         "indice_salud":     datos.get("indice_salud") or 0,
         "nivel_salud":      datos.get("nivel_salud") or "N/A",
         "shannon":          float(diversidad.get("shannon") or 0),
         "simpson":          float(diversidad.get("simpson") or 0),
         "equitatividad":    float(diversidad.get("equitatividad") or 0),
-        "riqueza":          int(diversidad.get("riqueza") or len(datos.get("todos_taxa") or [])),
+        "riqueza":          int(diversidad.get("riqueza") or len(taxa_asignados)),
         "n_benefico":       n_ben,
         "n_fitopatogeno":   n_fito,
         "n_neutral":        n_neu,
         "n_sin_clasificar": totales_clas.get("sin_clasificar", 0),
-        # Mismo denominador que calcular_indice_salud(), para no contradecir el nivel de salud.
-        "ratio_ben":        n_ben / total_ben_fito,
-        "ratio_fito":       n_fito / total_ben_fito,
+        # Mismo cálculo que calcular_indice_salud(), para no contradecir el nivel de salud.
+        "ratio_ben":        pct_ben / total_ben_fito,
+        "ratio_fito":       pct_fito / total_ben_fito,
+        "pct_benefico":     pct_ben,
+        "pct_fitopatogeno": pct_fito,
+        "pct_sin_asignar":  float(abund.get("sin_asignar", 0) or 0),
         # Para la narrativa descriptiva ("% de los taxa catalogados"), que sí
         # debe incluir neutrales en el denominador.
         "ratio_fito_comunidad": n_fito / total_cat,
         "n_muestras":       len(muestras),
         "is_comparativo":   len(muestras) > 1,
-        "total_taxa":       len(datos.get("todos_taxa") or []),
+        "total_taxa":       len(taxa_asignados),
         "marcador":         datos.get("tipo") or "16S",
         "nivel_tax":        datos.get("nivel") or "genus",
     }
@@ -511,17 +560,24 @@ def _generar_interpretacion_ejecutiva(datos: dict) -> list:
     parrafos = []
 
     plural = "s" if c["is_comparativo"] else ""
-    parrafos.append(
-        f"Esta muestra{plural} presenta{plural} un Índice de Salud del Suelo de "
-        f"{c['indice_salud']}/100, clasificado como {c['nivel_salud']}. "
-        + _NIVEL_TEXTO_SALUD.get(c["nivel_salud"], "")
-    )
+    if c["nivel_salud"] == "NO ESTIMABLE":
+        parrafos.append("El indicador exploratorio no es estimable: no hay cobertura funcional "
+                        "de benéficos o fitopatógenos. Esto no implica un suelo en riesgo.")
+    else:
+        parrafos.append(
+            f"Esta muestra{plural} presenta{plural} un Índice de Salud del Suelo de "
+            f"{c['indice_salud']}/100, clasificado como {c['nivel_salud']}. "
+            + _NIVEL_TEXTO_SALUD.get(c["nivel_salud"], "")
+        )
 
     parrafos.append(
         f"Se identificaron {c['total_taxa']} taxones distintos a nivel de {c['nivel_tax']} "
         f"mediante el marcador molecular {c['marcador']}, de los cuales {c['n_benefico']} "
         f"están catalogados como benéficos, {c['n_fitopatogeno']} como potenciales fitopatógenos, "
         f"{c['n_neutral']} como neutrales y {c['n_sin_clasificar']} aún no están catalogados."
+        + (f" Además, el {c['pct_sin_asignar']:.1f}% de las lecturas no tiene asignación a este nivel "
+           f"taxonómico; esa fracción no se cuenta como un taxón en los índices."
+           if c["pct_sin_asignar"] >= 0.05 else "")
     )
 
     if c["n_fitopatogeno"] > 0:
@@ -530,7 +586,8 @@ def _generar_interpretacion_ejecutiva(datos: dict) -> list:
                   "Su proporción sugiere un riesgo fitosanitario que amerita monitoreo.")
         parrafos.append(
             f"Se detectó presencia de microorganismos fitopatógenos ({c['n_fitopatogeno']} "
-            f"taxón(es), {c['ratio_fito_comunidad']*100:.1f}% de los taxa catalogados funcionalmente). {riesgo}"
+            f"taxón(es), {c['pct_fitopatogeno']:.1f}% de las lecturas frente a {c['pct_benefico']:.1f}% "
+            f"de benéficos). {riesgo}"
         )
     else:
         parrafos.append("No se detectaron microorganismos fitopatógenos entre los taxa catalogados funcionalmente.")
@@ -566,14 +623,15 @@ _REGLAS_CONCLUSIONES = [
         f"de uno o pocos taxa sobre el resto de la comunidad.")},
     {"condicion": lambda c: c["ratio_fito"] > 0.15,
      "texto": lambda c: (
-        f"Los taxa fitopatógenos representan {c['ratio_fito']*100:.1f}% frente a los benéficos "
-        f"({c['n_fitopatogeno']} taxón(es)), un nivel que sugiere riesgo fitosanitario relevante.")},
+        f"Los fitopatógenos representan {c['ratio_fito']*100:.1f}% de la abundancia conjunta de "
+        f"fitopatógenos y benéficos ({c['n_fitopatogeno']} taxón(es)), un nivel que sugiere riesgo "
+        f"fitosanitario relevante.")},
     {"condicion": lambda c: c["n_fitopatogeno"] == 0,
      "texto": lambda c: "No se detectaron microorganismos fitopatógenos entre los taxa catalogados funcionalmente."},
     {"condicion": lambda c: c["ratio_ben"] > 0.5,
      "texto": lambda c: (
         f"Los microorganismos benéficos predominan claramente sobre los fitopatógenos "
-        f"({c['ratio_ben']*100:.1f}% frente a estos últimos), aportando potencial de reciclaje de "
+        f"({c['ratio_ben']*100:.1f}% de su abundancia conjunta), aportando potencial de reciclaje de "
         f"nutrientes y control biológico natural.")},
     {"condicion": lambda c: 0 < c["equitatividad"] < 0.3,
      "texto": lambda c: (
@@ -1038,7 +1096,7 @@ class ExportService:
 
             codigos  = [d["muestra"].codigo for d in datos_por_muestra]
             shannons = [float(d.get("diversidad", {}).get("shannon", 0) or 0) for d in datos_por_muestra]
-            indices  = [d.get("indice_salud", 0) for d in datos_por_muestra]
+            indices  = [(d.get("indice_salud") or 0) for d in datos_por_muestra]
 
             SHAN_PALETA = _resolver_colores(['#DC2626', '#F97316', '#EAB308', '#16A34A'], modo)  # bajo→alto
             SAL_PALETA  = _resolver_colores(['#dc2626', '#ca8a04', '#16a34a', '#14532d'], modo)   # crítico→excelente
@@ -1201,13 +1259,14 @@ class ExportService:
                     detalle_clas, totales_clas, indice_salud, nivel_salud,
                     tipo, nivel, top_n, usuario
         """
+        datos = _pdf_safe_data(datos)
         muestra      = datos.get("muestra")
         top_taxa     = datos.get("top_taxa", [])
         todos_taxa   = datos.get("todos_taxa", [])
         diversidad   = datos.get("diversidad", {})
         detalle_clas = datos.get("detalle_clas", {})
         totales_clas = datos.get("totales_clas", {})
-        indice_salud = datos.get("indice_salud", 0)
+        indice_salud = (datos.get("indice_salud") or 0)
         nivel_salud  = datos.get("nivel_salud", "MODERADO")
         tipo         = datos.get("tipo", "16S")
         nivel        = datos.get("nivel", "genus")
@@ -1370,7 +1429,7 @@ class ExportService:
             textColor=colors.black)
 
         barra_data = [[
-            Paragraph(str(indice_salud), salud_num_style),
+            Paragraph("—" if nivel_salud == "NO ESTIMABLE" else _indice_texto(datos.get("indice_salud")), salud_num_style),
             Table(
                 [[Paragraph(f"<b>{nivel_salud}</b>", salud_lbl_style)],
                  [Paragraph("Índice de Salud del Suelo  (escala 0 – 100)", salud_sub_style)],
@@ -1422,7 +1481,7 @@ class ExportService:
         cod_muestra = _safe(muestra, "codigo", "la muestra seleccionada")
         conclusion = (
             f"La muestra <b>{cod_muestra}</b> del cultivo <b>{cultivo_nom}</b> presenta un "
-            f"Índice de Salud del Suelo de <b>{indice_salud}/100</b> ({nivel_salud}). "
+            f"Indicador exploratorio: <b>{_indice_texto(datos.get('indice_salud'))}</b> ({nivel_salud}). "
             f"El análisis con marcador <b>{marcador_lbl}</b> a nivel taxonómico de <b>{nivel}</b> detectó "
             f"<b>{riqueza_v}</b> taxa únicos con diversidad Shannon H' = <b>{shannon_v:.3f}</b> ({shan_nivel}). "
             f"La comunidad incluye <b>{totales_clas.get('benefico', 0)}</b> taxa benéficos y "
@@ -1725,13 +1784,15 @@ class ExportService:
 
         marcador_txt = "16S rRNA" if tipo == "16S" else "ITS (Internal Transcribed Spacer)"
         total_cat    = totales_clas.get('benefico',0) + totales_clas.get('fitopatogeno',0) + totales_clas.get('neutral',0)
+        n_asignados  = sum(1 for t in todos_taxa if es_taxon_asignado(t.get("taxonomia")))
         nota_meto = (
             f"Marcador molecular: <b>{marcador_txt}</b> · Nivel: <b>{nivel}</b> · "
-            f"Taxa únicos detectados: <b>{len(todos_taxa)}</b> · "
-            f"Taxa catalogados: <b>{total_cat}</b> de {len(todos_taxa)}.<br/><br/>"
+            f"Taxa únicos detectados: <b>{n_asignados}</b> · "
+            f"Taxa catalogados: <b>{total_cat}</b> de {n_asignados}.<br/><br/>"
             f"La diversidad alfa se calculó con Shannon-Wiener (H') y Simpson (1–D). "
-            f"El Índice de Salud del Suelo integra la proporción benéfico/fitopatógeno (70%) y "
-            f"la diversidad normalizada Shannon/3.5 (30%). "
+            f"El Índice de Salud del Suelo (indicador exploratorio) integra la proporción de abundancia "
+            f"benéfica frente a fitopatógena (70%) y la diversidad normalizada Shannon/3.5 (30%). "
+            f"Las lecturas sin asignación taxonómica no se cuentan como taxón. "
             f"Plataforma: BioMicro UTC — {fecha_gen}."
         )
         t_nota = Table([[Paragraph(nota_meto, S["body_sm"])]], colWidths=[ancho_util])
@@ -1767,6 +1828,7 @@ class ExportService:
                     totales_clas, indice_salud, nivel_salud, tipo, nivel,
                     top_n, usuario
         """
+        datos = _pdf_safe_data(datos)
         muestras          = datos.get("muestras", [])
         datos_por_muestra = datos.get("datos_por_muestra", [])
         top_taxa          = datos.get("top_taxa", [])
@@ -1866,7 +1928,7 @@ class ExportService:
         contenido.append(Spacer(1, 14))
 
         # Ordenar por indice_salud desc
-        sorted_dpm = sorted(datos_por_muestra, key=lambda x: x.get("indice_salud", 0), reverse=True)
+        sorted_dpm = sorted(datos_por_muestra, key=lambda x: (x.get("indice_salud") or -1), reverse=True)
 
         comp_hdr = [[
             Paragraph("<b>Muestra</b>",       S["th_dark"]),
@@ -1884,7 +1946,7 @@ class ExportService:
             # Taxa totales de la muestra (todos_taxa), no solo el Top N.
             comp_hdr.append([
                 Paragraph(str(m.codigo),                     S["body_sm"]),
-                Paragraph(str(d.get("indice_salud", 0)),     S["body_sm"]),
+                Paragraph(_indice_texto(d.get("indice_salud")),     S["body_sm"]),
                 Paragraph(str(d.get("nivel_salud", "N/A")),  S["body_sm"]),
                 Paragraph(str(len(d.get("todos_taxa", []))), S["body_sm"]),
                 Paragraph(f"{shan:.3f}",                     S["body_sm"]),
@@ -2085,8 +2147,9 @@ class ExportService:
             f"Análisis comparativo de <b>{len(muestras)}</b> muestras · Marcador: <b>{marcador_txt}</b> "
             f"· Nivel: <b>{nivel}</b>.<br/>"
             f"Taxa únicos detectados: <b>{riqueza_g}</b> · Shannon H' global: <b>{shannon_g:.3f}</b>.<br/><br/>"
-            f"El Índice de Salud del Suelo integra la proporción benéfico/fitopatógeno (70%) y la diversidad "
-            f"normalizada Shannon/3.5 (30%). Plataforma: BioMicro UTC — {fecha_gen}."
+            f"El Índice de Salud del Suelo (indicador exploratorio) integra la proporción de abundancia "
+            f"benéfica frente a fitopatógena (70%) y la diversidad normalizada Shannon/3.5 (30%). "
+            f"Las lecturas sin asignación taxonómica no se cuentan como taxón. Plataforma: BioMicro UTC — {fecha_gen}."
         )
         t_nota = Table([[Paragraph(nota_meto, S["body_sm"])]], colWidths=[ancho_util])
         t_nota.setStyle(TableStyle([
@@ -2127,7 +2190,7 @@ class ExportService:
         diversidad       = datos.get("diversidad") or {}
         detalle_clas     = datos.get("detalle_clas", {})
         totales_clas     = datos.get("totales_clas", {})
-        indice_salud     = datos.get("indice_salud", 0)
+        indice_salud     = (datos.get("indice_salud") or 0)
         nivel_salud      = datos.get("nivel_salud", "N/A")
         tipo             = datos.get("tipo", "16S")
         nivel            = datos.get("nivel", "genus")
@@ -2676,7 +2739,7 @@ class ExportService:
         fecha_gen = datetime.now().strftime("%d/%m/%Y %H:%M")
         analista  = str(usuario) if usuario else "Sistema"
         marcador_lbl = "16S rRNA (bacterias)" if tipo == "16S" else "ITS (hongos)"
-        total_taxa_global = len(todos_taxa)
+        total_taxa_global = sum(1 for t in todos_taxa if es_taxon_asignado(t.get("taxonomia")))
         total_catalogados = (totales_clas.get("benefico", 0)
                              + totales_clas.get("fitopatogeno", 0)
                              + totales_clas.get("neutral", 0))
@@ -2732,7 +2795,7 @@ class ExportService:
                 # Índice de salud
                 res_rows += [
                     ["ÍNDICE DE SALUD DEL SUELO", "", ""],
-                    ["Índice (0 – 100)",    str(indice_salud),
+                    ["Índice (0 – 100)",    _indice_texto(datos.get("indice_salud")),
                      INTERP_SALUD.get(nivel_salud, "")],
                     ["Nivel cualitativo",   nivel_salud, ""],
                     ["", "", ""],
@@ -3075,7 +3138,7 @@ class ExportService:
                     ["🔴 Taxa Fitopatógenos",str(totales_clas.get("fitopatogeno", 0)), ""],
                     ["🔵 Taxa Neutrales",    str(totales_clas.get("neutral", 0)), ""],
                     ["⚪ Taxa Sin Clasificación",str(totales_clas.get("sin_clasificar", 0)), ""],
-                    ["Índice Salud Global", str(indice_salud),
+                    ["Índice Salud Global", _indice_texto(datos.get("indice_salud")),
                      INTERP_SALUD.get(nivel_salud, "")],
                     ["Nivel cualitativo global", nivel_salud, ""],
                 ]
@@ -3525,7 +3588,7 @@ class ExportService:
             color_salud_d = _NIVEL_COLORES.get(nivel_salud, "#64748b")
             _kpi_card(3, 1,  "Total Taxa Detectados", total_taxa_global, PLOTLY_VERDE_OS)
             _kpi_card(3, 6,  "Shannon H'", f"{shanval:.2f}", PLOTLY_AZUL)
-            _kpi_card(3, 11, "Índice de Salud", f"{indice_salud}/100", color_salud_d)
+            _kpi_card(3, 11, "Índice de Salud", f"{_indice_texto(datos.get('indice_salud'))}", color_salud_d)
             _kpi_card(3, 16, "Taxa Benéficos", totales_clas.get("benefico", 0), PLOTLY_VERDE)
             _kpi_card(3, 21, "Taxa Fitopatógenos", totales_clas.get("fitopatogeno", 0), PLOTLY_ROJO)
 
@@ -3647,6 +3710,7 @@ class ExportService:
         datos keys: datos_por_nivel ({nivel: top_taxa/diversidad/indice_salud/nivel_salud}),
         muestra, tipo, top_n, usuario.
         """
+        datos = _pdf_safe_data(datos)
         datos_por_nivel = datos.get("datos_por_nivel", {})
         muestra = datos.get("muestra")
         tipo    = datos.get("tipo", "16S")
@@ -3736,7 +3800,7 @@ class ExportService:
             div = d.get("diversidad") or {}
             resumen_rows.append([
                 Paragraph(NIVELES_ES.get(nivel, nivel.capitalize()), S["body_sm"]),
-                Paragraph(str(d.get("indice_salud", 0)), S["center"]),
+                Paragraph(_indice_texto(d.get("indice_salud")), S["center"]),
                 Paragraph(d.get("nivel_salud", "N/A"), S["center"]),
                 Paragraph(f"{float(div.get('shannon', 0) or 0):.4f}", S["center"]),
                 Paragraph(str(div.get("riqueza", 0)), S["center"]),
@@ -3766,7 +3830,7 @@ class ExportService:
         for idx, nivel in enumerate(niveles_con_datos, 1):
             d   = datos_por_nivel[nivel]
             div = d.get("diversidad") or {}
-            indice_salud = d.get("indice_salud", 0)
+            indice_salud = (d.get("indice_salud") or 0)
             nivel_salud  = d.get("nivel_salud", "MODERADO")
             top_taxa     = d.get("top_taxa", [])
 
@@ -3781,7 +3845,7 @@ class ExportService:
                 ),
                 Spacer(1, 10),
                 _kpi_tiles([
-                    {"val": str(indice_salud), "lbl": "Índice de Salud", "sub": nivel_salud},
+                    {"val": _indice_texto(d.get("indice_salud")), "lbl": "Índice de Salud", "sub": nivel_salud},
                     {"val": str(riqueza_v),     "lbl": "Riqueza (S)",    "sub": "Taxa únicos"},
                     {"val": f"{shannon_v:.4f}", "lbl": "Shannon H'",     "sub": "Diversidad"},
                     {"val": f"{simpson_v:.4f}", "lbl": "Simpson (1-D)",  "sub": "Gini-Simpson"},
@@ -3920,7 +3984,7 @@ class ExportService:
         def _kpis_nivel(ws, fila_inicio, d):
             div = d.get("diversidad") or {}
             kpis = [
-                ("Índice de Salud", d.get("indice_salud", 0)),
+                ("Índice de Salud", d.get("indice_salud")),
                 ("Estado",          d.get("nivel_salud", "N/A")),
                 ("Shannon H'",      round(float(div.get("shannon", 0) or 0), 4)),
                 ("Simpson (1-D)",   round(float(div.get("simpson", 0) or 0), 4)),
@@ -3961,7 +4025,7 @@ class ExportService:
             div = d.get("diversidad") or {}
             vals = [
                 NIVELES_ES.get(nivel, nivel.capitalize()),
-                d.get("indice_salud", 0),
+                d.get("indice_salud"),
                 d.get("nivel_salud", "N/A"),
                 round(float(div.get("shannon", 0) or 0), 4),
                 div.get("riqueza", 0),

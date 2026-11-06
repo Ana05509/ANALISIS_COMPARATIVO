@@ -54,22 +54,29 @@ def _norm(s: str) -> str:
 
 
 def _parsear_ufc(texto: str):
-    """Retorna (coeficiente, exponente, menor_que_limite)."""
-    t = (texto or '').strip()
-    if not t:
+    """(coeficiente, exponente, censurado); un límite explícito usa los mismos campos."""
+    t = (texto or "").strip()
+    if not t or t in ("—", "-", "N/D", "ND"):
         return None, None, False
-    if _UFC_MENOR.search(t):
+    # Normaliza superíndices sin confundir el 10 de la base con el exponente.
+    t = re.sub(r"10([⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺]+)", lambda m: "10^" + m[1].translate(
+        str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺", "0123456789-+")), t)
+    patron = (
+        r"(?P<menor><)?\s*(?P<coef>\d+(?:[.,]\d+)?)"
+        r"(?:\s*[xX×]\s*10\s*(?:\^\s*)?(?P<exp>[+-]?\d+))?"
+        r"\s*(?:UFC(?:\s*/\s*(?:gss|g|ml))?)?\s*"
+    )
+    m = re.fullmatch(patron, t, re.IGNORECASE)
+    if not m:
+        raise ValueError(f"Valor UFC no reconocido: {t[:100]}. Revise la notación del informe.")
+    coef = Decimal(m["coef"].replace(",", "."))
+    exp = int(m["exp"] or 0)
+    if abs(exp) > 30 or coef > Decimal("9999.99"):
+        raise ValueError("Valor UFC fuera del rango admitido.")
+    # Mantener compatibilidad para <1 de informes anteriores.
+    if m["menor"] and coef == 1 and exp == 0:
         return None, None, True
-    m = _UFC_CIENTIFICO.search(t)
-    if m:
-        coef = float(m.group(1).replace(',', '.'))
-        exp  = int(m.group(2))
-        return Decimal(str(coef)), exp, False
-    m = _UFC_SIMPLE.search(t)
-    if m:
-        coef = float(m.group(1).replace(',', '.'))
-        return Decimal(str(coef)), 0, False
-    return None, None, False
+    return coef, exp, bool(m["menor"])
 
 
 # Cabecera
@@ -199,6 +206,11 @@ def _parsear_aislamiento(pdf) -> list:
         texto  = pagina.extract_text() or ''
         tablas = pagina.extract_tables() or []
 
+        if len(_ORG_HEADING.findall(texto)) > 1:
+            raise ValueError(
+                "Hay varios organismos en una misma página. No se pueden asociar sus tablas "
+                "con certeza; use el ingreso manual o un PDF con un organismo por página."
+            )
         # Detectar encabezados de organismo en el texto
         for linea in texto.split('\n'):
             m = _ORG_HEADING.search(linea)
@@ -531,6 +543,8 @@ def parsear_pdf(archivo) -> dict:
               'datos': [...], 'formato': 'cipal' | 'mag'}
     """
     with pdfplumber.open(archivo) as pdf:
+        if not pdf.pages or len(pdf.pages) > 100:
+            raise ValueError("El PDF debe contener entre 1 y 100 páginas.")
         texto_p1 = pdf.pages[0].extract_text() or ''
         if _CIPAL_MICRO_MARCA.search(texto_p1) or _CIPAL_MICORRIZA_MARCA.search(texto_p1):
             # Se reutiliza el texto de la página 0.

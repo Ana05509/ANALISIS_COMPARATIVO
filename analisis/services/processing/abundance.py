@@ -4,9 +4,10 @@
 import pandas as pd
 from typing import List
 
-from analisis.constants import NIVELES_VALIDOS
+from analisis.constants import NIVELES_VALIDOS, TAXONES_NO_ASIGNADOS
 
-CATEGORIAS_CONTROL = {"others", "unclassified", "unknown", "others sp"}
+# Alias por compatibilidad: la lista vive en analisis.constants.
+CATEGORIAS_CONTROL = TAXONES_NO_ASIGNADOS
 
 
 # FUNCIÓN SOLUCIÓN ENLACE: Requerida por analysis_service.py

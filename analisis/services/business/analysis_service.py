@@ -5,18 +5,18 @@ from django.db.models import F, Sum
 from analisis.models import ResultadoTaxonomico, CatalogoMicroorganismo, VariedadClon, MuestraSuelo
 from analisis.services.processing.diversity import DiversityService
 from analisis.services.processing.abundance import comparar_abundancias
-from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, OPCIONES_TOP_N, get_taxonomia_annotation, clasificar_taxon, NIVEL_ALIASES, normalizar_nombre_catalogo
+from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, OPCIONES_TOP_N, get_taxonomia_annotation, clasificar_taxon, NIVEL_ALIASES, normalizar_nombre_catalogo, es_taxon_asignado
 
 
 def _filtrar_catalogo_por_nivel(qs, nivel: str):
-    """Filtra por nivel aceptando nombres en inglés o español; si no hay resultados, no filtra."""
+    """Filtra por nivel aceptando nombres en inglés o español, sin mezclar niveles."""
     from django.db.models import Q
     aliases = NIVEL_ALIASES.get(nivel, [nivel])
     q = Q()
     for alias in aliases:
         q |= Q(nivel__iexact=alias)
     qs_nivel = qs.filter(q)
-    return qs_nivel if qs_nivel.exists() else qs
+    return qs_nivel
 
 
 def obtener_lookup_catalogo(tipo, nivel=None):
@@ -118,7 +118,9 @@ def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=N
 
 
 def _diversidad_alfa_de_grupo(grupo):
-    """Índices alfa de una muestra a partir de sus filas {hits} agregadas por taxón."""
+    """Índices alfa de una muestra a partir de sus filas {taxonomia, hits} agregadas por taxón.
+    Las lecturas sin asignar no son un taxón: no entran en riqueza ni en las proporciones."""
+    grupo = grupo[grupo["taxonomia"].map(es_taxon_asignado)]
     total = grupo["hits"].sum() or 1
     df_m = pd.DataFrame({"%_hits": grupo["hits"] / total * 100})
     df_m = df_m[df_m["%_hits"] > 0]
@@ -191,10 +193,11 @@ def obtener_diversidad_beta_inter(tipo="16S", nivel="genus", muestra_ids=None):
 
     abundancias: dict = {}
     for mid, filas in _abundancias_por_muestra(tipo, nivel, muestra_ids).items():
-        vec = {t: h for t, h in filas if t}
+        vec = {t: h for t, h in filas if es_taxon_asignado(t) and h > 0}
         if vec:
             abundancias[mid] = vec
 
+    abundancias = {mid: vec for mid, vec in abundancias.items() if vec}
     if len(abundancias) < 2:
         return None
 
@@ -258,6 +261,7 @@ def obtener_diversidad_gamma(tipo="16S", nivel="genus", muestra_ids=None):
         .annotate(total=Sum("num_hits"))
         .order_by("-total")
     )
+    pooled = [p for p in pooled if es_taxon_asignado(p["tax"])]
     if not pooled:
         return None
 
@@ -294,12 +298,13 @@ def obtener_permanova(tipo="16S", nivel="genus", muestra_ids=None, n_perm=499):
         nivel_agrupacion = "variedad/clon"
 
     # Vector de abundancias por muestra
-    # Como antes: entra toda muestra con filas, aunque ninguna tenga taxón a este nivel.
+    # Solo entran muestras con abundancia positiva asignada al nivel solicitado.
     abundancias: dict = {
-        mid: {t: h for t, h in filas if t}
+        mid: {t: h for t, h in filas if es_taxon_asignado(t) and h > 0}
         for mid, filas in _abundancias_por_muestra(tipo, nivel, muestra_ids).items()
     }
 
+    abundancias = {mid: vec for mid, vec in abundancias.items() if vec}
     if len(abundancias) < 2:
         return None
 
@@ -319,6 +324,9 @@ def obtener_permanova(tipo="16S", nivel="genus", muestra_ids=None, n_perm=499):
     grupos   = [mapa_grupo[mid] for mid in ids_ok]
     resultado = DiversityService.calcular_permanova(dist_mat, grupos, n_permutaciones=n_perm)
     if resultado:
+        resultado["muestras_excluidas_sin_asignacion"] = [
+            mid for mid in muestra_ids if mid not in abundancias
+        ]
         resultado["nivel_agrupacion"]    = nivel_agrupacion
         resultado["muestras_con_datos"]  = n
         if resultado.get("ejecutado"):

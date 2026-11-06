@@ -1,0 +1,10 @@
+﻿..2026-11-06 18:21:01,068 WARNING [django.request] Method Not Allowed (GET): /csp-report/
+....................................
+----------------------------------------------------------------------
+Ran 156 tests in 34.097s
+
+OK
+Destroying test database for alias 'default'...
+
+Found 156 test(s).
+System check identified no issues (0 silenced).

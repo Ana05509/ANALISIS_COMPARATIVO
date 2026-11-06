@@ -1,4 +1,7 @@
+import uuid
 from django.db import models
+from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.auth.models import AbstractUser
 from simple_history.models import HistoricalRecords
@@ -71,12 +74,25 @@ class MuestraSuelo(models.Model):
     fecha_registro = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Ingreso")
     localidad = models.CharField(max_length=100, db_index=True, verbose_name="Localidad")
     finca_lote = models.CharField(max_length=150, verbose_name="Finca / Lote")
-    altitud = models.IntegerField(null=True, blank=True, db_index=True, verbose_name="Altitud (msnm)")
+    altitud = models.IntegerField(null=True, blank=True, db_index=True, verbose_name="Altitud (msnm)",
+                                  validators=[MinValueValidator(0), MaxValueValidator(6500)])
     history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Muestra de Suelo"
         verbose_name_plural = "Muestras de Suelo"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(altitud__isnull=True) | models.Q(altitud__gte=0, altitud__lte=6500),
+                name="muestra_altitud_valida",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.variedad_clon_id and self.cultivo_id:
+            if self.variedad_clon.cultivo_id != self.cultivo_id:
+                raise ValidationError({"variedad_clon": "La variedad no pertenece al cultivo seleccionado."})
 
     def save(self, *args, **kwargs):
         # Código siempre en mayúsculas para evitar muestras duplicadas.
@@ -111,6 +127,9 @@ class ArchivoMolecular(models.Model):
     class Meta:
         verbose_name = "Archivo Molecular"
         verbose_name_plural = "Archivos Moleculares"
+        constraints = [
+            models.UniqueConstraint(fields=["muestra", "tipo_analisis"], name="unico_marcador_por_muestra"),
+        ]
 
     def __str__(self):
         return f"{self.tipo_analisis} - Muestra: {self.muestra.codigo}"
@@ -329,3 +348,25 @@ class BloqueoLogin(models.Model):
     class Meta:
         verbose_name = "Bloqueo de inicio de sesión"
         verbose_name_plural = "Bloqueos de inicio de sesión"
+
+
+class ArchivoMolecularRevision(models.Model):
+    """Estado anterior conservado al sustituir una entrada; no editable desde formularios."""
+    muestra = models.ForeignKey(MuestraSuelo, on_delete=models.CASCADE, related_name="revisiones_moleculares")
+    tipo_analisis = models.CharField(max_length=10)
+    archivo = models.FileField(upload_to="archivos_moleculares/")
+    sha256 = models.CharField(max_length=64, blank=True)
+    fecha = models.DateTimeField(auto_now_add=True)
+    metadatos = models.JSONField(default=dict)
+    resultados = models.JSONField(default=list)
+
+
+class ReporteArchivado(models.Model):
+    """Artefacto emitido y manifiesto científico congelados, independientes del catálogo vigente."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    fecha = models.DateTimeField(auto_now_add=True)
+    formato = models.CharField(max_length=10)
+    nombre = models.CharField(max_length=255)
+    sha256 = models.CharField(max_length=64)
+    contenido = models.BinaryField()
+    manifiesto = models.JSONField(default=dict)

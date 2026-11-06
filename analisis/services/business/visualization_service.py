@@ -7,6 +7,7 @@ from typing import Dict, List, Any, Optional
 import numpy as np
 
 from analisis.services.processing.diversity import DiversityService
+from analisis.constants import es_taxon_asignado
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +171,9 @@ class VisualizationService:
         try:
             n_muestras = len(columnas_muestras)
             if n_muestras >= 3:
-                matriz = df_analisis[columnas_muestras].values.T
+                # Las lecturas sin asignar no son un taxón compartido entre muestras.
+                asignados = df_analisis[nivel].map(es_taxon_asignado)
+                matriz = df_analisis.loc[asignados, columnas_muestras].values.T
                 dist_matrix = DiversityService.matriz_bray_curtis(matriz)
 
                 pcoa = DiversityService.calcular_pcoa(dist_matrix)

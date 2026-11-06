@@ -1,5 +1,6 @@
 import csv
 import logging
+import zipfile
 
 import pandas as pd
 from django.db import IntegrityError, transaction
@@ -47,10 +48,23 @@ def leer_archivo(archivo) -> pd.DataFrame:
     nombre = archivo.name.lower()
     try:
         archivo.seek(0)
+        if nombre.endswith(".xlsx"):
+            with zipfile.ZipFile(archivo) as libro:
+                if sum(item.file_size for item in libro.infolist()) > 100 * 1024 * 1024:
+                    raise ValueError("El Excel supera 100 MB descomprimido.")
+            archivo.seek(0)
         if nombre.endswith((".xlsx", ".xls")):
-            return pd.read_excel(archivo)
+            df = pd.read_excel(archivo, nrows=100001)
+            if len(df) > 100000:
+                raise ValueError("El archivo supera 100 000 registros.")
+            return df
         sep = "\t" if nombre.endswith(".tsv") else _detectar_separador(archivo)
-        return pd.read_csv(archivo, sep=sep)
+        df = pd.read_csv(archivo, sep=sep, nrows=100001)
+        if len(df) > 100000:
+            raise ValueError("El archivo supera 100 000 registros.")
+        return df
+    except zipfile.BadZipFile as e:
+        raise ValueError('No se pudo leer el archivo: el XLSX no es un libro válido.') from e
     except ImportError as e:
         raise ValueError(
             f"El servidor no tiene instalado el soporte para leer este tipo de archivo ({e.name}). "
@@ -71,9 +85,52 @@ def _error_duplicado(codigo, tipo, archivo_existente):
     )
 
 
+ALTITUD_MIN, ALTITUD_MAX = 0, 6500  # msnm; el punto más alto de Ecuador ronda los 6263 m
+
+
+def leer_altitud(valor):
+    """Altitud en msnm o None si no se indicó (antes se guardaba 0, que es un valor real)."""
+    texto = str(valor if valor is not None else "").strip()
+    if not texto:
+        return None
+    try:
+        altitud = int(float(texto.replace(",", ".")))
+    except ValueError:
+        raise ValueError("La altitud debe ser un número entero en metros sobre el nivel del mar.")
+    if not ALTITUD_MIN <= altitud <= ALTITUD_MAX:
+        raise ValueError(f"La altitud debe estar entre {ALTITUD_MIN} y {ALTITUD_MAX} msnm.")
+    return altitud
+
+
+def _diferencias_metadatos(muestra, datos):
+    """Campos que el formulario cambiaría en una muestra existente.
+    Un campo vacío en el formulario significa "sin cambio" y no cuenta."""
+    etiquetas = {
+        "cultivo": "Cultivo", "variedad_clon": "Variedad/Clon", "localidad": "Localidad",
+        "finca_lote": "Finca/Lote", "altitud": "Altitud", "tipo_muestra": "Tipo de muestra",
+        "observaciones": "Observaciones",
+    }
+    difs = []
+    for campo, etiqueta in etiquetas.items():
+        nuevo = datos.get(campo)
+        if nuevo in (None, ""):
+            continue
+        actual = getattr(muestra, campo)
+        if hasattr(nuevo, "pk"):
+            distinto = getattr(actual, "pk", None) != nuevo.pk
+        else:
+            distinto = str(actual if actual is not None else "").strip().lower() != str(nuevo).strip().lower()
+        if distinto:
+            difs.append(f"{etiqueta}: «{actual if actual not in (None, '') else '—'}» → «{nuevo}»")
+    return difs
+
+
 def _borrar_del_almacenamiento(storage, nombres):
+    from analisis.models import ArchivoMolecularRevision
     for nombre in nombres:
         try:
+            if ArchivoMolecularRevision.objects.filter(archivo=nombre).exists():
+                continue
             storage.delete(nombre)
         except Exception:
             logger.warning("No se pudo borrar el archivo %s del almacenamiento", nombre, exc_info=True)
@@ -106,7 +163,7 @@ def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
         raise ValueError("La localidad es obligatoria.")
 
     finca_lote = request.POST.get("finca_lote", "").strip()
-    altitud = float(request.POST.get("altitud") or 0.0)
+    altitud = leer_altitud(request.POST.get("altitud"))
 
     # 2. Cultivo y variedad: aquí solo se validan; los manuales se crean dentro
     #    de la transacción para no dejar registros sueltos si la carga falla.
@@ -180,12 +237,27 @@ def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
             if muestra is None:
                 muestra = MuestraSuelo.objects.create(codigo=codigo_muestra, **datos_muestra)
             else:
+                # Si la muestra ya tiene datos de OTRO marcador, cambiar sus metadatos
+                # alteraría también esos resultados: se rechaza en lugar de sobrescribir
+                # en silencio. Solo se permite al reemplazar el único marcador cargado.
+                otros_marcadores = ArchivoMolecular.objects.filter(muestra=muestra).exclude(tipo_analisis=tipo).exists()
+                diferencias = _diferencias_metadatos(muestra, datos_muestra)
+                if otros_marcadores and diferencias:
+                    raise ValueError(
+                        f"La muestra {codigo_muestra} ya existe con otros datos de campo y tiene resultados "
+                        f"de otro marcador. Para no alterarlos, use los mismos datos o pida a un "
+                        f"administrador que corrija la muestra. Diferencias: " + "; ".join(diferencias) + "."
+                    )
                 for campo, valor in datos_muestra.items():
+                    if valor in (None, "") and campo in ("altitud", "finca_lote", "observaciones"):
+                        continue  # vacío en el formulario = conservar el valor guardado
                     setattr(muestra, campo, valor)
                 muestra.save()
 
             nombres_anteriores = [a.archivo.name for a in anteriores if a.archivo.name]
             for anterior in anteriores:
+                from analisis.services.business.trazabilidad import archivar_revision
+                archivar_revision(anterior)
                 anterior.delete()  # CASCADE: también sus ResultadoTaxonomico
 
             archivo.seek(0)

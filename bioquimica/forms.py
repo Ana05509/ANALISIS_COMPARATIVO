@@ -60,8 +60,8 @@ class EnsayoManualForm(forms.Form):
             return archivo
         if not archivo.name.lower().endswith('.pdf'):
             raise forms.ValidationError("El respaldo debe ser un archivo PDF.")
-        if archivo.size > 20 * 1024 * 1024:
-            raise forms.ValidationError("El PDF no debe superar 20 MB.")
+        if archivo.size > 10 * 1024 * 1024:
+            raise forms.ValidationError("El PDF no debe superar 10 MB.")
         archivo.seek(0)
         es_pdf = archivo.read(5) == b'%PDF-'
         archivo.seek(0)

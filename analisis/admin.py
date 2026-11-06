@@ -27,6 +27,7 @@ from .models import (
     ResultadoTaxonomico, CatalogoMicroorganismo, Usuario, EventoAcceso,
 )
 from analisis.services.processing.pipeline import PipelineProcesamiento
+from analisis.services.business.upload_service import validar_archivo, leer_archivo
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +149,17 @@ class MuestraSueloForm(forms.ModelForm):
     Formulario encargado de inyectar las guías de texto invisibles (placeholders)
     que desaparecen al escribir dentro de los inputs de Unfold.
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        cultivo_id = self.data.get("cultivo") if self.is_bound else self.instance.cultivo_id
+        if cultivo_id and str(cultivo_id).isdigit():
+            self.fields["variedad_clon"].queryset = VariedadClon.objects.filter(cultivo_id=cultivo_id)
+        else:
+            self.fields["variedad_clon"].queryset = VariedadClon.objects.none()
+
+    altitud = forms.IntegerField(required=False, min_value=0, max_value=6500,
+                                 widget=forms.NumberInput(attrs={"placeholder": "Ej: 250"}))
+
     class Meta:
         model = MuestraSuelo
         fields = '__all__'
@@ -217,26 +229,41 @@ class MuestraSueloAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, ModelAdmin):
 
 # LÓGICA DE ARCHIVOS MOLECULARES
 def _leer_archivo_molecular(archivo_field):
-    archivo_field.seek(0)
-    nombre = archivo_field.name.lower()
-    if nombre.endswith((".xlsx", ".xls")):
-        return pd.read_excel(archivo_field)
-    raw = archivo_field.read()
-    archivo_field.seek(0)
-    try:
-        return pd.read_csv(io.BytesIO(raw))
-    except Exception:
-        return pd.read_csv(io.BytesIO(raw), sep="\t")
+    validar_archivo(archivo_field)
+    return leer_archivo(archivo_field)
+
+
+class ArchivoMolecularForm(forms.ModelForm):
+    class Meta:
+        model = ArchivoMolecular
+        fields = "__all__"
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get("archivo")
+        if archivo:
+            try:
+                resultado = PipelineProcesamiento.procesar_archivo_df(_leer_archivo_molecular(archivo))
+                if not resultado.get("data"):
+                    raise ValueError("El archivo no contiene datos taxonómicos válidos.")
+            except (ValueError, OSError) as exc:
+                raise forms.ValidationError(str(exc)) from exc
+            finally:
+                archivo.seek(0)
+        return archivo
+
 
 def _disparar_pipeline(archivo_mol, request):
-    ResultadoTaxonomico.objects.filter(archivo=archivo_mol).delete()
-    df_raw = _leer_archivo_molecular(archivo_mol.archivo)
+    try:
+        df_raw = _leer_archivo_molecular(archivo_mol.archivo)
+    finally:
+        archivo_mol.archivo.close()
     resultado = PipelineProcesamiento.procesar_archivo_df(df_raw)
     
     if not resultado or not resultado.get("data"):
         raise ValueError("El archivo no contiene datos taxonómicos válidos.")
         
     with transaction.atomic():
+        ResultadoTaxonomico.objects.filter(archivo=archivo_mol).delete()
         ResultadoTaxonomico.objects.bulk_create([
             ResultadoTaxonomico(
                 archivo=archivo_mol,
@@ -252,6 +279,7 @@ def _disparar_pipeline(archivo_mol, request):
 
 @admin.register(ArchivoMolecular)
 class ArchivoMolecularAdmin(AccionesColumnaMixin, ModelAdmin):
+    form = ArchivoMolecularForm
     list_display = ("id", "tipo_badge", "muestra", "archivo_corto", "total_resultados", "fecha_carga_corta", "acciones")
     list_display_links = ("id",)
     list_filter   = ("tipo_analisis", "fecha_carga")
@@ -298,18 +326,30 @@ class ArchivoMolecularAdmin(AccionesColumnaMixin, ModelAdmin):
         return obj.fecha_carga.strftime("%d/%m/%Y")
 
     def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
+        anterior = ArchivoMolecular.objects.filter(pk=obj.pk).first() if change else None
+        anterior_nombre = anterior.archivo.name if anterior else None
+        nuevo_nombre = None
         try:
-            total = _disparar_pipeline(obj, request)
-            if change:
-                messages.success(request, f"Archivo [{obj.tipo_analisis}] re-procesado. {total} registros actualizados.")
-            else:
-                messages.success(request, f"¡Pipeline completado! {total} registros procesados.")
-        except ValueError as e:
-            messages.error(request, f"Error en pipeline: {e}")
+            with transaction.atomic():
+                if anterior:
+                    from analisis.services.business.trazabilidad import archivar_revision
+                    archivar_revision(anterior)
+                super().save_model(request, obj, form, change)
+                nuevo_nombre = obj.archivo.name
+                total = _disparar_pipeline(obj, request)
+                if anterior_nombre and anterior_nombre != nuevo_nombre:
+                    storage = obj.archivo.storage
+                    from analisis.services.business.upload_service import _borrar_del_almacenamiento
+                    transaction.on_commit(lambda: _borrar_del_almacenamiento(storage, [anterior_nombre]))
         except Exception:
-            logger.exception("Fallo inesperado al procesar un archivo molecular desde el admin")
-            messages.error(request, "Error inesperado al procesar el archivo. Revise los logs del servidor.")
+            if nuevo_nombre and nuevo_nombre != anterior_nombre:
+                obj.archivo.close()
+                try:
+                    obj.archivo.storage.delete(nuevo_nombre)
+                except OSError:
+                    logger.exception("No se pudo limpiar el archivo de una edición fallida")
+            raise
+        messages.success(request, f"Pipeline completado: {total} registros procesados.")
 
 
 # RESULTADOS TAXONÓMICOS
@@ -1971,3 +2011,46 @@ class LogEntryAdmin(AccionesColumnaMixin, ModelAdmin):
         nombre = ahora.strftime("registro_acciones_%Y%m%d_%H%M%S.pdf")
         resp["Content-Disposition"] = f'attachment; filename="{nombre}"'
         return resp
+
+
+from .models import ReporteArchivado, ArchivoMolecularRevision
+
+
+@admin.register(ReporteArchivado)
+class ReporteArchivadoAdmin(ModelAdmin):
+    list_display = ("fecha", "formato", "nombre", "descargar")
+    readonly_fields = ("id", "fecha", "formato", "nombre", "sha256", "manifiesto")
+    fields = readonly_fields
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).defer("contenido")
+
+    @admin.display(description="Archivo emitido")
+    def descargar(self, obj):
+        return format_html('<a href="{}">Descargar copia archivada</a>',
+                           reverse("analisis:reporte_archivado", args=[obj.pk]))
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ArchivoMolecularRevision)
+class ArchivoMolecularRevisionAdmin(ModelAdmin):
+    list_display = ("fecha", "muestra", "tipo_analisis", "sha256")
+    readonly_fields = ("fecha", "muestra", "tipo_analisis", "archivo", "sha256", "metadatos", "resultados")
+    fields = readonly_fields
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

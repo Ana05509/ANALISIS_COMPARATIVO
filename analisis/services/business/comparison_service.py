@@ -2,7 +2,7 @@ import json
 import pandas as pd
 from django.db.models import Sum
 from analisis.models import MuestraSuelo, ResultadoTaxonomico
-from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, MAPA_NIVELES, OPCIONES_TOP_N, get_taxonomia_annotation, clasificar_taxon
+from analisis.constants import MARCADORES_VALIDOS, NIVELES_VALIDOS, MAPA_NIVELES, OPCIONES_TOP_N, get_taxonomia_annotation, clasificar_taxon, es_taxon_asignado
 from analisis.services.business.analysis_service import obtener_lookup_catalogo
 
 
@@ -156,7 +156,8 @@ def ejecutar_comparacion_clean(cleaned_data):
     sets = {mid: set() for mid in ids}
     for mid, tax in (analisis.annotate(_tax=taxonomia_expr)
                      .values_list("archivo__muestra_id", "_tax")):
-        sets[mid].add(tax)
+        if es_taxon_asignado(tax):  # "Unclassified" no es un taxón compartido
+            sets[mid].add(tax)
     dominantes, compartidos, exclusivos = _calcular_diferencial(sets)
 
     return {

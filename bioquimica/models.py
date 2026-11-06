@@ -55,6 +55,9 @@ class EnsayoMicrobiologico(models.Model):
         return self.aislados.count()
 
 
+_SUPERINDICES = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
+
+
 class RecuentoUFC(models.Model):
     TIPO_ORGANISMO = [
         ('hongo', 'Hongo'),
@@ -88,20 +91,24 @@ class RecuentoUFC(models.Model):
 
     @property
     def valor_display(self):
-        if self.menor_que_limite:
+        prefijo = "<" if self.menor_que_limite else ""
+        if self.menor_que_limite and self.coeficiente is None:
             return "<1 UFC/g"
         if self.coeficiente is None:
             return "—"
         exp = self.exponente or 0
-        if exp > 0:
-            return f"{self.coeficiente} × 10⁰{exp} UFC/g" if exp < 10 else f"{self.coeficiente} × 10^{exp} UFC/g"
-        return f"{self.coeficiente} UFC/g"
+        if exp != 0:
+            # Exponente en superíndice, también negativos y de dos cifras: 3 × 10⁶, 4 × 10⁻², 2,5 × 10¹²
+            return f"{prefijo}{self.coeficiente} × 10{str(exp).translate(_SUPERINDICES)} UFC/g"
+        return f"{prefijo}{self.coeficiente} UFC/g"
 
     @property
     def valor_numerico(self):
         """Valor numérico para graficar en escala logarítmica."""
         if self.menor_que_limite:
-            return 0.5
+            # Punto de representación del dato censurado, no una medición exacta.
+            limite = float(self.coeficiente) * (10 ** (self.exponente or 0)) if self.coeficiente is not None else 1
+            return limite / 2
         if self.coeficiente is None:
             return 0
         return float(self.coeficiente) * (10 ** (self.exponente or 0))

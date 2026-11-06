@@ -313,6 +313,12 @@
     </div>
 </div>
 {% endwith %}
+{% elif nivel_salud == "NO ESTIMABLE" %}
+<div class="card card-sm" style="margin-bottom:1rem;">
+    <strong>Indicador no estimable</strong>
+    <p>No hay cobertura funcional suficiente de benéficos o fitopatógenos.
+       Esto no implica un suelo en riesgo. Uso exclusivo de investigación y docencia.</p>
+</div>
 {% endif %}
 
 <!--

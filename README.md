@@ -11,15 +11,15 @@ El sistema está orientado a investigadores, docentes y estudiantes que trabajan
 
 | Capa | Tecnología |
 |---|---|
-| Backend | Django 5.1.6 |
-| Autenticación | django-allauth 65.2.0 |
+| Backend | Django 6.0.10 |
+| Autenticación | django-allauth 65.17.0 |
 | Admin UI | django-unfold 0.94.0 |
-| Base de datos | PostgreSQL (psycopg2-binary 2.9.10) |
-| Procesamiento | pandas 2.2.2 · numpy 2.0.2 · scipy 1.14.1 |
-| Machine Learning | scikit-learn 1.5.2 |
-| Gráficos | Plotly 5.24.1 · Matplotlib 3.9.2 |
-| Reportes | ReportLab 4.2.2 · openpyxl 3.1.5 |
-| Import/Export | django-import-export 4.3.1 · tablib[xlsx] |
+| Base de datos | PostgreSQL (psycopg2-binary 2.9.12) |
+| Procesamiento | pandas 3.0.3 · numpy 2.4.6 · scipy 1.17.1 |
+| Machine Learning | scikit-learn 1.8.0 |
+| Gráficos | Plotly 6.7.0 · Matplotlib 3.10.9 |
+| Reportes | ReportLab 4.5.1 · openpyxl 3.1.5 |
+| Import/Export | django-import-export 4.4.1 · tablib[xlsx] |
 
 ---
 
@@ -145,3 +145,19 @@ python manage.py runserver
 | `/catalogo/importar/` | Importación masiva al catálogo |
 | `/reportes/` | Generación y descarga de reportes |
 | `/admin/` | Administración (django-unfold) |
+
+
+## Pruebas y correcciones de auditoría
+Uso previsto: investigación y docencia, sin decisiones diagnósticas ni agronómicas operativas.
+Ejecutar las pruebas con el entorno virtual y configuración aislada:
+
+```powershell
+venv\Scripts\python.exe manage.py test --noinput --settings=config.settings_test
+```
+
+La configuración de pruebas evita SMTP real y redirecciones HTTPS del cliente sintético.
+Los cambios de auditoría incluyen las migraciones 0013 y 0014; no aplicarlas directamente
+en Railway sin respaldo y ensayo en un entorno separado. 0013 se detiene si encuentra
+duplicados muestra/marcador o altitudes inválidas, sin eliminar registros.
+Los originales sustituidos y los reportes emitidos se conservan como históricos; esto
+aumenta almacenamiento y debe incorporarse a las copias de respaldo.

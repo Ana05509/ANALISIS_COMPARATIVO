@@ -93,18 +93,22 @@ class CargaMolecularTests(PruebaConMedia):
         self.assertEqual(MuestraSuelo.objects.get().localidad, "Cotopaxi")
         self.assertEqual(len(_archivos_en_disco()), 1)
 
-    def test_reemplazo_confirmado_borra_el_archivo_anterior_del_disco(self):
+    def test_reemplazo_confirmado_conserva_el_original_en_revision(self):
         self._subir(nombre="primero.csv")
         antes = _archivos_en_disco()
-        csv2 = CSV_VALIDO.replace(",60,60", ",70,70")
+        csv2 = (CSV_VALIDO.replace(",60,60", ",70,63.63636")
+                .replace(",30,30", ",30,27.27273").replace(",10,10", ",10,9.09091"))
         resp = self._subir(csv2, nombre="segundo.csv", confirmar_sobrescritura="1")
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertEqual(ArchivoMolecular.objects.count(), 1)
         self.assertEqual(ResultadoTaxonomico.objects.get(genus="Bacillus").num_hits, 70)
         despues = _archivos_en_disco()
-        self.assertEqual(len(despues), 1)
-        self.assertNotEqual(antes, despues)
-        self.assertIn("segundo", despues[0])
+        self.assertEqual(len(despues), 2)
+        self.assertTrue(set(antes).issubset(despues))
+        self.assertTrue(any("segundo" in nombre for nombre in despues))
+        revision = MuestraSuelo.objects.get().revisiones_moleculares.get()
+        self.assertEqual(len(revision.resultados), 3)
+        self.assertTrue(revision.sha256)
 
     # Fallos parciales
 
@@ -164,8 +168,8 @@ class PipelineEquivalenciaTests(PruebaConMedia):
             "family": ["Bacillaceae", "Unclassified ", "Nectriaceae", "Pseudomonadaceae"],
             "genus": ["Bacillus", None, "Fusarium", "Pseudomonas"],
             "species": ["Bacillus_subtilis(AJ1)", "sp.", None, "putida"],
-            "num_hits": ["10", 0, 3.0, "x"],
-            "%_hits": ["12,5", 0, 0.123456789, None],
+            "num_hits": ["10", 0, 3.0, 7],
+            "%_hits": ["50,0", 0, 15.0, 35],
         })
         nuevo = PipelineProcesamiento.procesar_archivo_df(df)
         self.assertEqual(nuevo["data"], self._version_anterior(df))
