@@ -15,6 +15,7 @@ from analisis.models import (
     CatalogoMicroorganismo, ArchivoMolecular,
 )
 from analisis.services.business.analysis_service import obtener_lookup_catalogo
+from analisis.constants import clasificar_taxon
 
 
 def _error(msg, status=400):
@@ -95,7 +96,8 @@ def api_muestra_detalle(request, pk):
         archivo__tipo_analisis=tipo,
     )
 
-    catalogo = obtener_lookup_catalogo(tipo)
+    # Mismo criterio que dashboard y reportes: solo entradas de nivel género.
+    catalogo = obtener_lookup_catalogo(tipo, nivel="genus")
 
     todos_los_taxa = list(
         qs.values(taxonomia=F("genus"))
@@ -107,7 +109,7 @@ def api_muestra_detalle(request, pk):
     taxa = todos_los_taxa[:top_n]
     for t in taxa:
         t["porcentaje"]    = round(t["total_hits"] / grand_total * 100, 2)
-        t["clasificacion"] = catalogo.get((t["taxonomia"] or "").lower(), "sin_clasificar")
+        t["clasificacion"] = clasificar_taxon(t["taxonomia"] or "", catalogo, "genus")
 
     return _ok({
         "muestra": {

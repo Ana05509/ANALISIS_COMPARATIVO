@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 
 from ..models import MuestraSuelo, ResultadoTaxonomico
 from ..services.business.analysis_service import obtener_lookup_catalogo
+from analisis.constants import clasificar_taxon
 
 DISPLAY_LIMIT = 50  # filas mostradas en la tabla; todos los taxa siguen en BD
 
@@ -23,10 +24,11 @@ def ver_producto(request, id):
 
     analisis_top = list(qs.order_by("-num_hits")[:DISPLAY_LIMIT])
 
-    catalogo = obtener_lookup_catalogo(tipo_actual)
+    # Mismo criterio que dashboard y reportes: solo entradas de nivel género.
+    catalogo = obtener_lookup_catalogo(tipo_actual, nivel="genus")
 
     for reg in analisis_top:
-        reg.clasificacion = catalogo.get((reg.genus or "").lower(), "sin_clasificar")
+        reg.clasificacion = clasificar_taxon(reg.genus or "", catalogo, "genus")
 
     total_beneficos         = sum(1 for r in analisis_top if r.clasificacion == "benefico")
     total_fitopatogenos     = sum(1 for r in analisis_top if r.clasificacion == "fitopatogeno")
