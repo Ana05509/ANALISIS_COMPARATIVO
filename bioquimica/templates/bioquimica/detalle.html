@@ -19,7 +19,7 @@
 <a href="{% url 'bioquimica:lista' %}" class="btn btn-outline btn-sm">
     <i class="ti ti-arrow-left"></i> Volver
 </a>
-{% if request.user.is_staff or request.user.rol == 'docente' %}
+{% if puede_cargar %}
 {% if ensayo.archivo_pdf %}
 <a href="{% url 'bioquimica:ver_pdf' ensayo.pk %}" target="_blank" class="btn btn-amber btn-sm">
     <i class="ti ti-file-type-pdf"></i> Ver PDF original

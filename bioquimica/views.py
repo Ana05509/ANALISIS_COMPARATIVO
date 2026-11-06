@@ -17,6 +17,7 @@ from .models import (
     MicroorganismoAislado, PruebaBioquimica,
 )
 from analisis.audit import registrar_accion
+from analisis.permisos import puede_cargar_datos
 from django.contrib.admin.models import ADDITION
 
 logger = logging.getLogger(__name__)
@@ -360,7 +361,7 @@ def detalle_ensayo(request, pk):
 def ver_pdf(request, pk):
     """Sirve el PDF original de un ensayo, solo a Docente/staff.
     No usar ensayo.archivo_pdf.url en las plantillas: no tiene control de acceso."""
-    if _bloquear_si_estudiante(request):
+    if _bloquear_sin_permiso(request):
         return redirect('bioquimica:detalle', pk=pk)
 
     ensayo = get_object_or_404(EnsayoMicrobiologico, pk=pk)
@@ -491,12 +492,11 @@ class _DuplicadoError(Exception):
         self.pk = pk
 
 
-def _bloquear_si_estudiante(request):
-    """True (y ya dejó el mensaje de error) si el usuario no tiene permiso
-    para registrar ensayos — Subir PDF e Ingreso manual son exclusivos de
-    Docente/Investigador (y Admin); Estudiante puede ver los ensayos ya
-    cargados pero no cargar nuevos."""
-    if request.user.rol == 'estudiante':
+def _bloquear_sin_permiso(request):
+    """True (y ya dejó el mensaje de error) si el usuario no puede registrar
+    ensayos ni ver los PDF originales (ver analisis.permisos). Los demás
+    pueden ver los ensayos ya cargados."""
+    if not puede_cargar_datos(request.user):
         messages.error(
             request,
             "Su nivel de cuenta no dispone de permisos para registrar ensayos. "
@@ -508,7 +508,7 @@ def _bloquear_si_estudiante(request):
 
 @login_required
 def subir_pdf(request):
-    if _bloquear_si_estudiante(request):
+    if _bloquear_sin_permiso(request):
         return redirect('bioquimica:lista')
 
     if request.method != 'POST':
@@ -687,7 +687,7 @@ def _contexto_formulario_previo(request, form):
 
 @login_required
 def ingreso_manual(request):
-    if _bloquear_si_estudiante(request):
+    if _bloquear_sin_permiso(request):
         return redirect("bioquimica:lista")
 
     if request.method != 'POST':

@@ -160,6 +160,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',  # Requerido por allauth
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'analisis.permisos.contexto_permisos',  # variable {{ puede_cargar }}
             ],
         },
     },

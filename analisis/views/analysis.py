@@ -14,15 +14,21 @@ from ..services.business.analysis_service import (
 )
 from ..services.business.visualization_service import VisualizationService
 from ..models import ResultadoTaxonomico, MuestraSuelo, ArchivoMolecular
-from analisis.constants import OPCIONES_TOP_N, NIVELES_VALIDOS, NIVELES_ES, NIVELES_CHOICES, MARCADORES_CHOICES
+from analisis.constants import (
+    OPCIONES_TOP_N, NIVELES_VALIDOS, NIVELES_ES, NIVELES_CHOICES, MARCADORES_CHOICES, MARCADORES_VALIDOS,
+)
 
 logger = logging.getLogger(__name__)
 
 @login_required
 def analisis_avanzado(request):
     tipo = request.GET.get("tipo", "16S")
+    if tipo not in MARCADORES_VALIDOS:
+        tipo = "16S"
     top_n_raw = request.GET.get("top_n", "10")
     nivel = request.GET.get("nivel", "genus")
+    if nivel not in NIVELES_VALIDOS:
+        nivel = "genus"
 
     # Acepta lista de muestra_id (multi-select) o producto_id (link desde detalle_producto)
     ids_raw = request.GET.getlist("muestra_id") or ([request.GET.get("producto_id")] if request.GET.get("producto_id") else [])
@@ -176,6 +182,8 @@ def analisis_avanzado(request):
 def resultado_analisis(request, muestra_id):
     try:
         tipo  = request.GET.get("tipo", "16S")
+        if tipo not in MARCADORES_VALIDOS:
+            tipo = "16S"
         nivel = request.GET.get("nivel", "genus")
         if nivel not in NIVELES_VALIDOS:
             nivel = "genus"

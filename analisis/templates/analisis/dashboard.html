@@ -7,7 +7,7 @@
 {% block topbar_title %}Dashboard de Control{% endblock %}
 
 {% block topbar_actions %}
-{% if user.is_staff or user.rol == 'tecnico' %}
+{% if puede_cargar %}
 <a href="{% url 'analisis:subir_datos' %}" class="btn btn-primary btn-sm">
     <i class="ti ti-upload" aria-hidden="true"></i> Nueva Muestra
 </a>

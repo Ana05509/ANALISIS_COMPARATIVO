@@ -12,6 +12,7 @@ from analisis.models import VariedadClon, Cultivo, MuestraSuelo
 from analisis.constants import MARCADORES_VALIDOS
 from analisis.audit import registrar_accion
 from django.contrib.admin.models import ADDITION
+from analisis.permisos import requiere_permiso_carga
 
 logger = logging.getLogger(__name__)
 
@@ -19,15 +20,8 @@ def _is_ajax(request):
     return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
 @login_required
+@requiere_permiso_carga("analisis:dashboard")
 def subir_datos(request):
-    if request.user.rol == 'estudiante':
-        messages.error(
-            request,
-            "Su nivel de cuenta no dispone de permisos para cargar datos moleculares. "
-            "Si es docente o investigador, contacte al administrador del sistema para actualizar su rol."
-        )
-        return redirect("analisis:dashboard")
-
     if request.method == "POST":
         cultivo_id = request.POST.get('cultivo')
         cultivo_manual = request.POST.get('cultivo_manual', '').strip()
@@ -149,8 +143,8 @@ def subir_datos(request):
 
 @login_required
 def cargar_variedades(request):
-    cultivo_id = request.GET.get('cultivo_id')
-    if cultivo_id:
-        variedades = VariedadClon.objects.filter(cultivo_id=cultivo_id).values('id', 'nombre')
+    cultivo_id = request.GET.get('cultivo_id', '')
+    if cultivo_id.isdigit():
+        variedades = VariedadClon.objects.filter(cultivo_id=int(cultivo_id)).values('id', 'nombre')
         return JsonResponse({'variedades': list(variedades)})
     return JsonResponse({'variedades': []})

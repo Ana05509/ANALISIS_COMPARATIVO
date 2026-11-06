@@ -101,5 +101,4 @@ def dashboard(request):
         "tipo_actual": tipo,
         "marcadores_disponibles": MARCADORES_VALIDOS,
         "estadisticas": contexto_estadisticas,
-        "es_estudiante": request.user.rol == 'estudiante',
     })

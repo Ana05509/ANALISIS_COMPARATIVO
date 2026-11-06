@@ -5,7 +5,7 @@
 {% block topbar_title %}Microbiología Bioquímica{% endblock %}
 
 {% block topbar_actions %}
-    {% if request.user.is_staff or request.user.rol == 'docente' %}
+    {% if puede_cargar %}
     <a href="{% url 'bioquimica:subir_pdf' %}" class="btn btn-primary btn-sm">
         <i class="ti ti-file-upload" aria-hidden="true"></i> Subir PDF
     </a>
@@ -98,7 +98,7 @@
             Aún no hay ensayos bioquímicos en el sistema.
         {% endif %}
     </p>
-    {% if request.user.is_staff or request.user.rol == 'docente' %}
+    {% if puede_cargar %}
     <a href="/admin/bioquimica/ensayomicrobiologico/add/" class="btn btn-primary btn-sm" style="margin-top:0.75rem;">
         <i class="ti ti-plus"></i> Registrar primer ensayo
     </a>

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.views.i18n import JavaScriptCatalog
 from django.views.generic import RedirectView
 from django.views.static import serve as serve_media
+from analisis.permisos import puede_cargar_datos
 from analisis.views.manual_admin import manual_admin_view
 
 urlpatterns = [
@@ -33,7 +34,7 @@ _MEDIA_INLINE = {'.png', '.jpg', '.jpeg', '.webp', '.gif'}
 
 @login_required
 def media_protegida(request, path):
-    if path.startswith(_MEDIA_RESTRINGIDA) and getattr(request.user, 'rol', None) == 'estudiante':
+    if path.startswith(_MEDIA_RESTRINGIDA) and not puede_cargar_datos(request.user):
         raise PermissionDenied
     response = serve_media(request, path, document_root=settings.MEDIA_ROOT)
     # Lo que no es imagen se descarga en vez de abrirse en el navegador.
