@@ -191,6 +191,17 @@ else:
         }
     }
 
+# CACHÉ. LocMemCache (por defecto) vive en la memoria de cada proceso: con
+# WEB_CONCURRENCY > 1 cada worker tiene el suyo. CACHE_BACKEND=db lo comparte
+# entre procesos (tabla biomicro_cache, la crea "createcachetable"). Lo usa el
+# limitador por IP de allauth; el bloqueo por cuenta ya está en la base
+# (analisis.BloqueoLogin) y no depende de esto.
+if os.environ.get('CACHE_BACKEND', 'local').strip().lower() == 'db':
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+                          'LOCATION': 'biomicro_cache'}}
+else:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
+
 # PASSWORDS VALIDATORS
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
