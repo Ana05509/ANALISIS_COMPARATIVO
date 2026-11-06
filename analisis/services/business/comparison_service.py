@@ -152,14 +152,11 @@ def ejecutar_comparacion_clean(cleaned_data):
     # Enviamos la totalidad de los datos pero parametrizando el 'taxa_top' para consolidar la fila 'Otros'
     tabla = comparar_productos(analisis, nivel, taxa_top=taxa_top, tipo=tipo)
 
-    sets = {
-        mid: set(
-            analisis.filter(archivo__muestra_id=mid)
-            .annotate(_tax=taxonomia_expr)
-            .values_list("_tax", flat=True)
-        )
-        for mid in ids
-    }
+    # Una sola consulta (antes, una por muestra); toda muestra elegida tiene su conjunto.
+    sets = {mid: set() for mid in ids}
+    for mid, tax in (analisis.annotate(_tax=taxonomia_expr)
+                     .values_list("archivo__muestra_id", "_tax")):
+        sets[mid].add(tax)
     dominantes, compartidos, exclusivos = _calcular_diferencial(sets)
 
     return {

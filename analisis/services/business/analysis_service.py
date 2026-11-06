@@ -106,18 +106,28 @@ def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=N
     )
     if not data: return None
 
-    df = pd.DataFrame(data)
     diversidades = []
     # Profundidad de secuenciación (suma de num_hits) por id de muestra
     lecturas_totales = {}
-    for muestra_pk, grupo in df.groupby("muestra_pk"):
+    for muestra_pk, grupo in pd.DataFrame(data).groupby("muestra_pk"):
         lecturas_totales[int(cast(int, muestra_pk))] = int(grupo["hits"].sum())
-        total = grupo["hits"].sum() or 1
-        df_m = pd.DataFrame({"%_hits": grupo["hits"] / total * 100})
-        df_m = df_m[df_m["%_hits"] > 0]
-        if not df_m.empty:
-            diversidades.append(DiversityService.calcular_diversidad_alfa(df_m))
+        div = _diversidad_alfa_de_grupo(grupo)
+        if div is not None:
+            diversidades.append(div)
+    return _promediar_diversidades(diversidades, lecturas_totales)
 
+
+def _diversidad_alfa_de_grupo(grupo):
+    """Índices alfa de una muestra a partir de sus filas {hits} agregadas por taxón."""
+    total = grupo["hits"].sum() or 1
+    df_m = pd.DataFrame({"%_hits": grupo["hits"] / total * 100})
+    df_m = df_m[df_m["%_hits"] > 0]
+    if df_m.empty:
+        return None
+    return DiversityService.calcular_diversidad_alfa(df_m)
+
+
+def _promediar_diversidades(diversidades, lecturas_totales):
     if not diversidades: return None
     n = len(diversidades)
     return {
@@ -129,6 +139,46 @@ def obtener_diversidad(tipo="16S", nivel="genus", variedad_id=None, muestra_id=N
         "lecturas_totales": lecturas_totales,
     }
 
+
+def obtener_diversidad_por_muestra(tipo="16S", nivel="genus", muestra_ids=None):
+    """{muestra_id: resultado} igual a obtener_diversidad(muestra_ids=[id]) para cada id,
+    pero con una sola consulta. Omite las muestras sin datos."""
+    if tipo not in MARCADORES_VALIDOS: tipo = "16S"
+    if not muestra_ids:
+        return {}
+    data = list(
+        _base_queryset(tipo, muestra_ids=muestra_ids)
+        .values(taxonomia=get_taxonomia_annotation(nivel), muestra_pk=F("archivo__muestra_id"))
+        .annotate(hits=Sum("num_hits"))
+    )
+    if not data:
+        return {}
+    resultado = {}
+    for muestra_pk, grupo in pd.DataFrame(data).groupby("muestra_pk"):
+        mid = int(cast(int, muestra_pk))
+        div = _promediar_diversidades(
+            [d for d in [_diversidad_alfa_de_grupo(grupo)] if d is not None],
+            {mid: int(grupo["hits"].sum())},
+        )
+        if div is not None:
+            resultado[mid] = div
+    return resultado
+
+
+def _abundancias_por_muestra(tipo, nivel, muestra_ids):
+    """{muestra_id: [(taxón, hits), ...]} en el orden de muestra_ids, con una sola consulta
+    (antes, una por muestra). Solo incluye muestras con al menos una fila."""
+    filas = (
+        ResultadoTaxonomico.objects
+        .filter(archivo__tipo_analisis=tipo, archivo__muestra_id__in=muestra_ids)
+        .values(mid=F("archivo__muestra_id"), t=get_taxonomia_annotation(nivel))
+        .annotate(h=Sum("num_hits"))
+    )
+    por_muestra: dict = {}
+    for fila in filas:
+        por_muestra.setdefault(fila["mid"], []).append((fila["t"], fila["h"]))
+    return {mid: por_muestra[mid] for mid in dict.fromkeys(muestra_ids) if mid in por_muestra}
+
 def obtener_diversidad_beta_inter(tipo="16S", nivel="genus", muestra_ids=None):
     """Beta diversidad entre muestras: Bray-Curtis y Jaccard promedio, core y taxa únicos.
     Requiere al menos 2 muestras."""
@@ -139,16 +189,9 @@ def obtener_diversidad_beta_inter(tipo="16S", nivel="genus", muestra_ids=None):
     if not muestra_ids or len(muestra_ids) < 2:
         return None
 
-    taxonomia_expr = get_taxonomia_annotation(nivel)
     abundancias: dict = {}
-    for mid in muestra_ids:
-        data = list(
-            ResultadoTaxonomico.objects
-            .filter(archivo__tipo_analisis=tipo, archivo__muestra_id=mid)
-            .values(t=taxonomia_expr)
-            .annotate(h=Sum("num_hits"))
-        )
-        vec = {row["t"]: row["h"] for row in data if row["t"]}
+    for mid, filas in _abundancias_por_muestra(tipo, nivel, muestra_ids).items():
+        vec = {t: h for t, h in filas if t}
         if vec:
             abundancias[mid] = vec
 
@@ -251,17 +294,11 @@ def obtener_permanova(tipo="16S", nivel="genus", muestra_ids=None, n_perm=499):
         nivel_agrupacion = "variedad/clon"
 
     # Vector de abundancias por muestra
-    taxonomia_expr = get_taxonomia_annotation(nivel)
-    abundancias: dict = {}
-    for mid in muestra_ids:
-        qs = ResultadoTaxonomico.objects.filter(
-            archivo__tipo_analisis=tipo,
-            archivo__muestra_id=mid,
-        )
-        if not qs.exists():
-            continue
-        data = list(qs.values(t=taxonomia_expr).annotate(h=Sum("num_hits")))
-        abundancias[mid] = {row["t"]: row["h"] for row in data if row["t"]}
+    # Como antes: entra toda muestra con filas, aunque ninguna tenga taxón a este nivel.
+    abundancias: dict = {
+        mid: {t: h for t, h in filas if t}
+        for mid, filas in _abundancias_por_muestra(tipo, nivel, muestra_ids).items()
+    }
 
     if len(abundancias) < 2:
         return None

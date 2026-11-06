@@ -11,7 +11,9 @@ from django.http import JsonResponse, HttpResponse, HttpResponseBase
 from django.views.decorators.http import require_POST
 
 from analisis.models import MuestraSuelo, ResultadoTaxonomico, CatalogoMicroorganismo
-from analisis.services.business.analysis_service import obtener_analisis_avanzado, obtener_diversidad, _filtrar_catalogo_por_nivel
+from analisis.services.business.analysis_service import (
+    obtener_analisis_avanzado, obtener_diversidad, obtener_diversidad_por_muestra, _filtrar_catalogo_por_nivel,
+)
 from analisis.services.business.export_service import ExportService
 from analisis.constants import MARCADORES_VALIDOS, OPCIONES_TOP_N, NIVELES_VALIDOS, MAPA_NIVELES, get_taxonomia_annotation, clasificar_taxon, buscar_en_catalogo, NIVELES_ES, NIVELES_CHOICES, MARCADORES_CHOICES, normalizar_nombre_catalogo
 from analisis.audit import registrar_accion
@@ -38,7 +40,17 @@ def calcular_indice_salud(n_ben, n_fito, n_neu, n_sc, shannon=0):
     return indice, nivel
 
 
-def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S"):
+def _catalogo_por_nombre(tipo, nivel):
+    """{nombre_normalizado: CatalogoMicroorganismo} del marcador y nivel (se reutiliza por petición)."""
+    return {
+        normalizar_nombre_catalogo(obj.nombre): obj
+        for obj in _filtrar_catalogo_por_nivel(
+            CatalogoMicroorganismo.objects.filter(marcador=tipo), nivel
+        )
+    }
+
+
+def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S", catalogo=None):
     """
     Devuelve (detalle_dict, totales_dict) con info funcional de cada taxón.
     detalle_dict[cat] = [{nombre, porcentaje, descripcion, referencia}, ...]
@@ -47,12 +59,8 @@ def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S"):
     taxa_qs    = list(qs.values(taxon=get_taxonomia_annotation(nivel)).annotate(hits=Sum("num_hits")).order_by("-hits"))
     grand_total = sum(r["hits"] for r in taxa_qs) or 1
 
-    catalogo = {
-        normalizar_nombre_catalogo(obj.nombre): obj
-        for obj in _filtrar_catalogo_por_nivel(
-            CatalogoMicroorganismo.objects.filter(marcador=tipo), nivel
-        )
-    }
+    if catalogo is None:
+        catalogo = _catalogo_por_nombre(tipo, nivel)
 
     detalle = {c: [] for c in CATS}
     totales = {c: 0  for c in CATS}
@@ -74,7 +82,7 @@ def _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo="16S"):
     return detalle, totales
 
 
-def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
+def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None, diversidad=None):
     """
     Construye el dict completo de datos para PDF / Excel.
     Retorna None si no hay datos.
@@ -100,7 +108,8 @@ def _construir_datos_reporte(tipo, nivel, top_n, muestra_ids=None):
         r["total_porcentaje"] = round(pct_raw, 4) if pct_raw < 0.01 else round(pct_raw, 2)
         r["clasificacion"]    = clasificar_taxon(str(r["taxonomia"] or ""), catalogo_map, nivel)
 
-    diversidad  = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids) or {}
+    if diversidad is None:  # la vista puede pasar la que ya calculó
+        diversidad = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids) or {}
     detalle_clas, totales_clas = _obtener_clasificacion_detalle(qs, nivel, campo_db, tipo)
     shannon_val  = diversidad.get("shannon", 0) or 0
     indice, nivel_salud = calcular_indice_salud(
@@ -145,6 +154,9 @@ def _construir_datos_por_muestra(tipo, nivel, top_n, muestras_list):
     """Para reportes comparativos: datos por cada muestra seleccionada."""
     campo_db  = MAPA_NIVELES.get(nivel, "genus")
     EXCLUIR = {"others", "unclassified", "unknown", "others sp", "nan", ""}
+    catalogo = _catalogo_por_nombre(tipo, nivel)  # una vez, no una por muestra
+    div_por_muestra = obtener_diversidad_por_muestra(tipo=tipo, nivel=nivel,
+                                                     muestra_ids=[m.id for m in muestras_list])
     resultado = []
     for muestra in muestras_list:
         qs_m = ResultadoTaxonomico.objects.filter(
@@ -163,8 +175,8 @@ def _construir_datos_por_muestra(tipo, nivel, top_n, muestras_list):
             str(r["taxonomia"]) for r in all_raw
             if r.get("taxonomia") and str(r["taxonomia"]).lower() not in EXCLUIR
         }
-        div_m = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=[muestra.id]) or {}
-        detalle_m, totales_m = _obtener_clasificacion_detalle(qs_m, nivel, campo_db, tipo)
+        div_m = div_por_muestra.get(muestra.id) or {}
+        detalle_m, totales_m = _obtener_clasificacion_detalle(qs_m, nivel, campo_db, tipo, catalogo=catalogo)
         indice_m, nivel_m = calcular_indice_salud(
             totales_m["benefico"], totales_m["fitopatogeno"],
             totales_m["neutral"],  totales_m["sin_clasificar"],
@@ -281,7 +293,7 @@ def reportes(request):
             ctx["datos_clasificacion_json"] = json.dumps(datos_clas)
 
             # ④ Índice de salud + totales funcionales
-            datos_rpt = _construir_datos_reporte(tipo, nivel, top_n, muestra_ids)
+            datos_rpt = _construir_datos_reporte(tipo, nivel, top_n, muestra_ids, diversidad=ctx["diversidad"])
             if datos_rpt:
                 ctx["indice_salud"]          = datos_rpt["indice_salud"]
                 ctx["nivel_salud"]           = datos_rpt["nivel_salud"]
@@ -292,9 +304,10 @@ def reportes(request):
                 muestras_set = MuestraSuelo.objects.filter(
                     id__in=muestra_ids
                 ).only("id", "codigo").order_by("codigo")
+                div_por_muestra = obtener_diversidad_por_muestra(tipo=tipo, nivel=nivel, muestra_ids=muestra_ids)
                 alfa_pm = {}
                 for m in muestras_set:
-                    div_m = obtener_diversidad(tipo=tipo, nivel=nivel, muestra_ids=[m.id]) or {}
+                    div_m = div_por_muestra.get(m.id) or {}
                     if div_m:
                         alfa_pm[m.codigo] = {
                             "riqueza":       int(div_m.get("riqueza", 0)),

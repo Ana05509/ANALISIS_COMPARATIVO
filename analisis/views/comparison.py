@@ -8,7 +8,7 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
-from django.db.models import Sum
+from django.db.models import F, Sum
 
 from analisis.models import ResultadoTaxonomico, ArchivoMolecular
 from analisis.services.business.comparison_service import ejecutar_comparacion_clean
@@ -180,13 +180,18 @@ def comparar(request):
                     taxonomia_expr = get_taxonomia_annotation(nivel)
                     alfa_por_muestra = {}
                     shannon_por_muestra = {}
+                    # Una sola consulta para todas las muestras (antes, una por muestra)
+                    filas_por_muestra: Dict[int, List[Dict[str, Any]]] = {}
+                    for fila in (
+                        ResultadoTaxonomico.objects
+                        .filter(archivo__tipo_analisis=marcador,
+                                archivo__muestra__in=list(muestras_seleccionadas))
+                        .values(mid=F('archivo__muestra_id'), t=taxonomia_expr)
+                        .annotate(h=Sum('num_hits'))
+                    ):
+                        filas_por_muestra.setdefault(fila['mid'], []).append(fila)
                     for muestra in muestras_seleccionadas:
-                        rows = list(
-                            ResultadoTaxonomico.objects
-                            .filter(archivo__tipo_analisis=marcador, archivo__muestra=muestra)
-                            .values(t=taxonomia_expr)
-                            .annotate(h=Sum('num_hits'))
-                        )
+                        rows = filas_por_muestra.get(muestra.id, [])
                         # Profundidad = todas las lecturas de la muestra, incluidas
                         # las que no tienen asignación a este nivel taxonómico
                         lecturas_totales = int(sum(r['h'] or 0 for r in rows))
