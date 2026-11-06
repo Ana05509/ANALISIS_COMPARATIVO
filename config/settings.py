@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',  # Mapeado aquí para no estorbar a Unfold
+    'django.contrib.postgres',  # ArrayField de analisis.BloqueoLogin
 
     "unfold.contrib.import_export", 
     "import_export",
@@ -256,7 +257,11 @@ ACCOUNT_LOGOUT_REDIRECT_URL = 'analisis:login'
 ACCOUNT_AUTHENTICATED_LOGIN_REDIRECTS = True
 ACCOUNT_SIGNUP_FORM_CLASS = 'analisis.signup_form.CustomSignupForm'
 ACCOUNT_ADAPTER = 'analisis.adapter.CustomAccountAdapter'
-ACCOUNT_PREVENT_ENUMERATION = False
+# "Olvidé mi contraseña" responde igual exista o no la cuenta, y no escribe a
+# direcciones no registradas. El registro sigue avisando "ya existe una cuenta":
+# ocultarlo exige verificación de correo obligatoria (cambiaría el flujo de alta).
+ACCOUNT_PREVENT_ENUMERATION = True
+ACCOUNT_EMAIL_UNKNOWN_ACCOUNTS = False
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']  # sin username; email=username
 ACCOUNT_LOGIN_METHODS = {'email'}                               # login con correo (username = email auto)
 ACCOUNT_UNIQUE_EMAIL = True         # un correo = una cuenta

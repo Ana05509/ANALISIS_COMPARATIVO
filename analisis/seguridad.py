@@ -3,7 +3,9 @@ Seguridad de acceso y aceptación de condiciones legales.
 
 1. Bloqueo del login: tras INTENTOS_MAXIMOS fallos con un mismo correo en
    VENTANA_MINUTOS, ese correo queda bloqueado MINUTOS_BLOQUEO minutos
-   (incluso con la contraseña correcta). Usa el caché de Django.
+   (incluso con la contraseña correcta). Se guarda en la tabla BloqueoLogin,
+   compartida por todos los procesos; cada fallo se registra con una sola
+   sentencia atómica de PostgreSQL.
 
 2. Aceptación de Términos y Política de privacidad: se registra en LogEntry.
    Para pedir una nueva aceptación basta con subir TERMINOS_VERSION.
@@ -11,8 +13,9 @@ Seguridad de acceso y aceptación de condiciones legales.
 import hashlib
 import math
 import time
+from datetime import datetime, timedelta, timezone
 
-from django.core.cache import cache
+from django.db import connection, transaction
 
 INTENTOS_MAXIMOS = 3
 VENTANA_MINUTOS = 15
@@ -25,20 +28,30 @@ _SESION_TERMINOS = "terminos_aceptados_version"
 
 # 1. Bloqueo de login
 
-def _claves(correo: str):
-    h = hashlib.sha256(correo.strip().lower().encode("utf-8")).hexdigest()
-    return f"biomicro:login:fallos:{h}", f"biomicro:login:bloqueo:{h}"
+def _clave(correo: str) -> str:
+    return hashlib.sha256(correo.strip().lower().encode("utf-8")).hexdigest()
+
+
+def _ahora() -> datetime:
+    # time.time() (y no timezone.now()) para poder simular el paso del tiempo en las pruebas.
+    return datetime.fromtimestamp(time.time(), tz=timezone.utc)
+
+
+def _modelo():
+    from analisis.models import BloqueoLogin
+    return BloqueoLogin
 
 
 def minutos_bloqueo_restantes(correo: str) -> int:
     """Minutos que faltan para poder volver a intentar (0 = no bloqueado)."""
     if not correo.strip():
         return 0
-    _, clave_bloqueo = _claves(correo)
-    hasta = cache.get(clave_bloqueo)
-    if not hasta or hasta <= time.time():
+    hasta = (_modelo().objects.filter(clave=_clave(correo))
+             .values_list("bloqueado_hasta", flat=True).first())
+    ahora = _ahora()
+    if not hasta or hasta <= ahora:
         return 0
-    return max(1, math.ceil((hasta - time.time()) / 60))
+    return max(1, math.ceil((hasta - ahora).total_seconds() / 60))
 
 
 def registrar_fallo(correo: str) -> int:
@@ -48,23 +61,34 @@ def registrar_fallo(correo: str) -> int:
     """
     if not correo.strip():
         return INTENTOS_MAXIMOS
-    clave_fallos, clave_bloqueo = _claves(correo)
-    ahora = time.time()
-    fallos = [t for t in cache.get(clave_fallos, []) if t > ahora - VENTANA_MINUTOS * 60]
-    fallos.append(ahora)
-
-    if len(fallos) >= INTENTOS_MAXIMOS:
-        cache.set(clave_bloqueo, ahora + MINUTOS_BLOQUEO * 60, MINUTOS_BLOQUEO * 60)
-        cache.delete(clave_fallos)
-        return 0
-    cache.set(clave_fallos, fallos, VENTANA_MINUTOS * 60)
-    return INTENTOS_MAXIMOS - len(fallos)
+    clave, ahora = _clave(correo), _ahora()
+    tabla = connection.ops.quote_name(_modelo()._meta.db_table)
+    with transaction.atomic(), connection.cursor() as cursor:
+        # Inserta o actualiza en una sola sentencia: la fila queda bloqueada hasta
+        # el commit, así dos fallos simultáneos nunca leen el mismo contador.
+        cursor.execute(
+            f"""
+            INSERT INTO {tabla} (clave, intentos, bloqueado_hasta)
+            VALUES (%(clave)s, ARRAY[%(ahora)s::timestamptz], NULL)
+            ON CONFLICT (clave) DO UPDATE SET intentos =
+                ARRAY(SELECT t FROM unnest({tabla}.intentos) AS t
+                      WHERE t > %(limite)s ORDER BY t) || %(ahora)s::timestamptz
+            RETURNING cardinality(intentos)
+            """,
+            {"clave": clave, "ahora": ahora, "limite": ahora - timedelta(minutes=VENTANA_MINUTOS)},
+        )
+        fallos = cursor.fetchone()[0]
+        if fallos >= INTENTOS_MAXIMOS:
+            _modelo().objects.filter(clave=clave).update(
+                intentos=[], bloqueado_hasta=ahora + timedelta(minutes=MINUTOS_BLOQUEO)
+            )
+            return 0
+    return INTENTOS_MAXIMOS - fallos
 
 
 def limpiar_fallos(correo: str) -> None:
     """Tras un inicio de sesión correcto el contador vuelve a cero."""
-    clave_fallos, _ = _claves(correo)
-    cache.delete(clave_fallos)
+    _modelo().objects.filter(clave=_clave(correo)).update(intentos=[])
 
 
 # 2. Aceptación de términos

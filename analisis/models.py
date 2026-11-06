@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.postgres.fields import ArrayField
 from django.contrib.auth.models import AbstractUser
 from simple_history.models import HistoricalRecords
 
@@ -315,3 +316,16 @@ class EventoAcceso(models.Model):
     @property
     def sistema_operativo(self):
         return _parsear_user_agent(self.user_agent)[1]
+
+
+class BloqueoLogin(models.Model):
+    """Intentos fallidos recientes y bloqueo temporal por correo (ver analisis.seguridad).
+    En la base de datos para que lo compartan todos los procesos de gunicorn."""
+    clave = models.CharField(max_length=64, primary_key=True,
+                             help_text="SHA-256 del correo normalizado (no se guarda el correo).")
+    intentos = ArrayField(models.DateTimeField(), default=list, blank=True)
+    bloqueado_hasta = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Bloqueo de inicio de sesión"
+        verbose_name_plural = "Bloqueos de inicio de sesión"

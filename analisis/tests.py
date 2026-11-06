@@ -7,7 +7,7 @@ import warnings
 import numpy as np
 import pandas as pd
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 from scipy.spatial.distance import braycurtis, pdist, squareform
 
 from analisis.services.business.upload_service import leer_archivo
@@ -333,11 +333,8 @@ class ExportacionCatalogoTests(SimpleTestCase):
         self.assertEqual(hojas["Catálogo"]["nombre"].tolist(), ["Bacillus", "Ralstonia"])
 
 
-class BloqueoLoginTests(SimpleTestCase):
-
-    def setUp(self):
-        from django.core.cache import cache
-        cache.clear()
+class BloqueoLoginTests(TestCase):
+    """El bloqueo vive en la tabla BloqueoLogin (compartida por todos los procesos)."""
 
     def test_tres_fallos_bloquean_quince_minutos(self):
         from analisis import seguridad
