@@ -593,7 +593,8 @@
     function filtrarPorMarcadorComparar(marcador) {
         listDiv.querySelectorAll('.muestra-row').forEach(function (row) {
             var rowTipos = row.dataset.tipos || '';
-            var visible = !rowTipos || rowTipos.indexOf(marcador) !== -1;
+            // Solo muestras con datos del marcador elegido (una sin archivos no se ofrece).
+            var visible = rowTipos.split(' ').indexOf(marcador) !== -1;
             row.classList.toggle('marcador-oculta', !visible);
             if (!visible) {
                 var cb = row.querySelector('input');

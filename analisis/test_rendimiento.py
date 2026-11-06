@@ -84,3 +84,38 @@ class ConsultasNoCrecenPorMuestraTests(PruebaConMedia):
     def test_comparar_hace_las_mismas_consultas_con_3_o_6_muestras(self):
         self._consultas_comparar(2)  # calentamiento: la primera petición llena cachés internas
         self.assertEqual(self._consultas_comparar(3), self._consultas_comparar(6))
+
+
+class MuestrasSinDatosDelMarcadorTests(PruebaConMedia):
+    """Una muestra sin datos del marcador elegido no debe dejar en cero el core ni los dominantes."""
+
+    def setUp(self):
+        super().setUp()
+        from analisis.models import MuestraSuelo
+        self.client.force_login(crear_usuario("docente", "docente"))
+        self.con_datos = [crear_muestra("BAC-1", self.cultivo, self.variedad).id,
+                          crear_muestra("BAC-2", self.cultivo, self.variedad, taxa=TAXA[1]).id]
+        self.sin_datos = [MuestraSuelo.objects.create(codigo=c, cultivo=self.cultivo, variedad_clon=self.variedad,
+                                                      localidad="X", finca_lote="L").id
+                          for c in ("HONGO-SIN-ARCHIVO", "OTRA-SIN-ARCHIVO")]
+
+    def test_comparar_excluye_y_avisa(self):
+        resp = self.client.get(reverse("analisis:comparar"), {
+            "marcador": "16S", "nivel": "genus", "top_n": 10, "muestras": self.con_datos + self.sin_datos})
+        self.assertEqual(resp.context["total_muestras"], 2)
+        self.assertEqual(sorted(resp.context["compartidos"]), ["Bacillus", "Pseudomonas"])
+        self.assertEqual(sorted(resp.context["dominantes"]), ["Bacillus", "Pseudomonas"])
+        avisos = " ".join(str(m) for m in resp.context["messages"])
+        self.assertIn("HONGO-SIN-ARCHIVO", avisos)
+
+    def test_comparar_con_menos_de_dos_muestras_con_datos(self):
+        resp = self.client.get(reverse("analisis:comparar"), {
+            "marcador": "16S", "nivel": "genus", "top_n": 10, "muestras": self.con_datos[:1] + self.sin_datos})
+        self.assertEqual(resp.context["tabla_comparativa"], [])
+        self.assertIn("al menos dos muestras con datos 16S", " ".join(str(m) for m in resp.context["messages"]))
+
+    def test_analisis_avanzado_excluye_y_avisa(self):
+        resp = self.client.get(reverse("analisis:analisis_avanzado"), {
+            "tipo": "16S", "nivel": "genus", "top_n": 10, "muestra_id": self.con_datos + self.sin_datos})
+        self.assertEqual(resp.context["muestra_ids_seleccionados"], self.con_datos)
+        self.assertIn("OTRA-SIN-ARCHIVO", " ".join(str(m) for m in resp.context["messages"]))

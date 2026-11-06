@@ -104,6 +104,22 @@ def comparar(request):
         except (ValueError, TypeError):
             TOP_N_VISUALIZACION = 10
 
+        # Solo entran las muestras con datos del marcador elegido: una sin datos
+        # deja en cero el core (taxa en TODAS) y los dominantes (en más de la mitad).
+        if muestras_seleccionadas:
+            con_datos = set(ArchivoMolecular.objects.filter(
+                muestra__in=muestras_seleccionadas, tipo_analisis=marcador
+            ).values_list("muestra_id", flat=True))
+            sin_datos = [m.codigo for m in muestras_seleccionadas if m.id not in con_datos]
+            muestras_seleccionadas = [m for m in muestras_seleccionadas if m.id in con_datos]
+            if sin_datos:
+                messages.warning(
+                    request,
+                    f"No se incluyeron por no tener datos {marcador}: {', '.join(sin_datos)}.",
+                )
+            if len(muestras_seleccionadas) < 2:
+                messages.error(request, f"Se necesitan al menos dos muestras con datos {marcador} para comparar.")
+
         if muestras_seleccionadas and len(muestras_seleccionadas) >= 2:
             contexto["marcador_seleccionado"] = marcador
             contexto["total_muestras"] = len(muestras_seleccionadas)

@@ -55,6 +55,17 @@ def analisis_avanzado(request):
         _tipos_raw.setdefault(mid, []).append(t)
     tipos_por_muestra_json = json.dumps(_tipos_raw)
 
+    # Solo entran las muestras con datos del marcador elegido.
+    if muestra_ids:
+        con_datos = set(ArchivoMolecular.objects.filter(
+            muestra_id__in=muestra_ids, tipo_analisis=tipo
+        ).values_list("muestra_id", flat=True))
+        sin_datos = list(MuestraSuelo.objects.filter(id__in=muestra_ids).exclude(id__in=con_datos)
+                         .order_by("codigo").values_list("codigo", flat=True))
+        muestra_ids = [mid for mid in muestra_ids if mid in con_datos]
+        if sin_datos:
+            messages.warning(request, f"No se incluyeron por no tener datos {tipo}: {', '.join(sin_datos)}.")
+
     contexto = {
         "top_microorganismos": [],
         "top_microorganismos_json": "[]",
