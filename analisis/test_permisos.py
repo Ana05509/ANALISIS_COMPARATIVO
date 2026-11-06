@@ -39,6 +39,7 @@ class ReglaDePermisoTests(SimpleTestCase):
 class PermisosEnVistasTests(PruebaConMedia):
 
     def setUp(self):
+        super().setUp()
         self.estudiante = crear_usuario("estudiante", "estudiante")
         self.docente = crear_usuario("docente", "docente")
         self.admin = crear_usuario("admin", "admin", is_staff=True, is_superuser=True)
@@ -99,6 +100,7 @@ class PermisosEnVistasTests(PruebaConMedia):
 class ParametrosInvalidosTests(PruebaConMedia):
 
     def setUp(self):
+        super().setUp()
         self.client.force_login(crear_usuario("docente", "docente"))
 
     def test_cargar_variedades_con_id_no_numerico(self):

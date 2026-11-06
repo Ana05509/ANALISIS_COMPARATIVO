@@ -84,19 +84,22 @@ class PipelineProcesamiento:
         df = PipelineProcesamiento.limpiar_datos(df)
         df = df[df["num_hits"] > 0].reset_index(drop=True)
 
-        registros = []
-        for _, row in df.iterrows():
-            registros.append({
-                "kingdom":   str(row["kingdom"]),
-                "phylum":    str(row["phylum"]),
-                "tax_class": str(row["class"]),
-                "order":     str(row["order"]),
-                "family":    str(row["family"]),
-                "genus":     str(row["genus"]),
-                "species":   str(row["species"]),
-                "num_hits":  int(row["num_hits"]),
-                "%_hits":    round(float(row["%_hits"]), 5),
-            })
+        # Vectorizado (antes iterrows): mismas claves, tipos y redondeo.
+        salida = pd.DataFrame({
+            "kingdom":   df["kingdom"].astype(str),
+            "phylum":    df["phylum"].astype(str),
+            "tax_class": df["class"].astype(str),
+            "order":     df["order"].astype(str),
+            "family":    df["family"].astype(str),
+            "genus":     df["genus"].astype(str),
+            "species":   df["species"].astype(str),
+            "num_hits":  df["num_hits"].astype(int),
+            "%_hits":    df["%_hits"].astype(float),
+        })
+        registros = salida.to_dict("records")
+        for fila in registros:  # round() de Python: idéntico al de la versión anterior
+            fila["num_hits"] = int(fila["num_hits"])
+            fila["%_hits"] = round(float(fila["%_hits"]), 5)
 
         return {
             "data":            registros,

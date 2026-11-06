@@ -1,9 +1,8 @@
 import logging
-from typing import cast
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse, QueryDict
+from django.http import JsonResponse
 from django.urls import reverse
 from analisis.services.business.upload_service import procesar_upload, MuestraDuplicadaError
 from analisis.services.processing.pipeline import ColumnasInvalidasError
@@ -43,32 +42,14 @@ def subir_datos(request):
         else:
             form.fields['variedad_clon'].queryset = VariedadClon.objects.none()
 
-        # Manejo de variedad manual
-        if variedad_manual and cultivo_id:
-            try:
-                cultivo = Cultivo.objects.get(id=cultivo_id)
-                variedad, created = VariedadClon.objects.get_or_create(
-                    nombre=variedad_manual,
-                    cultivo=cultivo,
-                    defaults={'descripcion': 'Creada manualmente desde la subida'}
-                )
-                if form.is_valid():
-                    form.cleaned_data['variedad_clon'] = variedad
-                else:
-                    # cast solo para el chequeador de tipos.
-                    datos_mutables = cast(QueryDict, form.data.copy())
-                    datos_mutables['variedad_clon'] = variedad.id
-                    form.data = datos_mutables
-                if created:
-                    messages.info(request, f"Variedad '{variedad_manual}' creada automáticamente.")
-            except (Cultivo.DoesNotExist, ValueError):
-                messages.error(request, "El cultivo seleccionado no existe.")
-                return redirect("analisis:subir_datos")
-
+        # La variedad manual la crea procesar_upload dentro de su transacción,
+        # solo si la carga completa sale bien.
         if form.is_valid():
             try:
                 localidad_limpia = form.cleaned_data.get("localidad")
                 resultado = procesar_upload(request)
+                if resultado.get("variedad_creada"):
+                    messages.info(request, f"Variedad '{variedad_manual}' creada automáticamente.")
                 muestra = MuestraSuelo.objects.filter(pk=resultado.get("muestra_id")).first()
                 if muestra:
                     registrar_accion(

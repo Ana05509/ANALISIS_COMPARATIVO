@@ -11,6 +11,7 @@ SECRETO = 'relation "tabla_interna" does not exist'
 class ErroresSinDetalleInternoTests(PruebaConMedia):
 
     def setUp(self):
+        super().setUp()
         self.docente = crear_usuario("docente", "docente")
         self.muestra = crear_muestra("M-ERR", self.cultivo, self.variedad)
         self.client.force_login(self.docente)

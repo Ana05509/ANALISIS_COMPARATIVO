@@ -1,4 +1,5 @@
 """Ayudas compartidas por las pruebas con base de datos (no contiene pruebas)."""
+import os
 import shutil
 import tempfile
 
@@ -70,6 +71,12 @@ class PruebaConMedia(TestCase):
         super().tearDownClass()
         cls._override_media.disable()
         shutil.rmtree(cls._media_tmp, ignore_errors=True)
+
+    def setUp(self):
+        super().setUp()
+        # Cada prueba empieza con la carpeta media temporal vacía
+        shutil.rmtree(self._media_tmp, ignore_errors=True)
+        os.makedirs(self._media_tmp, exist_ok=True)
 
     @classmethod
     def setUpTestData(cls):

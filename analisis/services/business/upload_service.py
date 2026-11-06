@@ -1,12 +1,15 @@
 import csv
+import logging
 
 import pandas as pd
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from typing import Dict, Any
 
 from analisis.models import MuestraSuelo, ArchivoMolecular, ResultadoTaxonomico, Cultivo, VariedadClon
 from analisis.services.processing.pipeline import PipelineProcesamiento
+
+logger = logging.getLogger(__name__)
 
 
 class MuestraDuplicadaError(ValueError):
@@ -59,6 +62,23 @@ def leer_archivo(archivo) -> pd.DataFrame:
             f"primera fila contenga los encabezados y que el texto esté en UTF-8. Detalle: {e}"
         ) from e
 
+def _error_duplicado(codigo, tipo, archivo_existente):
+    return MuestraDuplicadaError(
+        codigo=codigo,
+        tipo=tipo,
+        fecha_carga=archivo_existente.fecha_carga,
+        total_taxones=archivo_existente.resultados_taxonomicos.count(),
+    )
+
+
+def _borrar_del_almacenamiento(storage, nombres):
+    for nombre in nombres:
+        try:
+            storage.delete(nombre)
+        except Exception:
+            logger.warning("No se pudo borrar el archivo %s del almacenamiento", nombre, exc_info=True)
+
+
 def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
     archivo = request.FILES.get("archivo")
     if not archivo:
@@ -69,20 +89,17 @@ def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
     codigo_muestra = request.POST.get("nombre_producto", "").strip().upper()
     if not codigo_muestra:
         raise ValueError("El código de muestra es obligatorio.")
-    
+
     tipo = request.POST.get("tipo", "16S").strip()
     confirmar_sobrescritura = request.POST.get("confirmar_sobrescritura") == "1"
 
+    # Aviso temprano para no procesar el archivo en vano; se vuelve a comprobar
+    # dentro de la transacción, con la muestra bloqueada.
     archivo_existente = ArchivoMolecular.objects.filter(
         muestra__codigo=codigo_muestra, tipo_analisis=tipo
-    ).select_related("muestra").first()
+    ).first()
     if archivo_existente and not confirmar_sobrescritura:
-        raise MuestraDuplicadaError(
-            codigo=codigo_muestra,
-            tipo=tipo,
-            fecha_carga=archivo_existente.fecha_carga,
-            total_taxones=archivo_existente.resultados_taxonomicos.count(),
-        )
+        raise _error_duplicado(codigo_muestra, tipo, archivo_existente)
 
     localidad = request.POST.get("localidad", "").strip()
     if not localidad:
@@ -91,45 +108,67 @@ def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
     finca_lote = request.POST.get("finca_lote", "").strip()
     altitud = float(request.POST.get("altitud") or 0.0)
 
-    # 2. Lógica de Cultivo y Variedad (Manual o Selección)
+    # 2. Cultivo y variedad: aquí solo se validan; los manuales se crean dentro
+    #    de la transacción para no dejar registros sueltos si la carga falla.
     cultivo_id = request.POST.get("cultivo")
     cultivo_manual = request.POST.get("cultivo_manual", "").strip()
     variedad_id = request.POST.get("variedad_clon")
     variedad_manual = request.POST.get("variedad_manual", "").strip()
 
-    if cultivo_manual:
-        cultivo, _ = Cultivo.objects.get_or_create(nombre=cultivo_manual)
-    elif cultivo_id:
+    cultivo = None
+    if not cultivo_manual:
+        if not cultivo_id:
+            raise ValueError("Debe seleccionar o ingresar un Cultivo.")
         try:
             cultivo = Cultivo.objects.get(id=cultivo_id)
-        except Cultivo.DoesNotExist:
+        except (Cultivo.DoesNotExist, ValueError):
             raise ValueError("El cultivo seleccionado no existe.")
-    else:
-        raise ValueError("Debe seleccionar o ingresar un Cultivo.")
 
-    if variedad_manual:
-        variedad, _ = VariedadClon.objects.get_or_create(nombre=variedad_manual, cultivo=cultivo)
-    elif variedad_id:
+    variedad = None
+    if not variedad_manual:
+        if not variedad_id:
+            raise ValueError("Debe seleccionar o ingresar una Variedad/Clon.")
         try:
-            variedad = VariedadClon.objects.get(id=variedad_id, cultivo=cultivo)
-        except VariedadClon.DoesNotExist:
+            # Con un cultivo nuevo ninguna variedad existente puede pertenecerle.
+            variedad = VariedadClon.objects.get(id=variedad_id, cultivo=cultivo) if cultivo else None
+        except (VariedadClon.DoesNotExist, ValueError):
+            variedad = None
+        if variedad is None:
             raise ValueError("La variedad seleccionada no existe para este cultivo.")
-    else:
-        raise ValueError("Debe seleccionar o ingresar una Variedad/Clon.")
 
-    # 3. Pipeline: guarda todos los taxones, sin truncar
+    # 3. Pipeline (lo costoso y lo que más falla) antes de escribir nada
     df_raw = leer_archivo(archivo)
-    pipeline = PipelineProcesamiento()
-    resultado = pipeline.procesar_archivo_df(df_raw)
+    resultado = PipelineProcesamiento.procesar_archivo_df(df_raw)
 
     if not resultado or "data" not in resultado or not resultado["data"]:
         raise ValueError("El archivo no contiene registros válidos o el formato es incorrecto.")
 
-    # 4. Persistencia
-    with transaction.atomic():
-        muestra, _ = MuestraSuelo.objects.update_or_create(
-            codigo=codigo_muestra,
-            defaults={
+    # 4. Persistencia. La transacción no deshace lo escrito en el almacenamiento:
+    #    el archivo nuevo se borra si algo falla y el anterior solo tras el commit.
+    storage = ArchivoMolecular._meta.get_field("archivo").storage
+    nombre_nuevo = None
+    try:
+        with transaction.atomic():
+            # select_for_update no bloquea filas que aún no existen: si dos cargas
+            # crean a la vez la misma muestra nueva, la segunda falla por el UNIQUE
+            # del código (IntegrityError, abajo) en lugar de duplicar datos.
+            muestra = MuestraSuelo.objects.select_for_update().filter(codigo=codigo_muestra).first()
+            anteriores = []
+            if muestra is not None:
+                anteriores = list(ArchivoMolecular.objects.filter(muestra=muestra, tipo_analisis=tipo))
+                if anteriores and not confirmar_sobrescritura:
+                    raise _error_duplicado(codigo_muestra, tipo, anteriores[0])
+
+            if cultivo is None:
+                cultivo, _ = Cultivo.objects.get_or_create(nombre=cultivo_manual)
+            variedad_creada = False
+            if variedad is None:
+                variedad, variedad_creada = VariedadClon.objects.get_or_create(
+                    nombre=variedad_manual, cultivo=cultivo,
+                    defaults={"descripcion": "Creada manualmente desde la subida"},
+                )
+
+            datos_muestra = {
                 "cultivo": cultivo,
                 "variedad_clon": variedad,
                 "tipo_muestra": request.POST.get("tipo_muestra", "Suelo").strip(),
@@ -138,35 +177,58 @@ def procesar_upload(request: HttpRequest) -> Dict[str, Any]:
                 "finca_lote": finca_lote,
                 "altitud": altitud,
             }
-        )
+            if muestra is None:
+                muestra = MuestraSuelo.objects.create(codigo=codigo_muestra, **datos_muestra)
+            else:
+                for campo, valor in datos_muestra.items():
+                    setattr(muestra, campo, valor)
+                muestra.save()
 
-        archivo.seek(0)
-        ArchivoMolecular.objects.filter(muestra=muestra, tipo_analisis=tipo).delete()
-        archivo_mol = ArchivoMolecular.objects.create(
-            muestra=muestra,
-            tipo_analisis=tipo,
-            archivo=archivo
-        )
+            nombres_anteriores = [a.archivo.name for a in anteriores if a.archivo.name]
+            for anterior in anteriores:
+                anterior.delete()  # CASCADE: también sus ResultadoTaxonomico
 
-        # Volcado con mapeo flexible
-        bulk_data = []
-        for item in resultado["data"]:
-            bulk_data.append(ResultadoTaxonomico(
-                archivo=archivo_mol,
-                kingdom=item.get("kingdom") or item.get("Kingdom") or "Unclassified",
-                phylum=item.get("phylum") or item.get("Phylum") or "Unclassified",
-                tax_class=item.get("tax_class") or item.get("class") or item.get("Class") or "Unclassified",
-                order=item.get("order") or item.get("Order") or "Unclassified",
-                family=item.get("family") or item.get("Family") or "Unclassified",
-                genus=item.get("genus") or item.get("Genus") or "Unclassified",
-                species=item.get("species") or item.get("Species") or "Unclassified",
-                num_hits=int(item.get("num_hits") or item.get("Num_hits") or 0),
-                porcentaje_hits=float(item.get("%_hits") or item.get("porcentaje_hits") or 0.0),
-            ))
-        ResultadoTaxonomico.objects.bulk_create(bulk_data)
+            archivo.seek(0)
+            archivo_mol = ArchivoMolecular(muestra=muestra, tipo_analisis=tipo)
+            archivo_mol.archivo.save(archivo.name, archivo, save=False)  # escribe en el almacenamiento
+            nombre_nuevo = archivo_mol.archivo.name
+            archivo_mol.save()
+
+            # Volcado con mapeo flexible
+            bulk_data = []
+            for item in resultado["data"]:
+                bulk_data.append(ResultadoTaxonomico(
+                    archivo=archivo_mol,
+                    kingdom=item.get("kingdom") or item.get("Kingdom") or "Unclassified",
+                    phylum=item.get("phylum") or item.get("Phylum") or "Unclassified",
+                    tax_class=item.get("tax_class") or item.get("class") or item.get("Class") or "Unclassified",
+                    order=item.get("order") or item.get("Order") or "Unclassified",
+                    family=item.get("family") or item.get("Family") or "Unclassified",
+                    genus=item.get("genus") or item.get("Genus") or "Unclassified",
+                    species=item.get("species") or item.get("Species") or "Unclassified",
+                    num_hits=int(item.get("num_hits") or item.get("Num_hits") or 0),
+                    porcentaje_hits=float(item.get("%_hits") or item.get("porcentaje_hits") or 0.0),
+                ))
+            ResultadoTaxonomico.objects.bulk_create(bulk_data, batch_size=2000)
+
+            obsoletos = [n for n in nombres_anteriores if n != nombre_nuevo]
+            transaction.on_commit(lambda: _borrar_del_almacenamiento(storage, obsoletos))
+    except IntegrityError as exc:
+        if nombre_nuevo:
+            _borrar_del_almacenamiento(storage, [nombre_nuevo])
+        logger.warning("Conflicto de integridad al guardar la muestra %s", codigo_muestra, exc_info=True)
+        raise ValueError(
+            "Otra carga de esta misma muestra se guardó al mismo tiempo. "
+            "Revise el historial y, si hace falta, vuelva a subir el archivo."
+        ) from exc
+    except BaseException:
+        if nombre_nuevo:
+            _borrar_del_almacenamiento(storage, [nombre_nuevo])
+        raise
 
     return {
         "total_registros": len(resultado["data"]),
         "muestra_id": muestra.id,
-        "codigo": muestra.codigo
+        "codigo": muestra.codigo,
+        "variedad_creada": variedad_creada,
     }

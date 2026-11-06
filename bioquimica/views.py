@@ -7,7 +7,7 @@ from typing import cast
 import plotly.graph_objects as go
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import redirect, render, get_object_or_404
 
@@ -441,49 +441,74 @@ def _guardar_ensayo(archivo, request):
     if fecha_recepcion is None and fecha_ejecucion is None and fecha_reporte is None:
         observaciones = 'En el informe no se encuentra esta información (fecha del análisis).'
 
-    with transaction.atomic():
-        ensayo = EnsayoMicrobiologico(
-            codigo=codigo,
-            tipo=resultado['tipo'],
-            es_cipal=resultado.get('formato') == 'cipal',
-            nombre_muestra=header.get('nombre_muestra', 'Muestra'),
-            etiqueta=header.get('etiqueta', ''),
-            fecha_recepcion=fecha_recepcion,
-            fecha_ejecucion=fecha_ejecucion,
-            fecha_reporte=fecha_reporte,
-            temp_ambiental=header.get('temp_ambiental'),
-            humedad_ambiental=header.get('humedad_ambiental'),
-            observaciones=observaciones,
-            registrado_por=request.user,
-        )
-        archivo.seek(0)
-        ensayo.archivo_pdf.save(archivo.name, archivo, save=False)
-        ensayo.save()
+    # La transacción no deshace lo escrito en el almacenamiento: si algo falla,
+    # se borra el PDF ya guardado.
+    nombre_pdf = None
+    try:
+        with transaction.atomic():
+            ensayo = EnsayoMicrobiologico(
+                codigo=codigo,
+                tipo=resultado['tipo'],
+                es_cipal=resultado.get('formato') == 'cipal',
+                nombre_muestra=header.get('nombre_muestra', 'Muestra'),
+                etiqueta=header.get('etiqueta', ''),
+                fecha_recepcion=fecha_recepcion,
+                fecha_ejecucion=fecha_ejecucion,
+                fecha_reporte=fecha_reporte,
+                temp_ambiental=header.get('temp_ambiental'),
+                humedad_ambiental=header.get('humedad_ambiental'),
+                observaciones=observaciones,
+                registrado_por=request.user,
+            )
+            archivo.seek(0)
+            ensayo.archivo_pdf.save(archivo.name, archivo, save=False)  # escribe en el almacenamiento
+            nombre_pdf = ensayo.archivo_pdf.name
+            ensayo.save()
 
-        if resultado['tipo'] == 'recuento':
-            # Sin bulk_create: los parámetros adicionales necesitan el pk del recuento.
-            for i, d in enumerate(resultado['datos']):
-                d = dict(d)
-                parametros = d.pop('parametros', [])
-                d.setdefault('orden', i)
-                r = RecuentoUFC(ensayo=ensayo, **d)
-                r.save()
-                if parametros:
-                    ParametroRecuento.objects.bulk_create([
-                        ParametroRecuento(recuento=r, **p) for p in parametros
-                    ])
-        else:
-            for org_data in resultado['datos']:
-                taxonomia = org_data.pop('taxonomia', {})
-                pruebas   = org_data.pop('pruebas', [])
-                org = MicroorganismoAislado(ensayo=ensayo, **org_data, **taxonomia)
-                org.save()
-                if pruebas:
-                    PruebaBioquimica.objects.bulk_create([
-                        PruebaBioquimica(microorganismo=org, **p) for p in pruebas
-                    ])
+            if resultado['tipo'] == 'recuento':
+                # Sin bulk_create: los parámetros adicionales necesitan el pk del recuento.
+                for i, d in enumerate(resultado['datos']):
+                    d = dict(d)
+                    parametros = d.pop('parametros', [])
+                    d.setdefault('orden', i)
+                    r = RecuentoUFC(ensayo=ensayo, **d)
+                    r.save()
+                    if parametros:
+                        ParametroRecuento.objects.bulk_create([
+                            ParametroRecuento(recuento=r, **p) for p in parametros
+                        ])
+            else:
+                for org_data in resultado['datos']:
+                    taxonomia = org_data.pop('taxonomia', {})
+                    pruebas   = org_data.pop('pruebas', [])
+                    org = MicroorganismoAislado(ensayo=ensayo, **org_data, **taxonomia)
+                    org.save()
+                    if pruebas:
+                        PruebaBioquimica.objects.bulk_create([
+                            PruebaBioquimica(microorganismo=org, **p) for p in pruebas
+                        ])
+    except IntegrityError:
+        # Otro proceso guardó el mismo código entre la comprobación y el INSERT.
+        _borrar_pdf(nombre_pdf)
+        existente = EnsayoMicrobiologico.objects.filter(codigo=codigo).first()
+        if existente is None:
+            raise
+        raise _DuplicadoError(codigo, existente.pk)
+    except BaseException:
+        _borrar_pdf(nombre_pdf)
+        raise
 
     return ensayo
+
+
+def _borrar_pdf(nombre):
+    """Borra un PDF ya escrito cuyo ensayo no llegó a guardarse."""
+    if not nombre:
+        return
+    try:
+        EnsayoMicrobiologico._meta.get_field('archivo_pdf').storage.delete(nombre)
+    except Exception:
+        logger.warning("No se pudo borrar el PDF huérfano %s", nombre, exc_info=True)
 
 
 class _DuplicadoError(Exception):
@@ -705,6 +730,7 @@ def ingreso_manual(request):
     tipo = form.cleaned_data['tipo']
     omitidas = []
 
+    nombre_pdf = None
     try:
         with transaction.atomic():
             ensayo = EnsayoMicrobiologico(
@@ -723,7 +749,8 @@ def ingreso_manual(request):
             archivo_pdf = form.cleaned_data.get('archivo_pdf')
             if archivo_pdf:
                 ensayo.archivo_pdf = archivo_pdf
-            ensayo.save()
+            ensayo.save()  # escribe el PDF en el almacenamiento
+            nombre_pdf = ensayo.archivo_pdf.name or None
 
             if tipo == 'recuento':
                 filas = _parsear_recuento_manual(request.POST)
@@ -758,8 +785,16 @@ def ingreso_manual(request):
                             PruebaBioquimica(microorganismo=org, **p) for p in pruebas
                         ])
     except ValueError as e:
+        _borrar_pdf(nombre_pdf)
         messages.error(request, str(e))
         return render(request, 'bioquimica/ingreso_manual.html', _contexto_formulario_previo(request, form))
+    except IntegrityError:
+        _borrar_pdf(nombre_pdf)
+        form.add_error('codigo', 'Ya existe un ensayo con este código.')
+        return render(request, 'bioquimica/ingreso_manual.html', _contexto_formulario_previo(request, form))
+    except BaseException:
+        _borrar_pdf(nombre_pdf)
+        raise
 
     registrar_accion(request, ensayo, "Ensayo registrado manualmente (sin PDF).", accion=ADDITION)
     if omitidas:
