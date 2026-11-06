@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -8,6 +10,7 @@ from ..models import MuestraSuelo
 from analisis.constants import MARCADORES_VALIDOS
 
 POR_PAGINA = 20
+logger = logging.getLogger(__name__)
 
 @login_required
 def historial(request):
@@ -55,8 +58,9 @@ def historial(request):
         page_obj  = paginator.get_page(request.GET.get("page", 1))
         total     = paginator.count
 
-    except Exception as e:
-        messages.error(request, f"Error al consultar la bitácora histórica: {str(e)}")
+    except Exception:
+        logger.exception("Fallo al consultar el historial (usuario=%s)", request.user.pk)
+        messages.error(request, "No se pudo consultar el historial. Intente de nuevo.")
         page_obj  = None
         localidades = []
         total = 0

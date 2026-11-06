@@ -1,4 +1,5 @@
 import json
+import logging
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -6,6 +7,9 @@ from typing import Dict, List, Any, Optional
 import numpy as np
 
 from analisis.services.processing.diversity import DiversityService
+
+logger = logging.getLogger(__name__)
+
 
 class VisualizationService:
     """
@@ -126,8 +130,9 @@ class VisualizationService:
             
             paquete_graficos["grafico_barras_apiladas"] = json.loads(fig_barras.to_json() or "{}")
             
-        except Exception as e:
-            paquete_graficos["error_barras"] = f"Error en barras apiladas: {str(e)}"
+        except Exception:
+            logger.exception("Fallo al generar el gráfico de barras apiladas")
+            paquete_graficos["error_barras"] = "No se pudo generar el gráfico de barras apiladas."
 
         # 2. MAPA DE CALOR INTERACTIVO
         try:
@@ -157,8 +162,9 @@ class VisualizationService:
             
             paquete_graficos["grafico_heatmap"] = json.loads(str(fig_heatmap.to_json()))
             
-        except Exception as e:
-            paquete_graficos["error_heatmap"] = f"Error en mapa de calor: {str(e)}"
+        except Exception:
+            logger.exception("Fallo al generar el mapa de calor")
+            paquete_graficos["error_heatmap"] = "No se pudo generar el mapa de calor."
 
         # 3. ANÁLISIS DE COORDENADAS PRINCIPALES – PCoA (Bray-Curtis)
         try:
@@ -276,7 +282,11 @@ class VisualizationService:
             else:
                 paquete_graficos["error_pca"] = "Se requieren al menos 3 muestras para PCoA (Bray-Curtis)."
 
-        except Exception as e:
-            paquete_graficos["error_pca"] = f"Error en PCoA Bray-Curtis: {str(e)}"
+        except ValueError as e:
+            # Validaciones de DiversityService.calcular_pcoa: mensajes pensados para el usuario.
+            paquete_graficos["error_pca"] = f"PCoA Bray-Curtis: {e}"
+        except Exception:
+            logger.exception("Fallo al generar la PCoA")
+            paquete_graficos["error_pca"] = "No se pudo generar la PCoA Bray-Curtis."
 
         return paquete_graficos

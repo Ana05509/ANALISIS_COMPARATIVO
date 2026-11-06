@@ -1,3 +1,4 @@
+import logging
 from typing import cast
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
@@ -11,6 +12,8 @@ from analisis.models import VariedadClon, Cultivo, MuestraSuelo
 from analisis.constants import MARCADORES_VALIDOS
 from analisis.audit import registrar_accion
 from django.contrib.admin.models import ADDITION
+
+logger = logging.getLogger(__name__)
 
 def _is_ajax(request):
     return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -114,8 +117,9 @@ def subir_datos(request):
                 upload_error = str(e)
             except ValueError as e:
                 upload_error = str(e)
-            except Exception as e:
-                upload_error = f"Error inesperado al procesar el archivo: {str(e)}"
+            except Exception:
+                logger.exception("Fallo inesperado al subir archivo (usuario=%s)", request.user.pk)
+                upload_error = "Error inesperado al procesar el archivo. Intente de nuevo o contacte al administrador."
         else:
             primer_error = next(
                 (err for errs in form.errors.values() for err in errs), None

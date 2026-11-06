@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 from datetime import datetime
 import json
@@ -17,6 +18,8 @@ from analisis.audit import registrar_accion
 from django.contrib.admin.models import CHANGE
 
 FORMATOS_VALIDOS = ("pdf", "excel")
+logger = logging.getLogger(__name__)
+_ERROR_REPORTE = "No se pudo generar el reporte. Intente de nuevo o contacte al administrador."
 
 
 # Helpers de cálculo
@@ -301,9 +304,10 @@ def reportes(request):
                         }
                 ctx["alfa_por_muestra"] = alfa_pm
 
-        except Exception as exc:
-            import traceback; traceback.print_exc()
-            messages.error(request, f"Error al cargar el reporte: {exc}")
+        except Exception:
+            logger.exception("Fallo al cargar reportes (usuario=%s, tipo=%s, nivel=%s, muestras=%s)",
+                             request.user.pk, tipo, nivel, muestra_ids)
+            messages.error(request, "No se pudo cargar el reporte. Intente de nuevo o con otra selección.")
 
     return render(request, "analisis/reportes.html", ctx)
 
@@ -371,7 +375,9 @@ def generar_reporte(request) -> HttpResponseBase:
                     if diff:
                         datos["analisis_diferencial"] = diff
                 except Exception:
-                    pass
+                    # El Excel se genera igual, solo sin la hoja diferencial.
+                    logger.warning("Análisis diferencial omitido en el Excel (muestra=%s)",
+                                   muestras_list[0].id, exc_info=True)
             if muestras_list:
                 registrar_accion(
                     request, muestras_list[0],
@@ -401,9 +407,10 @@ def generar_reporte(request) -> HttpResponseBase:
         response["Content-Disposition"] = f'attachment; filename="{nombre}"'
         return response
 
-    except Exception as exc:
-        import traceback; traceback.print_exc()
-        return JsonResponse({"ok": False, "error": str(exc)}, status=500)
+    except Exception:
+        logger.exception("Fallo al generar reporte (usuario=%s, formato=%s, tipo=%s, nivel=%s, muestras=%s)",
+                         request.user.pk, formato, tipo, nivel, muestra_ids)
+        return JsonResponse({"ok": False, "error": _ERROR_REPORTE}, status=500)
 
 
 @login_required
@@ -467,6 +474,7 @@ def generar_reporte_general(request) -> HttpResponseBase:
         response["Content-Disposition"] = f'attachment; filename="{nombre}"'
         return response
 
-    except Exception as exc:
-        import traceback; traceback.print_exc()
-        return JsonResponse({"ok": False, "error": str(exc)}, status=500)
+    except Exception:
+        logger.exception("Fallo al generar informe general (usuario=%s, formato=%s, muestra=%s)",
+                         request.user.pk, formato, muestra_id)
+        return JsonResponse({"ok": False, "error": _ERROR_REPORTE}, status=500)

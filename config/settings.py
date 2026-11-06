@@ -482,4 +482,23 @@ else:
 
 USE_DJANGO_JQUERY = True
 
+# LOGS: todo a la consola (Railway los recoge de stdout/stderr).
+# Sin esto, con DEBUG=False Django descarta los errores 500: su manejador de
+# consola solo actúa con DEBUG=True y mail_admins no tiene ADMINS.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'biomicro': {'format': '%(asctime)s %(levelname)s [%(name)s] %(message)s'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'biomicro'},
+    },
+    'root': {'handlers': ['console'], 'level': os.environ.get('LOG_LEVEL', 'INFO')},
+    'loggers': {
+        'django': {'level': 'INFO'},
+        'django.db.backends': {'level': 'WARNING'},
+    },
+}
+
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https' if not DEBUG else 'http'

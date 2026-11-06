@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import admin
 from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
@@ -25,6 +27,8 @@ from .models import (
     ResultadoTaxonomico, CatalogoMicroorganismo, Usuario, EventoAcceso,
 )
 from analisis.services.processing.pipeline import PipelineProcesamiento
+
+logger = logging.getLogger(__name__)
 
 # Configuración de cabeceras
 admin.site.site_header = "BioMicro UTC"
@@ -303,8 +307,9 @@ class ArchivoMolecularAdmin(AccionesColumnaMixin, ModelAdmin):
                 messages.success(request, f"¡Pipeline completado! {total} registros procesados.")
         except ValueError as e:
             messages.error(request, f"Error en pipeline: {e}")
-        except Exception as e:
-            messages.error(request, f"Error inesperado: {e}")
+        except Exception:
+            logger.exception("Fallo inesperado al procesar un archivo molecular desde el admin")
+            messages.error(request, "Error inesperado al procesar el archivo. Revise los logs del servidor.")
 
 
 # RESULTADOS TAXONÓMICOS
@@ -421,8 +426,10 @@ class CatalogoMicroorganismoAdmin(AccionesColumnaMixin, SimpleHistoryAdmin, Mode
                         self.message_user(request, f"Importación exitosa: {resumen}.", messages.SUCCESS)
                 except ValueError as exc:
                     self.message_user(request, str(exc), messages.ERROR)
-                except Exception as exc:
-                    self.message_user(request, f"Error inesperado: {exc}", messages.ERROR)
+                except Exception:
+                    logger.exception("Fallo inesperado al importar el catálogo desde el admin")
+                    self.message_user(request, "Error inesperado al importar. Revise los logs del servidor.",
+                                      messages.ERROR)
             else:
                 self.message_user(request, "Archivo no válido.", messages.ERROR)
             return HttpResponseRedirect("../")

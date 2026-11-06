@@ -1,4 +1,5 @@
 import json
+import logging
 import pandas as pd
 import plotly.express as px
 from typing import Any, Dict, List
@@ -20,6 +21,8 @@ from analisis.services.business.analysis_service import (
 from analisis.constants import (
     OPCIONES_TOP_N, NIVELES_ES, get_taxonomia_annotation,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _contar_clasificaciones(tabla: List[Dict[str, Any]]) -> Dict[str, int]:
@@ -229,8 +232,9 @@ def comparar(request):
                 else:
                     messages.info(request, "No se encontraron datos para las muestras seleccionadas.")
 
-            except Exception as e:
-                messages.error(request, f"Error en el procesamiento comparativo: {str(e)}")
+            except Exception:
+                logger.exception("Fallo en comparación de perfiles (usuario=%s)", request.user.pk)
+                messages.error(request, "No se pudo completar la comparación. Intente de nuevo o con otra selección.")
     elif request.GET:
         # Formulario inválido (p. ej. menos de 2 muestras): avisar al usuario.
         primer_error = next(

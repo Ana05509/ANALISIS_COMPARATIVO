@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -8,6 +9,8 @@ from django.shortcuts import render
 from ..models import MuestraSuelo, ResultadoTaxonomico
 from ..services.business.analysis_service import obtener_diversidad, obtener_lookup_catalogo
 from analisis.constants import MARCADORES_VALIDOS, clasificar_taxon
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def dashboard(request):
@@ -80,10 +83,9 @@ def dashboard(request):
         # Diversidad alfa — por muestra individual, sobre todos los taxa
         contexto_estadisticas = obtener_diversidad(tipo=tipo) or {}
 
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        messages.error(request, f"Error crítico: {str(e)}")
+    except Exception:
+        logger.exception("Fallo al cargar el dashboard (usuario=%s, tipo=%s)", request.user.pk, tipo)
+        messages.error(request, "No se pudo cargar el panel. Intente de nuevo en unos minutos.")
         return render(request, "analisis/dashboard.html", {"error_critico": True})
 
     return render(request, "analisis/dashboard.html", {

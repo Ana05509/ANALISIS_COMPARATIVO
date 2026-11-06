@@ -1,3 +1,4 @@
+import logging
 import os
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
@@ -7,6 +8,7 @@ from PIL import Image, UnidentifiedImageError
 _TIPOS_PERMITIDOS = {'image/jpeg', 'image/png', 'image/webp'}
 _FORMATOS_PERMITIDOS = {'JPEG', 'PNG', 'WEBP'}
 _MAX_MB = 2
+logger = logging.getLogger(__name__)
 
 
 def _es_imagen_valida(archivo):
@@ -45,7 +47,7 @@ def perfil_usuario(request):
                         if os.path.isfile(user.avatar.path):
                             os.remove(user.avatar.path)
                     except Exception:
-                        pass
+                        logger.warning("No se pudo borrar el avatar anterior (usuario=%s)", user.pk, exc_info=True)
                 user.avatar = archivo
                 user.save()
                 messages.success(request, 'Foto de perfil actualizada.')
@@ -58,7 +60,7 @@ def perfil_usuario(request):
                     if os.path.isfile(user.avatar.path):
                         os.remove(user.avatar.path)
                 except Exception:
-                    pass
+                    logger.warning("No se pudo borrar el avatar (usuario=%s)", user.pk, exc_info=True)
                 user.avatar = None
                 user.save()
                 messages.success(request, 'Foto de perfil eliminada.')

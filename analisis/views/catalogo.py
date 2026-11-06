@@ -1,4 +1,6 @@
 # analisis/views/catalogo.py
+import logging
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -7,6 +9,8 @@ from analisis.services.business.catalog_service import CatalogService
 from analisis.forms import CatalogoImportarForm
 from analisis.audit import registrar_accion
 from django.contrib.admin.models import ADDITION, CHANGE
+
+logger = logging.getLogger(__name__)
 
 def _filtrar_catalogo(params):
     """Filtros del catálogo; compartidos por el listado y la exportación."""
@@ -151,8 +155,9 @@ def importar_catalogo(request):
                     messages.success(request, f"Importación exitosa: {resumen}.")
             except ValueError as e:
                 messages.error(request, str(e))
-            except Exception as e:
-                messages.error(request, f"Error al procesar el archivo: {e}")
+            except Exception:
+                logger.exception("Fallo al importar el catálogo (usuario=%s)", request.user.pk)
+                messages.error(request, "No se pudo procesar el archivo. Revise su formato e intente de nuevo.")
         else:
             for field_errors in form.errors.values():
                 for error in field_errors:

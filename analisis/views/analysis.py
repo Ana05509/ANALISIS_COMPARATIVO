@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -13,6 +15,8 @@ from ..services.business.analysis_service import (
 from ..services.business.visualization_service import VisualizationService
 from ..models import ResultadoTaxonomico, MuestraSuelo, ArchivoMolecular
 from analisis.constants import OPCIONES_TOP_N, NIVELES_VALIDOS, NIVELES_ES, NIVELES_CHOICES, MARCADORES_CHOICES
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def analisis_avanzado(request):
@@ -147,11 +151,12 @@ def analisis_avanzado(request):
             if diff:
                 contexto["analisis_diferencial"] = diff
 
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        messages.error(request, f"Error al computar los perfiles: {str(e)}")
-        contexto["graficos_avanzados"] = {'error': str(e)}
+    except Exception:
+        logger.exception("Fallo en análisis avanzado (usuario=%s, tipo=%s, nivel=%s, muestras=%s)",
+                         request.user.pk, tipo, nivel, muestra_ids)
+        aviso = "No se pudieron calcular los perfiles. Intente de nuevo o con otra selección."
+        messages.error(request, aviso)
+        contexto["graficos_avanzados"] = {'error': aviso}
 
     contexto.update({
         "tipo_actual": tipo,
@@ -195,7 +200,8 @@ def resultado_analisis(request, muestra_id):
         contexto["muestra_id"]          = muestra_id
         contexto["opciones_top_n"]      = OPCIONES_TOP_N
         contexto["niveles_disponibles"] = NIVELES_VALIDOS
-    except Exception as e:
-        messages.error(request, f"No se pudo estructurar el reporte: {str(e)}")
+    except Exception:
+        logger.exception("Fallo en resultado_analisis (usuario=%s, muestra=%s)", request.user.pk, muestra_id)
+        messages.error(request, "No se pudo generar el resultado de la muestra. Intente de nuevo.")
         return redirect("analisis:analisis_avanzado")
     return render(request, "analisis/resultados.html", contexto)

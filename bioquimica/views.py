@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from decimal import Decimal, InvalidOperation
 from typing import cast
@@ -17,6 +18,8 @@ from .models import (
 )
 from analisis.audit import registrar_accion
 from django.contrib.admin.models import ADDITION
+
+logger = logging.getLogger(__name__)
 
 
 def _grafico_recuento(ensayo):
@@ -412,8 +415,13 @@ def _guardar_ensayo(archivo, request):
 
     try:
         resultado = parsear_pdf(archivo)
-    except Exception as e:
+    except ValueError as e:
+        # pdf_parser lanza ValueError con mensajes pensados para el usuario.
         raise ValueError(f"No se pudo leer «{archivo.name}»: {e}")
+    except Exception:
+        logger.exception("Fallo inesperado al leer un PDF de bioquímica")
+        raise ValueError(f"No se pudo leer «{archivo.name}»: el archivo está dañado "
+                         "o no tiene un formato de reporte reconocido.")
 
     header = resultado['header']
     codigo = header.get('codigo')
@@ -526,9 +534,12 @@ def subir_pdf(request):
             creados.append((ensayo.codigo, ensayo.pk))
         except _DuplicadoError as e:
             duplicados.append(e.codigo)
-        except Exception as e:
+        except ValueError as e:
             # Un PDF con problemas no debe frenar la carga del resto.
             errores.append(str(e))
+        except Exception:
+            logger.exception("Fallo inesperado al guardar un ensayo desde PDF (usuario=%s)", request.user.pk)
+            errores.append(f"No se pudo guardar «{archivo.name}». Intente de nuevo o contacte al administrador.")
 
     if creados:
         lista = ', '.join(c for c, _ in creados)
