@@ -24,6 +24,7 @@ Todo lo que aparece aquí se verificó en el código del repositorio a la fecha 
 | 6 | [Pruebas y validación](06_pruebas_validacion.md) | Pruebas automatizadas, verificaciones manuales, incidencias y defectos conocidos |
 | 7 | [Operación y mantenimiento](07_operacion_mantenimiento.md) | Auditoría, respaldos, dependencias, accesos e incidencias |
 | 8 | [Entrega y cierre](08_entrega_cierre.md) | Inventario, riesgos, recomendaciones y acta de entrega |
+| 9 | [Rama de mejoras de seguridad y estabilidad](09_rama_mejoras_seguridad_estabilidad.md) | Hallazgos verificados, cambios, pruebas, despliegue y reversión |
 
 ## Estado del código a la fecha de corte
 
